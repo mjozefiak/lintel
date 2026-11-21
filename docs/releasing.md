@@ -10,10 +10,15 @@ These are named in the spec (`.ai/specs/2026-11-19-updates-and-open-source-hygie
 does not do them:
 
 - The Homebrew tap (`mjozefiak/homebrew-lintel`).
-- The site rebuild token `LINTEL_WEB_DISPATCH_TOKEN` and the Environment `publish`. `publish` still tries the dispatch, but
-  without the token it prints "the website is not rebuilt" and goes on. Rebuild `lintel-web` by hand if needed.
-- A recorded designated requirement. Until `Resources/designated-requirement.txt` holds a real one (spec Step 3.4), a tag
-  run fails in `sign` after verification and nothing is published; a manual signed run only warns.
+- The Environment `publish`. The site rebuild token `LINTEL_WEB_DISPATCH_TOKEN` exists as a repository secret, and `publish`
+  reads it from there. If the token is missing or has expired, `publish` warns that the website was not asked to rebuild and
+  goes on: rebuild `lintel-web` by hand (`workflow_dispatch`).
+
+What exists and a release depends on: the designated requirement is recorded in `Resources/designated-requirement.txt`
+(a tag run fails in `sign` when the signed app's requirement differs), and the Sparkle key in the Environment `release`
+matches `SUPublicEDKey` (checked in every signed run). The website must serve `appcast.xml` for "Check Now" to work in an
+installed copy; until `lintel-web` deploys the feed, a check reports an error and no update is offered. That is fixed by
+deploying the site, without a new release.
 
 ## Before you tag
 
