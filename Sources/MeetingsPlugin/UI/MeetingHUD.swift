@@ -164,21 +164,15 @@ struct MeetingHUDView: View {
     var body: some View {
         let state = model.state
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 10) {
-                icon(for: state)
-                    .frame(width: 20, height: 20)
-                if case .recording(let recording) = state {
-                    recordingRow(recording)
-                } else {
-                    Text(state.title)
-                        .font(.callout.weight(.medium))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.85)
-                    Spacer(minLength: 0)
+            if case .recording = state {
+                // The meters give way before the clock or the buttons do: with labels, without labels, none.
+                ViewThatFits(in: .horizontal) {
+                    headerRow(state, meters: .labelled)
+                    headerRow(state, meters: .bare)
+                    headerRow(state, meters: .hidden)
                 }
-                ForEach(Array(state.actions.enumerated()), id: \.offset) { _, action in
-                    actionButton(action, in: state)
-                }
+            } else {
+                headerRow(state, meters: .labelled)
             }
             if let detail = state.detail {
                 Text(detail)
@@ -202,7 +196,28 @@ struct MeetingHUDView: View {
         .accessibilityLabel(state.accessibilityLabel)
     }
 
-    private func recordingRow(_ recording: MeetingHUDState.Recording) -> some View {
+    private enum Meters { case labelled, bare, hidden }
+
+    private func headerRow(_ state: MeetingHUDState, meters: Meters) -> some View {
+        HStack(spacing: 10) {
+            icon(for: state)
+                .frame(width: 20, height: 20)
+            if case .recording(let recording) = state {
+                recordingRow(recording, meters: meters)
+            } else {
+                Text(state.title)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 0)
+            }
+            ForEach(Array(state.actions.enumerated()), id: \.offset) { _, action in
+                actionButton(action, in: state)
+            }
+        }
+    }
+
+    private func recordingRow(_ recording: MeetingHUDState.Recording, meters: Meters) -> some View {
         HStack(spacing: 10) {
             Text(MeetingHUDState.clock(recording.elapsedSeconds))
                 .font(.callout.monospacedDigit().weight(.medium))
@@ -210,14 +225,16 @@ struct MeetingHUDView: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .accessibilityHidden(true)
             Spacer(minLength: 4)
-            if recording.recordsMicrophone {
+            if meters != .hidden, recording.recordsMicrophone {
                 LevelMeter(
-                    label: String(localized: "Me", comment: "Meeting HUD level meter of the microphone"),
+                    label: meters == .labelled
+                        ? String(localized: "Me", comment: "Meeting HUD level meter of the microphone") : nil,
                     level: recording.micLevel, animated: !still)
             }
-            if recording.recordsSystem {
+            if meters != .hidden, recording.recordsSystem {
                 LevelMeter(
-                    label: String(localized: "System", comment: "Meeting HUD level meter of the system audio"),
+                    label: meters == .labelled
+                        ? String(localized: "System", comment: "Meeting HUD level meter of the system audio") : nil,
                     level: recording.systemLevel, animated: !still)
             }
         }
@@ -266,15 +283,17 @@ struct MeetingHUDView: View {
 
 /// A short bar that follows one track's level, with its name. Not animated when Reduce Motion is on.
 private struct LevelMeter: View {
-    let label: String
+    let label: String?
     let level: Float
     let animated: Bool
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if let label {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.15))
                 Capsule()

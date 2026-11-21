@@ -33,6 +33,29 @@ final class MeetingHUDQA {
         ("recording-device-disconnected", recording { $0.lost = [.mic] }),
         ("recording-system-audio-lost", recording { $0.lost = [.system] }),
         ("recording-microphone-only", recording { $0.recordsSystem = false }),
+        // The clock past one hour ("1:23:45") is the widest the row gets.
+        ("recording-long", recording { $0.elapsedSeconds = 5025 }),
+        (
+            "recording-consent-long",
+            recording {
+                $0.elapsedSeconds = 5025
+                $0.showsConsent = true
+            }
+        ),
+        (
+            "recording-no-system-audio-long",
+            recording {
+                $0.elapsedSeconds = 5025
+                $0.noSystemAudio = true
+            }
+        ),
+        (
+            "recording-no-microphone-audio-long",
+            recording {
+                $0.elapsedSeconds = 5025
+                $0.noMicrophoneAudio = true
+            }
+        ),
         ("finishing", .finishing),
         ("processing-transcribing", .processing(.transcribing(remaining: 12))),
         ("processing-speakers", .processing(.recognisingSpeakers)),

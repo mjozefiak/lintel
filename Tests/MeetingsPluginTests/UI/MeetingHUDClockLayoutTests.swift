@@ -14,4 +14,14 @@ import Testing
         #expect(next.contains(".lineLimit(1)"))
         #expect(next.contains(".fixedSize(horizontal: true, vertical: false)"))
     }
+
+    /// The recording row must fit the 386 pt content width in every state (issue #233, review round 2): the
+    /// meters give way (labelled, bare, none), never the clock or the buttons.
+    @Test func theMetersGiveWayBeforeTheButtons() throws {
+        let source = try String(contentsOf: TestPaths.meetingsSource(named: "MeetingHUD.swift"), encoding: .utf8)
+        #expect(source.contains("ViewThatFits(in: .horizontal)"))
+        for variant in [".labelled", ".bare", ".hidden"] {
+            #expect(source.contains("headerRow(state, meters: \(variant))"))
+        }
+    }
 }
