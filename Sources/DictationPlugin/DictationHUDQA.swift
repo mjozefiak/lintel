@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import LintelUI
 import SwiftUI
 
 /// DEBUG only, `--qa-hud dictation:<state>` (`plugins.dictation.qaHUD`): draws the real `DictationHUDView` in the given
@@ -68,11 +69,17 @@ final class DictationHUDQA {
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.isFloatingPanel = true
-        panel.contentView = NSHostingView(
-            // `cacheDisplay` does not draw the glass, so the snapshot gets the window colour behind the real view.
-            rootView: DictationHUDView(model: model).background(
-                Color(nsColor: .windowBackgroundColor)
-            ))
+        // The panel is transparent like the real one. Only `cacheDisplay` (the `--qa-snapshot` PNG) gets a backdrop,
+        // cut to the capsule, because it does not draw the glass.
+        let host = SnapshotBackdropHostingView(rootView: DictationHUDView(model: model))
+        host.backdropShape = { bounds in
+            let size = DictationHUDView.size
+            let capsule = NSRect(
+                x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2,
+                width: size.width, height: size.height)
+            return SnapshotBackdropHostingView<DictationHUDView>.roundedPath(capsule, radius: size.height / 2)
+        }
+        panel.contentView = host
         return panel
     }
 }

@@ -155,6 +155,9 @@ final class MeetingHUDPanel: HUDPresenter {
 }
 
 struct MeetingHUDView: View {
+    /// The corner radius of the glass, shared with the QA snapshot's backdrop (`MeetingHUDQA`).
+    static let cornerRadius: CGFloat = 22
+
     let model: MeetingHUDModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
@@ -191,10 +194,11 @@ struct MeetingHUDView: View {
         }
         .padding(.horizontal, 14)
         .frame(width: 400, height: state.hasDetailLine ? 68 : 44, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
         .overlay {
             if contrast == .increased {
-                RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.primary.opacity(0.6), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+                    .strokeBorder(.primary.opacity(0.6), lineWidth: 1)
             }
         }
         .animation(still ? nil : .smooth(duration: 0.2), value: state.hasDetailLine)

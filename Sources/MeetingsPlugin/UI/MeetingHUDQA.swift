@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import LintelUI
 import SwiftUI
 
 /// DEBUG only, `--qa-hud meeting:<state>` (`plugins.meetings.qaHUD`): draws the real `MeetingHUDView` in the given
@@ -89,11 +90,13 @@ final class MeetingHUDQA {
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.isFloatingPanel = true
-        panel.contentView = NSHostingView(
-            // `cacheDisplay` does not draw the glass, so the snapshot gets the window colour behind the real view.
-            rootView: MeetingHUDView(model: model).background(
-                Color(nsColor: .windowBackgroundColor)
-            ))
+        // The panel is transparent like the real one. Only `cacheDisplay` (the `--qa-snapshot` PNG) gets a backdrop,
+        // cut to the glass's rounded rectangle, because it does not draw the glass.
+        let host = SnapshotBackdropHostingView(rootView: MeetingHUDView(model: model))
+        host.backdropShape = {
+            SnapshotBackdropHostingView<MeetingHUDView>.roundedPath($0, radius: MeetingHUDView.cornerRadius)
+        }
+        panel.contentView = host
         return panel
     }
 }
