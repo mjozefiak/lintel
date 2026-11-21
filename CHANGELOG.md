@@ -2,9 +2,13 @@
 
 All notable user-visible changes to Lintel are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Each release has a `## [x.y.z] - YYYY-MM-DD`
-section (pre-releases use `x.y.z-beta.N`). No version has been released yet.
+section (pre-releases use `x.y.z-beta.N`).
 
 ## [Unreleased]
+
+## [0.1.0-beta.1] - 2026-11-22
+
+The first public beta.
 
 ### Added
 
@@ -21,6 +25,7 @@ section (pre-releases use `x.y.z-beta.N`). No version has been released yet.
 - Welcome screen that sets the shortcut and walks through the steps of the features you enable.
 - English and Polish interface.
 - Lintel offers to move itself to Applications (or to your home folder's Applications when the system one is not writable) when it starts from a disk image or Downloads. It never replaces a newer installed copy, and moves the original to the Trash after the new copy is checked.
+- In-app updates. Lintel asks once, after the welcome screen, whether it may check for updates, and makes no update request before you answer. Settings → General → Updates has automatic checks, automatic downloads, beta versions (on by default in a beta) and Check Now. Updates are signed and checked before they are installed, and your permissions stay granted across them. An update that is ready waits until a recording or its processing ends before it restarts Lintel.
 
 ### Changed
 
