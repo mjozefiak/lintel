@@ -133,6 +133,9 @@ final class DictationHUDPanel: HUDPresenter {
 }
 
 struct DictationHUDView: View {
+    /// The size of the capsule, shared with the QA snapshot's backdrop (`DictationHUDQA`).
+    static let size = CGSize(width: 248, height: 40)
+
     let model: HUDModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
@@ -183,7 +186,7 @@ struct DictationHUDView: View {
         }
         .padding(.leading, 14)
         .padding(.trailing, 12)
-        .frame(width: 248, height: 40)
+        .frame(width: Self.size.width, height: Self.size.height)
         .glassEffect(.regular, in: .capsule)
         .overlay {
             if contrast == .increased { Capsule().strokeBorder(.primary.opacity(0.6), lineWidth: 1) }
