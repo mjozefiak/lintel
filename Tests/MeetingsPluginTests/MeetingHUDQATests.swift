@@ -23,7 +23,10 @@ import Testing
         #expect(problems.count == 12)
         var notices: [MeetingHUDState.Notice] = []
         for case .recording(let recording) in states { if let notice = recording.notice { notices.append(notice) } }
-        #expect(Set(notices).count == 10)
+        // `Notice` is only `Equatable`, so the distinct ones are counted without a `Set`.
+        var distinct: [MeetingHUDState.Notice] = []
+        for notice in notices where !distinct.contains(notice) { distinct.append(notice) }
+        #expect(distinct.count == 10)
         for state in states { #expect(!state.title.isEmpty) }
     }
 
