@@ -65,14 +65,14 @@ required check always runs, so no stub is needed.
 
 ### Phase 1: Workflow
 
-- [ ] 1.1 One TSan step with the combined filter
-- [ ] 1.2 Cache .build and .build-tsan
-- [ ] 1.3 Docs-only classifier and TSan skip
+- [x] 1.1 One TSan step with the combined filter — ebebc365
+- [x] 1.2 Cache .build and .build-tsan — ebebc365
+- [x] 1.3 Docs-only classifier and TSan skip — ebebc365
 
 ### Phase 2: Guard and docs
 
-- [ ] 2.1 CIWorkflowTests
-- [ ] 2.2 AGENTS.md sentence
+- [x] 2.1 CIWorkflowTests — 6861fa66
+- [x] 2.2 AGENTS.md sentence — 6861fa66
 
 ### Phase 3: Measure
 
