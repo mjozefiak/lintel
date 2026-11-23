@@ -19,7 +19,7 @@ Spec był pisany w trybie autonomicznym. Poniższe odpowiedzi są domyślne, odw
 | Q4 | Pełna macierz (12 wariantów na stan) w CI? | **Nie.** CI porównuje 3 warianty na stan: light·M·en, dark·M·en, light·XL·pl. Pełna macierz idzie do akceptacji właściciela jako eksport (artefakt), bez commitu. | Koszt CI i rozmiar repo. light·XL·pl łapie zawijanie i długie polskie teksty (#236, #52), dark łapie kolory. |
 | Q5 | Git LFS dla PNG? | **Nie** na start. Zwykłe PNG w git, budżet 25 MB na katalog złotych obrazów, sprawdzany testem. Po przekroczeniu wracamy do decyzji. | LFS na GitHubie ma limity transferu i komplikuje klonowanie (już jest submoduł). Pilot to ok. 70 plików. |
 | Q6 | Próg diffu? | Piksel różni się, gdy dowolny kanał RGBA różni się o więcej niż 3/255. Test pada, gdy różni się **> 0,1% pikseli** albo gdy rozmiar obrazu jest inny. | Tolerancja antyaliasingu bez przepuszczania zmiany odstępu o 1 pt (zmienia ona cały pas pikseli). Próg leży w jednym miejscu i łatwo go zmienić. |
-| Q7 | Jak właściciel akceptuje zrzuty? | **Bez nowej etykiety.** PR zmieniający złote PNG ma `needs-qa`. Właściciel daje `qa-approved` z linią `Gallery head: <sha>` obok `QA head:`. Agent nie nagrywa złotych obrazów od nowa po to, żeby test przeszedł, bez sekcji „Golden changes” w PR. | Wykorzystuje istniejącą bramkę QA (`SDLC.md`) i nie zmienia taksonomii etykiet w `.ai/agentic.config.json`. |
+| Q7 | Jak właściciel akceptuje zrzuty? | **Bez nowej etykiety.** PR zmieniający złote PNG ma `needs-qa`. Właściciel daje `qa-approved` z liniami `Gallery head: <sha>` i `Gallery run: <run id>` obok `QA head:`. Agent nie nagrywa złotych obrazów od nowa po to, żeby test przeszedł, bez sekcji „Golden changes” w PR. | Wykorzystuje istniejącą bramkę QA (`SDLC.md`) i nie zmienia taksonomii etykiet w `.ai/agentic.config.json`. |
 | Q8 | Agent design-review: nowy skill czy nadpisanie istniejącego? | Repo-lokalne nadpisanie **`.ai/skills/om-ux-review-pr/SKILL.md`**: wejściem są pary galeria ↔ aplikacja, a różnice oznaczone „blokuje” wstrzymują `needs-qa`. | `SDLC.md` już przewiduje repo-lokalne nadpisania skilli. Nie instalujemy nic nowego. |
 | Q9 | Co z prototypem HTML (`.ai/prototypes/lintel-app/`) i makietami per spec? | **Zamrożone jako historyczne**, z oznaczeniem „superseded by the gallery” w README. Nie usuwamy ich. HTML zostaje tylko do szkicu nowego kierunku i jest porzucany po akceptacji galerii. | Odwracalne. Usunięcie zniszczyłoby kontekst starszych PR-ów. |
 | Q10 | Zakres pilota? | Tylko „Notes are written by” (Settings → Meetings) ze wszystkimi stanami z `qaProviderStatus`/`qaProviderScenario` oraz dwoma popoverami. HUD-y i reszta ekranów to faza 5, ekran po ekranie. | Najwięcej rund QA (3) i popovery, których dziś nie widać w `--qa-snapshot`. Najmniejszy zakres, który sprawdza cały mechanizm. |
@@ -60,8 +60,8 @@ Fakty z raportu przyczyn (PR-y z `needs-qa`/`qa-approved` od 2026-11-01, ok. 90 
 ```mermaid
 flowchart LR
   A["Spec UI: macierz stanów\n(bramka 'stany przed kodem')"] --> B["Sceny galerii\nna danych fikcyjnych (NOWE)"]
-  B --> C["Eksport macierzy 12 wariantów\n→ akceptacja właściciela (NOWE)"]
-  C --> D["Złote PNG, podzbiór CI\n(job record-goldens, NOWE)"]
+  B --> C["Render na runnerze CI: arkusz 12 wariantów\n→ akceptacja właściciela (NOWE)"]
+  C --> D["Złote PNG, podzbiór CI z tego samego\nprzebiegu (job record-goldens, NOWE)"]
   D --> E["Implementacja logiki\n(istniejące: model, wtyczka)"]
   E --> F["CI: diff złotych PNG\n+ artefakt diffów (NOWE)"]
   E --> G["Design-review: galeria ↔ --qa-snapshot\n(nadpisanie om-ux-review-pr, NOWE)"]
@@ -104,7 +104,7 @@ Najważniejsze: właściciel akceptuje obraz wyrenderowany tym samym kodem Swift
 | `GalleryScene`, `GalleryState`, `GalleryVariant`, `GalleryPresentation` | `Sources/LintelUI/Gallery/` (`#if DEBUG`) | nowe | Kontrakt in-tree: scena = id, tytuł, lista stanów. Stan = id, opis, `presentation`, `make: @MainActor () -> AnyView`. Wariant = `appearance × TextSize × locale`. |
 | `GalleryProviding` | `Sources/LintelUI/Gallery/` (`#if DEBUG`) | nowe | `static var galleryScenes: [GalleryScene]`. Typ wtyczki deklaruje zgodność w swoim targecie (`extension MeetingsPlugin: GalleryProviding`). |
 | `GalleryRenderer` | `Sources/LintelUI/Gallery/` (`#if DEBUG`) | nowe | Renderuje stan w wariancie do `NSBitmapImageRep`: niewidoczne `NSWindow` (borderless, poza ekranem, `appearance` z wariantu, skala 2×), `NSHostingView` z `.lintelTextSize`, `.environment(\.locale)` i bundlem języka, czeka na układ, potem `cacheDisplay`. |
-| Tryby prezentacji | `GalleryPresentation` | nowe | `.window(size:)` (pane w kontenerze o szerokości `SettingsLayout`), `.sheet(size:)`, `.popover(anchor:)`, `.hud(shape:)`. Arkusz, popover i HUD renderują swoją treść w `SnapshotBackdropHostingView` (istnieje, PR #237) na nieprzezroczystym tle `LintelBrand.windowBackgroundColor`. Popover ma obrys i strzałkę narysowane przez renderer (przybliżenie chrome'u, opisane w podpisie). |
+| Tryby prezentacji | `GalleryPresentation` | nowe | `.window(width:height:)` (pane w kontenerze o szerokości `SettingsLayout`, `height: nil` = wysokość dopasowana), `.sheet(width:)`, `.popover(width:)`, `.hud(shape:)` (sygnatury jak w API Contracts). Arkusz, popover i HUD renderują swoją treść w `SnapshotBackdropHostingView` (istnieje, PR #237) na nieprzezroczystym tle `LintelBrand.windowBackgroundColor`. Popover ma obrys i strzałkę narysowane przez renderer (przybliżenie chrome'u, opisane w podpisie). |
 | `GalleryDiff` | `Sources/LintelUI/Gallery/` (`#if DEBUG`) | nowe | Czysta funkcja: dwa bitmapy → liczba i udział różnych pikseli (próg 3/255 na kanał) plus obraz diffu (zmienione piksele na czerwono na wyblakłym oryginale). Bez I/O, testowana na syntetycznych bitmapach. |
 | `GalleryFingerprint` | jw. | nowe | Odcisk renderera: wersja macOS (build), skala, wersja `GalleryRenderer`. Zapisany w `goldens.json` obok PNG. |
 | `GalleryWindowController` (`--qa-gallery`) | `Sources/LintelApp/QA/` (`#if DEBUG`) | nowe | Okno z listą scen ze wszystkich `PluginRegistry.all` zgodnych z `GalleryProviding` plus scen powłoki (`LintelApp`), siatką wariantów i przełącznikami motywu, rozmiaru i języka. **Bez nowego miejsca, które zna konkretne wtyczki**: iteruje `PluginRegistry.all.compactMap { $0 as? any GalleryProviding.Type }`. |
@@ -116,7 +116,7 @@ Najważniejsze: właściciel akceptuje obraz wyrenderowany tym samym kodem Swift
 | `DesignTokens` + `DesignTokensTests` | `Sources/LintelUI/Brand/DesignTokens.swift`, `Tests/LintelUITests/` | nowe | Jedna lista tokenów zbudowana z `BrandPalette` (hex light/dark, alfy), `TextSize.scale`, `SettingsLayout` i `WelcomeLayout`. Test porównuje ją z `.uxproof/tokens.json` (dryf = czerwony test z poleceniem regeneracji). `LINTEL_WRITE_TOKENS=1` zapisuje plik. |
 | `.uxproof/contract.json` | `.uxproof/` | zmiana | Poprawne ścieżki (`Sources/LintelUI/...`), `LintelUI` jako korzeń komponentów, odnośnik do galerii jako źródła prawdy. Znikają tokeny `"design"` bez źródła w kodzie. |
 | CI: krok „Gallery snapshots” | `.github/workflows/ci.yml` | zmiana | Po kroku „Test”, `swift test --filter GallerySnapshotTests` z `LINTEL_SNAPSHOTS=compare`, bez przebudowy (ten sam build). `timeout-minutes: 4`, `upload-artifact` z diffami tylko przy porażce. |
-| CI: job `record-goldens` | `.github/workflows/gallery-goldens.yml` | nowe | Tylko `workflow_dispatch` na wskazanej gałęzi, bez sekretów. `LINTEL_SNAPSHOTS=record`, wynik jako artefakt (agent albo człowiek commituje go na tę gałąź). Job nigdy sam nie pushuje. |
+| CI: job `record-goldens` | `.github/workflows/gallery-goldens.yml` | nowe | Tylko `workflow_dispatch` na wskazanej gałęzi, bez sekretów. `LINTEL_SNAPSHOTS=record` renderuje na runnerze **pełną macierz** zmienionych scen (arkusz `index.html` do akceptacji) i z tego samego przebiegu złote PNG podzbioru CI. Jeden artefakt `gallery-record-<run id>` z obiema częściami; agent albo człowiek commituje złote PNG z niego na tę gałąź. Job nigdy sam nie pushuje. |
 | Nadpisanie `om-ux-review-pr` | `.ai/skills/om-ux-review-pr/SKILL.md` | nowe | Wejście: pary (stan z galerii, `--qa-snapshot` aplikacji w tym samym stanie) plus checklista HIG/LintelUI. Wyjście: lista różnic z flagą `blocks`. Uruchamiane przez autora w osobnym kontekście, przed `needs-qa`. |
 | `docs/design-gallery.md` | `docs/` | nowe | Jak dodać scenę, jak eksportować, jak nagrać złote obrazy, czego snapshot nie pokazuje (glass, ciemny HUD). |
 | `SDLC.md`, `docs/qa.md`, `AGENTS.md`, `CODE_REVIEW.md` | repo | zmiana | Bramka „stany przed kodem”, krok design-review, reguła 1:1 z galerią, nowe argumenty QA, wiersz w tabeli „Task routing”. |
@@ -134,9 +134,9 @@ Najważniejsze: właściciel akceptuje obraz wyrenderowany tym samym kodem Swift
 
 Bez baz danych i bez kluczy ustawień. Jedyne nowe pliki:
 
-- `goldens.json` (per target testów): `{ "version": 1, "fingerprint": { "os": "27.0 (…)", "scale": 2, "renderer": 1 }, "threshold": { "channel": 3, "share": 0.001 }, "files": { "<scene>/<state>@<variant>.png": { "width": …, "height": …, "sha256": "…" } } }`.
+- `goldens.json` (per target testów): `{ "version": 1, "fingerprint": { "os": "27.0 (…)", "scale": 2, "renderer": 1 }, "recordRun": "<id przebiegu gallery-goldens.yml>", "threshold": { "channel": 3, "share": 0.001 }, "files": { "<scene>/<state>@<variant>.png": { "width": …, "height": …, "sha256": "…" } } }`. `recordRun` wskazuje przebieg, którego arkusz właściciel zaakceptował.
 - `.uxproof/tokens.json`: ten sam format co dziś (`name`, `value`, `kind`, `source`). `source` to zawsze ścieżka pliku Swift, nigdy `"design"`. Kolory jako `{ "light": "#267C6C", "dark": "#6BBDAB" }` (plus `alpha` tam, gdzie paleta ją ma). Plik jest generowany, ręczna edycja kończy się czerwonym testem.
-- Nazwa wariantu: `<light|dark>-<s|m|l|xl>-<en|pl>`, np. `dark-m-en`. Podzbiór CI: `light-m-en`, `dark-m-en`, `light-xl-pl`.
+- Nazwa wariantu: `<light|dark>-<s|m|l|xl>-<en|pl>`, np. `dark-m-en`. Podzbiór CI: `light-m-en`, `dark-m-en`, `light-xl-pl`. Pełna macierz pomija `l` (skala 1,15 leży między M i XL, a XL wyznacza górną granicę zawijania), stąd 2 × 3 × 2 = 12. Nazwa `l` zostaje w formacie, żeby scena mogła ją dodać jawnie.
 
 Żaden z tych plików nie jest chronionym kontraktem (`BACKWARD_COMPATIBILITY.md`). Klucze QA (`--qa-gallery`, `--qa-gallery-export`, `--qa-gallery-scene`) są tylko w DEBUG i nie są kontraktem, tak samo jak pozostałe `--qa…`.
 
@@ -203,9 +203,10 @@ Język: renderer ustawia `\.locale` i bundle `Localizable` tego języka. `swift 
 
 ### Akceptacja przez właściciela
 
-1. Autor dodaje albo zmienia sceny, uruchamia `--qa-gallery-export` i dołącza `index.html` plus PNG (pełna macierz zmienionych scen) jako dowód w PR.
-2. Właściciel ogląda arkusz i daje `qa-approved` z `Gallery head: <sha>` albo prosi o zmiany.
-3. Dopiero po akceptacji powstają złote PNG (podzbiór CI, job `record-goldens`) w tym samym PR-ze. Od tej chwili zaakceptowane snapshoty są referencją 1:1.
+1. Autor dodaje albo zmienia sceny i iteruje lokalnie (`--qa-gallery`, `--qa-gallery-export`). Lokalny eksport jest roboczy: inny build systemu renderuje tekst inaczej niż runner.
+2. Gdy sceny są gotowe, autor uruchamia `gallery-goldens.yml` na gałęzi PR-a i linkuje w PR artefakt `gallery-record-<run id>` (arkusz pełnej macierzy plus złote PNG z **tego samego renderu**).
+3. Właściciel ogląda arkusz z artefaktu i daje `qa-approved` z `Gallery head: <sha>` oraz `Gallery run: <run id>` albo prosi o zmiany.
+4. Złote PNG z tego artefaktu trafiają do tego samego PR-a, z `recordRun` w `goldens.json`. Taki commit dotyka tylko `Tests/` i nie unieważnia akceptacji, o ile `sha256` w `goldens.json` zgadzają się z plikami artefaktu zaakceptowanego przebiegu (sprawdza to recenzent w sekcji „Golden changes”). Każdy inny commit po akceptacji podlega zwykłym regułom bramki QA. Od tej chwili zaakceptowane snapshoty są referencją 1:1.
 
 ### Pilot: Settings → Meetings → „Notes are written by”
 
@@ -239,7 +240,7 @@ Spec, który dodaje albo zmienia UI, ma przed fazą implementacji tabelę stanó
 
 | Sytuacja | Co się dzieje | Co widzi autor |
 |---|---|---|
-| Runner CI dostał nową wersję macOS (inne fonty) | Odcisk w `goldens.json` ≠ odcisk runnera, więc test **pada** z komunikatem „renderer fingerprint changed: run gallery-goldens.yml”. Nie porównuje pikseli. | Jeden czytelny błąd zamiast 75 diffów. Nagranie od nowa to osobny PR z eksportem do przejrzenia. |
+| Runner CI dostał nową wersję macOS (inne fonty) | Odcisk w `goldens.json` ≠ odcisk runnera, więc test **pada** z komunikatem „renderer fingerprint changed: run gallery-goldens.yml”. Nie porównuje pikseli. Krok jest czerwony na **każdym** otwartym PR-ze, dopóki PR z nowym nagraniem nie trafi na `main` (patrz Ryzyka). | Jeden czytelny błąd zamiast 75 diffów. Nagranie od nowa to osobny PR z arkuszem z artefaktu do przejrzenia. |
 | Lokalny Mac ma inny build systemu niż CI | Testy galerii są **pomijane** (`.disabled` z powodem) poza `LINTEL_SNAPSHOTS=compare-anyway`. Okno i eksport działają normalnie. | Brak fałszywych czerwonych testów lokalnie. |
 | Diff ponad próg | Test pada. `actual.png` i `diff.png` trafiają do `$LINTEL_SNAPSHOT_ARTIFACTS`, a CI wrzuca je jako artefakt `gallery-diffs`. | Obraz różnicy w artefakcie, nazwa stanu i wariantu w błędzie. |
 | Scena rzuca albo widok ma zerowy rozmiar | `GalleryError` z id stanu, a test pada. Okno galerii pokazuje kartę błędu zamiast stanu. | Konkretny stan, nie cały zestaw. |
@@ -258,6 +259,7 @@ Spec, który dodaje albo zmienia UI, ma przed fazą implementacji tabelę stanó
 - **Determinizm renderu.** Największe ryzyko techniczne: kursor tekstowy, fokus, tło okna, subpikselowy antyaliasing. Faza 1 ma kryterium wyjścia: ten sam stan wyrenderowany 20 razy w jednym procesie i w 3 osobnych procesach daje 0% różnicy. Jeśli tego nie osiągniemy, próg zostaje, ale spec wraca do właściciela przed fazą 2.
 - **Polskie teksty w `swift test`.** Katalog `.xcstrings` jest kompilowany tylko przez `scripts/make-app.sh`. Jeśli render w `swift test` pokaże angielski, wariant `light-xl-pl` w CI wymaga kroku kompilacji katalogu (`xcstringstool`) przed testami. To jest koszt CI do zmierzenia w fazie 1.
 - **Rozmiar repo.** Ok. 75 PNG po 40–80 KB na pilota. Przy 30 ekranach × 10 stanów × 3 warianty to ok. 900 PNG, czyli 50–70 MB w historii przy każdym nagraniu od nowa. Budżet 25 MB na katalog wymusi decyzję (LFS, rzadsze warianty) zanim to nastąpi.
+- **Aktualizacja obrazu runnera.** Zmiana odcisku blokuje krok „Gallery snapshots” na wszystkich PR-ach naraz. To świadomy wybór: ciche pominięcie porównania osłabiłoby bramkę bez śladu. Mitigacja: komunikat wskazuje jedną komendę naprawczą, a PR z nowym nagraniem dotyka tylko `Tests/` i nie wymaga zmian w kodzie. Jeśli zdarza się to częściej niż raz w miesiącu, faza 1 dopisuje do `docs/perf.md` decyzję o przypięciu wersji obrazu runnera.
 - **Przyzwyczajenie do „record”.** Ryzyko, że agent nagra złote obrazy od nowa, żeby test przeszedł. Mitigacja: zmiana złotych PNG wymaga `needs-qa` i `Gallery head:` (Q7), `CODE_REVIEW.md` każe porównać sekcję „Golden changes” z diffem, a job nagrywający działa tylko ręcznie.
 - **Kierunek produktu, nie defekt:** reguła „1:1 z prototypem HTML” (pamięć właściciela 2026-11-05) zmienia się w „1:1 z zaakceptowanymi snapshotami galerii”. To decyzja właściciela z 2026-11-23. Spec ją tylko zapisuje w `SDLC.md` i `CODE_REVIEW.md`.
 - **Brak zmian chronionych kontraktów.** `LintelKit`, klucze ustawień, formaty na dysku i `Package.swift` (graf) zostają bez zmian. `GalleryProviding` żyje w `LintelUI` pod `#if DEBUG`, a `LintelUI` nie jest chronionym kontraktem.
@@ -279,8 +281,8 @@ Spec, który dodaje albo zmienia UI, ma przed fazą implementacji tabelę stanó
 2. **1.2 Renderer.** `GalleryRenderer` (okno poza ekranem, skala 2×, wygląd, `lintelTextSize`, locale i bundle, wyłączone animacje, `cacheDisplay`, tryby `.window`/`.sheet`/`.popover`/`.hud` przez `SnapshotBackdropHostingView`). Test: prosta scena z `Form`, `Toggle` i `TextField` daje niepuste piksele kontrolek (różnica względem pustego tła), a 20 renderów daje 0% różnicy. **Pomiar:** czas renderu i determinizm między 3 procesami, zapisane w `docs/perf.md`. Ustalenie, czy `pl` renderuje się w `swift test` (jeśli nie: krok kompilacji katalogu, zmierzony).
 3. **1.3 Popover do wydzielenia.** Wydzielić `ChoiceMenuList` z `ChoiceMenuButton` bez zmiany zachowania. Istniejące `ProviderChoiceTests` i `MeetingsPaneTests` bez zmian i zielone.
 4. **1.4 Sceny pilota.** `MeetingsPlugin+Gallery.swift` (`extension MeetingsPlugin: GalleryProviding`), budowa modelu z fałszywymi portami (przeniesiona z `ProviderChoiceSupport.swift`), wszystkie stany z tabeli UI/UX. Testy: unikalne id, niepuste `summary`, `GalleryNoRealSystemTests`.
-5. **1.5 Okno i eksport.** `--qa-gallery`, `--qa-gallery-export <dir>`, `--qa-gallery-scene <id>` w `QAOptions` i `GalleryWindowController`. Test parsera opcji. Ręcznie: eksport pilota w 12 wariantach plus `index.html` jako dowód w PR (light/dark, S/M/XL, en/pl).
-6. **1.6 Testy złotych obrazów i CI.** `MeetingsPluginTests/Gallery/GallerySnapshotTests` (`LINTEL_SNAPSHOTS=compare|record`, odcisk, artefakty), `GoldenBudgetTests`, `goldens.json`, `.github/workflows/gallery-goldens.yml` (dispatch, bez sekretów, artefakt), krok „Gallery snapshots” w `ci.yml` z `timeout-minutes: 4` i `upload-artifact` przy porażce. Złote PNG z joba CI. Dowód w PR: celowo zepsuty odstęp w gałęzi próbnej daje czerwony krok i artefakt `diff.png` (zrzut w PR, potem revert). Czas kroku w PR.
+5. **1.5 Okno i eksport.** `--qa-gallery`, `--qa-gallery-export <dir>`, `--qa-gallery-scene <id>` w `QAOptions` i `GalleryWindowController`. Test parsera opcji. Ręcznie: zrzut okna `--qa-gallery` i lokalny eksport pilota jako dowód działania narzędzia. Arkusz do akceptacji właściciela pochodzi z przebiegu CI z kroku 1.6.
+6. **1.6 Testy złotych obrazów i CI.** `MeetingsPluginTests/Gallery/GallerySnapshotTests` (`LINTEL_SNAPSHOTS=compare|record`, odcisk, artefakty), `GoldenBudgetTests`, `goldens.json`, `.github/workflows/gallery-goldens.yml` (dispatch, bez sekretów, jeden artefakt z arkuszem pełnej macierzy i złotymi PNG z tego samego renderu, `recordRun` w `goldens.json`), krok „Gallery snapshots” w `ci.yml` z `timeout-minutes: 4` i `upload-artifact` przy porażce. Złote PNG z joba CI. Dowód w PR: celowo zepsuty odstęp w gałęzi próbnej daje czerwony krok i artefakt `diff.png` (zrzut w PR, potem revert). Czas kroku w PR.
 7. **1.7 Dokumentacja.** `docs/design-gallery.md`, nowe argumenty w `docs/qa.md`, wiersz w `AGENTS.md` (Task routing: „Design gallery”).
 
 ### Faza 2: tokeny ze Swifta
@@ -290,7 +292,7 @@ Spec, który dodaje albo zmienia UI, ma przed fazą implementacji tabelę stanó
 
 ### Faza 3: proces
 
-1. **3.1** `SDLC.md`: etap Design wymaga tabeli stanów i scen galerii zaakceptowanych przez właściciela. QA gate: dla UI „zgodność z zaakceptowanymi snapshotami galerii”. `Gallery head:` obok `QA head:`. Sekcja „Golden changes” w PR, który zmienia złote PNG.
+1. **3.1** `SDLC.md`: etap Design wymaga tabeli stanów i scen galerii zaakceptowanych przez właściciela. QA gate: dla UI „zgodność z zaakceptowanymi snapshotami galerii”. `Gallery head:` i `Gallery run:` obok `QA head:`. Sekcja „Golden changes” w PR, który zmienia złote PNG.
 2. **3.2** `.ai/skills/om-ux-review-pr/SKILL.md` (repo-lokalne nadpisanie): wejście to pary galeria ↔ `--qa-snapshot` dla każdego zmienionego stanu, checklista (HIG macOS, komponenty `LintelUI`, `lineLimit` na licznikach i chipach, kontrast, XL, pl), wyjście to tabela różnic z `blocks: yes/no`. Autor nie oznacza różnicy jako „accepted gap”. Robi to tylko właściciel, w specu.
 3. **3.3** `CODE_REVIEW.md`: PR z UI bez scen dla stanów z tabeli speca → blocker. Zmiana złotych PNG bez „Golden changes” → blocker.
 4. **3.4** `.ai/prototypes/lintel-app/README.md` i `lintel-brand/README.md`: „Superseded by the SwiftUI gallery (spec 2026-11-23-swiftui-design-gallery); kept for history”.
