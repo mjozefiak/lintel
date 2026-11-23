@@ -61,6 +61,8 @@ required check always runs, so no stub is needed.
 
 ## Progress
 
+PR: #249
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Workflow
@@ -76,4 +78,4 @@ required check always runs, so no stub is needed.
 
 ### Phase 3: Measure
 
-- [ ] 3.1 Before and after timings in the PR body
+- [x] 3.1 Before and after timings in the PR body — 6b4d124d
