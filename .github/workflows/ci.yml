@@ -57,9 +57,13 @@ jobs:
         timeout-minutes: 2
         run: |
           docs_only=false
-          if [ "$GITHUB_EVENT_NAME" = pull_request ] && files=$(git diff --name-only --no-renames HEAD^1 HEAD) \
-            && printf '%s\n' "$files" | scripts/ci-docs-only.sh; then
-            docs_only=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            if files=$(git diff --name-only --no-renames HEAD^1 HEAD); then
+              echo "changed files: $(printf '%s\n' "$files" | grep -c .)"
+              if printf '%s\n' "$files" | scripts/ci-docs-only.sh; then docs_only=true; fi
+            else
+              echo "::warning::could not diff the merge commit against its base; running everything"
+            fi
           fi
           echo "docs-only: $docs_only"
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
