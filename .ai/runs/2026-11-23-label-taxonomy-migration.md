@@ -18,14 +18,16 @@ Non-goals: deleting or renaming labels on GitHub (post-merge commands go in the 
 
 ## Progress
 
+PR: #245
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Config and tracker descriptor
 
-- [ ] 1.1 Update label groups in agentic.config.json
-- [ ] 1.2 Add label alias map, claim and milestone conventions to the GitHub tracker descriptor
+- [x] 1.1 Update label groups in agentic.config.json — 886a2401
+- [x] 1.2 Add label alias map, claim and milestone conventions to the GitHub tracker descriptor — e084aa9a
 
 ### Phase 2: Process docs
 
-- [ ] 2.1 Rewrite the SDLC label, claim, QA comment and follow-up rules
-- [ ] 2.2 Update CODE_REVIEW.md, AGENTS.md, dependabot and issue templates
+- [x] 2.1 Rewrite the SDLC label, claim, QA comment and follow-up rules — 85ce3837
+- [x] 2.2 Update CODE_REVIEW.md, AGENTS.md, dependabot and issue templates — dc0b0f2c
