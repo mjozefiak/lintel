@@ -40,11 +40,13 @@ Upstream references: cli/cli#11983 (`gh pr edit` aborts without any project flag
 - A `--json` field list must never include `projectCards`: it is a Projects (classic) relic that errors on every client version (see above). Request only the fields the calling skill names.
 - A PR is linked to the issue it resolves with `Fixes #{issueId}` (or `Closes #{issueId}`) in the PR body; GitHub then closes the issue on merge. To reference without auto-closing, use a plain issue link.
 - PRs open as **drafts** when a skill says so; a human (or **mark-pr-ready**) promotes them.
-- Claim/lock signals on an issue or PR are: assignee set to the automation user, the `state:in-progress` label, and a `🤖`-prefixed claim comment. All three are set on claim; the label is guarded (below). **In this repository the claim label is `state:in-progress`**: wherever a skill names `in-progress`, read it as `state:in-progress`, both when applying it (the guards translate the old name) and when reading labels from **get-pr** / **get-issue** to detect a claim. There is no `ci-monitoring` label: a run that finished its work releases the claim, and an owed CI follow-up is stated in its summary comment instead.
+- Claim/lock signals on an issue or PR are: assignee set to the automation user, the `state:in-progress` label, and a `🤖`-prefixed claim comment. All three are set on claim; the label is guarded (below). **In this repository the claim label is `state:in-progress`**: wherever a skill names `in-progress`, read it as `state:in-progress`, both when applying it (the guards translate the old name) and when reading labels from **get-pr** / **get-issue** to detect a claim. A bundled skill script that tests for the literal `in-progress` (for example `om-auto-issue-triage/scripts/select-issues.mjs`) cannot be translated by the guards: when a label list is handed to such a script, add `in-progress` to it for every item that carries `state:in-progress`. There is no `ci-monitoring` label: a run that finished its work releases the claim, and an owed CI follow-up is stated in its summary comment instead.
 - **Repository process rules** (`SDLC.md`, decision of 2026-11-23). They override the installed skills' defaults wherever the two differ:
   - **No label-rationale comments.** Skip every step that posts a comment explaining why labels were applied or changed (including the consolidated rationale comment). Labels are self-explanatory; the run's summary comment may name them in one line.
   - **No priority labels.** Priority is the issue's milestone (`beta.2` or `later`, operation **set-milestone**), never a `priority-*` label. A step that says "apply exactly one priority label" is skipped.
   - **Review nits are never filed as issues.** A nit or non-blocking finding is fixed in the same PR or dropped (and listed as dropped in the summary comment). Only a real bug becomes a new issue (`type:bug` + `area:*`); a flaky test is added as a checklist line to the open umbrella issue "Flaky tests" (#240) instead of a new issue. Steps such as "file follow-up issues for nits" do not run.
+  - **`qa-approved` is the owner's alone.** No skill applies it, including `om-auto-qa-pr --self-qa-signoff` and the orchestrated QA stage of `om-auto-merge-buddy`: `apply_label` refuses it (below), and `automerge.defaultToHumanQa` is `true` in the config so the merge buddy waits for the owner instead of signing off. The owner applies the label in the GitHub UI.
+  - **`risk-*` labels are for PRs only.** `apply_issue_label` skips them; an issue's weight is its milestone.
   - **One QA comment per PR, edited in place.** The QA evidence and the `QA head:` line live in a single comment that each QA round rewrites through **update-comment**; a new QA round never posts a second QA comment.
 - Long, multi-line comment bodies are posted with `--body-file` (or a heredoc via process substitution) so formatting is preserved.
 - CI status truth comes from **get-pr-checks**; the set of *required* checks comes from **get-required-checks** (branch protection). When branch protection is not readable (404), treat every reported check as required.
@@ -92,6 +94,8 @@ apply_label() {
   _label=$(resolve_label "$1")
   if [ -z "$_label" ]; then
     echo "Skipping label '$1' (retired in this repo, see SDLC.md)"
+  elif [ "$_label" = "qa-approved" ]; then
+    echo "Refusing label 'qa-approved' (only the owner applies it, see SDLC.md)"
   elif label_exists "$_label"; then
     gh api -X POST "repos/$(tracker_repo)/issues/$2/labels" -f "labels[]=$_label" >/dev/null
   else
@@ -102,7 +106,13 @@ apply_label() {
 # Issue labels. GitHub labels issues and PRs through the same /issues/ endpoint, so this
 # delegates; it keeps its own name because skills call the guards by name. $1 = label,
 # $2 = issue id.
-apply_issue_label() { apply_label "$1" "$2"; }
+# In this repository an issue carries no risk label (risk is a PR label, SDLC.md).
+apply_issue_label() {
+  case "$1" in
+    risk-*) echo "Skipping label '$1' on issue $2 (risk labels are for PRs, see SDLC.md)" ;;
+    *)      apply_label "$1" "$2" ;;
+  esac
+}
 
 # Removal. $1 = label, $2 = PR or issue number. A label that is not currently applied
 # answers 404 — a no-op, not a failure, so removal needs no existence check.
@@ -205,9 +215,11 @@ gh issue list --repo {owner}/{repo} --state open --search "<query> in:title,body
 ```
 
 #### create-issue
-Title, body, assignee, labels → created issue URL.
+Title, body, assignee, labels → created issue URL. The issue is created **without** `--label`, then every label goes through `apply_issue_label`: `gh issue create --label` skips the alias map and fails the whole command when a label does not exist, which is the case for every legacy name once the old labels are deleted.
 ```bash
-gh issue create --repo {owner}/{repo} --title "<title>" --assignee <login> --label <labels> --body "<body>"
+ISSUE_URL=$(gh issue create --repo {owner}/{repo} --title "<title>" --assignee <login> --body "<body>")
+ISSUE_ID=${ISSUE_URL##*/}
+for l in <labels>; do apply_issue_label "$l" "$ISSUE_ID"; done   # one quoted word per label
 ```
 
 #### close-issue
@@ -243,7 +255,11 @@ Always through the guards: `apply_issue_label "<label>" {issueId}` / `remove_iss
 `{issueId}`, milestone title (`beta.2` or `later`, from `labels.milestones` in the config) → the issue's milestone. This repository expresses priority with milestones, not labels. An empty title clears the milestone.
 ```bash
 MS_NUMBER=$(gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.title=="<title>") | .number')
-gh api -X PATCH repos/{owner}/{repo}/issues/{issueId} -F "milestone=${MS_NUMBER}" >/dev/null
+if [ -n "$MS_NUMBER" ]; then
+  gh api -X PATCH repos/{owner}/{repo}/issues/{issueId} -F "milestone=${MS_NUMBER}" >/dev/null
+else
+  echo "Skipping milestone '<title>' (no open milestone with that title)"
+fi
 # clear: gh api -X PATCH repos/{owner}/{repo}/issues/{issueId} -F milestone=null
 ```
 
@@ -467,7 +483,7 @@ gh api --paginate repos/{owner}/{repo}/labels --jq '.[].name'
 ```
 
 #### create-label
-Name, color, description. Never delete, rename, or recolor existing labels.
+Name, color, description. Never delete, rename, or recolor existing labels. Never create a legacy name: when `resolve_label <name>` prints something other than `<name>` (a mapped or retired label), treat the label as present and skip the creation, even when a skill lists it as "missing from the taxonomy" (for example `in-progress` or `ci-monitoring` in `om-auto-merge-buddy`).
 ```bash
 gh label create <name> --color <hex> --description "<description>"
 ```

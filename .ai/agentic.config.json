@@ -63,7 +63,7 @@
     "label": "automerge",
     "mode": "prepare-to-merge",
     "requireIndependentReview": false,
-    "defaultToHumanQa": false,
+    "defaultToHumanQa": true,
     "humanOnlyLabels": [],
     "humanOnlyAuthors": [],
     "complexQa": "always",
