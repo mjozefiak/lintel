@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-prototype-id="lintel-direction-b">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lintel direction B: Paper &amp; Ink</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* B. Paper & Ink: warm paper neutrals, New York serif for headings, hairlines instead of cards, the cut ring as the listening indicator. Native controls stay. */
+.light{--desk:#E2DDD3;--win:#F6F4F0;--side:#EEEAE3;--ink:#191610;--sec:#6B645A;--ter:#A39B8F;--hair:rgba(25,22,16,.13);--fill:rgba(25,22,16,.06);--accent:#267C6C;--atext:#036152;--onacc:#FFFFFF;--ok:#267C6C;--field:#FFFFFF;--shadow:0 24px 60px rgba(60,45,20,.18),0 0 0 .5px rgba(25,22,16,.2)}
+.dark{--desk:#0C0A08;--win:#1C1915;--side:#171411;--ink:#F1EEE9;--sec:#A39B8F;--ter:#6F685E;--hair:rgba(241,238,233,.13);--fill:rgba(241,238,233,.07);--accent:#6BBDAB;--atext:#6BBDAB;--onacc:#161310;--ok:#6BBDAB;--field:#24201B;--shadow:0 24px 60px rgba(0,0,0,.6),0 0 0 .5px rgba(241,238,233,.14)}
+body{font:13px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+.serif{font-family:"New York","NewYork",ui-serif,"Iowan Old Style","Charter",Georgia,serif}
+.win{background:var(--win);color:var(--ink);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex:none}
+.big{width:960px;height:640px}
+.sidebar{width:210px;flex:none;background:var(--side);border-right:1px solid var(--hair);padding:14px 12px;display:flex;flex-direction:column}
+.sidebar .lights{padding:0 4px 18px}
+.brandline{display:flex;gap:8px;align-items:center;padding:0 6px 14px;font-weight:600}
+.mark.s{width:18px;height:18px;color:var(--ink)}
+.sfield{display:flex;gap:6px;align-items:center;border-bottom:1px solid var(--hair);padding:4px 6px 7px;color:var(--sec);margin-bottom:12px}
+.sfield .ic{width:13px;height:13px}
+.sh{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--sec);padding:14px 6px 4px}
+.si{display:flex;gap:9px;align-items:center;padding:5px 6px;border:0;background:none;text-align:left;width:100%;border-radius:5px;position:relative;color:var(--ink)}
+.si .ic{color:var(--sec)}
+.si.on{color:var(--atext);font-weight:600}
+.si.on::before{content:"";position:absolute;left:-12px;top:5px;bottom:5px;width:3px;border-radius:0 2px 2px 0;background:var(--accent)}
+.si.on .ic{color:var(--atext)}
+.sp{flex:1}
+.main{flex:1;min-width:0;overflow:auto;padding:30px 44px}
+.btn{border:0;border-radius:6px;padding:4px 12px;background:var(--field);box-shadow:0 0 0 .5px var(--hair),0 1px 1px rgba(0,0,0,.05);white-space:nowrap}
+.btn.pri{background:var(--accent);color:var(--onacc);box-shadow:none;font-weight:500}
+.btn.lg{padding:6px 16px}
+.link{border:0;background:none;color:var(--atext);padding:0;text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--atext) 40%,transparent);text-underline-offset:3px}
+kbd{font:500 12px -apple-system,sans-serif;background:var(--field);border-radius:5px;padding:2px 8px;box-shadow:0 0 0 .5px var(--hair),0 1px 0 var(--hair)}
+.pop{display:inline-flex;gap:6px;align-items:center;background:var(--field);border-radius:6px;padding:3px 8px;box-shadow:0 0 0 .5px var(--hair);white-space:nowrap}
+.pop .ic{width:11px;height:11px;color:var(--sec)}
+.sw{width:32px;height:19px;border-radius:10px;background:var(--fill);box-shadow:inset 0 0 0 1px var(--hair);position:relative;border:0;padding:0;flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left .15s}
+.sw[aria-checked=true]{background:var(--accent);box-shadow:none}.sw[aria-checked=true]::after{left:15px}
+@media (prefers-reduced-motion:reduce){.sw::after{transition:none}}
+.kicker{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--sec)}
+/* onboarding */
+.onb{width:760px;height:560px}
+.margin{width:200px;flex:none;border-right:1px solid var(--hair);padding:16px 22px;display:flex;flex-direction:column}
+.margin .lights{margin-bottom:28px}
+.margin ol{list-style:none;margin:18px 0 0;padding:0}
+.margin li{display:flex;gap:10px;align-items:baseline;padding:7px 0;color:var(--sec)}
+.margin li .n{font-variant-numeric:tabular-nums;font-size:11px;width:18px}
+.margin li.done{color:var(--ink)}
+.margin li.done .n{color:var(--sec)}
+.margin li.cur{color:var(--atext);font-weight:600}
+.margin .mark.big{width:34px;height:34px;color:var(--ink)}
+.page{flex:1;display:flex;flex-direction:column;min-width:0}
+.page .body{flex:1;padding:46px 48px 0}
+.page h1{text-wrap:balance;font-size:30px;font-weight:600;line-height:1.15;margin:8px 0 8px;letter-spacing:-.01em}
+.page .hint{color:var(--sec);margin:0 0 22px;font-size:14px}
+.letter{border-top:1px solid var(--ink);border-bottom:1px solid var(--hair)}
+.letter .ln{display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--hair)}
+.letter .k{width:64px;color:var(--sec);flex:none}
+.letter .txt{padding:14px 0 16px;min-height:92px;font-size:16px;line-height:1.55}
+.ph{color:var(--ter);font-style:italic}
+.listen{display:flex;gap:10px;align-items:center;color:var(--atext);font-size:14px}
+.mark.l{width:22px;height:22px;color:var(--atext)}
+@media (prefers-reduced-motion:no-preference){.mark.l{animation:b-turn 2.4s linear infinite}}
+@keyframes b-turn{to{transform:rotate(360deg)}}
+.hold{margin-top:18px;display:flex;gap:14px;align-items:center}
+.holdbtn{display:inline-flex;gap:10px;align-items:center;border:1px solid var(--ink);border-radius:999px;padding:7px 16px 7px 8px;background:transparent;user-select:none;touch-action:none}
+.holdbtn .mark{width:22px;height:22px;color:var(--ink)}
+.holdbtn[aria-pressed=true]{border-color:var(--accent);color:var(--atext)}
+.holdbtn kbd{margin-left:4px}
+.or{color:var(--sec);font-size:12px}
+.ok{margin-top:16px;font-size:14px;display:flex;gap:10px;align-items:baseline}
+.ok .ic{color:var(--ok);transform:translateY(3px)}
+.priv{font-style:italic;color:var(--sec);font-size:13px;padding:0 48px 14px}
+.page .foot{display:flex;gap:8px;align-items:center;padding:14px 20px;border-top:1px solid var(--hair)}
+/* home */
+.hello{font-size:34px;font-weight:600;margin:6px 0 22px;line-height:1.1;letter-spacing:-.01em}
+.acts{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--ink);border-bottom:1px solid var(--hair)}
+.act{padding:16px 20px 18px 0}
+.act+.act{border-left:1px solid var(--hair);padding-left:20px}
+.act h3{font-size:18px;font-weight:600;margin:0 0 4px}
+.act p{margin:0 0 12px;color:var(--sec)}
+.recdot{width:8px;height:8px;border-radius:50%;background:#C2372B;display:inline-block}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:36px;margin-top:26px}
+.sec-h{display:flex;flex-wrap:wrap;column-gap:8px;align-items:baseline;border-bottom:1px solid var(--ink);padding-bottom:6px}
+.sec-h>span:last-child{white-space:nowrap}
+.sec-h h4{font-size:17px;font-weight:600;margin:0}
+.ri{display:grid;grid-template-columns:18px 1fr auto;gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--hair);align-items:baseline}
+.ri .ic{color:var(--sec);transform:translateY(3px)}
+.ri .t{font-weight:500}
+.ri .w{color:var(--sec);font-size:12px;white-space:nowrap;text-align:right}
+.ri .m{grid-column:2;color:var(--sec);font-size:12px}
+.ri .m b{color:var(--atext);font-weight:500}
+.ck{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--hair)}
+.ck .ic{color:var(--ok);margin-top:1px}
+.ck.done span{color:var(--sec);text-decoration:line-through;text-decoration-color:var(--ter)}
+.box{width:14px;height:14px;border:1px solid var(--sec);border-radius:3px;flex:none;margin-top:2px}
+.ck .a{display:block;margin-top:4px}
+/* settings */
+.ptitle h2{font-size:28px;font-weight:600;margin:0 0 6px}
+.status{display:flex;gap:8px;align-items:center;color:var(--sec);margin-bottom:6px}
+.status .mark{width:15px;height:15px;color:var(--atext)}
+.status b{color:var(--atext);font-weight:600}
+.sect{margin-top:24px}
+.sect .kicker{border-bottom:1px solid var(--ink);padding-bottom:6px}
+.row{display:flex;gap:16px;align-items:center;padding:11px 0;border-bottom:1px solid var(--hair)}
+.row .lbl{flex:1;min-width:0}
+.row .help{color:var(--sec);font-size:12px;margin-top:2px}
+.disc{display:flex;gap:6px;align-items:center;border:0;background:none;padding:0;margin:24px 0 0;color:var(--atext);font-weight:500}
+.disc .ic{width:12px;height:12px}
+.pfoot{font-style:italic;color:var(--sec);margin-top:22px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="shared.js"></script>
+<script>
+(function () {
+  const L = window.LINTEL, H = L.H;
+  const sw = (k, S) => `<button class="sw" role="switch" aria-checked="${S.toggles[k]}" data-act="toggle" data-key="${k}"><span class="vh">${k}</span></button>`;
+
+  function onb(S, c) {
+    const steps = c.steps.map((s, i) => `<li class="${i < 3 ? 'done' : i === 3 ? 'cur' : ''}"><span class="n">0${i + 1}</span>${s}</li>`).join('');
+    let body;
+    if (S.dict === 'idle') body = `<span class="ph">${c.bodyPh}</span>`;
+    else if (S.dict === 'listening') body = `<span class="listen">${H.mark('l')}${c.listening} <span style="color:var(--sec)">${c.letGo}</span></span>`;
+    else body = H.esc(L.typedText()) + (S.dict === 'typing' ? '<span class="caret"></span>' : '');
+    const done = S.dict === 'done';
+    return `<div class="win onb" role="dialog" aria-label="${c.app}">
+      <aside class="margin"><span class="lights"><i></i><i></i><i></i></span>${H.mark('big')}<ol aria-label="${c.stepOf}">${steps}</ol></aside>
+      <section class="page">
+        <div class="body">
+          <div class="kicker">${c.stepOf}</div>
+          <h1 class="serif">${c.onbTitle}</h1>
+          <p class="hint">${c.onbHint}</p>
+          <div class="letter">
+            <div class="ln"><span class="k">${c.to}</span><span>${c.toName}</span></div>
+            <div class="ln"><span class="k">${c.subject}</span><span>${c.subj}</span></div>
+            <div class="txt serif" aria-live="polite">${body}</div>
+          </div>
+          ${done
+            ? `<div class="ok">${H.ic('check')}<span>${c.success} <button class="link" data-act="again">${c.again}</button></span></div>`
+            : `<div class="hold"><button class="holdbtn" data-act="hold" aria-pressed="${S.dict === 'listening'}">${H.mark()}<span>${S.dict === 'listening' ? c.listening : c.hold}</span><kbd>${c.key}</kbd></button><span class="or">${c.onbOr}</span></div>`}
+        </div>
+        <p class="priv serif">${c.privacy}</p>
+        <div class="foot"><button class="btn lg">${c.back}</button><span class="sp"></span><button class="btn lg">${c.skip}</button><button class="btn lg pri" data-act="next" ${done ? '' : 'style="opacity:.55"'}>${c.cont}</button></div>
+      </section>
+    </div>`;
+  }
+
+  function sidebarMain(S, c) {
+    const n = c.nav;
+    const it = (k, ic) => `<button class="si ${S.nav === k ? 'on' : ''}" data-nav="${k}">${H.ic(ic)}<span>${n[k]}</span></button>`;
+    return `<aside class="sidebar"><span class="lights"><i></i><i></i><i></i></span>
+      <div class="brandline">${H.mark('s')}Lintel</div>
+      <div class="sfield">${H.ic('search')}${c.searchNotes}</div>
+      ${it('home', 'home')}${it('notes', 'note')}${it('meetings', 'meeting')}${it('dictations', 'mic')}${it('dictionary', 'book')}
+      <span class="sp"></span>${it('settings', 'gear')}</aside>`;
+  }
+
+  function home(S, c) {
+    const rec = S.rec
+      ? `<span style="display:flex;gap:8px;align-items:center"><span class="recdot"></span>${c.recording} · ${L.recTime()} <button class="btn" data-act="rec">${c.stop}</button></span>`
+      : `<button class="btn pri" data-act="rec">${c.startRec}</button>`;
+    const items = c.items.map((r) => `<div class="ri">${H.ic(H.kindIcon[r.k])}<span class="t">${r.t}</span><span class="w">${r.w}</span><span class="m">${r.m}${r.b ? ` · <b>${r.b}</b>` : ''}</span></div>`).join('');
+    const ck = c.checklist.map((x) => `<div class="ck ${x.done ? 'done' : ''}">${x.done ? H.ic('check') : '<span class="box"></span>'}<span>${x.t}${x.a ? `<button class="link a">${x.a}</button>` : ''}</span></div>`).join('');
+    return `<div class="win big">${sidebarMain(S, c)}
+      <main class="main">
+        <div class="kicker">${c.date}</div>
+        <div class="hello serif">${c.greet}</div>
+        <div class="acts">
+          <div class="act"><h3 class="serif">${c.dictTitle}</h3><p>${c.dictSub}</p><kbd>${c.key}</kbd></div>
+          <div class="act"><h3 class="serif">${c.recTitle}</h3><p>${c.recSub}</p>${rec}</div>
+        </div>
+        <div class="cols">
+          <div><div class="sec-h"><h4 class="serif">${c.recent}</h4><span class="sp"></span><button class="link">${c.seeAll}</button></div>${items}</div>
+          ${S.setupHidden ? '<div></div>' : `<div><div class="sec-h"><h4 class="serif">${c.setup}</h4><span class="sp"></span><span style="color:var(--sec);font-size:12px">${c.setupN}</span></div>${ck}<div style="margin-top:8px"><button class="link" data-act="hide">${c.hide}</button></div></div>`}
+        </div>
+      </main></div>`;
+  }
+
+  function settings(S, c) {
+    const it = ([k, l]) => `<button class="si ${S.pane === k ? 'on' : ''}" data-pane="${k}">${H.ic(H.sideIcon[k])}<span>${l}</span></button>`;
+    const row = (l, h, ctl) => `<div class="row"><div class="lbl">${l}${h ? `<div class="help">${h}</div>` : ''}</div>${ctl}</div>`;
+    const more = S.more ? row(c.rowMic, '', `<span class="pop">${c.micVal}${H.ic('chevd')}</span>`) + row(c.rowRestore, '', sw('restore', S)) : '';
+    return `<div class="win big"><aside class="sidebar"><span class="lights"><i></i><i></i><i></i></span>
+        <div class="sfield">${H.ic('search')}${c.searchSet}</div>
+        ${c.side.core.map(it).join('')}<div class="sh">${c.side.addonsH}</div>${c.side.addons.map(it).join('')}<div class="sh"></div>${c.side.rest.map(it).join('')}
+        <span class="sp"></span><button class="si" data-act="backhome">${H.ic('home')}<span>${c.nav.home}</span></button></aside>
+      <main class="main">
+        <div class="ptitle"><h2 class="serif">${c.side.core[1][1]}</h2></div>
+        <div class="status" role="status">${H.mark()}<b>${c.status}</b><span>· ${c.statusSub}</span></div>
+        <div class="sect"><div class="kicker">${c.secShortcut}</div>${row(c.rowDictate, c.helpDictate, `<kbd>${c.key}</kbd>`)}</div>
+        <div class="sect"><div class="kicker">${c.secWriting}</div>${row(c.rowTidy, c.helpTidy, sw('tidy', S))}${row(c.rowLang, c.langVal, `<button class="btn">${c.change}</button>`)}</div>
+        <div class="sect"><div class="kicker">${c.secWords}</div>${row(c.rowDict, c.helpDict, `<button class="btn">${c.openDict}</button>`)}</div>
+        <div class="sect"><div class="kicker">${c.secHistory}</div>${row(c.rowKeep, c.helpKeep, `<span class="pop">${c.keepVal}${H.ic('chevd')}</span>`)}</div>
+        <button class="disc" data-act="more" aria-expanded="${S.more}">${H.ic(S.more ? 'chevd' : 'chev')}${c.more}</button>
+        ${more}
+        <p class="pfoot serif">${c.privacy}</p>
+      </main></div>`;
+  }
+
+  window.SKETCH = { id: 'b', name: 'B · Paper & Ink', screens: { onb, home, set: settings } };
+})();
+</script>
+</body>
+</html>
