@@ -15,41 +15,45 @@
   "labels": {
     "enabled": true,
     "pipeline": [
-      "review",
-      "changes-requested",
-      "qa",
       "qa-failed",
-      "merge-queue",
       "blocked",
       "do-not-merge"
     ],
     "category": [
-      "bug",
-      "feature",
-      "refactor",
-      "security",
-      "dependencies",
-      "documentation"
+      "type:bug",
+      "type:feature",
+      "type:chore",
+      "security"
     ],
     "meta": [
       "needs-qa",
-      "skip-qa",
       "qa-approved",
-      "qa-self-verified",
-      "in-progress",
-      "ci-monitoring"
+      "state:in-progress"
     ],
-    "priority": [
-      "priority-low",
-      "priority-medium",
-      "priority-high",
-      "priority-extreme"
-    ],
+    "priority": [],
     "risk": [
       "risk-low",
       "risk-medium",
       "risk-high"
-    ]
+    ],
+    "area": [
+      "area:dictation",
+      "area:meetings",
+      "area:notes",
+      "area:app"
+    ],
+    "state": [
+      "state:idea",
+      "state:needs-decision",
+      "state:agent-ready",
+      "state:in-progress"
+    ],
+    "milestones": [
+      "beta.2",
+      "later"
+    ],
+    "claim": "state:in-progress",
+    "rationaleComments": false
   },
   "qaGate": true,
   "ci": {
