@@ -163,10 +163,12 @@ struct AppEnvironment {
         LegacyDataMigration(fileManager: fileManager).run(supportDirectory: support, cachesDirectory: caches)
         let root = support.appending(path: "Lintel", directoryHint: .isDirectory)
         try createPrivateDirectory(root, fileManager: fileManager)
+        let settings = UserDefaultsSettingsStore()
+        pinPreviousPluginDefaults(dataRoot: root, settings: settings, fileManager: fileManager)
         let environment = AppEnvironment(
             dataRoot: root,
             cachesRoot: caches.appending(path: "Lintel", directoryHint: .isDirectory),
-            settings: UserDefaultsSettingsStore(),
+            settings: settings,
             keychain: SystemKeychainClient(),
             pasteboardName: nil,
             usage: openRanking(in: root),
@@ -206,6 +208,7 @@ struct AppEnvironment {
             options.persistentSettings
             ? QAFileSettingsStore(url: root.appending(path: QAFileSettingsStore.fileName), seeded: seeded)
             : InMemorySettingsStore(seeded)
+        pinPreviousPluginDefaults(dataRoot: root, settings: settings, fileManager: fileManager)
         let environment = AppEnvironment(
             dataRoot: root,
             cachesRoot: root.appending(path: "Caches", directoryHint: .isDirectory),
@@ -301,6 +304,14 @@ struct AppEnvironment {
 
     /// `ranking.sqlite` at the data root. If it cannot be opened, ranking falls back to memory for this
     /// session instead of stopping the app.
+    /// Runs `PluginDefaultsMigration` before `openRanking` creates `ranking.sqlite` (the sign of an earlier launch)
+    /// and before the host reads any `plugins.<id>.enabled`.
+    static func pinPreviousPluginDefaults(dataRoot: URL, settings: any SettingsStore, fileManager: FileManager) {
+        let existing = PluginDefaultsMigration.isExistingInstall(
+            dataRoot: dataRoot, settings: settings, fileManager: fileManager)
+        PluginDefaultsMigration.run(settings: settings, isExistingInstall: existing)
+    }
+
     static func openRanking(in root: URL) -> any UsageRecorder {
         do {
             return try UsageRepository.open(
