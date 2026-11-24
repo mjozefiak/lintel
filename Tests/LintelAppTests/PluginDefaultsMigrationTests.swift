@@ -127,9 +127,9 @@ private final class LegacyDefaultsDouble: DefaultsAccess {
         #expect(enabled(env.makeHost(PluginRegistry.all)) == Self.oldDefaults)
     }
 
-    /// An install from the Pounce era: `LegacyDataMigration` moves its folder (with `ranking.sqlite`) and copies its
+    /// An install under the previous app name: `LegacyDataMigration` moves its folder (with `ranking.sqlite`) and copies its
     /// settings first, so the pin sees an install that ran before and keeps a switch the user had stored.
-    @Test func aPounceEraInstallIsAnExistingInstallAfterTheLegacyMove() throws {
+    @Test func aPounceEraInstallIsAnExistingInstallAfterTheLegacyMove() throws {  // LEGACY-POUNCE
         let fileManager = FileManager.default
         let support = fileManager.temporaryDirectory.appending(path: "lintel-defaults-\(UUID().uuidString)")
         let legacy = support.appending(path: LegacyDataMigration.legacyFolderName, directoryHint: .isDirectory)
@@ -149,7 +149,7 @@ private final class LegacyDefaultsDouble: DefaultsAccess {
     }
 
     /// When the folder could not be moved, the copied welcome answers alone still mark the install as an old one.
-    @Test func aPounceEraInstallWhoseFolderDidNotMoveIsRecognisedByItsCopiedSettings() throws {
+    @Test func aPounceEraInstallWhoseFolderDidNotMoveIsRecognisedByItsCopiedSettings() throws {  // LEGACY-POUNCE
         let defaults = LegacyDefaultsDouble()
         LegacyDataMigration().migrateDefaults(
             legacy: [SettingsKeys.onboardingShortcutCompleted: true, "unrelated": 1], into: defaults)
