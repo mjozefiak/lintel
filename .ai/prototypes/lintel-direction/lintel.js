@@ -21,7 +21,7 @@
         { id: 'marta', k: 'dictation', t: 'Email to Marta about the Q4 budget', m: 'Dictation · 118 words', w: '16:10', g: 1 },
         { id: 'interview', k: 'meeting', f: 'recruiting', t: 'Interview: product designer', m: 'Meeting · 35 min · 2 tasks', w: '13:00', g: 1 },
         { id: 'board', k: 'dictation', t: 'Notes for the board update', m: 'Dictation · 240 words', w: '10:15', g: 2 },
-        { id: 'fjord', k: 'meeting', f: 'clients', t: 'Kick-off with Fjord Legal', m: 'Meeting · 51 min · 5 tasks', w: '15:00', g: 2 }
+        { id: 'fjord', k: 'meeting', f: 'clients', t: 'Kick-off with Fjord Legal', m: 'Meeting · 51 min', fail: 'Notes not written', w: '15:00', g: 2 }
       ],
       newRec: { t: 'Meeting, 24 November, 15:02', m: 'Meeting · 12 min', rec: 'Recording' },
       note: {
@@ -35,6 +35,7 @@
         mine: ['Ingrid OK with the price if we start in Jan', 'Ask Marek about the wording of the service levels', 'She mentioned a second office in Bergen, follow up in Q1'],
         tr: [['You', 'Thanks for making time, Ingrid. Shall we start with the price?'], ['Ingrid Halvorsen', 'Yes. We can accept it if you can start in January.'], ['Marek Lis', 'January works for us. I’ll send the service levels this week.'], ['Ingrid Halvorsen', 'Good. I need them before I go to the board.']]
       },
+      failed: { t: 'Lintel couldn’t write the notes for this meeting.', s: 'The recording and transcript are safe. Try again, or read the transcript.', b: 'Try Again' },
       dictNote: { meta: 'Yesterday, 16:10 · Dictation · pasted into Mail', body: 'Hi Marta, I went through the Q4 numbers and they look good. Can we go over the travel budget on Thursday? I’d like to move two trips to January.' },
       rec: {
         live: 'Recording', hears: 'Lintel hears you and the other people in the call.', pad: 'My notes',
@@ -94,7 +95,7 @@
         { id: 'marta', k: 'dictation', t: 'E-mail do Marty o budżecie na IV kwartał', m: 'Dyktowanie · 118 słów', w: '16:10', g: 1 },
         { id: 'interview', k: 'meeting', f: 'recruiting', t: 'Rozmowa rekrutacyjna: projektant produktu', m: 'Spotkanie · 35 min · 2 zadania', w: '13:00', g: 1 },
         { id: 'board', k: 'dictation', t: 'Notatki do raportu dla zarządu', m: 'Dyktowanie · 240 słów', w: '10:15', g: 2 },
-        { id: 'fjord', k: 'meeting', f: 'clients', t: 'Spotkanie otwierające z Fjord Legal', m: 'Spotkanie · 51 min · 5 zadań', w: '15:00', g: 2 }
+        { id: 'fjord', k: 'meeting', f: 'clients', t: 'Spotkanie otwierające z Fjord Legal', m: 'Spotkanie · 51 min', fail: 'Notatki nienapisane', w: '15:00', g: 2 }
       ],
       newRec: { t: 'Spotkanie, 24 listopada, 15:02', m: 'Spotkanie · 12 min', rec: 'Nagrywanie' },
       note: {
@@ -108,6 +109,7 @@
         mine: ['Ingrid OK z ceną, jeśli startujemy w styczniu', 'Zapytać Marka o zapis poziomów usług', 'Wspomniała o drugim biurze w Bergen, wrócić w I kw.'],
         tr: [['Ty', 'Dziękuję za czas, Ingrid. Zaczniemy od ceny?'], ['Ingrid Halvorsen', 'Tak. Akceptujemy ją, jeśli zaczniecie w styczniu.'], ['Marek Lis', 'Styczeń nam pasuje. W tym tygodniu wyślę poziomy usług.'], ['Ingrid Halvorsen', 'Dobrze. Potrzebuję ich przed posiedzeniem zarządu.']]
       },
+      failed: { t: 'Lintel nie zdołał napisać notatek z tego spotkania.', s: 'Nagranie i transkrypcja są bezpieczne. Spróbuj ponownie albo przeczytaj transkrypcję.', b: 'Spróbuj ponownie' },
       dictNote: { meta: 'Wczoraj, 16:10 · Dyktowanie · wklejone do Maila', body: 'Cześć Marto, liczby za IV kwartał wyglądają dobrze. Czy możemy w czwartek omówić budżet na podróże? Chciałabym przenieść dwa wyjazdy na styczeń.' },
       rec: {
         live: 'Nagrywanie', hears: 'Lintel słyszy Ciebie i pozostałe osoby w rozmowie.', pad: 'Moje notatki',
@@ -161,7 +163,7 @@
     ['general', 'lang', 0, 'Languages I speak', 'Języki, w których mówię', 'language polish english jezyk polski angielski'],
     ['general', 'mic', 0, 'Microphone', 'Mikrofon', 'mic headset headphones sluchawki'],
     ['general', 'size', 0, 'Text size', 'Wielkość tekstu', 'bigger larger font zoom wiekszy czcionka'],
-    ['general', 'login', 0, 'Open Lintel when I log in', 'Otwieraj Lintel po zalogowaniu', 'startup start launch logowanie uruchamiaj'],
+    ['general', 'login', 0, 'Open Lintel when I log in', 'Otwieraj Lintel po zalogowaniu', 'login startup start launch logowanie uruchamiaj'],
     ['general', 'dock', 0, 'Show Lintel in the Dock', 'Pokazuj Lintel w Docku', 'dock icon ikona'],
     ['general', 'early', 1, 'Try new features early', 'Testuj nowości wcześniej', 'beta test testowe'],
     ['dictation', 'shortcut', 0, 'Dictation shortcut', 'Skrót dyktowania', 'hotkey key keyboard skrot klawisz dyktuj'],
@@ -264,7 +266,7 @@
     checked: false,
     dict: pick('demo', ['listening', 'done'], 'idle'),
     typed: 0,
-    filter: 'all', sel: 'nordlys', setupHidden: false,
+    filter: 'all', sel: pick('sel', ['nordlys', 'sync', 'marta', 'interview', 'board', 'fjord'], 'nordlys'), setupHidden: false,
     recSec: 761, procP: null,
     toggles: { tidy: true, restore: true, login: true, dock: true, early: false, suggest: true, write: true, remind: true, auto: true, files: true, own: false, quick: false, clip: false, win: false },
     audit: qs.get('audit') === '1'
@@ -330,7 +332,7 @@
       const on = S.screen !== 'rec' && S.sel === x.id;
       const working = x.p !== undefined && x.p < 1;
       const mark = working ? ring('progress', 15, x.p) : ring(x.k, 15);
-      const meta = working ? `<span class="m work">${x.work}</span>` : `<span class="m">${x.m}</span>`;
+      const meta = working ? `<span class="m work">${x.work}</span>` : x.fail ? `<span class="m">${x.m} · <span class="failt">${x.fail}</span></span>` : `<span class="m">${x.m}</span>`;
       out += `<button class="li ${on ? 'on' : ''}" data-item="${x.id}" aria-current="${on}">${mark}<span class="tx"><span class="t">${x.t}</span>${meta}</span><span class="w">${x.w}</span></button>`;
     }
     return `<nav class="list" aria-label="${c.nav.all}">${out}</nav>`;
@@ -356,6 +358,11 @@
     }
     const tabs = n.tabs.map((l, i) => { const k = ['notes', 'mine', 'transcript'][i]; return `<button role="tab" aria-selected="${tab === k}" data-tab="${k}">${l}</button>`; }).join('');
     const head = item.id === 'nordlys' ? n.meta : item.m;
+    if (item.fail && tab === 'notes') {
+      const f = c.failed;
+      return `<div class="nhead"><div class="sp"><h1 class="ntitle">${item.t}</h1><div class="nmeta">${head}</div></div></div>
+        <div class="tabs" role="tablist">${tabs}</div><div class="warnbox" role="alert">${ic('warn')}<div class="tx"><b>${f.t}</b>${f.s}</div><button class="btn" data-act="noop">${f.b}</button></div>`;
+    }
     return `<div class="nhead"><div class="sp"><h1 class="ntitle">${item.t}</h1><div class="nmeta">${head}</div></div>${full ? '' : `<button class="btn" data-go="note">${ic('expand')}${n.open}</button>`}<button class="btn">${ic('copy')}${n.copy}</button></div>
       <div style="margin-top:8px"><span class="chip">${ring('meeting', 11)}${n.onMac}</span></div>
       <div class="tabs" role="tablist">${tabs}</div>${noteBody(c, tab)}`;
