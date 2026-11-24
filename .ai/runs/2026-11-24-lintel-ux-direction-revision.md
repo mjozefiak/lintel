@@ -29,4 +29,4 @@ Replace the three visual directions with one, "A with the warmth of C", whose br
 ### Phase 2: Doc and evidence
 
 - [x] 2.1 Direction doc revision 2 (principles, glossary, IA, brand signature, onboarding, checklist results, tree test) — 3dbc6b4b
-- [ ] 2.2 Screenshots on the evidence branch, foolproof table and PR body
+- [x] 2.2 Screenshots on the evidence branch, foolproof table and PR body — ef622a54 (evidence branch), PR body
