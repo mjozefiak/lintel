@@ -107,22 +107,26 @@ import Testing
         #expect(old.value(forKey: SettingsKeys.pluginEnabled("apps")) == .bool(true))
         #expect(old.value(forKey: SettingsKeys.pluginEnabled("meetings")) == .bool(false))
     }
-    /// The welcome screen shows the steps of the enabled plugins (`AppCoordinator` hands it the active ones): the core
-    /// steps on a new install, no Full Disk Access step while Files is off, and the old steps on an old install.
+    /// The welcome screen shows the steps of the enabled plugins and the Shortcut page only while one of them searches
+    /// (`AppCoordinator` hands it the active ones): on a new install the core steps without the Shortcut page and
+    /// without the Full Disk Access step, on an old install the old pages.
     private func welcomePages(_ env: TestEnvironment) -> [String] {
         let host = env.makeHost(PluginRegistry.all)
-        let steps = host.entries.filter { host.isEnabled($0.manifest.id) }.flatMap { $0.plugin.onboardingSteps }
+        let enabled = host.entries.filter { host.isEnabled($0.manifest.id) }.map { $0.plugin }
+        let steps = enabled.flatMap { $0.onboardingSteps }
         let hotkeys = HotkeyService(registrar: InMemoryHotkeyRegistrar(), settings: env.settings, readOccupied: { [] })
         let controller = OnboardingController(hotkeys: hotkeys, settings: AppSettings(store: env.settings)) { steps }
         controller.activatesApp = false
+        let searches = enabled.contains { !$0.searchSources.isEmpty }
+        controller.launcherIsActive = { searches }
         return controller.pendingPages.map { $0.id }
     }
 
-    @Test func aNewInstallsWelcomeScreenShowsTheCoreStepsAndNoFullDiskAccess() throws {
+    @Test func aNewInstallsWelcomeScreenShowsTheCoreStepsWithoutTheShortcutOrFullDiskAccess() throws {
         let env = try TestEnvironment()
         defer { env.tearDown() }
         PluginDefaultsMigration.run(settings: env.settings, isExistingInstall: false)
-        #expect(welcomePages(env) == ["intro", "shortcut", "dictation.setup", "meetings.setup", "done"])
+        #expect(welcomePages(env) == ["intro", "dictation.setup", "meetings.setup", "done"])
     }
 
     @Test func anOldInstallStillGetsTheStepsOfItsOldPlugins() throws {

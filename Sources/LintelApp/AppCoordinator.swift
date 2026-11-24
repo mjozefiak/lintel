@@ -438,6 +438,7 @@ final class AppCoordinator {
             host.entries.filter(\.state.isActive).flatMap(\.plugin.onboardingSteps)
         }
         onboarding.activatesApp = environment.registersGlobalHotkeys
+        onboarding.launcherIsActive = { !host.activeSources.isEmpty }
         onboarding.openMainWindow = { [weak self] in self?.router.openMainWindow() }
         self.onboarding = onboarding
 

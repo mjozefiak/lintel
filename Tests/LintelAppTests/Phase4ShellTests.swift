@@ -265,6 +265,19 @@ actor PlainRecorder: UsageRecorder {
         return (controller, settings)
     }
 
+    @Test func withoutASearchingPluginTheWelcomeScreenSkipsTheShortcutAndDoesNotNameIt() {
+        let store = InMemorySettingsStore()
+        let (controller, settings) = makeController(store, steps: ["dictation.setup"])
+        controller.launcherIsActive = { false }
+        #expect(controller.pendingPages.map(\.id) == ["intro", "dictation.setup", "done"])
+        #expect(controller.hasPendingSteps)
+        settings.shortcutOnboardingCompleted = true
+        #expect(controller.pendingPages.map(\.id) == ["dictation.setup", "done"])
+        #expect(
+            WelcomeColumnView.text(for: WelcomePage(kind: .done), shortcut: nil)
+                == "Your notes live in the Lintel window: click the Dock icon or press ⌘,.")
+    }
+
     @Test func firstLaunchCombinesTheIntroTheShortcutAndEveryPluginStep() {
         let store = InMemorySettingsStore()
         let (controller, settings) = makeController(store, steps: ["clipboard.intro", "files.fullDiskAccess"])
