@@ -93,6 +93,12 @@ final class HotkeyService {
         setMainShortcutActive(active)
     }
 
+    /// Storing a shortcut registers it with the system, also while no handler listens; an inactive launcher gives the
+    /// key back at once.
+    private func releaseMainShortcutIfInactive() {
+        if !isMainShortcutActive { registrar.removeHandler(for: .main) }
+    }
+
     /// Registers the main shortcut (`true`) or unregisters it (`false`); the stored shortcut is not touched. Does
     /// nothing before `start` or when nothing changes.
     func setMainShortcutActive(_ active: Bool) {
@@ -116,6 +122,7 @@ final class HotkeyService {
         if resolved != current {
             registrar.setShortcut(resolved, for: .main)
             logger.info("Main shortcut set to the default \(resolved?.displayString ?? "none", privacy: .public)")
+            releaseMainShortcutIfInactive()
         }
         mainShortcut = registrar.shortcut(for: .main)
     }
@@ -124,6 +131,7 @@ final class HotkeyService {
     func userRecordedMainShortcut() {
         settings.setValue(.bool(true), forKey: SettingsKeys.hotkeyUserDefined)
         mainShortcut = registrar.shortcut(for: .main)
+        releaseMainShortcutIfInactive()
     }
 
     /// Goes back to the automatic default (the onboarding step's "Skip").
@@ -230,6 +238,8 @@ final class InMemoryHotkeyRegistrar: HotkeyRegistrar {
     /// Tests set this to false to simulate another app holding Escape.
     var escapeAvailable = true
     private(set) var escapeReleases = 0
+    /// How often each name's key was given back (`removeHandler`).
+    private(set) var releases: [HotkeyName: Int] = [:]
 
     func shortcut(for name: HotkeyName) -> HotkeyShortcut? { shortcuts[name] }
 
@@ -248,6 +258,7 @@ final class InMemoryHotkeyRegistrar: HotkeyRegistrar {
     func removeHandler(for name: HotkeyName) {
         handlers[name] = nil
         keyEventHandlers[name] = nil
+        releases[name, default: 0] += 1
     }
 
     func claimEscape(_ action: @escaping @MainActor () -> Void) -> EscapeKeyClaim {

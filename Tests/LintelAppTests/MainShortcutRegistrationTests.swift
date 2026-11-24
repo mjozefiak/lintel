@@ -29,6 +29,31 @@ import Testing
         #expect(service.mainShortcut == .commandSpace)
     }
 
+    /// Storing a shortcut registers it with the system even without a handler (KeyboardShortcuts), so an inactive
+    /// launcher gives the key back after the first default and after the user records another shortcut.
+    @Test func anInactiveLauncherGivesTheKeyBackWheneverAShortcutIsStored() {
+        let registrar = InMemoryHotkeyRegistrar()
+        let service = HotkeyService(registrar: registrar, settings: InMemorySettingsStore()) { [] }
+        service.start(onMainShortcut: {}, active: false)
+        #expect(registrar.releases[.main] == 1, "the first launch stores the default")
+
+        registrar.setShortcut(.controlOptionSpace, for: .main)
+        service.userRecordedMainShortcut()
+        #expect(registrar.releases[.main] == 2)
+        #expect(service.mainShortcut == .controlOptionSpace, "the user's shortcut is kept")
+
+        service.setMainShortcutActive(true)
+        registrar.setShortcut(.commandSpace, for: .main)
+        service.userRecordedMainShortcut()
+        #expect(registrar.releases[.main] == 2, "an active launcher keeps its key")
+        #expect(registrar.handlers[.main] != nil)
+
+        service.setMainShortcutActive(false)
+        service.setMainShortcutActive(false)
+        #expect(registrar.releases[.main] == 3, "turning it off releases exactly once")
+        #expect(service.mainShortcut == .commandSpace)
+    }
+
     @Test func startIsActiveByDefault() {
         let registrar = InMemoryHotkeyRegistrar()
         let service = HotkeyService(registrar: registrar, settings: InMemorySettingsStore()) { [] }
