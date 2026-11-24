@@ -87,7 +87,8 @@ import Testing
         }
         #expect(!existing(InMemorySettingsStore()))
         #expect(existing(InMemorySettingsStore([SettingsKeys.onboardingShortcutCompleted: .bool(true)])))
-        #expect(existing(InMemorySettingsStore([SettingsKeys.onboardingCompletedSteps: .stringArray(["files.access"])])))
+        let answered = InMemorySettingsStore([SettingsKeys.onboardingCompletedSteps: .stringArray(["files.access"])])
+        #expect(existing(answered))
         try Data().write(to: root.appending(path: UsageRepository.fileName))
         #expect(existing(InMemorySettingsStore()))
     }
