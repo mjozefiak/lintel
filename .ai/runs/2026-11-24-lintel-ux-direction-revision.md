@@ -24,9 +24,9 @@ Replace the three visual directions with one, "A with the warmth of C", whose br
 
 ### Phase 1: Sketch
 
-- [ ] 1.1 One-direction sketch: main window (explorer, empty, note, recording, dictionary), settings (7 pages + search), onboarding (5 steps); drop A, B, C files
+- [x] 1.1 One-direction sketch: main window (explorer, empty, note, recording, dictionary), settings (7 pages + search), onboarding (5 steps); drop A, B, C files — 52435e64
 
 ### Phase 2: Doc and evidence
 
-- [ ] 2.1 Direction doc revision 2 (principles, glossary, IA, brand signature, onboarding, checklist results, tree test)
+- [x] 2.1 Direction doc revision 2 (principles, glossary, IA, brand signature, onboarding, checklist results, tree test) — 3dbc6b4b
 - [ ] 2.2 Screenshots on the evidence branch, foolproof table and PR body
