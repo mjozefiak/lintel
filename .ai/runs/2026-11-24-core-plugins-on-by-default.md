@@ -82,3 +82,9 @@ PR: #251
 
 - [x] 3.1 BACKWARD_COMPATIBILITY.md and AGENTS.md — 86d7be57
 - [x] 3.2 Manual QA with screenshots — evidence branch `qa-evidence-pr-251`
+
+### Phase 4: Owner decision 1 (main shortcut only while a plugin searches)
+
+- [x] 4.1 Register the main shortcut only while an active plugin has search sources, with tests — c7223070
+- [x] 4.2 Docs (AGENTS.md, docs/qa.md, BACKWARD_COMPATIBILITY.md §5, CHANGELOG) — c7223070, 7f916a1a
+- [x] 4.3 QA screenshots of the changed behaviour — evidence branch `qa-evidence-pr-251`, folder `pr-251/r2/`
