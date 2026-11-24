@@ -445,7 +445,7 @@ actor PlainRecorder: UsageRecorder {
         #expect(WelcomePage(kind: .done).heading == "You’re set")
         #expect(
             WelcomeColumnView.text(for: WelcomePage(kind: .intro), shortcut: nil)
-                == "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac.")
+                == "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings.")
         #expect(
             WelcomeColumnView.text(for: WelcomePage(kind: .shortcut), shortcut: nil)
                 == ShortcutStepContent.explanation)

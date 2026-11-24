@@ -432,7 +432,7 @@ struct WelcomeColumnView: View {
         case .intro:
             String(
                 localized:
-                    "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac.",
+                    "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings.",
                 comment: "Welcome screen: text of the first page")
         case .shortcut:
             ShortcutStepContent.explanation

@@ -106,4 +106,28 @@ import Testing
         #expect(old.value(forKey: SettingsKeys.pluginEnabled("apps")) == .bool(true))
         #expect(old.value(forKey: SettingsKeys.pluginEnabled("meetings")) == .bool(false))
     }
+    /// The welcome screen shows the steps of the enabled plugins (`AppCoordinator` hands it the active ones): the core
+    /// steps on a new install, no Full Disk Access step while Files is off, and the old steps on an old install.
+    private func welcomePages(_ env: TestEnvironment) -> [String] {
+        let host = env.makeHost(PluginRegistry.all)
+        let steps = host.entries.filter { host.isEnabled($0.manifest.id) }.flatMap { $0.plugin.onboardingSteps }
+        let hotkeys = HotkeyService(registrar: InMemoryHotkeyRegistrar(), settings: env.settings, readOccupied: { [] })
+        let controller = OnboardingController(hotkeys: hotkeys, settings: AppSettings(store: env.settings)) { steps }
+        controller.activatesApp = false
+        return controller.pendingPages.map { $0.id }
+    }
+
+    @Test func aNewInstallsWelcomeScreenShowsTheCoreStepsAndNoFullDiskAccess() throws {
+        let env = try TestEnvironment()
+        defer { env.tearDown() }
+        PluginDefaultsMigration.run(settings: env.settings, isExistingInstall: false)
+        #expect(welcomePages(env) == ["intro", "shortcut", "dictation.setup", "meetings.setup", "done"])
+    }
+
+    @Test func anOldInstallStillGetsTheStepsOfItsOldPlugins() throws {
+        let env = try TestEnvironment()
+        defer { env.tearDown() }
+        PluginDefaultsMigration.run(settings: env.settings, isExistingInstall: true)
+        #expect(welcomePages(env) == ["intro", "shortcut", "files.fullDiskAccess", "clipboard.intro", "done"])
+    }
 }

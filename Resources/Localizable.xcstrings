@@ -4033,20 +4033,20 @@
         }
       }
     },
-    "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac." : {
+    "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings." : {
       "comment" : "Welcome screen: text of the first page",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac."
+            "value" : "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Szukaj aplikacji i plików, wklejaj z historii, dyktuj, miej notatki ze spotkań. Wszystko na tym Macu."
+            "value" : "Dyktuj w dowolnej aplikacji i miej notatki ze spotkań, wszystko na tym Macu. Wyszukiwanie, historię schowka i inne dodatki włączysz w Ustawieniach."
           }
         }
       }
