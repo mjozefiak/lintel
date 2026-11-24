@@ -7,21 +7,22 @@ Website: [lintelapp.com](https://lintelapp.com)
 
 ## Features
 
-Lintel is made of plugins. App search, file search, clipboard history and Notes are on by default;
-dictation, meeting notes and window management are off until you turn them on.
+Lintel is made of plugins. Dictation, meeting notes and Notes are on by default; app search, file search,
+clipboard history and window management are add-ons, off until you turn them on in Settings → Features.
+(An install from before 2026-11-24 keeps the switches it had.)
 
-- **App search:** fuzzy matching ("vsc" finds Visual Studio Code) that learns from what you pick, without
+- **App search** (off by default): fuzzy matching ("vsc" finds Visual Studio Code) that learns from what you pick, without
   ever ranking a weaker match above a better one. The empty panel suggests the apps you use most.
-- **File search:** its own in-memory index of file and folder names in your home folder and
+- **File search** (off by default): its own in-memory index of file and folder names in your home folder and
   `/Applications`, kept fresh with FSEvents instead of Spotlight. Names only; Lintel never reads what is
   inside your files.
-- **Clipboard history** (⌘⇧V): text, rich text, links, images and files from the last 30 days (up to
+- **Clipboard history** (off by default; ⌘⇧V): text, rich text, links, images and files from the last 30 days (up to
   1000 entries), encrypted on disk with SQLCipher and a key in your Keychain. Password managers and
   concealed items are skipped. Return pastes into the app you were using.
-- **Dictation** (off by default): speak anywhere and Lintel pastes the text. Speech recognition runs on
+- **Dictation:** speak anywhere and Lintel pastes the text. Speech recognition runs on
   your Mac. An optional cleanup step uses a small built-in model or a server you run yourself on
   `localhost`. Audio is never written to disk. A history of dictations is kept encrypted.
-- **Meeting notes** (off by default): records the microphone and the system audio, transcribes on your
+- **Meeting notes:** records the microphone and the system audio, transcribes on your
   Mac and writes notes, kept in an encrypted library.
 - **Notes:** the main window collects meeting notes, dictations and your own notes, with search, history
   and comments.

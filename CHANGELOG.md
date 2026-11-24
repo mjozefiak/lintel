@@ -6,6 +6,11 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ## [Unreleased]
 
+### Changed
+
+- On a new install, Dictation and Meetings are on, and app search, file search and clipboard history are add-ons that you turn on in Settings → Features. If you used Lintel before this version, every switch stays as it was.
+- The welcome screen starts with dictation and meeting notes. It asks for the launcher shortcut only when app search, file search or window management is on; the shortcut is always in Settings → General.
+
 ## [0.1.0-beta.1] - 2026-11-22
 
 The first public beta.
