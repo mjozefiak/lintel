@@ -54,6 +54,11 @@ final class HotkeyService {
 
     /// The current main shortcut, for menus and settings.
     private(set) var mainShortcut: HotkeyShortcut?
+    /// Whether the main shortcut is registered with the system. Only while an active plugin searches (owner decision
+    /// 2026-11-24): with every launcher add-on off the panel finds nothing, so the key stays free for other apps. The
+    /// stored shortcut is kept either way.
+    private(set) var isMainShortcutActive = false
+    @ObservationIgnored private var onMainShortcut: (@MainActor () -> Void)?
     /// Whether Spotlight (or another symbolic hotkey) holds Command-Space right now.
     private(set) var spotlightHoldsCommandSpace = false
 
@@ -81,10 +86,24 @@ final class HotkeyService {
         ShortcutPolicy.defaultShortcut(occupied: readOccupied())
     }
 
-    /// Applies the default when the user has not chosen a shortcut, and starts listening.
-    func start(onMainShortcut action: @escaping @MainActor () -> Void) {
+    /// Applies the default when the user has not chosen a shortcut, and starts listening when `active`.
+    func start(onMainShortcut action: @escaping @MainActor () -> Void, active: Bool = true) {
         refreshDefault()
-        registrar.setHandler(for: .main, action)
+        onMainShortcut = action
+        setMainShortcutActive(active)
+    }
+
+    /// Registers the main shortcut (`true`) or unregisters it (`false`); the stored shortcut is not touched. Does
+    /// nothing before `start` or when nothing changes.
+    func setMainShortcutActive(_ active: Bool) {
+        guard let onMainShortcut, active != isMainShortcutActive else { return }
+        if active {
+            registrar.setHandler(for: .main, onMainShortcut)
+        } else {
+            registrar.removeHandler(for: .main)
+        }
+        isMainShortcutActive = active
+        logger.info("Main shortcut \(active ? "registered" : "unregistered", privacy: .public)")
     }
 
     /// Re-reads the symbolic hotkeys and moves the main shortcut to the current default unless the user
