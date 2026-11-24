@@ -1,168 +1,242 @@
 # Lintel UX direction
 
-> Status: **draft for the owner's decision**, 2026-11-23. Design-only (no Swift, no settings keys changed). The shared parts (personas, tone, glossary, settings IA, principles) are proposed as one package; the visual choice between the three sketched directions is the owner's. Sketches: `.ai/prototypes/lintel-direction/`.
+> Status: **revision 2, draft for the owner's decision**, 2026-11-24. Design-only: no Swift, no settings keys, no strings in `Localizable.xcstrings`. Sketch: `.ai/prototypes/lintel-direction/lintel.html`. Revision 1 (2026-11-23, three directions A, B, C with a Home dashboard) is in the PR history.
 
-## Status and handoff
+## What changed in revision 2
 
-**Done**
-- Inputs read: `.uxproof/conventions.md`, the settings audit, the UI root-cause report, the Figma evaluation (session scratchpad reports, 2026-11-23), `.ai/specs/2026-11-04-lintel-main-window.md`, `.ai/prototypes/lintel-app` (CSS tokens, README), owner memory (audience shift 2026-11-23, Verdigris palette, SwiftUI gallery as source of truth).
-- Every jargon-bearing string pulled from `Resources/Localizable.xcstrings` (1412 keys) to ground the glossary.
-- Web research (findings and sources below).
-- Shared direction written: personas, tone, glossary, settings IA, principles.
-- Three clickable sketches built (A Quiet Native, B Paper & Ink, C Friendly Guide), each with the same three screens (onboarding step 4 "Try it", main window Home, Settings → Dictation), light and dark, English and Polish. Screenshots are in the PR body.
-- Direction comparison, validation plan, open decisions and evidence limits (below).
+Owner feedback on revision 1 (2026-11-24): A Quiet Native and C Friendly Guide were liked most; the brand character got lost; the main view must be the notes explorer, not a Home dashboard; settings were not rethought enough; notes and dictation are the core, while quick search (launcher and file search), clipboard history and window layouts are add-ons that are off by default.
 
-**Next (after the owner picks)**
-1. Owner picks A, B, C or a named mix, and answers the open decisions below.
-2. The chosen direction becomes the SwiftUI gallery's tokens and the three design tracks (onboarding, main window, settings rebuild) each get their own spec that cites this doc.
-3. Run the five-user preference and findability check described under Validation before the settings rebuild is specced.
+Three research reports were written for this round (`~/.lintel-agents/2026-11-24/`): a competitor UI teardown (Wispr Flow, Circleback, Fireflies, Granola), foolproof UI rules with a 19-item checklist, and a settings IA built from scratch with a 20-task tree test. Revision 2 follows them:
+
+1. **One direction, "Quiet Native with warmth"**: A's native structure and controls with C's warmth (warm neutrals, rounded empty states, an illustrated step rail in onboarding). B is dropped: warm cream with a serif and green already reads as Granola. A neutral grey tone is kept as the one contrasting variant (`tone=neutral`) because the owner has to decide whether the warmth stays.
+2. **The brand signature is the working ring**, not a typeface or a palette (below).
+3. **Main window = three-column notes explorer.** There is no Home dashboard, no stats and no upsell.
+4. **Settings rebuilt** to the IA research: 7 sidebar items, one home per setting, an Add-ons page where everything is off, a single Privacy & data page, and one AI assistant choice.
+5. **Onboarding rebuilt**: goal → privacy → access with reasons → practice dictation → first meeting, with the copy fixes from the audit.
+6. **Every sketched screen is checked** against the 19-item foolproof checklist (results below and in the PR body).
 
 ## Decision being made
 
-One shared UX direction that the three later design tracks (first-run onboarding, friendlier main window, settings rebuilt from scratch) follow, so they do not each invent a look, a vocabulary and an IA. The visual choice between 2-3 directions is the owner's.
+The look, the vocabulary and the IA that the three design tracks (main window, settings rebuild, onboarding) follow, so each spec starts from one accepted direction instead of inventing its own. Code changes (inverting plugin defaults, the settings rebuild, the new main window) come later in their own PRs.
 
-## Research findings (web, 2026-11-23)
+## Inputs
 
-- **Wispr Flow** (help center): Mac onboarding is privacy choice → permissions (Microphone + Accessibility) → microphone test → shortcut test → languages; a "skip" path keeps only those essentials. Default push-to-talk is Fn (Ctrl+Opt without an Apple Fn key); double-tap for hands-free. Reviewers say setup asks about writing style; a secondhand design note says practice happens in a sample email field rather than a video. Dictionary learns from corrections; Styles per app category (Personal, Work, Email). Settings expose no models or servers. Complaints: privacy (not fully on-device), resource use, support.
-  Sources: [setup guide](https://docs.wisprflow.ai/articles/3152211871-setup-guide), [first dictation](https://docs.wisprflow.ai/articles/6409258247-starting-your-first-dictation), [product-aware onboarding](https://docs.wisprflow.ai/articles/5926242953-product-aware-onboarding-choosing-dictation-notetaker-or-both-macos), [Styles](https://docs.wisprflow.ai/articles/2368263928-how-to-setup-flow-styles), [unite.ai review](https://www.unite.ai/wispr-flow-review/), [Cult of Mac](https://www.cultofmac.com/reviews/wispr-flow-mac-speech-to-text-app-review), [Product Hunt reviews](https://producthunt.com/products/wisprflow/reviews).
-- **Granola**: praised by non-technical reviewers for near-zero setup and "no bot in the call" (feels discreet with clients and board members). Home opens on "Coming up" (next meetings from the calendar). Permissions: microphone, screen & system audio, calendar.
-  Sources: [Granola setup docs](https://docs.granola.ai/help-center/getting-started/setting-up-granola-for-the-first-time), [calendar setup](https://www.granola.ai/docs/docs/101/gettingstarted/calendarintegrations), [G2 reviews](https://www.g2.com/products/granola/reviews), [tl;dv review](https://tldv.io/blog/granola-review/).
-- **Superhuman**: activation came from a guided 30-minute session that made the user do real work in their own inbox, later turned into a self-serve in-product flow. Lesson: practise on the user's real task, not a tour.
-  Sources: [First Round: onboarding playbook](https://review.firstround.com/superhuman-onboarding-playbook/), [Heavybit](https://www.heavybit.com/library/blog/4-phases-of-building-an-enterprise-onboarding-process/).
-- **Linear**: one thing per screen, calm visuals, no confetti, tours or tooltips; ends with a short "get familiar" checklist. Sources: [Candu teardown](https://www.candu.ai/blog/linear-onboarding-teardown), [growth.dives](https://growth-dives.kit.com/posts/growth-dives-inside-linear-s-onboarding-3-things-i-didn-t-expect).
-- **Raycast**: new first-run flow in v0.59 (May 2026); screen detail not verified. [changelog](https://www.raycast.com/changelog/macos/0-59).
-- **Things 3**: two Apple Design Awards; UI deliberately "invisible" so content leads. [App Store](https://apps.apple.com/us/app/id904237743).
-- **Apple Notes / Voice Memos**: recording and transcript live inside the note; summary is an optional extra layer, not the headline. [Notes: record and transcribe](https://support.apple.com/guide/notes/apdb5106e334), [Voice Memos transcription](https://support.apple.com/guide/voice-memos/vm4a03609f0d). Apple HIG: onboarding fast, fun, optional. [HIG onboarding](https://developer.apple.com/design/human-interface-guidelines/onboarding).
-- **Otter / Notion AI meeting notes**: setup called straightforward; friction from upsell before calendar connect (Otter) and plan gating/beta (Notion). [tl;dv on Notion](https://tldv.io/blog/notion-ai-meeting-notes-review/), [tl;dv on Otter](https://tldv.io/blog/otter-ai-review/).
-- Not found: App Store reviews quoting onboarding of these apps; any review from lawyers or sales teams about settings.
+- Owner feedback 2026-11-24 (above) and the owner decisions of 2026-11-19: Claude as an optional notes writer (off by default, with consent text), notes are summaries without timestamps, **no per-line AI or human authorship marks**, chat over notes and post-meeting actions are prototype-first and decided by the owner (not part of this direction).
+- `research-competitors-ui.md`: everyone in the category separates "mine" from "AI" (Wispr's My thoughts tab, Granola's black and grey lines); personalisation such as the dictionary lives in the main window, while Settings stay short and systemic; one list of notes with search beats an assistant dashboard (Fireflies collects complaints about clutter); none of the four has a Polish UI, and local privacy is the weak spot of Wispr and Granola.
+- `research-foolproof-ui.md`: 15 rules (R1-R15), the 19-item checklist (C1-C19) and the ten worst violations on `main` and in revision 1.
+- `research-settings-ia.md`: the 7-item sidebar, a page-by-page row table with defaults, removed items, search with synonyms, the 20-task tree test, and the contradictions in `main` and in revision 1.
+- Revision 1 research (Wispr Flow setup, Granola, Superhuman, Linear, Raycast, Things, Apple Notes, Otter, Notion) still holds; sources are in the PR history.
 
-## Personas (assumptions, not research; Lintel has no telemetry or interviews)
+## Personas (assumptions; Lintel has no telemetry or interviews)
 
-1. **Anna, sales manager** (8+ calls a day, writes follow-ups between calls). Wants notes and follow-up emails without typing. Fears: sounding robotic, a client noticing a bot. Success: the follow-up is sent before the next call.
-2. **Piotr, lawyer / consultant** (confidential client work, dictates memos). Wants dictation that spells names and terms right and never leaves the Mac. Fears: data leaving the device, losing a recording. Success: he trusts it with a client memo.
-3. **Kasia, recruiter / HR** (interviews, many short messages, Polish and English). Wants both languages without switching. Fears: setup she cannot finish alone. Success: she set it up in 3 minutes without help.
+1. **Anna, sales manager**: 8+ calls a day, writes follow-ups between calls. Success: the follow-up is sent before the next call.
+2. **Piotr, lawyer / consultant**: confidential client work, dictates memos. Success: he trusts it with a client memo, and nothing leaves the Mac.
+3. **Kasia, recruiter / HR**: interviews, Polish and English. Success: she sets it up in 3 minutes without help.
 
 ## Tone of voice
 
-Calm, plain, second person, short sentences (about 15 words), verbs on buttons, no exclamation marks, no AI hype words ("magic", "supercharge", "AI-powered"), no technical nouns. Say what happens to the user's words, not how the machine works. Polish uses "Ty" forms with capital letters in direct address ("Twoje słowa"), never declines the name Lintel.
-
-## Glossary (current UI term → plain words; "hidden" = never in Basics, at most behind More options)
-
-| Current term | Plain English | Plain Polish | Where it may appear |
-|---|---|---|---|
-| speech model, Parakeet, Whisper, WhisperKit | voice pack (download) / "speech recognition" | pakiet głosu / rozpoznawanie mowy | AI on this Mac pane only; engine names hidden |
-| LLM, built-in model, Qwen, Bielik, GGUF, notes model | writing assistant | asystent pisania | AI on this Mac pane; model names hidden |
-| Clean up / formatting | Tidy up my text | Porządkuj mój tekst | Dictation |
-| Run on: Built-in (Lintel) / My server, endpoint, address, localhost, port | hidden ("Use my own AI server" under More options in AI on this Mac) | ukryte | More options only |
-| notesProvider "Claude" / This Mac | Meeting notes written by: This Mac / Claude (online) | Notatki pisze: ten Mac / Claude (online) | AI on this Mac |
-| diarization, speaker model, speaker recognition | telling speakers apart (always on, no setting) | rozpoznawanie, kto mówi | hidden; only "Speakers" in a note |
-| transcript | transcript (kept; understood by office users) | transkrypcja | Notes |
-| retention, retentionDays, maximumEntries | Keep … for 30 days | Przechowuj przez 30 dni | Privacy & Data, history rows |
-| Erase Data, Clear Library, Clear History | Delete all meetings… / Delete dictation history… | Usuń wszystkie spotkania… | Privacy & Data |
-| bundle ID | hidden (pick an app from a list instead) | ukryte | More options |
-| Full Disk Access | "Search everywhere on this Mac" (permission name shown only on the System Settings button) | Szukaj wszędzie na tym Macu | Search add-on |
-| Accessibility (permission) | "Let Lintel type into other apps" | Pozwól Lintel pisać w innych aplikacjach | onboarding, Privacy & Data |
-| System Audio Recording | "Hear the other people in a call" | Słysz innych uczestników rozmowy | onboarding, Meetings |
-| Test System Audio, Capture diagnostics, Copy diagnostics | Check call audio / Send a problem report | Sprawdź dźwięk rozmowy / Zgłoś problem | More options |
-| voice processing, echo suppression | hidden (always on) | ukryte | — |
-| index, Rebuild Index, Reset Ranking | hidden; "Start over" under More options | ukryte | More options |
-| launcher | Quick search | Szybkie wyszukiwanie | Add-ons |
-| plugin, feature toggles pane | features are switched on in their own pane header | — | — |
-| vocabulary | Dictionary ("words Lintel always spells your way") | Słownik | top-level pane (proposed) |
-| spool, keep warm, VAD, tokens | hidden | ukryte | never |
-
-## Settings IA (shared by every direction)
-
-Core: General · Dictation · Meetings · Notes · Dictionary. Add-ons: Quick search · Clipboard history · Window layouts. Then: Privacy & Data · AI on this Mac. A "Search settings" field sits above the sidebar. Each pane: status line → 3-5 basic rows → "More options" (collapsed) → one footer sentence. Builds on the 2026-11-23 settings audit (rank 1-5) without changing settings keys in this PR.
+Calm, plain, second person, short sentences (about 15 words), verbs on buttons, no exclamation marks, no AI hype words ("magic", "supercharge", "AI-powered"), no technical nouns. Say what happens to the user's words, not how the machine works. Headings are nouns; questions only as onboarding titles. Polish uses "Ty" forms with capitals in direct address ("Twoje słowa") and never declines the name Lintel. English buttons use title case (macOS), labels sentence case.
 
 ## Design principles
 
-These apply to every direction; the sketches follow all twelve.
+1. **Open on the user's content.** The window opens on the notes explorer; the first-run checklist is one row that can be hidden (R2).
+2. **Core on, add-ons off.** A fresh install has dictation and meeting notes; add-ons have no trace in the main window, onboarding or the sidebar until turned on (R1).
+3. **One obvious next step per screen**: one filled button, and it names what happens ("Record Meeting", "Stop and Write Notes") (R3).
+4. **Show the result, not the machinery.** No model, server, engine or index names outside "More options" (R4).
+5. **One home per setting.** Other pages only point to it with a "›" row; search finds it by the user's word in English or Polish (IA research).
+6. **Five rows, then More options**, never "Advanced" (R5).
+7. **Pick from a list instead of typing**: apps, folders, shortcuts (R6).
+8. **Prevent, then explain.** Continue is never greyed out without a reason; errors say what happened, what to do, and offer one fix button (R7, R9).
+9. **Mine is never rewritten.** What the user types stays in My notes; Lintel's notes are a separate tab, not marks on each line (owner 2026-11-19).
+10. **Privacy where the data is**: one sentence per page, "On this Mac" on every note, Privacy & data as the only place for permissions, retention and deletion.
+11. **Native, plus one signature**: macOS controls and layout everywhere; the brand is the working ring and Verdigris for what is live (R15).
+12. **Bilingual and large-text safe**: every screen is checked in Polish and at XL text without truncation (R14).
 
+## Brand signature: the working ring
 
-1. Show the result, not the machinery (no model, server or engine names in Basics).
-2. One obvious next step per screen; the primary button says what happens.
-3. Practise on a real task in onboarding (dictate into a sample email), never a video or tour.
-4. Ask for a permission only when its reason is on screen, in the user's words.
-5. Privacy is stated where the data is, in one sentence ("Nothing is sent anywhere").
-6. Defaults decide; options are for exceptions (More options, never "Advanced").
-7. Every setting has one home and is findable by search.
-8. Voice and notes first; add-ons never sit above them.
-9. Native controls, signature in three places only (accent, mark, onboarding/HUD motion).
-10. Calm over clever: no confetti, glow, sparkles, purple-blue gradients.
-11. Bilingual by design: every layout tested with Polish, which runs ~30% longer.
-12. Recoverable: every destructive action names what is deleted and how long it was kept.
+The cut ring from the logo is the one element that carries the brand inside the product. It is a working element, not a decoration, and it appears in five states:
 
-## Native vs signature
+| State | Where | Look |
+|---|---|---|
+| Record button | toolbar of the main window (the only filled button) | white ring on Verdigris + "Record Meeting" |
+| Live (recording, listening) | toolbar pill while recording, the recording panel, the "Now" row, Hold to Talk in onboarding, the dictation HUD | Verdigris ring that slowly turns, the centre dot breathes; static under Reduce Motion |
+| Working (writing notes) | the note's row in the list | the ring closes as the notes are written ("Writing notes…") |
+| Note type | every row and the Meetings / Dictations filters | meeting = ring with the centre dot, dictation = ring without it, always with the word in the meta line (never shape alone) |
+| Empty | empty notes view | an outlined ring and one sentence with one action |
 
-Native: window chrome, sidebar, grouped forms, toggles, pop-ups, shortcut recorder, sheets, SF Symbols, Dynamic Type via `TextSize`, system status colours. Signature: Verdigris accent (#267C6C / dark #6BBDAB; text #036152), the cut-ring mark (also the "listening" indicator), warm ink/paper neutrals, onboarding and HUD motion (respects Reduce Motion).
+**Verdigris** (#267C6C light, #6BBDAB dark; text #036152 / #7FCDBB) appears only on the primary button, the selection (sidebar, list, onboarding step, chosen option; a 14 % tint with a 3 pt bar) and live state (the ring, the recording pill, "Writing notes…", the status line of a ready feature). Switches and checkboxes use it for "on", as macOS does; links use the accent text colour (open decision 4). No gradients, glow, sparkles or purple-blue.
 
-## Three visual directions
+**Warmth** (from C): warm neutral surfaces (#F8F6F2 window, #EFECE6 sidebar; dark #1D1B18 / #242220), 10-12 pt corners on groups and cards, the outlined ring in empty states, and a warm step rail with the ring and "Your words, on this Mac." in onboarding. Not taken from C: icon circles on every row, rounded type, and questions as section headings.
 
-- **A. Quiet Native**: looks like a first-party Apple app (System Settings / Notes); neutral greys, accent only on selection and primary buttons. Lowest build cost; risk: the owner already called a similar look "bland" (2026-11-04).
-- **B. Paper & Ink** (author's current lean): warm paper neutrals, New York serif for headings (`.fontDesign(.serif)`), hairlines instead of filled cards, the cut ring as the listening indicator. Signature without leaving native controls.
-- **C. Friendly Guide**: rounded type and 14-16 pt corners, soft Verdigris tints, icon circles, an illustrated side panel in onboarding, section headings as questions ("How do you start?"). Warmest for non-technical users; highest build cost and furthest from native.
+**Variant (`tone=neutral`)**: the same screens on cool system greys (revision 1's A). It shows what the warmth adds and what it costs; one screenshot is in the PR.
 
-## Sketch content (fixed copy, en / pl)
+## Information architecture
 
-Screens: (1) onboarding step 4 of 5 "Try it", (2) main window Home, (3) Settings → Dictation.
+### Main window: the notes explorer
 
-- Onboarding: "Say something. Lintel will type it." / "Powiedz coś. Lintel to napisze." · "Hold ⌥ Space, say a sentence, then let go." / "Przytrzymaj ⌥ Spację, powiedz zdanie i puść." · sample email To: Marta Nowak, Subject: Q4 budget / Temat: Budżet na IV kwartał · result "Hi Marta, I went through the Q4 numbers and they look good. Can we go over the travel budget on Thursday?" / "Cześć Marto, liczby za IV kwartał wyglądają dobrze. Czy możemy w czwartek omówić budżet na podróże?" · success "That's it. It works the same in Mail, Slack, Word and every other app." / "To wszystko. Tak samo działa w Mailu, Slacku, Wordzie i każdej innej aplikacji." · buttons Back / Skip for now / Continue (Wstecz / Pomiń na razie / Dalej) · footer "Your voice is turned into text on this Mac. Nothing is sent anywhere." / "Głos zamienia się w tekst na tym Macu. Nic nie jest nigdzie wysyłane." Steps: Welcome, Access, Shortcut, Try it, Meetings.
-- Home: "Monday, 23 November" · "Good afternoon, Anna" / "Dzień dobry, Anno" · actions "Dictate in any app" and "Record a meeting" [Start Recording] · Recent: Client call: Nordlys Energy (Meeting · 42 min · Notes ready), Weekly sales sync (3 follow-ups), Email to Marta about the Q4 budget (Dictation · 118 words), Notes for the board update · "Finish setting up · 3 of 5 done" checklist.
-- Settings → Dictation: status "Ready to dictate" · Shortcut: Dictate [⌥ Space] "Hold to talk. Or tap once to start and once to stop." · "Tidy up my text" (on) · "Languages I speak: English, Polish [Change…]" · Names and words: Dictionary "12 words Lintel always spells your way" [Open Dictionary] · History: "Keep my dictations [30 days]" "Older ones are deleted on their own." · More options: Microphone, "After pasting, put back what I had copied" · footer privacy sentence.
+Three columns, like Mail and Notes.
 
-## Sketches
+- **Sidebar**: All notes · Meetings · Dictations (counts) → Folders (+ New Folder) → Dictionary at the bottom. Add-ons never appear here.
+- **Toolbar**: Search notes · Record Meeting (ring, primary) · Settings (gear, ⌘,).
+- **List**: grouped by day; each row has the type ring, the title (wraps up to 3 lines instead of truncating), meta ("Meeting · 42 min · 3 tasks"), time. Row states: ready, writing notes (closing ring), notes not written (warning text). The first-run checklist is one row above the list ("Finish setting up · 3 of 5 · Hear other people in calls [Allow] ✕").
+- **Preview**: title, meta, "On this Mac" chip, Open and Copy, then the tabs **Notes · My notes · Transcript**. Notes = summary, decisions, tasks with the person who owns them; a footer says Lintel wrote them from the recording on this Mac. My notes = only what the user typed, with "Only you write here. Lintel never changes these notes." A dictation shows the text and where it was pasted.
+- **Note in a full window** (Open or double-click): sidebar and list hidden, "‹ All notes" to go back.
+- **Recording**: the toolbar button becomes a live pill (ring, time, Stop); a "Now" row is selected; the preview shows the live panel ("Lintel hears you and the other people in the call.", Stop and Write Notes), a consent reminder and a My notes pad for typing during the call. If Lintel hears only the microphone, a warning says so with a Fix Call Audio button.
+- **Notes not written**: the preview says what happened, that the recording and transcript are safe, and offers Try Again.
+- **Empty**: outlined ring, "Your notes will appear here", one sentence about recording and dictating, Try Dictation (Record Meeting stays the one primary in the toolbar).
+- **Dictionary**: a page in the main window (its only home): search, Add Word, each word with "Added by you" or "Learned from your corrections" and Remove.
 
-Files: `.ai/prototypes/lintel-direction/a-quiet-native.html`, `b-paper-and-ink.html`, `c-friendly-guide.html`. `shared.js` holds the copy (en/pl, identical in all three), the state and the interactions; `shared.css` only the switcher bar. Open a file directly in a browser, or serve the folder (`python3 -m http.server 8766 --bind 127.0.0.1`).
+### Settings (separate window, ⌘,)
 
-- Query: `?screen=onb|home|set&theme=light|dark&lang=en|pl&chrome=0&demo=done|listening&more=1`. The bar at the top switches screen, theme, language and direction; `chrome=0` hides it for screenshots.
-- Clickable: on "Try it", hold the button (or ⌥ Space) to get the listening state, let go and the sample email types itself, then the success line and Continue appear ("Try again" resets). Continue goes to Home. On Home: Start Recording / Stop, Hide the checklist, Settings in the sidebar. In Settings: switches, More options, the sidebar, Home to go back.
-- All names and data are fictional (Anna, Marta Nowak, Nordlys Energy). Motion respects Reduce Motion (typing is skipped, the listening mark stops).
+Sidebar: **General · Dictation · Meetings & notes · AI assistant · Privacy & data** | **Add-ons** (with "3 off") | **About & help**, plus "Search settings" on top. An enabled add-on gets an indented page under Add-ons. Each page: title (Dictation and Meetings & notes have their on/off switch there) → status line → up to 5 rows → More options → one privacy sentence.
 
-## Direction comparison
+| Page | Basic rows | More options |
+|---|---|---|
+| General | Languages I speak · Microphone (Automatic) · Text size (M/L/XL) · Open Lintel when I log in · Show Lintel in the Dock | Try new features early |
+| Dictation | status "Ready to dictate" · Shortcut (⌥ Space) · Tidy up my text · Dictionary (12 words, Open) · "Dictations are kept for 30 days" › Privacy & data | After pasting, put back what I had copied · Paste my last dictation unedited (shortcut) |
+| Meetings & notes | status (e.g. "Hears only you for now", Allow…) · Record a meeting (shortcut) · Suggest recording when a call starts · Your name in notes · Notes written by: This Mac › AI assistant · Export all notes | Write notes after each meeting · Never suggest recording in (app picker) · Check call audio |
+| AI assistant | status · one choice "Who writes your notes and tidies your text": This Mac (private, offline) / Claude (your account, words sent to Anthropic); with Claude: Use Claude for Meeting notes ☑ / Dictation ☐ and "Lintel asks you before the first meeting is sent." | Assistant on this Mac (Recommended for this Mac) · Downloaded files 3.7 GB (Show, Remove…) · Use my own AI server |
+| Privacy & data | "Recordings, notes and dictations stay on this Mac." · What Lintel can use: Microphone, Hear other people in a call, Type into other apps (Allowed ✓ / Allow…) · What Lintel keeps: Meeting audio (Delete when notes are ready), Dictations (30 days) · Delete my data… (sheet: dictations 128 / meetings and notes 42 / everything, button "Delete 42 Meetings", Cancel is the default) | Notes and transcripts (Keep forever) · Remind me to tell people I'm recording |
+| Add-ons | "Extra tools. All off until you turn them on." · Quick search · Clipboard history · Window layouts, each with "Off" next to its switch | — |
+| ↳ Quick search (when on) | status "Choose a shortcut to start" · Shortcut (chosen by the user, never ⌘Space by default) · Also search files · Folders | Result order · Show hidden files · Skip these folders · Start over |
+| ↳ Clipboard history / Window layouts | Shortcut · Never save from these apps (password managers preset) / Shortcut · Space between windows | the rest of today's controls |
+| About & help | status "Lintel 1.0 beta 2 · Up to date" (Check Now) · Update automatically · What's new · Show welcome again · Send a problem report (shows what is sent) · Acknowledgements | — |
 
-| | A. Quiet Native | B. Paper & Ink | C. Friendly Guide |
+**Search** indexes every row's English and Polish label plus synonyms (hotkey/skrót, recordings/nagrania, delete/usuń, spell/literuj, disk space/miejsce, …). A result names its page (and "More options" when the row is there); choosing it opens the page, expands More options and highlights the row. Checked with 18 user words: spell, literuj, usuń, mikrofon, headset, recordings, stop saving, claude, disk space, slack, bigger, bug, clipboard, export, login, my name, tell people, zoom; all found after adding "login".
+
+**Removed from today's settings**: the Features, Models, Permissions and Advanced panes (their rows moved to the pages above); the three text-model pickers, two speech-model pickers, the Whisper language, Speaker model, "Run on", the model-name footer, Bundle ID fields, Capture diagnostics (replaced by Send a problem report), Notes → Wrap lines and Notes model, a separate Clear in every pane, Reset Ranking and Rebuild (now "Start over" inside the add-on). Today's keys behind removed rows keep their stored values; which become "ignored" is decided in the settings rebuild spec with a BACKWARD_COMPATIBILITY review.
+
+### Onboarding (one window, step rail on the left)
+
+Steps adapt to the goal: Dictation skips First meeting and the call-audio permission; Meeting notes skips Try dictation and "Type into other apps".
+
+1. **Your goal**: "What would you like Lintel to do?": Type what I say / Write my meeting notes / Both (default). "You can change this later in Settings."
+2. **Privacy**: "Your words stay on this Mac": saved on this Mac, encrypted; nothing sent anywhere, Claude only if chosen later and Lintel asks first; no account. With meetings: "When you record a meeting, tell the other people. Lintel reminds you."
+3. **Access**: "Lintel needs your OK for a few things": one row per permission with the reason in plain words and Allow; "(Opens System Settings)" where macOS does that; "You can skip any of these and allow them later in Settings → Privacy & data." Continue is always active.
+4. **Try dictation**: the sample email, Hold to Talk or ⌥ Space, Change shortcut. **Copy fixes**: the false promise "No microphone handy? Press and hold the button instead." is replaced by "Can't talk right now? Continue, and try it later from the menu bar."; Continue is never greyed out.
+5. **First meeting**: what the call suggestion looks like (a picture, not a live button), "You can also press Record Meeting in the Lintel window.", Check call audio, the consent sentence, and **Open Lintel**, which lands on the empty notes view.
+
+No account, no marketing questions, no add-ons.
+
+## Glossary (current UI term → plain words; "More only" = never in the basic rows)
+
+| Current term | English | Polish | Where |
 |---|---|---|---|
-| Feels like | System Settings, Notes | a well-set letter or notebook | a guided consumer app |
-| Signature | accent on selection and primary buttons only | warm paper, serif headings, hairline rules, cut ring as the listening mark | Verdigris tints, icon circles, illustration, questions as section headings |
-| Onboarding | centred, dots, Mail-like compose box | numbered steps in the margin, the email as a ruled letter | illustrated side panel, progress bar, rounded email card |
-| Settings | grouped inset boxes | ruled sections, no boxes | rounded cards with an icon per row |
-| SwiftUI cost | lowest: stock `Form(.grouped)`, `List(.sidebar)` | low-medium: `.fontDesign(.serif)` on titles, custom section header and divider styles, own window background colour | highest: custom row and card views, `.fontDesign(.rounded)`, illustration assets in two themes |
-| Risk | looks like every other Mac utility; the owner called a similar look "bland" (2026-11-04) | serif can read as "editorial" rather than "tool"; hairlines need care in dark mode and at XL text | furthest from native; icon circles everywhere add noise; Polish labels truncate first (see below) |
-| Fit for the audience | trusted and familiar, but nothing says "this is Lintel" | calm and confident; signals "your words" without AI clichés | warmest and most explanatory; can feel childish to lawyers and managers |
+| speech model, Parakeet, Whisper, WhisperKit | (none; recognition just works) | — | engine names never shown |
+| LLM, built-in model, Qwen, Bielik, GGUF, notes model | AI assistant / assistant on this Mac | Asystent AI / asystent na tym Macu | AI assistant page; model names More only |
+| notesProvider Claude / This Mac | Who writes your notes: This Mac / Claude (your account) | Kto pisze notatki: Ten Mac / Claude (Twoje konto) | AI assistant |
+| Run on: Built-in / My server, endpoint, address, port | Use my own AI server | Użyj własnego serwera AI | More only |
+| Clean up / formatting | Tidy up my text | Porządkuj mój tekst | Dictation |
+| diarization, speaker model | (always on, no setting; speakers shown by name in the transcript) | — | — |
+| retention, retentionDays, maximumEntries | What Lintel keeps · 30 days · Keep forever · Delete when notes are ready | Co Lintel przechowuje · 30 dni · Przechowuj zawsze · Usuń, gdy notatki są gotowe | Privacy & data |
+| Erase Data, Clear Library, Clear History | Delete my data… → "Delete 42 Meetings" | Usuń moje dane… → „Usuń 42 spotkania” | Privacy & data |
+| bundle ID | (pick an app: Add App…) | Dodaj aplikację… | More only |
+| Full Disk Access | Search everywhere on this Mac | Szukaj wszędzie na tym Macu | Quick search add-on |
+| Accessibility (permission) | Type into other apps | Pisz w innych aplikacjach | onboarding, Privacy & data |
+| System Audio Recording | Hear other people in a call | Słysz innych w rozmowie | onboarding, Privacy & data, recording warning |
+| Test System Audio, diagnostics | Check call audio · Send a problem report | Sprawdź dźwięk rozmowy · Zgłoś problem | Meetings & notes More, About & help |
+| index, Rebuild Index, Reset Ranking | Start over | Zacznij od nowa | Quick search More only |
+| launcher | Quick search | Szybkie wyszukiwanie | Add-ons |
+| plugin, Features pane | Add-ons (extras) or nothing (core features have their switch in their page title) | Dodatki | Settings |
+| vocabulary | Dictionary: names and words Lintel always spells your way | Słownik | main window |
+| AI-written vs mine | Notes · My notes · Transcript | Notatki · Moje notatki · Transkrypcja | note tabs |
+| Advanced | More options | Więcej opcji | every page |
 
-What the sketches showed when built:
-- **Polish length**: at the 960 pt window, A and C truncate two of four Recent titles in Polish ("Rozmowa z klientem: …", "Cotygodniowe spotkanie sp…" in A; "Rozmowa z klientem: Nordlys En…", "E-mail do Marty o budżecie na IV k…" in C) because the status chip sits beside the title (A) or icon circles take width (C). B fits all four: status ("Notatki gotowe") goes into the meta line as accent text. Checklist rows wrap to two or three lines in Polish in all three.
-- **Hierarchy**: A needs the green status dot and the filled primary button to show what matters; B mostly from type size and rules, with the filled button as the only fill; C from colour fills, which compete with the accent on the primary button.
-- **Contrast** (WCAG, computed from the sketch tokens): accent text 6.3-7.9:1 and secondary text 5.3-6.4:1 in all three, both themes; white on the light accent button 5.0:1. Placeholder text is about 2.5-2.7:1 in all three (placeholder only, as on macOS; real content never uses that colour).
+## Foolproof checklist (C1-C19) on every sketched screen
 
-**Author's recommendation: B. Paper & Ink**, with two things borrowed from C: the "Finish setting up" checklist with a progress bar, and the Verdigris-tinted status line in Settings. Reasons: it carries the brand (warm neutrals, the cut ring as the listening indicator) without leaving native controls, it is the only direction where Polish fits without truncation and without extra icons, it costs little more than A in SwiftUI, and it reads as calm and serious to all three personas. A is the fallback if build time is the constraint. This is a recommendation; nothing is decided until the owner picks.
+Method: the sketch's `audit=1` mode checked each of 24 screen states in English and Polish at M and XL text (96 runs) for truncated or spilling text, filled primary buttons, jargon outside More options and small targets; contrast was computed from the tokens in all four tone/theme combinations; settings search was run with 18 user words; the rest was judged on the screenshots. ✓ pass · ✗ fail · ◐ partly (or not verifiable in HTML) · – not applicable.
 
-## Validation
+| Screen | C1 | C2 | C3 | C4 | C5 | C6 | C7 | C8 | C9 | C10 | C11 | C12 | C13 | C14 | C15 | C16 | C17 | C18 | C19 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Onboarding 1 Goal | – | ✓ | ◐ | – | ✓ | – | – | – | ✓ | ✓ | – | – | – | – | ✓ | ◐ | ◐ | – | ✓ |
+| Onboarding 2 Privacy | – | – | ◐ | – | ✓ | – | – | – | – | ✓ | – | – | – | – | ✓ | ◐ | ◐ | – | ✓ |
+| Onboarding 3 Access | – | – | ◐ | – | ✓ | ✓ | – | ✓ | ✓ | ✓ | – | – | – | ✓ | ✓ | ◐ | ◐ | – | ✓ |
+| Onboarding 4 Try dictation | – | – | ◐ | – | ✓ | – | – | – | ✓ | ✓ | – | – | – | – | ✓ | ◐ | ◐ | – | ◐ |
+| Onboarding 5 First meeting | ✓ | – | ✓ | – | ✓ | ✓ | – | ✓ | ✓ | ✓ | – | – | – | – | ✓ | ◐ | ◐ | – | ✓ |
+| Notes explorer | ✓ | ✓ | ✓ | ✓ | ✓ | – | – | – | ✓ | ✓ | – | ✓ | ✓ | – | ✓ | ◐ | ◐ | – | ✓ |
+| Empty notes | ✓ | ✓ | ✓ | ✓ | ✓ | – | – | – | – | ✓ | – | – | ✓ | – | ✓ | ◐ | ◐ | – | ✓ |
+| Note, full window | – | – | ✓ | – | ✓ | – | – | – | – | ✓ | – | – | – | – | ✓ | ◐ | ◐ | – | ✓ |
+| Recording (+ cannot hear the call) | – | ✓ | ✓ | ✓ | ✓ | – | – | – | – | ✓ | – | ✓ | – | ✓ | ✓ | ◐ | ◐ | – | ✓ |
+| Dictionary | – | ✓ | ✓ | ✓ | ✓ | – | – | – | ✓ | ✓ | ◐ | – | ✗ | – | ✓ | ◐ | ◐ | – | ✓ |
+| Settings: General | – | – | – | ✓ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | – | – | – | – | ✓ | ◐ | ◐ | ✓ | ✓ |
+| Settings: Dictation | – | – | – | ✓ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | – | – | – | – | ✓ | ◐ | ◐ | ✓ | ◐ |
+| Settings: Meetings & notes | – | – | – | ✓ | ✓ | ◐ | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ | ✓ | ✓ | ◐ | ◐ | ✓ | ◐ |
+| Settings: AI assistant | – | – | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | – | – | – | ✓ | ◐ | ◐ | ✓ | ✓ |
+| Settings: Privacy & data (+ delete sheet) | – | – | ✓ | ✓ | ✓ | ◐ | ✓ | ✗ | ✓ | ✓ | ✓ | – | – | ✓ | ✓ | ◐ | ◐ | ✓ | ◐ |
+| Settings: Add-ons (+ Quick search page) | – | ✓ | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ◐ | ✓ | – | – | ✓ | ◐ | ◐ | ✓ | ✓ |
+| Settings: About & help | – | – | – | ✓ | ✓ | ◐ | ✓ | ✓ | – | ✓ | – | – | – | – | ✓ | ◐ | ◐ | ✓ | ✓ |
+| Settings: search results | – | – | – | – | ✓ | – | – | – | – | ✓ | – | – | ◐ | – | ✓ | ◐ | ◐ | ✓ | ✓ |
 
-Before the decision (cheap, no build):
-- **Five-second and preference test**: show the three Home screenshots (light, in the person's language) to five non-technical office workers, at least two Polish speakers. Ask what the app does, what they would click first, and which they would trust with a client memo. Pass: at least 4 of 5 can say "it types what I say and writes meeting notes" for the chosen direction.
-- **Findability**: in the chosen Settings sketch, ask "where do you change how long dictations are kept?" and "where do you make Lintel spell a client's name right?". Pass: found in under 15 s by 4 of 5 without using search.
+What the ✗ and ◐ marks mean:
 
-After the decision (in the design tracks' own PRs):
-- SwiftUI gallery snapshots of the three screens in light and dark, S and XL text, English and Polish (conventions "Done means").
-- Onboarding: time from first launch to first successful dictation, measured in QA runs with the `--qa` launcher; target under 3 minutes for a first-time user (persona Kasia).
-- VoiceOver walk of onboarding and Settings; Reduce Motion on and off.
+- **C8 ✗ Privacy & data** has 6 basic rows (3 permissions, 2 retention rows, Delete). Options: accept it as the one cross-cutting page, or give permissions their own page (8 sidebar items). Open decision 3.
+- **C13 ✗ Dictionary**: its empty state is not sketched yet (proposed: "Add names you use often, like clients and colleagues." + Add Word). Search with no results shows a hint but no action (◐).
+- **C3 ◐ Onboarding 1-4**: one filled button, but "Continue" does not name a result (wizard convention; the last step says "Open Lintel"). Settings pages have no filled button on purpose (changes apply at once, as on macOS), hence "–".
+- **C6 ◐**: self-explanatory rows have no help line (for example "Open Lintel when I log in", "Your name in notes", "What's new"); every help line that exists is under 15 words and describes the effect. Either the rule becomes "help where the label is not enough" or those rows get a line.
+- **C11 ◐**: Dictionary's Remove, AI assistant's Remove… (downloads) and Quick search's Start Over need their confirmation or undo designed in the specs; only Delete my data is sketched (names the object and count, Cancel is the default, the destructive button says "Delete 42 Meetings").
+- **C16 ◐ everywhere**: computed from the tokens, text is 4.6:1 or more and controls 3.1:1 or more in all four tone/theme combinations (after darkening the warning text to #8A4F00 and lightening dark red to #FFA8A0); Increase Contrast cannot be checked in HTML.
+- **C17 ◐ everywhere**: every control is a real button or field with a visible focus ring, Esc and ⌘, work, Reduce Motion stops the ring and the typing; VoiceOver was not run.
+- **C19 ◐**: links ("Change in Privacy & data ›", "Change shortcut") use the accent text colour as macOS does; strict reading allows Verdigris only on the primary button, the selection and live state. Open decision 4.
+- **C12 ✓ explorer** covers the "notes not written" state; **C15 ✓** means no truncation in Polish at XL at the default window size (list titles wrap to up to 3 lines; panes scroll vertically).
+
+## Validation plan
+
+**Before the specs (cheap, no build):**
+
+1. **Tree test, 20 tasks** (sidebar and page names as text only, no search), 5-8 people moderated first, then 30+ remote. Pass: at least 80 % success per task and at least 70 % correct first clicks. A task under the bar leads to a rename or a pointer row, never a second home. The most uncertain are tasks 2, 4, 10 and 18.
+
+| # | Task | Expected place |
+|---|---|---|
+| 1 | Change my dictation shortcut | Dictation › Shortcut |
+| 2 | Stop saving meeting recordings | Privacy & data › What Lintel keeps › Meeting audio |
+| 3 | Turn on clipboard history | Add-ons › Clipboard history |
+| 4 | Use my company's Claude for notes | AI assistant › Who writes your notes › Claude |
+| 5 | Make Lintel spell a client's name right | main window › Dictionary (pointer in Dictation) |
+| 6 | Delete all my meetings | Privacy & data › Delete my data |
+| 7 | Lintel doesn't hear the others on Zoom | Privacy & data › Hear other people in a call (also the Meetings & notes status and the recording warning) |
+| 8 | Dictate in Polish and English | General › Languages I speak |
+| 9 | Stop Lintel changing my words | Dictation › Tidy up my text |
+| 10 | Use my headset microphone | General › Microphone |
+| 11 | Stop recording suggestions in Slack huddles | Meetings & notes › More options › Never suggest recording in |
+| 12 | Keep my notes forever | Privacy & data › More options › Notes and transcripts |
+| 13 | Export all notes | Meetings & notes › Export all notes |
+| 14 | Turn off the "tell people" reminder | Privacy & data › More options › Remind me… |
+| 15 | Make the text bigger | General › Text size |
+| 16 | Stop Lintel opening at login | General › Open Lintel when I log in |
+| 17 | Open apps with a shortcut | Add-ons › Quick search |
+| 18 | Free up disk space | AI assistant › More options › Downloaded files |
+| 19 | Fix my name in meeting notes | Meetings & notes › Your name in notes |
+| 20 | Report a bug | About & help › Send a problem report |
+
+2. **Five-second test** on the notes explorer and the empty state (light, the person's language), five non-technical office workers, at least two Polish speakers: what does the app do, what would you click first, would you trust it with a client memo. Pass: 4 of 5 say "it types what I say and writes meeting notes".
+3. **Warm vs neutral**: show both explorer screenshots side by side to the same five; record which feels "made for me" and which "looks like every other app".
+
+**After the decision (in each track's own PR):** SwiftUI gallery snapshots of each screen in light and dark, M and XL, English and Polish; the 19-item checklist as the QA table before `needs-qa`; time from first launch to first dictation under 3 minutes in `--qa` runs; a VoiceOver walk of onboarding, the explorer and Settings.
+
+## Follow-ups outside this PR
+
+- **Invert the plugin defaults** (dictation and meetings on; apps, files, clipboard and windows off for new installs; existing users keep their values): a code PR with a BACKWARD_COMPATIBILITY review.
+- **AI assistant as one choice**: an ADR and an additive contract for one shared assistant setting (today's three text-model pickers and two speech-model pickers).
+- **Settings rebuild spec** (`settings-ia-v2`) after the tree test; update `.uxproof/conventions.md` with it, since today's conventions still prescribe the Models and Advanced panes.
+- **Main window spec** (explorer, recording, note tabs, failed state) and **onboarding spec**, each citing this doc and the accepted sketch.
+- A jargon gate: check C5 as a test over the basic-row strings in `Localizable.xcstrings`.
 
 ## Open decisions (owner)
 
-1. **Direction**: A, B, C, or B with the two C borrowings recommended above.
-2. **Default dictation shortcut**: keep ⌥ Space, or move to a single key like Wispr Flow's Fn. Fn is not a normal hot key on macOS and needs a feasibility check before it is promised.
-3. **Dictionary as a top-level pane** (proposed in the IA and shown in the sketches) vs. keeping vocabulary inside Dictation.
-4. **"Finish setting up" checklist on Home** (Linear-style, can be hidden, disappears when done): keep or drop.
-5. **"Coming up" meetings on Home**: needs calendar access, which belongs to the later proactive-agent work; the sketches leave it out.
-6. **Glossary adoption**: rename the visible strings in the settings rebuild (keys unchanged), e.g. "Tidy up my text", "AI on this Mac", "More options" instead of "Advanced". The conventions' archetype still says "Advanced disclosure"; the chosen wording should update `.uxproof/conventions.md` in the same PR as the rebuild.
+1. **Direction**: accept "Quiet Native with warmth" with the working ring as the brand signature.
+2. **Tone**: warm neutrals (default) or neutral greys (variant).
+3. **Privacy & data with 6 basic rows** (C8): keep as the one cross-cutting page, or split permissions into their own page.
+4. **Accent on links** (C19): keep the macOS convention or make links neutral and keep Verdigris strictly for primary, selection and live.
+5. **Onboarding buttons** (C3): keep "Continue" or name each step's result.
+6. **Mine vs AI as tabs** (Notes · My notes · Transcript), consistent with the 2026-11-19 decision against per-line marks.
+7. **Default shortcuts**: dictation ⌥ Space; Record a meeting has no default until the user sets one (or pick one now).
+8. **Deleting**: permanent ("This can't be undone.") or a 30-day Recently deleted (needs engineering).
+9. **Order of work**: run the tree test and the five-second test before the three specs, or write the specs now and test the prototype.
 
 ## Evidence limits
 
-- Personas are assumptions (no telemetry, no interviews). No user has seen the sketches.
-- The research is desk research from public help pages and reviews (sources linked above); no App Store reviews quoting onboarding and no reviews from lawyers or sales teams were found.
-- Sketches are HTML, not SwiftUI. Controls are drawn to look native but are not the real ones. Headless Chrome may not render New York (B) or SF Pro Rounded (C) and falls back to another serif or to SF Pro; the SwiftUI build would use `.fontDesign(.serif)` / `.fontDesign(.rounded)`.
-- Screenshots cover light and dark, English and Polish, at the default text size only. XL text, VoiceOver and Increase Contrast were not checked.
-- Only three screens per direction; other screens (notes reading view, HUD, permissions, empty and error states) are not sketched and may change the comparison.
-- The research findings about Raycast's new first-run flow were not verified screen by screen.
+- Personas are assumptions; no user has seen the sketch.
+- Competitor layouts come from help centres, changelogs and reviews, not from using the apps (see the research reports).
+- The sketch is HTML, not SwiftUI: controls are drawn, Chrome may substitute fonts, and the window sizes (1000 × 640 main, 800 × 620 settings, 820 × 580 onboarding) are proposals.
+- The audit checks layout facts, not meaning; C6, C7, C11-C14 and C19 were judged by eye. VoiceOver and Increase Contrast were not checked.
+- Not sketched: the dictation HUD outside onboarding, the menu bar menu, the Dictionary empty state, confirmation sheets other than Delete my data, the add-on permission flow, and the Claude consent sheet.
