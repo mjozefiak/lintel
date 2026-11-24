@@ -53,6 +53,10 @@ stored values, runs once, a fresh install's second launch).
 
 ## Risks
 
+- Found in QA: with the add-ons off the main shortcut opens a panel that finds nothing, so the welcome screen skips the
+  Shortcut page (and the final page does not name the shortcut) while no active plugin has search sources. Whether the
+  main shortcut should be registered at all in that state is left to the owner.
+
 - `risk-high`: a protected settings contract (`plugins.<id>.enabled`). Mitigation: the migration is tested on every
   path and runs before any read; existing installs are detected by two independent signals.
 - A user who installed but never launched past the very first moment (no `ranking.sqlite`) counts as new. Acceptable:
@@ -60,19 +64,21 @@ stored values, runs once, a fresh install's second launch).
 
 ## Progress
 
+PR: #251
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Defaults and migration
 
-- [ ] 1.1 PluginDefaultsMigration with tests
-- [ ] 1.2 Flip the manifests and update the manifest tests
-- [ ] 1.3 Run the migration at launch before the ranking file is created
+- [x] 1.1 PluginDefaultsMigration with tests — 6aa2a152
+- [x] 1.2 Flip the manifests and update the manifest tests — 6aa2a152, d78d05e2
+- [x] 1.3 Run the migration at launch before the ranking file is created — 6aa2a152
 
 ### Phase 2: Welcome screen
 
-- [ ] 2.1 First-page text and welcome-flow tests for the new defaults
+- [x] 2.1 First-page text and welcome-flow tests for the new defaults — 654bf669, c66a6484
 
 ### Phase 3: Docs and QA
 
-- [ ] 3.1 BACKWARD_COMPATIBILITY.md and AGENTS.md
-- [ ] 3.2 Manual QA with screenshots
+- [x] 3.1 BACKWARD_COMPATIBILITY.md and AGENTS.md — 86d7be57
+- [x] 3.2 Manual QA with screenshots — evidence branch `qa-evidence-pr-251`
