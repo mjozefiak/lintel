@@ -208,7 +208,10 @@ struct AppEnvironment {
             options.persistentSettings
             ? QAFileSettingsStore(url: root.appending(path: QAFileSettingsStore.fileName), seeded: seeded)
             : InMemorySettingsStore(seeded)
-        pinPreviousPluginDefaults(dataRoot: root, settings: settings, fileManager: fileManager)
+        // In-memory settings are new on every run, so only a run that keeps them can be an install that ran before;
+        // otherwise a second run on the same `--qa-data-root` would get the old defaults.
+        pinPreviousPluginDefaults(
+            dataRoot: root, settings: settings, fileManager: fileManager, settingsPersist: options.persistentSettings)
         let environment = AppEnvironment(
             dataRoot: root,
             cachesRoot: root.appending(path: "Caches", directoryHint: .isDirectory),
@@ -302,16 +305,21 @@ struct AppEnvironment {
     }
     #endif
 
-    /// `ranking.sqlite` at the data root. If it cannot be opened, ranking falls back to memory for this
-    /// session instead of stopping the app.
     /// Runs `PluginDefaultsMigration` before `openRanking` creates `ranking.sqlite` (the sign of an earlier launch)
-    /// and before the host reads any `plugins.<id>.enabled`.
-    static func pinPreviousPluginDefaults(dataRoot: URL, settings: any SettingsStore, fileManager: FileManager) {
-        let existing = PluginDefaultsMigration.isExistingInstall(
-            dataRoot: dataRoot, settings: settings, fileManager: fileManager)
+    /// and before the host reads any `plugins.<id>.enabled`. `settingsPersist` is false only for a QA run with
+    /// in-memory settings, which is always a new install.
+    static func pinPreviousPluginDefaults(
+        dataRoot: URL, settings: any SettingsStore, fileManager: FileManager, settingsPersist: Bool = true
+    ) {
+        let existing =
+            settingsPersist
+            && PluginDefaultsMigration.isExistingInstall(
+                dataRoot: dataRoot, settings: settings, fileManager: fileManager)
         PluginDefaultsMigration.run(settings: settings, isExistingInstall: existing)
     }
 
+    /// `ranking.sqlite` at the data root. If it cannot be opened, ranking falls back to memory for this
+    /// session instead of stopping the app.
     static func openRanking(in root: URL) -> any UsageRecorder {
         do {
             return try UsageRepository.open(

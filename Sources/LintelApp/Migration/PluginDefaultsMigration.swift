@@ -8,9 +8,9 @@ import LintelPersistence
 /// `plugins.<id>.enabled` is a protected settings key (`BACKWARD_COMPATIBILITY.md` §3): a missing value means
 /// `manifest.defaultEnabled`, so flipping a default would silently switch plugins on or off for every install that
 /// never touched the switch. Before the host reads any switch, this writes the old default for each flipped plugin
-/// that has no stored value, but only on an install that ran before. A new install gets nothing but the marker, so
+/// that has no stored choice, but only on an install that ran before. A new install gets nothing but the marker, so
 /// it starts with the new defaults, and the marker keeps its second launch from being mistaken for an old install.
-/// A stored value is never changed.
+/// A stored choice (a `Bool`, the only value `PluginHost.isEnabled` reads) is never changed.
 struct PluginDefaultsMigration {
     /// `Bool`: the pin has run (on any install, new or old). Added with the 2026-11-24 defaults.
     static let migratedKey = "app.pluginDefaultsMigrated"
@@ -50,7 +50,9 @@ struct PluginDefaultsMigration {
         var pinned: [PluginID] = []
         for entry in previousDefaults {
             let key = SettingsKeys.pluginEnabled(entry.id)
-            guard settings.value(forKey: key) == nil else { continue }
+            // The host reads only a stored `Bool`; anything else (a number or a string written by hand) already meant
+            // the default, so it is pinned like a missing value.
+            if case .bool = settings.value(forKey: key) { continue }
             settings.setValue(.bool(entry.enabled), forKey: key)
             pinned.append(entry.id)
         }
