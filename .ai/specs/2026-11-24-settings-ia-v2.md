@@ -71,9 +71,8 @@ Audience: non-technical office workers (personas Anna, Piotr, Kasia in the direc
 | **Privacy & data / Prywatność i dane** | "Recordings, notes and dictations stay on this Mac." / „Nagrania, notatki i dyktowania zostają na tym Macu.” | sentence | — | — |
 | *What Lintel can use / Do czego Lintel ma dostęp* | Microphone / Mikrofon · Hear other people in a call / Słysz innych w rozmowie · Type into other apps / Pisz w innych aplikacjach · (Quick search on) Search everywhere on this Mac / Szukaj wszędzie na tym Macu | `PermissionRow`, 3 states | enabled plugins' `requiredPermissions` | B |
 | *What Lintel keeps / Co Lintel przechowuje* | Meeting audio / Dźwięk spotkań: Delete when notes are ready · 7 · 30 · 90 days | popup | `keepAudio` + `keptAudioDays` | B |
-| | Dictations / Dyktowania: Don't keep · 7 · 30 · 90 days | popup | `historyEnabled` + `retentionDays` | B |
-| | Notes and transcripts / Notatki i transkrypcje: Keep forever · 1 year · 90 days · 30 days | popup | `plugins.meetings.retentionDays` | M |
-| | Clipboard / Schowek (Clipboard history on): 7 · 30 · 90 days | popup | `plugins.clipboard.retentionDays` | M |
+| | "Notes and transcripts stay until you delete them. Dictations and clipboard items are kept 30 days." / „Notatki i transkrypcje zostają, dopóki ich nie usuniesz. Dyktowania i schowek są przechowywane 30 dni.” (built from the effective values; the clipboard part only while Clipboard history is on) | read-only sentence | `plugins.meetings.retentionDays`, `plugins.dictation.historyEnabled` + `retentionDays`, `plugins.clipboard.retentionDays` | B |
+| | (only on an old install pinned to a limit) Notes and transcripts are deleted after 90 days · Keep Forever / Notatki i transkrypcje są usuwane po 90 dniach · Zachowaj na zawsze | button, one way: writes `0` | `plugins.meetings.retentionDays` | B |
 | | Remind me to tell people I'm recording / Przypominaj, by uprzedzić o nagrywaniu | toggle | `plugins.meetings.consentReminder` | M |
 | *Delete / Usuń* | Delete my data… / Usuń moje dane… → sheet; Recently deleted · 12 items › / Ostatnio usunięte · 12 › | button + pointer | contributed data stores | B |
 | **Add-ons / Dodatki** | "Extra tools. All off until you turn them on." / „Dodatkowe narzędzia. Wyłączone, dopóki ich nie włączysz.” | sentence | — | — |
@@ -81,7 +80,7 @@ Audience: non-technical office workers (personas Anna, Piotr, Kasia in the direc
 | ↳ **Quick search** (only while on) | Shortcut (chosen when turned on) · Also search files (`plugins.files.enabled`) · Folders | | | B |
 | | Result order · Show hidden files · Skip these folders · Search everywhere on this Mac · Suggest apps · Start over… | | `app.sectionOrder`, `plugins.files.*`, `plugins.apps.*` | M |
 | ↳ **Clipboard history** (only while on) | Shortcut ⌘⇧V · Never save from these apps (app picker, password managers preset) | | `plugins.clipboard.*` | B |
-| | Keep at most · Pause | | | M |
+| | Pause | | | M |
 | ↳ **Window layouts** (only while on) | Shortcuts · Space between windows | | `plugins.windows.*` | B |
 | | today's remaining controls, every command's recorder | | | M |
 | **About & help / Pomoc i informacje** | status "Lintel 1.0 beta 2 · Up to date" (Check Now) · Update automatically · What's new · Show welcome again · Send a problem report… (shows what is sent) · Acknowledgements | | Updates, onboarding, About | B |
@@ -163,19 +162,19 @@ New `app.*` keys are declared in `SettingsKeys.swift` and added to BC §3.
 2. **Speech model and folder** (phase 3). Same rule over dictation → meetings.
 3. **Languages** (phase 3). This is the union of the stored `speechLanguage` values in the order dictation, meetings. The old keys are deleted after the copy. The Whisper pin reads `languages.first`, which is the dictation value, as today. A meetings value that differed and Whisper selected for meetings keeps a meetings override, by the same rule as 1.
 4. **Microphone** (phase 3). Same rule as 1 (dictation → meetings).
-5. **Retention pin** (phase 4). On an install that ran before (same test as `PluginDefaultsMigration`) with no stored `plugins.meetings.retentionDays`, the migration writes `90`, the old effective value. New installs read the new default `0` (Keep forever). ⚠ This retains longer by default, so it needs owner approval (BC §3).
+5. **Retention pin** (phase 4). On an install that ran before (same test as `PluginDefaultsMigration`) with no stored `plugins.meetings.retentionDays`, the migration writes `90`, the old effective value. A stored value is kept as it is. New installs read the new default `0` (keep forever). Owner decision 2026-11-24 on #253 (Q7) approves this longer default, as BC §3 requires; the BC §3 entry cites it. The pinned install's only way to change it is the one-way Keep Forever button.
 
-**Keys kept, UI removed, documented in BC as "no UI"**: `plugins.dictation.keepWarmMinutes`, `plugins.dictation.maximumEntries`, `plugins.meetings.diarization`, `systemAudio`, `diarizationModelFolder`, `notesChunkTokens`, `notesReduceInputTokens`, `orphanAudioDays`. Still **ignored**: `plugins.notes.showAuthorBars`, `showQuotes` (BC already says so). `app.sectionOrder`, every `plugins.<id>.enabled`, retention keys and KeyboardShortcuts keys keep their names. Only their row moves. `plugins.meetings.notesProvider*` stay in the Meetings namespace (the consent keys of 2026-11-20). The AI assistant page writes them only through the Meetings section, so no consent value moves or appears without the user's choice.
+**Keys kept, UI removed, documented in BC as "no UI"**: the retention keys other than meeting audio (`plugins.meetings.retentionDays`, `plugins.dictation.historyEnabled`, `plugins.dictation.retentionDays`, `plugins.clipboard.retentionDays`, `plugins.clipboard.maximumEntries`; owner decision Q7: the only retention choice is how long meeting audio stays on disk), `plugins.dictation.keepWarmMinutes`, `plugins.dictation.maximumEntries`, `plugins.meetings.diarization`, `systemAudio`, `diarizationModelFolder`, `notesChunkTokens`, `notesReduceInputTokens`, `orphanAudioDays`. Still **ignored**: `plugins.notes.showAuthorBars`, `showQuotes` (BC already says so). `app.sectionOrder`, every `plugins.<id>.enabled`, retention keys and KeyboardShortcuts keys keep their names and stored values, so a user who turned dictation history off keeps it off. Only their row moves or goes. `plugins.meetings.notesProvider*` stay in the Meetings namespace (the consent keys of 2026-11-20). The AI assistant page writes them only through the Meetings section, so no consent value moves or appears without the user's choice.
 
 ### Recently deleted (phase 5)
 
 This uses additive GRDB migrations per encrypted store, named per BC §2:
 
-- `dictation.sqlite` `v2-soft-delete`, `meetings.sqlite` `v2-soft-delete`, `notes.sqlite` `v2-soft-delete`: a nullable `deleted_at` column on the top-level row (`dictation`, `meeting`, `note_doc`) plus an index. FTS triggers skip rows with `deleted_at`. Every list, search, count and `NoteSource.list` filters them out.
+- `dictation.sqlite` `v2-soft-delete`, `meetings.sqlite` `v2-soft-delete`, `notes.sqlite` `v2-soft-delete`, `clipboard.sqlite` `v2-soft-delete`: a nullable `deleted_at` column on the top-level row (`dictation`, `meeting`, `note_doc`, `clip_item`) plus an index. FTS triggers skip rows with `deleted_at`. Every list, search, count and `NoteSource.list` filters them out.
 - "Delete" sets `deleted_at` and touches nothing else. A meeting's spool and kept audio are deleted at once: audio is not kept for restore, because it is the most sensitive data and the notes and transcript survive. The restore sheet says "Audio isn't restored." A meeting in `recording` or `processing` is refused, as today.
 - The hourly retention jobs purge rows with `deleted_at` older than 30 days (`purgeExpired`), then `VACUUM` at most daily. Retention by age also moves rows to Recently deleted first, never straight to a purge.
 - **Delete everything** moves every store's rows and sets `app.eraseScheduledAt`. After 30 days, or on "Delete Now", the plugins' `eraseData()` runs (Keychain items and folders). Until then the data stays encrypted with its key.
-- The clipboard store is not soft-deleted (resolved assumption Q9 ⚠).
+- **Clipboard** (owner decision Q9, no exception): Clear history and single deletes move `clip_item` rows to Recently deleted like every other store. Deleted items stay in the SQLCipher store and their AES-GCM blob files (> 1 MB) stay encrypted until the purge. They never appear in the ⌘⇧V list, its search or filters, are never pasted, and are skipped by duplicate detection, so copying the same text again makes a new item. The 30-day / 1000-entry retention also moves items to Recently deleted first. Recently deleted shows clipboard items as "Clipboard item · 2 min ago" with no content preview, because they can be passwords; Restore puts them back in the history, not on the pasteboard.
 
 There is no new free-text field. Deleted rows keep their existing encryption. Logs carry counts and ids only.
 
@@ -187,7 +186,7 @@ Prototype: `.ai/prototypes/lintel-direction/lintel.html` (accepted direction "Qu
 
 **Sidebar:** 7 items in three groups separated by hairlines. Add-ons shows "3 off" (or "1 on"). An enabled add-on gets an indented sub-page under Add-ons. A sidebar dot appears for attention or error, as today.
 
-**States to put in the gallery (states before code):** each page in light/dark × M/XL × en/pl; Dictation and Meetings & notes off (title switch off: rows dimmed, the status line "Turn on to …" with one Turn On); permission missing (status + Allow…); AI assistant with Claude chosen, Claude not found, assistant model not downloaded (status "Download the assistant · 2.5 GB · Get It"); Privacy & data with every permission state (Allowed ✓ / Needs your OK [Allow…] / Not needed now) (C14); the Delete my data sheet (dictations 128 / meetings and notes 42 / everything; the button names the count; Cancel is the default); Recently deleted empty and full (Restore, Delete Now, "Deleted items are removed after 30 days."); the Undo toast after a delete ("42 meetings moved to Recently deleted · Undo", 10 s, also announced to VoiceOver, never the only way back); Add-ons all off, one on; the Quick search enable sheet (pick a shortcut, prefilled ⌃⌥Space, never ⌘Space; the Search everywhere permission explained); search with results, a More options hit and no results; About & help with an update available.
+**States to put in the gallery (states before code):** each page in light/dark × M/XL × en/pl; Dictation and Meetings & notes off (title switch off: rows dimmed, the status line "Turn on to …" with one Turn On); permission missing (status + Allow…); AI assistant with Claude chosen, Claude not found, assistant model not downloaded (status "Download the assistant · 2.5 GB · Get It"); Privacy & data with every permission state (Allowed ✓ / Needs your OK [Allow…] / Not needed now) (C14); the Delete my data sheet (dictations 128 / meetings and notes 42 / clipboard 300 while Clipboard history is on / everything; the button names the count; Cancel is the default); the What Lintel keeps sentence for a new install and the pinned old install (Keep Forever); Recently deleted empty and full with a clipboard item shown without content (Restore, Delete Now, "Deleted items are removed after 30 days."); the Undo toast after a delete ("42 meetings moved to Recently deleted · Undo", 10 s, also announced to VoiceOver, never the only way back); Add-ons all off, one on; the Quick search enable sheet (pick a shortcut, prefilled ⌃⌥Space, never ⌘Space; the Search everywhere permission explained); search with results, a More options hit and no results; About & help with an update available.
 
 **Onboarding link:** the Access step's "allow them later in Settings → Privacy & data" points to the one home that this spec builds.
 
@@ -216,13 +215,13 @@ Every UI phase's QA comment carries the C1–C19 table from `research-foolproof-
 | Surface | Change | Who is affected | Migration / rollback |
 |---|---|---|---|
 | BC §1 `LintelKit` | additive: `SettingsPage`, `SettingsSection`, `SettingsRowInfo`, `settingsSections`, `isAddOn`, `AssistantSettings`, `DataStoreInfo`; `settingsGroup` becomes ignored | every plugin | defaults keep old panes working; ADR 0014 |
-| BC §3 keys | 5 new `app.*` keys; moved model, speech, language and input keys; new retention default | every existing user | `SettingsIAMigration`, one test per case. Rollback: an older build reads the plugin keys. Deleted keys equal the winner, so the older build falls back to its default only where the user never chose one. Known cost: after a rollback a user may see the catalog default instead of the shared choice (documented in the ADR). |
-| BC §2 stores | `v2-soft-delete` in three encrypted stores | users with history | additive column. An older build ignores `deleted_at`, so soft-deleted rows reappear after a rollback (documented, safe direction) |
+| BC §3 keys | 5 new `app.*` keys; moved model, speech, language and input keys; new notes retention default (owner-approved, Q7); dictation and clipboard retention keys lose their UI | every existing user | `SettingsIAMigration`, one test per case. Rollback: an older build reads the plugin keys. Deleted keys equal the winner, so the older build falls back to its default only where the user never chose one. Known cost: after a rollback a user may see the catalog default instead of the shared choice (documented in the ADR). |
+| BC §2 stores | `v2-soft-delete` in four encrypted stores (dictation, meetings, notes, clipboard) | users with history | additive column. An older build ignores `deleted_at`, so soft-deleted rows reappear after a rollback (documented, safe direction) |
 | BC §5 behaviour | the main shortcut is registered only while Quick search is on. Every delete is reversible for 30 days | launcher users, everyone deleting | BC §5 entry. Users with Quick search on see no change |
-| Privacy defaults | notes kept forever on new installs (⚠ owner); deleted content kept 30 days | new installs | pinned 90 for old installs; the BC §3 privacy-default rule needs owner approval in the PR |
+| Privacy defaults | notes and transcripts kept forever on new installs; deleted content, clipboard included, kept 30 days encrypted; meeting audio is the only retention choice | new installs; everyone who clears the clipboard | owner decisions Q7 and Q9 of 2026-11-24 on #253 satisfy the BC §3 privacy-default rule. Old installs keep their notes value (90 if none stored). Clipboard items in Recently deleted never show content and are purged after 30 days or on Delete Now |
 | `.uxproof/conventions.md`, `guards.json` | rewritten for the 7 pages and the one-home rule | design review | same PR as phase 1 |
 
-Direction calls (not rule violations): the C8 exception, the notes-forever default, clipboard not in Recently deleted, and Claude limited to meeting notes.
+Direction calls (not rule violations): the C8 exception and Claude limited to meeting notes. The notes-forever default and the clipboard in Recently deleted were owner direction calls, now decided.
 
 ## Resolved assumptions (autonomous defaults)
 
@@ -234,15 +233,16 @@ Direction calls (not rule violations): the C8 exception, the notes-forever defau
 | Q4 | The three `builtInLLMModel` (and two speech) keys differ: what does the migration do? | Pick the winner (installed, dictation → meetings → notes), and keep differing keys as per-plugin overrides with a "Use the Same" row | Never changes which model a user's notes or cleanup run on (BC §3) | reversible |
 | Q5 | Does "Claude" also cover dictation? | No. Claude writes meeting notes only. Dictation stays on This Mac, and the page says so | `LintelProviders` is wired into Meetings only. Dictation via Claude is a new capability | reversible |
 | Q6 | A consent sheet before the first Claude meeting? | No sheet. Choosing Claude is the consent, with inline text naming Anthropic and the user's account | Owner decision 2026-11-20 | reversible |
-| Q7 | Notes and transcripts default | Keep forever on new installs. Existing installs with no stored value are pinned to 90 days | Notes are the main view. 90-day deletion contradicts it. Retaining longer by default needs owner approval (BC §3) | ⚠ NEEDS HUMAN CONFIRMATION |
+| Q7 | Notes and transcripts default | Keep forever on new installs. Existing installs keep their value (90 if none stored). The only retention choice in Settings is how long meeting audio stays on disk | **Owner decision 2026-11-24 on #253** | decided |
 | Q8 | "Write notes after each meeting" default | Unchanged (`false`), but moved to the basic rows so it is visible | #251 left this default to a separate owner decision | reversible |
-| Q9 | Does Clear clipboard history go to Recently deleted? | No: it deletes at once, with the sheet and an Undo toast held in memory for 10 s | Clipboard entries can be passwords. Keeping them 30 days weakens privacy. This deviates from owner decision 8 | ⚠ NEEDS HUMAN CONFIRMATION |
+| Q9 | Does Clear clipboard history go to Recently deleted? | Yes, 30 days encrypted, with the same Restore and Undo as owner decision 8 on #247. No exception | **Owner decision 2026-11-24 on #253** | decided |
 | Q10 | "Delete everything" with keys and folders | Soft for 30 days (keys and files kept), then `eraseData()`. "Delete Now" erases at once | Follows owner decision 8 without losing the reset | reversible |
 | Q11 | Dictionary's home before the main window's Dictionary page exists | The Dictation pointer opens today's vocabulary panel in a sheet (its only editor). It points to the main-window page once that page lands | One home either way | reversible |
 | Q12 | Main shortcut when Quick search is off; default when it is turned on | Unregistered while off. Turning it on asks, prefilled ⌃⌥Space, never ⌘Space. A user's own shortcut is kept | #247 sketch and #251 QA finding (a panel that finds nothing) | reversible |
 | Q13 | What does "Languages I speak" control? | The home of the old `speechLanguage` keys: the Whisper pin uses the first language. The language-detection spec (#246) reads it as its candidate set | No new behaviour invented | reversible |
 | Q14 | Dictation default shortcut ⌥Space (owner decision 7) | Not changed here. This spec shows whatever default is in effect, and the default change belongs to the onboarding spec | Changing a default shortcut is a BC §5 change with its own collision tests | reversible |
 | Q15 | Search languages | Always both English and Polish, whatever the system language | Bilingual users. The tree-test words are in both | reversible |
+| Q16 | What do dictation and clipboard retention become without a choice? | Their current values stay in effect (30 days; 500 and 1000 entries), with no UI. A stored value, including dictation history off, is kept. Privacy & data shows them in one read-only sentence. An old install pinned to a notes limit gets a one-way Keep Forever button | Follows Q7 without changing anyone's data. The button is the only way out of the pin | reversible |
 
 ## 📋 Phasing
 
@@ -251,7 +251,7 @@ Each phase is one `feat/` PR from `main`. Each UI phase starts with gallery scen
 1. **Shell: seven pages, sidebar, search, gates.** Contract part 1, the new sidebar, General (without Languages and Microphone), Add-ons, About & help, old panes hosted inside the new pages, search, pane-id mapping, conventions. Features, Advanced and Permissions disappear as panes.
 2. **Dictation and Meetings & notes pages.** Both plugins and Notes contribute sections: basic rows, More options, app picker, Check call audio, every command's recorder, pointer rows. The jargon leaves the basics.
 3. **AI assistant and shared values.** `AssistantSettings` port, migration steps 1–4, the AI assistant page, General's Languages and Microphone, Models pane removed (Downloaded files row), the Claude section contributed by Meetings.
-4. **Privacy & data.** Permissions in 3 states, retention rows contributed by plugins, consent reminder, the Delete my data sheet over today's delete paths, retention pin migration (step 5, ⚠ Q7).
+4. **Privacy & data.** Permissions in 3 states, the meeting audio choice and the read-only What Lintel keeps sentence, consent reminder, the Delete my data sheet over today's delete paths, retention pin migration (step 5, Q7).
 5. **Recently deleted.** Store migrations, `dataStores`, the Recently deleted sub-page, Undo toast, deferred Delete everything.
 6. **Add-on pages and cleanup.** Quick search (Apps + Files), Clipboard history, Window layouts as sub-pages, Start over, shortcut on enable, removal of the leftover pane code, BC "no UI" entries, `ShortcutCoverageTests`.
 7. **Validation (later, no code).** Tree test and five-second test per the plan below. The results feed renames or pointer rows only.
@@ -285,17 +285,17 @@ Each phase is one `feat/` PR from `main`. Each UI phase starts with gallery scen
 
 ### Phase 4: Privacy & data
 
-- 4.1 Gallery scenes: permission states, retention rows, the Delete my data sheet, clipboard row present or absent. Owner approval.
+- 4.1 Gallery scenes: permission states, the What Lintel keeps sentence (new install, pinned install with Keep Forever, clipboard part present or absent), the Delete my data sheet. Owner approval.
 - 4.2 What Lintel can use: `PermissionRow` with 3 states and plain names (the system name only on "Open System Settings"), enabled plugins' permissions only. Test: state mapping table for the 9 current states → 3.
-- 4.3 What Lintel keeps: Meeting audio, Dictations, Notes and transcripts, Clipboard, consent reminder, contributed by their plugins with placement `privacy`. The Dictation and Meetings pointer rows now land here. Retention pin migration step 5 and the new default (⚠ Q7). Test: popup ↔ key mapping (`keepAudio` + `keptAudioDays`; `historyEnabled` + `retentionDays`), migration cases.
+- 4.3 What Lintel keeps: the Meeting audio popup (the only retention choice), the read-only sentence, Keep Forever on pinned installs, consent reminder, contributed by their plugins with placement `privacy`. The Dictation and Meetings pointer rows now land here. Retention pin migration step 5 and the new default (Q7). Dictation and clipboard retention rows and Keep at most are removed. Test: popup ↔ key mapping (`keepAudio` + `keptAudioDays`), the sentence for each stored combination, Keep Forever writes `0`, migration cases.
 - 4.4 Delete my data sheet: counts per store, Cancel default, the verb names the count, over today's Clear and Erase paths (still immediate in this phase) including Notes' kept-copies box. Per-pane Clear buttons removed. Test: counts, refusal while recording, kept-copies path unchanged.
 
 ### Phase 5: Recently deleted
 
 - 5.1 Gallery scenes: Recently deleted empty and full, Undo toast, deferred Delete everything, restore refused (owner off). Owner approval.
-- 5.2 `v2-soft-delete` migrations in dictation, meetings and notes stores. Every read filters `deleted_at`, FTS triggers too. Test: migration on a v1 fixture, search and list exclude deleted rows, `NoteSource` hides them.
+- 5.2 `v2-soft-delete` migrations in dictation, meetings, notes and clipboard stores. Every read filters `deleted_at`, FTS triggers too. Test: migration on a v1 fixture, search and list exclude deleted rows, `NoteSource` hides them, the ⌘⇧V list, paste and duplicate detection skip deleted clips, blob files survive until the purge.
 - 5.3 `DataStoreInfo` contribution + plugin implementations (move all, list, restore, purge, purge expired in the hourly jobs; the meeting spool and kept audio deleted at once). Single-item deletes in list modes and the Notes explorer use the same soft path. Their in-surface Undo is the main-window spec's. Test: `TestClock` 30-day purge, restore round trip, refusal while recording.
-- 5.4 Recently deleted sub-page of Privacy & data, Undo toast (10 s, VoiceOver announcement), deferred Delete everything (`app.eraseScheduledAt`, Cancel deletion, Delete Now). The clipboard stays immediate (⚠ Q9). Test: toast undo, erase after 30 days, Keychain error leaves files.
+- 5.4 Recently deleted sub-page of Privacy & data, Undo toast (10 s, VoiceOver announcement), deferred Delete everything (`app.eraseScheduledAt`, Cancel deletion, Delete Now). Clipboard Clear uses the same path, and its items show without content (Q9). Test: toast undo, clipboard Clear then Restore round trip, no clip content in the sub-page, erase after 30 days, Keychain error leaves files.
 
 ### Phase 6: Add-on pages and cleanup
 
@@ -321,7 +321,7 @@ Each phase is one `feat/` PR from `main`. Each UI phase starts with gallery scen
 | 9 | Stop Lintel changing my words | Dictation › Tidy up my text |
 | 10 | Use my headset microphone | General › Microphone |
 | 11 | Stop recording suggestions in Slack huddles | Meetings & notes › More options › Never suggest recording in |
-| 12 | Keep my notes forever | Privacy & data › More options › Notes and transcripts |
+| 12 | Get back clipboard items I cleared by mistake | Privacy & data › Recently deleted |
 | 13 | Export all notes | Meetings & notes › Export all notes |
 | 14 | Turn off the "tell people" reminder | Privacy & data › More options › Remind me… |
 | 15 | Make the text bigger | General › Text size |
