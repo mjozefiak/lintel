@@ -40,7 +40,14 @@ Upstream references: cli/cli#11983 (`gh pr edit` aborts without any project flag
 - A `--json` field list must never include `projectCards`: it is a Projects (classic) relic that errors on every client version (see above). Request only the fields the calling skill names.
 - A PR is linked to the issue it resolves with `Fixes #{issueId}` (or `Closes #{issueId}`) in the PR body; GitHub then closes the issue on merge. To reference without auto-closing, use a plain issue link.
 - PRs open as **drafts** when a skill says so; a human (or **mark-pr-ready**) promotes them.
-- Claim/lock signals on an issue or PR are: assignee set to the automation user, the `in-progress` label, and a `🤖`-prefixed claim comment. All three are set on claim; the label is guarded (below). The `ci-monitoring` label is **not** a claim signal — it marks work that is finished and reported while its CI-result follow-up is still owed, and never makes another skill back off.
+- Claim/lock signals on an issue or PR are: assignee set to the automation user, the `state:in-progress` label, and a `🤖`-prefixed claim comment. All three are set on claim; the label is guarded (below). **In this repository the claim label is `state:in-progress`**: wherever a skill names `in-progress`, read it as `state:in-progress`, both when applying it (the guards translate the old name) and when reading labels from **get-pr** / **get-issue** to detect a claim. A bundled skill script that tests for the literal `in-progress` (for example `om-auto-issue-triage/scripts/select-issues.mjs`) cannot be translated by the guards: when a label list is handed to such a script, add `in-progress` to it for every item that carries `state:in-progress`. There is no `ci-monitoring` label: a run that finished its work releases the claim, and an owed CI follow-up is stated in its summary comment instead.
+- **Repository process rules** (`SDLC.md`, decision of 2026-11-23). They override the installed skills' defaults wherever the two differ:
+  - **No label-rationale comments.** Skip every step that posts a comment explaining why labels were applied or changed (including the consolidated rationale comment). Labels are self-explanatory; the run's summary comment may name them in one line.
+  - **No priority labels.** Priority is the issue's milestone (`beta.2` or `later`, operation **set-milestone**), never a `priority-*` label. A step that says "apply exactly one priority label" is skipped.
+  - **Review nits are never filed as issues.** A nit or non-blocking finding is fixed in the same PR or dropped (and listed as dropped in the summary comment). Only a real bug becomes a new issue (`type:bug` + `area:*`); a flaky test is added as a checklist line to the open umbrella issue "Flaky tests" (#240) instead of a new issue. Steps such as "file follow-up issues for nits" do not run.
+  - **`qa-approved` is the owner's alone.** No skill applies it, including `om-auto-qa-pr --self-qa-signoff` and the orchestrated QA stage of `om-auto-merge-buddy`: `apply_label` refuses it (below), and `automerge.defaultToHumanQa` is `true` in the config so the merge buddy waits for the owner instead of signing off. The owner applies the label in the GitHub UI.
+  - **`risk-*` labels are for PRs only.** `apply_issue_label` skips them; an issue's weight is its milestone.
+  - **One QA comment per PR, edited in place.** The QA evidence and the `QA head:` line live in a single comment that each QA round rewrites through **update-comment**; a new QA round never posts a second QA comment.
 - Long, multi-line comment bodies are posted with `--body-file` (or a heredoc via process substitution) so formatting is preserved.
 - CI status truth comes from **get-pr-checks**; the set of *required* checks comes from **get-required-checks** (branch protection). When branch protection is not readable (404), treat every reported check as required.
 - **A short `get-pr-checks` result is not evidence of green.** It reports *check runs*, and a workflow run GitHub has already created contributes no rows until its jobs register — so on a freshly pushed head the list is legitimately partial, and every job still to appear is neither passing nor pending but simply absent. Before concluding "green" or "nothing pending", cross-check the workflow level: **list-runs** on the PR head branch, keep the runs whose `headSha` is the PR head SHA, and count any whose `status` is not `completed` as PENDING. Green requires both — every reported check passing *and* every workflow run at that SHA completed. A workflow that has not been created at all is indistinguishable from one the path filters skipped; that residue is disclosed as pending CI, never resolved by guessing.
@@ -59,31 +66,62 @@ tracker_repo() {
   else gh repo view --json nameWithOwner --jq .nameWithOwner; fi
 }
 
+# Legacy label names → this repository's taxonomy (migration of 2026-11-23, SDLC.md).
+# Installed skills still name the old labels; every guard resolves through this map, so
+# an old name lands its new label, and a retired label becomes an explicit no-op (empty
+# output) instead of a missing-label skip. Names not listed pass through unchanged.
+resolve_label() {
+  case "$1" in
+    in-progress)                         printf '%s' 'state:in-progress' ;;
+    bug)                                 printf '%s' 'type:bug' ;;
+    feature|enhancement)                 printf '%s' 'type:feature' ;;
+    refactor|documentation|dependencies) printf '%s' 'type:chore' ;;
+    question)                            printf '%s' 'state:needs-decision' ;;
+    priority-low|priority-medium|priority-high|priority-extreme) ;;  # priority = milestone
+    review|changes-requested|merge-queue|qa) ;;  # PR state comes from the review decision
+    skip-qa|qa-self-verified|ci-monitoring) ;;   # retired, see SDLC.md
+    *)                                   printf '%s' "$1" ;;
+  esac
+}
+
 label_exists() {
-  gh api --paginate "repos/$(tracker_repo)/labels" --jq '.[].name' | grep -Fxq "$1"
+  gh api --paginate "repos/$(tracker_repo)/labels" --jq '.[].name' | grep -Fxq "$(resolve_label "$1")"
 }
 
 # PR labels. $1 = label, $2 = PR number.
 apply_label() {
   if [ "$LABELS_ENABLED" != "true" ]; then return 0; fi
-  if label_exists "$1"; then
-    gh api -X POST "repos/$(tracker_repo)/issues/$2/labels" -f "labels[]=$1" >/dev/null
+  _label=$(resolve_label "$1")
+  if [ -z "$_label" ]; then
+    echo "Skipping label '$1' (retired in this repo, see SDLC.md)"
+  elif [ "$_label" = "qa-approved" ]; then
+    echo "Refusing label 'qa-approved' (only the owner applies it, see SDLC.md)"
+  elif label_exists "$_label"; then
+    gh api -X POST "repos/$(tracker_repo)/issues/$2/labels" -f "labels[]=$_label" >/dev/null
   else
-    echo "Skipping label '$1' (not defined in this repo). Create it with: gh label create '$1'"
+    echo "Skipping label '$_label' (not defined in this repo). Create it with: gh label create '$_label'"
   fi
 }
 
 # Issue labels. GitHub labels issues and PRs through the same /issues/ endpoint, so this
 # delegates; it keeps its own name because skills call the guards by name. $1 = label,
 # $2 = issue id.
-apply_issue_label() { apply_label "$1" "$2"; }
+# In this repository an issue carries no risk label (risk is a PR label, SDLC.md).
+apply_issue_label() {
+  case "$1" in
+    risk-*) echo "Skipping label '$1' on issue $2 (risk labels are for PRs, see SDLC.md)" ;;
+    *)      apply_label "$1" "$2" ;;
+  esac
+}
 
 # Removal. $1 = label, $2 = PR or issue number. A label that is not currently applied
 # answers 404 — a no-op, not a failure, so removal needs no existence check.
 remove_label() {
   if [ "$LABELS_ENABLED" != "true" ]; then return 0; fi
+  _label=$(resolve_label "$1")
+  [ -z "$_label" ] && return 0
   gh api -X DELETE \
-    "repos/$(tracker_repo)/issues/$2/labels/$(printf '%s' "$1" | jq -sRr @uri)" \
+    "repos/$(tracker_repo)/issues/$2/labels/$(printf '%s' "$_label" | jq -sRr @uri)" \
     >/dev/null 2>&1 || true
 }
 remove_issue_label() { remove_label "$1" "$2"; }
@@ -98,8 +136,16 @@ remove_issue_label() { remove_label "$1" "$2"; }
 # mutual exclusion silently does not hold. Splitting on newlines through `read` behaves
 # identically in sh, bash and zsh; the trailing newline from `printf` matters, because
 # `read` returns non-zero on an unterminated last line and drops it.
+#
+# $PIPELINE_LABELS comes from the config (`labels.pipeline`: qa-failed, blocked,
+# do-not-merge). Setting a retired pipeline label (review, changes-requested, merge-queue,
+# qa) is a no-op and removes nothing, so a skill moving a PR to "review" never strips a
+# human's do-not-merge or blocked.
 set_pipeline_label() {
   if [ "$LABELS_ENABLED" != "true" ]; then return 0; fi
+  if [ -z "$(resolve_label "$2")" ]; then
+    echo "Skipping pipeline label '$2' (retired in this repo, see SDLC.md)"; return 0
+  fi
   printf '%s\n' "$PIPELINE_LABELS" | tr ' ' '\n' | while IFS= read -r label; do
     [ -z "$label" ] && continue
     [ "$label" = "$2" ] && continue
@@ -169,9 +215,11 @@ gh issue list --repo {owner}/{repo} --state open --search "<query> in:title,body
 ```
 
 #### create-issue
-Title, body, assignee, labels → created issue URL.
+Title, body, assignee, labels → created issue URL. The issue is created **without** `--label`, then every label goes through `apply_issue_label`: `gh issue create --label` skips the alias map and fails the whole command when a label does not exist, which is the case for every legacy name once the old labels are deleted.
 ```bash
-gh issue create --repo {owner}/{repo} --title "<title>" --assignee <login> --label <labels> --body "<body>"
+ISSUE_URL=$(gh issue create --repo {owner}/{repo} --title "<title>" --assignee <login> --body "<body>")
+ISSUE_ID=${ISSUE_URL##*/}
+for l in <labels>; do apply_issue_label "$l" "$ISSUE_ID"; done   # one quoted word per label
 ```
 
 #### close-issue
@@ -202,6 +250,18 @@ gh api -X DELETE repos/{owner}/{repo}/issues/{issueId}/assignees -f "assignees[]
 
 #### label-issue / unlabel-issue
 Always through the guards: `apply_issue_label "<label>" {issueId}` / `remove_issue_label "<label>" {issueId}`.
+
+#### set-milestone
+`{issueId}`, milestone title (`beta.2` or `later`, from `labels.milestones` in the config) → the issue's milestone. This repository expresses priority with milestones, not labels. An empty title clears the milestone.
+```bash
+MS_NUMBER=$(gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.title=="<title>") | .number')
+if [ -n "$MS_NUMBER" ]; then
+  gh api -X PATCH repos/{owner}/{repo}/issues/{issueId} -F "milestone=${MS_NUMBER}" >/dev/null
+else
+  echo "Skipping milestone '<title>' (no open milestone with that title)"
+fi
+# clear: gh api -X PATCH repos/{owner}/{repo}/issues/{issueId} -F milestone=null
+```
 
 #### get-issue-comment
 Comment id → body, author, URL.
@@ -423,39 +483,37 @@ gh api --paginate repos/{owner}/{repo}/labels --jq '.[].name'
 ```
 
 #### create-label
-Name, color, description. Never delete, rename, or recolor existing labels.
+Name, color, description. Never delete, rename, or recolor existing labels. Never create a legacy name: when `resolve_label <name>` prints something other than `<name>` (a mapped or retired label), treat the label as present and skip the creation, even when a skill lists it as "missing from the taxonomy" (for example `in-progress` or `ci-monitoring` in `om-auto-merge-buddy`).
 ```bash
 gh label create <name> --color <hex> --description "<description>"
 ```
 
 #### ensure-label-taxonomy
-Create every label from the config's taxonomy that does not exist yet (used by `om-setup-agent-pipeline`; skip ones that already exist per **list-labels**):
+Create every label from the config's taxonomy that does not exist yet (used by `om-setup-agent-pipeline`; skip ones that already exist per **list-labels**). Legacy names (`review`, `merge-queue`, `priority-*`, `in-progress`, …) are never created again; the guards map them (`resolve_label`).
 ```bash
-gh label create review            --color 0366d6 --description "Ready for code review"
-gh label create changes-requested --color b60205 --description "Reviewer requested changes"
-gh label create qa                --color fbca04 --description "Manual QA in progress"
-gh label create qa-failed         --color b60205 --description "Manual QA failed"
-gh label create merge-queue       --color 0e8a16 --description "Approved, ready to merge"
-gh label create blocked           --color b60205 --description "Blocked by a dependency"
-gh label create do-not-merge      --color b60205 --description "Hard merge block"
-gh label create bug               --color d73a4a --description "Bug fix"
-gh label create feature           --color a2eeef --description "New capability"
-gh label create refactor          --color cfd3d7 --description "No behavior change"
-gh label create security          --color b60205 --description "Security-relevant change"
-gh label create dependencies      --color 0366d6 --description "Dependency update"
-gh label create documentation     --color 0075ca --description "Docs only"
-gh label create needs-qa          --color fbca04 --description "Requires manual QA before merge"
-gh label create skip-qa           --color 0e8a16 --description "Low risk, QA not required"
-gh label create qa-approved       --color 0e8a16 --description "Manual QA passed"
-gh label create qa-self-verified  --color c5def5 --description "Self-QA exception used"
-gh label create in-progress       --color c5def5 --description "An automated skill is working on this"
-gh label create ci-monitoring     --color d4c5f9 --description "Work complete and reported; agent is watching CI results"
-gh label create do-not-close      --color c5def5 --description "Humans only: never auto-close this issue"
-gh label create priority-low      --color e4e669 --description "Cosmetic or follow-up work"
-gh label create priority-medium   --color fbca04 --description "Ordinary bug or feature"
-gh label create priority-high     --color d93f0b --description "Release-blocking"
-gh label create priority-extreme  --color b60205 --description "Outage or security incident"
-gh label create risk-low          --color 0e8a16 --description "Isolated, low blast radius"
-gh label create risk-medium       --color fbca04 --description "Ordinary change with tests"
-gh label create risk-high         --color b60205 --description "Wide blast radius, review deeply"
+gh label create type:bug             --color d73a4a --description "Something is broken"
+gh label create type:feature         --color a2eeef --description "New capability"
+gh label create type:chore           --color cfd3d7 --description "Docs, refactor, CI, dependencies, tooling"
+gh label create security             --color b60205 --description "Security-relevant change"
+gh label create area:dictation       --color 1d76db --description "Dictation"
+gh label create area:meetings        --color 1d76db --description "Meetings and transcription"
+gh label create area:notes           --color 1d76db --description "Notes"
+gh label create area:app             --color 1d76db --description "Shell, launcher, Files/Apps/Clipboard, Windows, release, CI, QA"
+gh label create state:idea           --color ededed --description "Not decided yet"
+gh label create state:needs-decision --color d876e3 --description "Waiting for the owner's decision"
+gh label create state:agent-ready    --color 0e8a16 --description "Specified enough for an agent to pick up"
+gh label create state:in-progress    --color c5def5 --description "Claimed: someone is working on this"
+gh label create needs-qa             --color fbca04 --description "Requires manual QA before merge"
+gh label create qa-approved          --color 0e8a16 --description "Owner's QA passed"
+gh label create qa-failed            --color b60205 --description "Manual QA failed"
+gh label create blocked              --color b60205 --description "Blocked by a dependency"
+gh label create do-not-merge         --color b60205 --description "Hard merge block"
+gh label create risk-low             --color 0e8a16 --description "Isolated, low blast radius"
+gh label create risk-medium          --color fbca04 --description "Ordinary change with tests"
+gh label create risk-high            --color b60205 --description "Wide blast radius, evidence table in SDLC.md"
+gh label create automerge            --color 0e8a16 --description "Owner queued this PR for the merge buddy"
+gh label create automerge-blocked    --color b60205 --description "Merge buddy parked this PR; a human clears it"
+gh label create do-not-close         --color c5def5 --description "Humans only: never auto-close this issue"
+gh api repos/{owner}/{repo}/milestones -f title=beta.2
+gh api repos/{owner}/{repo}/milestones -f title=later
 ```
