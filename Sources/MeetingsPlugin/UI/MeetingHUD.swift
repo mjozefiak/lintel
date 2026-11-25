@@ -171,7 +171,7 @@ struct MeetingHUDView: View {
                 icon(for: state)
                     .frame(width: 20, height: 20)
                 if case .recording(let recording) = state {
-                    recordingRow(recording)
+                    recordingRow(recording, compact: state.actions.count > 1)
                 } else {
                     Text(state.title)
                         .font(.callout.weight(.medium))
@@ -206,21 +206,25 @@ struct MeetingHUDView: View {
         .accessibilityLabel(state.accessibilityLabel)
     }
 
-    private func recordingRow(_ recording: MeetingHUDState.Recording) -> some View {
+    /// `compact`: a link sits next to "End recording" (a notice with a place to go), so the meters lose their names
+    /// to leave room; the clock and the buttons never wrap.
+    private func recordingRow(_ recording: MeetingHUDState.Recording, compact: Bool) -> some View {
         HStack(spacing: 10) {
             Text(MeetingHUDState.clock(recording.elapsedSeconds))
                 .font(.callout.monospacedDigit().weight(.medium))
+                .lineLimit(1)
+                .fixedSize()
                 .accessibilityHidden(true)
             Spacer(minLength: 4)
             if recording.recordsMicrophone {
                 LevelMeter(
                     label: String(localized: "Me", comment: "Meeting HUD level meter of the microphone"),
-                    level: recording.micLevel, animated: !still)
+                    level: recording.micLevel, animated: !still, showsLabel: !compact)
             }
             if recording.recordsSystem {
                 LevelMeter(
                     label: String(localized: "System", comment: "Meeting HUD level meter of the system audio"),
-                    level: recording.systemLevel, animated: !still)
+                    level: recording.systemLevel, animated: !still, showsLabel: !compact)
             }
         }
     }
@@ -234,10 +238,14 @@ struct MeetingHUDView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.red)
                 .controlSize(.small)
+                .lineLimit(1)
+                .fixedSize()
         default:
             Button(title) { model.onAction(action) }
                 .buttonStyle(.link)
                 .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .fixedSize()
         }
     }
 
@@ -271,12 +279,15 @@ private struct LevelMeter: View {
     let label: String
     let level: Float
     let animated: Bool
+    var showsLabel = true
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if showsLabel {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.15))
                 Capsule()
