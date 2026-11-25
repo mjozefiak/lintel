@@ -292,6 +292,7 @@ actor MeetingSession {
                 track.lastAudioAt = now()
                 tracks[channel] = track
                 consume(track, stream)
+                reportFallback(of: input.audio, channel: channel)
             } catch {
                 logStartFailure(channel, error, attempt: nil)
                 if channel == .mic, retriesMicrophone {
@@ -355,6 +356,16 @@ actor MeetingSession {
     }
 
     // MARK: Microphone recovery
+
+    /// Tells the HUD when the microphone the user chose was not there and the system's input is used instead.
+    /// The choice itself stays in Settings (the next recording tries it again).
+    private func reportFallback(of audio: any AudioInput, channel: AudioChannel) {
+        guard channel == .mic, let fallback = (audio as? any InputFallbackReporting)?.fallback else { return }
+        let input = inputDiagnostics()
+        logger.notice(
+            "The chosen microphone is not available; recording from the default input: \(input, privacy: .public)")
+        continuation.yield(.microphoneFallback(requested: fallback.requestedName, using: fallback.usingName))
+    }
 
     private func logStartFailure(_ channel: AudioChannel, _ error: any Error, attempt: Int?) {
         let kind = String(describing: error)
@@ -491,6 +502,8 @@ actor MeetingSession {
         consume(track, stream)
         counters[channel].resumes += 1
         continuation.yield(.trackResumed(channel))
+        // After `trackResumed`, which clears an earlier fallback notice: this input may be the chosen one again.
+        reportFallback(of: track.audio, channel: channel)
     }
 
     // MARK: Heartbeat
@@ -657,6 +670,7 @@ actor MeetingSession {
                 )
                 counters[channel].resumes += 1
                 continuation.yield(.trackResumed(channel))
+                reportFallback(of: track.audio, channel: channel)
                 return
             } catch {
                 logger.error(

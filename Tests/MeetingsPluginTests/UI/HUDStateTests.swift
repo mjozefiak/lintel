@@ -174,4 +174,39 @@ import Testing
         value.recordsMicrophone = false
         #expect(value.notice == .noSystemAudio)
     }
+
+    @Test func anUnavailableStoredMicrophoneHasFourTextsAndNeverShowsAUID() {
+        let texts: [(String?, String?, String)] = [
+            ("USB MICROPHONE", "Built-in", "Microphone “USB MICROPHONE” is unavailable – recording from “Built-in”"),
+            ("USB MICROPHONE", nil, "Microphone “USB MICROPHONE” is unavailable – recording from the system input"),
+            (nil, "Built-in", "The chosen microphone is unavailable – recording from “Built-in”"),
+            (nil, nil, "The chosen microphone is unavailable – recording from the system input"),
+        ]
+        for (requested, using, expected) in texts {
+            let state = recording {
+                $0.microphoneFallback = .init(requested: requested, using: using)
+            }
+            #expect(state.detail == expected)
+            #expect(state.actions == [.stop])
+            #expect(state.accessibilityLabel.contains(expected))
+        }
+    }
+
+    @Test func theFallbackNoticeYieldsToRealProblemsAndTheConsentReminder() {
+        var value = MeetingHUDState.Recording()
+        value.microphoneFallback = .init(requested: "USB MICROPHONE", using: nil)
+        #expect(value.notice == .microphoneFallback(.init(requested: "USB MICROPHONE", using: nil)))
+        value.showsConsent = true
+        #expect(value.notice == .consent)
+        value.showsConsent = false
+        value.lost = [.mic]
+        #expect(value.notice == .deviceDisconnected)
+        value.lost = []
+        value.unavailable = [.mic]
+        #expect(value.notice == .microphoneNotRecorded)
+        // A system-audio-only recording has no microphone to talk about.
+        value.unavailable = []
+        value.recordsMicrophone = false
+        #expect(value.notice == nil)
+    }
 }

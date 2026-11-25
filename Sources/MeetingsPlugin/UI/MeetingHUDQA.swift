@@ -40,6 +40,13 @@ final class MeetingHUDQA {
                 $0.retryingMicrophone = true
             }
         ),
+        (
+            "recording-microphone-fallback",
+            recording {
+                $0.microphoneFallback = MeetingHUDState.MicrophoneFallback(
+                    requested: "USB Microphone", using: "MacBook Pro Microphone")
+            }
+        ),
         ("recording-system-audio-lost", recording { $0.lost = [.system] }),
         ("recording-microphone-only", recording { $0.recordsSystem = false }),
         ("finishing", .finishing),

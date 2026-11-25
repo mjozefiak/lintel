@@ -10261,6 +10261,78 @@
         }
       }
     },
+    "Microphone “%@” is unavailable – recording from “%@”" : {
+      "comment" : "HUD notice: the chosen microphone is unplugged, the placeholders are device names",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone “%@” is unavailable – recording from “%@”"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofon „%1$@” jest niedostępny – nagrywam z „%2$@”"
+          }
+        }
+      }
+    },
+    "Microphone “%@” is unavailable – recording from the system input" : {
+      "comment" : "HUD notice: the chosen microphone is unplugged, the placeholder is its name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone “%@” is unavailable – recording from the system input"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofon „%@” jest niedostępny – nagrywam z wejścia systemowego"
+          }
+        }
+      }
+    },
+    "The chosen microphone is unavailable – recording from “%@”" : {
+      "comment" : "HUD notice: the chosen microphone is unplugged, the placeholder is the name of the input used",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The chosen microphone is unavailable – recording from “%@”"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybrany mikrofon jest niedostępny – nagrywam z „%@”"
+          }
+        }
+      }
+    },
+    "The chosen microphone is unavailable – recording from the system input" : {
+      "comment" : "HUD notice: the chosen microphone is unplugged",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The chosen microphone is unavailable – recording from the system input"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybrany mikrofon jest niedostępny – nagrywam z wejścia systemowego"
+          }
+        }
+      }
+    },
     "Your microphone is not being recorded" : {
       "comment" : "Meeting HUD notice when the microphone could not be started, only the system audio is recorded",
       "extractionState" : "manual",

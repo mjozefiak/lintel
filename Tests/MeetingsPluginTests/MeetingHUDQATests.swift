@@ -23,7 +23,7 @@ import Testing
         #expect(problems.count == 12)
         var notices: [MeetingHUDState.Notice] = []
         for case .recording(let recording) in states { if let notice = recording.notice { notices.append(notice) } }
-        #expect(notices.count == 12)
+        #expect(notices.count == 13)
         for state in states { #expect(!state.title.isEmpty) }
     }
 

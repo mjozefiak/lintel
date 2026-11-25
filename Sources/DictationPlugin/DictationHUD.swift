@@ -99,7 +99,7 @@ final class DictationHUDPanel: HUDPresenter {
 
     private func makePanel() -> NSPanel {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 280, height: 56),
+            contentRect: NSRect(origin: .zero, size: DictationHUDView.panelSize),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         panel.level = .statusBar
         panel.isOpaque = false
@@ -135,6 +135,11 @@ final class DictationHUDPanel: HUDPresenter {
 struct DictationHUDView: View {
     /// The size of the capsule, shared with the QA snapshot's backdrop (`DictationHUDQA`).
     static let size = CGSize(width: 248, height: 40)
+    /// The panel is taller than the capsule: the capsule sits at its bottom (where it always was) and the
+    /// sentence about an unavailable microphone goes above it.
+    static let panelSize = CGSize(width: 360, height: 104)
+    /// The distance of the capsule from the panel's bottom edge.
+    static let bottomInset: CGFloat = 8
 
     let model: HUDModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -142,6 +147,33 @@ struct DictationHUDView: View {
 
     var body: some View {
         let state = model.state
+        VStack(spacing: 6) {
+            Spacer(minLength: 0)
+            if let notice = state.notice {
+                Text(notice)
+                    .font(.footnote.weight(.medium))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: 344)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
+                    .overlay {
+                        if contrast == .increased {
+                            RoundedRectangle(cornerRadius: 14).strokeBorder(.primary.opacity(0.6), lineWidth: 1)
+                        }
+                    }
+            }
+            capsule(for: state)
+        }
+        .padding(.bottom, Self.bottomInset)
+        .frame(width: Self.panelSize.width, height: Self.panelSize.height)
+        .animation(reduceMotion || model.reducesMotion ? nil : .smooth(duration: 0.2), value: state)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(state.accessibilityLabel)
+    }
+
+    private func capsule(for state: HUDState) -> some View {
         HStack(spacing: 10) {
             icon(for: state)
                 .frame(width: 20, height: 20)
@@ -191,10 +223,6 @@ struct DictationHUDView: View {
         .overlay {
             if contrast == .increased { Capsule().strokeBorder(.primary.opacity(0.6), lineWidth: 1) }
         }
-        .frame(width: 280, height: 56)
-        .animation(reduceMotion || model.reducesMotion ? nil : .smooth(duration: 0.2), value: state)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(state.accessibilityLabel)
     }
 
     @ViewBuilder

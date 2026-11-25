@@ -10,7 +10,7 @@ import os
 let rate = AudioFormat.sampleRate
 
 /// An `AudioInput` the test feeds by hand. Nothing real is ever captured.
-final class ControlledInput: AudioInput {
+final class ControlledInput: InputFallbackReporting {
     private struct State {
         var continuation: AsyncStream<[Float]>.Continuation?
         var starts = 0
@@ -22,6 +22,11 @@ final class ControlledInput: AudioInput {
     }
 
     private let state = Mutex(State())
+    private let reportedFallback = Mutex<InputFallback?>(nil)
+
+    /// What the input says about the device it records from; `nil` is the chosen one (or the system's).
+    var fallback: InputFallback? { reportedFallback.withLock { $0 } }
+    func setFallback(_ fallback: InputFallback?) { reportedFallback.withLock { $0 = fallback } }
 
     var starts: Int { state.withLock { $0.starts } }
     var stops: Int { state.withLock { $0.stops } }

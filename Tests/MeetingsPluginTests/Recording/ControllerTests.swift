@@ -555,6 +555,38 @@ import Testing
         #expect(rig.hud.lastRecording?.notice != .microphoneNotRecorded)
     }
 
+    @Test func anUnavailableStoredMicrophoneIsNamedInTheHUDAndNeverByItsUID() async throws {
+        let rig = try ControllerRig(settings: ["plugins.meetings.consentReminder": .bool(false)])
+        await rig.startRecording()
+        rig.session?.send(.microphoneFallback(requested: "USB MICROPHONE", using: "MacBook Pro Microphone"))
+        await eventually { rig.hud.lastRecording?.microphoneFallback != nil }
+        let notice = rig.hud.lastRecording?.notice
+        #expect(
+            notice
+                == .microphoneFallback(
+                    .init(requested: "USB MICROPHONE", using: "MacBook Pro Microphone")))
+        let text = rig.hud.last?.detail
+        #expect(text == "Microphone “USB MICROPHONE” is unavailable – recording from “MacBook Pro Microphone”")
+        #expect(rig.hud.last?.actions == [.stop])
+        // Recording goes on: the preference is only ever read, never rewritten.
+        #expect(rig.controller.phase == .recording)
+    }
+
+    @Test func theFallbackNoticeGoesWhenTheMicrophoneIsBackOnTheChosenDevice() async throws {
+        let rig = try ControllerRig(settings: ["plugins.meetings.consentReminder": .bool(false)])
+        await rig.startRecording()
+        rig.session?.send(.microphoneFallback(requested: "USB MICROPHONE", using: nil))
+        await eventually { rig.hud.lastRecording?.microphoneFallback != nil }
+        rig.session?.send(.trackLost(.mic))
+        await eventually { rig.hud.lastRecording?.notice == .deviceDisconnected }
+        rig.session?.send(.trackResumed(.mic))
+        await eventually { rig.hud.lastRecording?.lost.isEmpty == true }
+        #expect(rig.hud.lastRecording?.microphoneFallback == nil)
+        // A resume on the default input says so again right after.
+        rig.session?.send(.microphoneFallback(requested: "USB MICROPHONE", using: "Built-in"))
+        await eventually { rig.hud.lastRecording?.microphoneFallback?.using == "Built-in" }
+    }
+
     @Test func tryAgainAsksTheSessionAndClearsTheWarningWhenTheMicrophoneStarts() async throws {
         let rig = try ControllerRig()
         await rig.startRecording()

@@ -481,6 +481,9 @@ final class MeetingController {
         case .trackUnavailable(let channel):
             recording.unavailable.insert(channel)
             refresh()
+        case .microphoneFallback(let requested, let using):
+            recording.microphoneFallback = MeetingHUDState.MicrophoneFallback(requested: requested, using: using)
+            refresh()
         case .trackLost(let channel):
             recording.lost.insert(channel)
             darken(channel)
@@ -504,6 +507,8 @@ final class MeetingController {
             // A track that was unavailable at the start or lost is recording again.
             recording.unavailable.remove(channel)
             recording.lost.remove(channel)
+            // The session reports a fallback again right after this event when the input still is one.
+            if channel == .mic { recording.microphoneFallback = nil }
             refresh()
         case .limitReached, .echoMayRemain, .segmentSaved, .nothingHeard:
             break

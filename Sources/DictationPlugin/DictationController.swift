@@ -145,6 +145,8 @@ final class DictationController {
             recordingState.loadingModel = false
         case .limitApproaching(let seconds):
             recordingState.secondsLeft = seconds
+        case .microphoneFallback(let fallback):
+            recordingState.fallback = fallback
         case .loadFailed(let busy):
             // No point in recording for a model that will not come: tell the user now.
             let session = session

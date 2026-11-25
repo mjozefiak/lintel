@@ -59,23 +59,58 @@ public struct InputDeviceInfo: Equatable, Sendable {
 
 /// `AVAudioEngine` on the chosen input (or the system's), converted to 16 kHz mono `Float32` and handed out
 /// in memory; nothing is written to disk. The stream ends when the device goes away or the Mac sleeps.
-public final class MicrophoneCapture: AudioInput, @unchecked Sendable {
+public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendable {
     private let deviceUID: String?
+    private let deviceName: String?
+    private let devices: @Sendable () -> [InputDevice]
+    private let defaultInputName: @Sendable () -> String?
     private let lock = NSLock()
+    private var activeFallback: InputFallback?
     private var engine: AVAudioEngine?
     private var observer: (any NSObjectProtocol)?
     private var continuation: AsyncStream<[Float]>.Continuation?
 
-    /// - Parameter deviceUID: the input device's UID from Settings, or `nil` for the system's input.
-    public init(deviceUID: String? = nil) {
+    /// - Parameters:
+    ///   - deviceUID: the input device's UID from Settings, or `nil` for the system's input. A device that is
+    ///     not there at the moment of `start` (unplugged) does not fail the capture: it records from the
+    ///     system's input and `fallback` says so.
+    ///   - deviceName: the name stored with that choice, for the message; read from a USB UID when `nil`.
+    ///   - devices, defaultInputName: where the devices come from (Core Audio; tests give lists).
+    public init(
+        deviceUID: String? = nil, deviceName: String? = nil,
+        devices: @escaping @Sendable () -> [InputDevice] = { MicrophoneCapture.inputDevices() },
+        defaultInputName: @escaping @Sendable () -> String? = { MicrophoneCapture.defaultInputInfo()?.name }
+    ) {
         self.deviceUID = deviceUID
+        self.deviceName = deviceName
+        self.devices = devices
+        self.defaultInputName = defaultInputName
     }
+
+    public var fallback: InputFallback? { lock.withLock { activeFallback } }
 
     public func start(onLevel: @escaping @Sendable (Float) -> Void) async throws -> AsyncStream<[Float]> {
         let engine = AVAudioEngine()
-        if let deviceUID {
-            try Self.select(deviceUID: deviceUID, on: engine)
+        let resolution = InputDeviceResolution.resolve(
+            requestedUID: deviceUID, requestedName: deviceName, available: devices(),
+            defaultInputName: defaultInputName())
+        var used: InputFallback?
+        switch resolution {
+        case .systemDefault:
+            break
+        case .chosen(let uid):
+            // The device was listed a moment ago; if selecting it still fails, the system's input is used.
+            do {
+                try Self.select(deviceUID: uid, on: engine)
+            } catch {
+                used = InputFallback(
+                    requestedName: deviceName ?? InputDeviceResolution.displayName(ofUID: uid),
+                    usingName: defaultInputName())
+            }
+        case .fallback(let fallback):
+            used = fallback
         }
+        lock.withLock { activeFallback = used }
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { throw CaptureError.noInputDevice }

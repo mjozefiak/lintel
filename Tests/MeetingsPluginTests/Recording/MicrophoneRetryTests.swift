@@ -98,6 +98,53 @@ import Testing
         #expect(try rig.rows(id).map(\.text) == ["Mic after Try again"])
     }
 
+    @Test func anUnpluggedStoredMicrophoneRecordsFromTheDefaultInputAndSaysSo() async throws {
+        let rig = try SessionRig(texts: [84: "Spoken on the default input"])
+        var mic = TrackScript()
+        mic.silence(1)
+        mic.say(84, seconds: 2)
+        mic.silence(14)
+        let device = ControlledInput()
+        device.setFallback(InputFallback(requestedName: "USB MICROPHONE", usingName: "MacBook Pro Microphone"))
+        let session = rig.session(mic: mic, system: systemScript(), limits: limits(rig), micAudio: device)
+        let log = SessionEventLog(session)
+        let id = try await session.start()
+        #expect(
+            await log.wait { $0 == .microphoneFallback(requested: "USB MICROPHONE", using: "MacBook Pro Microphone") })
+        // The microphone is recording (it is not reported missing) and its words are in the transcript.
+        #expect(!log.contains { $0 == .trackUnavailable(.mic) })
+        device.push(mic.samples)
+        let outcome = await session.finish()
+        #expect(outcome.result == .ready)
+        #expect(try rig.rows(id).map(\.text) == ["Spoken on the default input"])
+        #expect(log.all.filter { if case .microphoneFallback = $0 { true } else { false } }.count == 1)
+    }
+
+    @Test func aMicrophoneOnTheChosenDeviceReportsNoFallback() async throws {
+        let rig = try SessionRig(texts: [:])
+        let device = ControlledInput()
+        let session = rig.session(mic: TrackScript(), system: systemScript(), limits: limits(rig), micAudio: device)
+        let log = SessionEventLog(session)
+        _ = try await session.start()
+        _ = await session.finish()
+        #expect(!log.contains { if case .microphoneFallback = $0 { true } else { false } })
+    }
+
+    @Test func aMicrophoneThatStartsLateOnTheDefaultInputSaysSoWhenItResumes() async throws {
+        let rig = try SessionRig(texts: [:])
+        let device = ControlledInput(failFirstStarts: 1)
+        device.setFallback(InputFallback(requestedName: nil, usingName: "Built-in"))
+        let clock = TestClock()
+        let session = rig.session(
+            mic: TrackScript(), system: systemScript(), limits: limits(rig), clock: clock, micAudio: device,
+            micStartsLate: true)
+        let log = SessionEventLog(session)
+        _ = try await session.start()
+        #expect(await drive(clock) { log.contains { $0 == .trackResumed(.mic) } })
+        #expect(log.contains { $0 == .microphoneFallback(requested: nil, using: "Built-in") })
+        _ = await session.finish()
+    }
+
     @Test func aMicrophoneThatStartsLongAfterTheBeginningLandsAtItsRealPlaceOnTheTimeline() async throws {
         let rig = try SessionRig(texts: [83: "Spoken after the long wait"])
         // 200 s of wall clock pass before the microphone works: more than the 120 s an interruption fills.

@@ -22,6 +22,8 @@ actor DictationSession {
         /// The speech model could not be loaded; `busy` when another model (a meeting's) is in use right now.
         /// Sent at once, not after the user stops speaking.
         case loadFailed(busy: Bool)
+        /// The chosen microphone is not there: recording runs on the system's input.
+        case microphoneFallback(InputFallback)
     }
 
     enum Failure: Error, Equatable {
@@ -181,6 +183,9 @@ actor DictationSession {
             load?.cancel()
             Task.detached { await load?.value?.release() }
             throw error
+        }
+        if let fallback = (audio as? any InputFallbackReporting)?.fallback {
+            onEvent(.microphoneFallback(fallback))
         }
         consumeTask = Task { [weak self] in
             for await chunk in stream {

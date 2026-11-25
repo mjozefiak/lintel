@@ -39,6 +39,10 @@ enum MeetingSessionEvent: Equatable, Sendable {
     case modelLoaded
     /// The speech model could not be taken; `busy` when another model is in use. Segments wait in the spool.
     case modelUnavailable(busy: Bool)
+    /// The microphone the user chose is not available (unplugged), so the recording uses the system's input
+    /// (`InputFallback`): at the start, or after the device went away during the recording. The names are for the
+    /// HUD only; either can be unknown.
+    case microphoneFallback(requested: String?, using: String?)
     /// A track could not be started at the beginning (the session continues with the other one).
     case trackUnavailable(AudioChannel)
     /// A track ended while recording (device unplugged, permission revoked); the other one carries on.
