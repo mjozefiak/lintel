@@ -13,7 +13,7 @@
     <path d="M375 181 C385 191 392 198 398 206 C390 214 382 224 372 233"/>
   </g>
   <!-- Bands behind the icon names. Finder draws the names itself in white (dark mode) or black (light mode), so the band must give
-       at least 4.5:1 with both. #7B746E: 4.60:1 with white, 4.57:1 with black (scripts/tests/test_dmg_art.zsh checks it). -->
+       at least 4.5:1 with both. #7B746E: 4.60:1 with white, 4.57:1 with black (scripts/tests/test_dmg_art.zsh checks it). Finder's real label colour is near-black, see docs/releasing.md. -->
   <rect id="band-app" x="95" y="275" width="140" height="26" rx="13" fill="#7B746E"/>
   <rect id="band-applications" x="425" y="275" width="140" height="26" rx="13" fill="#7B746E"/>
 </svg>

@@ -1,5 +1,5 @@
 # dmgbuild settings for Lintel.dmg. Loaded by scripts/make-dmg.sh through the vendored dmgbuild:
-#   python3 -I -m dmgbuild -s scripts/dmg/settings.py -D app=... -D icon=... -D background=... Lintel Lintel.dmg
+#   python3 -I -B scripts/dmg/run.py -s scripts/dmg/settings.py -D app=... -D icon=... -D background=... Lintel Lintel.dmg
 # Values come from -D (the `defines` dictionary dmgbuild puts in scope), so the script tests can point them at a stub app.
 # The window has no toolbar, sidebar, path bar or status bar; the background art has no words (Resources/DMG/background.svg).
 

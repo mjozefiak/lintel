@@ -42,7 +42,14 @@ DMG="$DIST_DIR/$APP_NAME.dmg"
 DMG_VERSIONED="$DIST_DIR/$APP_NAME-$VERSION.dmg"
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+MOUNT="$TMP/mount"
+ATTACHED=0
+detach_mount() {
+  [[ "$ATTACHED" == 1 ]] || return 0
+  hdiutil detach -quiet "$MOUNT" 2>/dev/null || hdiutil detach -quiet -force "$MOUNT" 2>/dev/null || true
+  ATTACHED=0
+}
+trap 'detach_mount; rm -rf "$TMP"' EXIT
 
 rm -f "$DMG" "$DMG_VERSIONED"
 if [[ "$PLAIN" == 1 ]]; then
@@ -61,13 +68,13 @@ else
   [[ -f "$ICON" ]] || ICON=""
   "$PYTHON" -I -B "$ROOT/scripts/dmg/run.py" -s "$ROOT/scripts/dmg/settings.py" \
     -D "app=$APP" -D "icon=$ICON" -D "background=$ROOT/Resources/DMG/background.tiff" "$VOL_NAME" "$DMG" >/dev/null
-  # dmgbuild ignores a failed copy of the app: make sure the image holds the app before it is signed and shipped.
-  MOUNT="$TMP/mount"
+  # dmgbuild ignores a failed copy of the app: make sure the image holds a complete copy before it is signed and shipped.
   mkdir -p "$MOUNT"
+  ATTACHED=1
   hdiutil attach -quiet -readonly -nobrowse -noverify -mountpoint "$MOUNT" "$DMG"
-  have_app=0; [[ -d "$MOUNT/$APP_NAME.app/Contents" ]] && have_app=1
-  hdiutil detach -quiet "$MOUNT" || hdiutil detach -quiet -force "$MOUNT"
-  [[ "$have_app" == 1 ]] || { echo "The DMG does not contain $APP_NAME.app" >&2; exit 1; }
+  same_app=0; diff -rq "$APP" "$MOUNT/$APP_NAME.app" >/dev/null 2>&1 && same_app=1
+  detach_mount
+  [[ "$same_app" == 1 ]] || { echo "The DMG does not contain a complete copy of $APP_NAME.app" >&2; exit 1; }
 fi
 
 SIGN_TIMESTAMP="$(signing_timestamp_arg "$(probe_signing_identity "$SIGN_IDENTITY" "$SIGN_KEYCHAIN")")"

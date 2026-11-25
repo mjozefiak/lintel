@@ -23,13 +23,12 @@ for id in band-app band-applications; do
   assert_ok "$id: contrast with white ($white) is at least 4.5" awk -v v="$white" 'BEGIN { exit !(v >= 4.5) }'
   assert_ok "$id: contrast with black ($black) is at least 4.5" awk -v v="$black" 'BEGIN { exit !(v >= 4.5) }'
 done
-# Band centres (the icon names sit at x 165 and 495 pt, y 288 pt).
-for spot in "165 288" "495 288"; do
-  x=(${=spot})
-  assert_eq "$(sed -n 's/.*id="band-app".*fill="#\([0-9A-Fa-f]\{6\}\)".*/\1/p' "$ART/background.svg" | tr a-f A-F)" \
-    "$(inspect png-pixel "$ART/background.png" $x)" "background.png at the band ($spot) has the SVG colour"
-  assert_eq "$(inspect png-pixel "$ART/background.png" $x)" \
-    "$(inspect png-pixel "$ART/background@2x.png" $(( x[1] * 2 )) $(( x[2] * 2 )))" "the 2x band ($spot) has the same colour"
+# Band centres (the icon names sit at x 165 and 495 pt, y 288 pt): each exported band has its own SVG colour, at 1x and 2x.
+for pair in "band-app 165" "band-applications 495"; do
+  id="${pair% *}"; x="${pair#* }"
+  want="$(sed -n "s/.*id=\"$id\".*fill=\"#\([0-9A-Fa-f]\{6\}\)\".*/\1/p" "$ART/background.svg" | tr a-f A-F)"
+  assert_eq "$want" "$(inspect png-pixel "$ART/background.png" $x 288)" "background.png at $id has the SVG colour"
+  assert_eq "$want" "$(inspect png-pixel "$ART/background@2x.png" $(( x * 2 )) 576)" "background@2x.png at $id has the SVG colour"
 done
 # The background is opaque warm neutral away from the art.
 assert_eq "F8F6F2" "$(inspect png-pixel "$ART/background.png" 20 20)" "the corner is the warm neutral #F8F6F2"

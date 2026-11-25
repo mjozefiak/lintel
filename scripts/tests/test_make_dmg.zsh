@@ -9,7 +9,8 @@ inspect() { /usr/bin/python3 -I -B "$TESTS/dmg_inspect.py" "$@"; }
 NO_NET=(/usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)')
 
 tmp="$(mktemp -d)"; mnt="$tmp/mnt"; mkdir -p "$mnt"
-cleanup() { hdiutil detach -quiet "$mnt" 2>/dev/null; rm -rf "${tmp:?}"; }
+detach() { hdiutil detach -quiet "$mnt" 2>/dev/null || hdiutil detach -quiet -force "$mnt" 2>/dev/null; }
+cleanup() { detach; rm -rf "${tmp:?}"; }
 trap cleanup EXIT
 
 # VERSIONS.txt lists every vendored package, with its licence file and archive hash.
@@ -65,7 +66,7 @@ assert_contains "$layout" "hasBackgroundBookmark=1" "the background bookmark is 
 assert_contains "$layout" "view=icnv" "icon view"
 assert_contains "$layout" "WindowBounds={{200, 120}, {660, 432}}" "window bounds"
 for key in ShowToolbar ShowSidebar ShowStatusBar ShowPathbar; do assert_contains "$layout" "$key=0" "$key is off"; done
-hdiutil detach -quiet "$mnt"
+detach
 
 # --plain keeps the old undecorated image (no layout, no background).
 out="$(zsh "$ROOT/scripts/make-dmg.sh" --skip-build --plain 2>&1)"; rc=$?
@@ -73,7 +74,7 @@ assert_eq "0" "$rc" "make-dmg --plain builds ($out)"
 hdiutil attach -quiet -readonly -nobrowse -noverify -mountpoint "$mnt" "$DIST_DIR/Lintel.dmg" >/dev/null 2>&1
 assert_ok "--plain: the app is in the image" test -d "$mnt/Lintel.app/Contents"
 assert_ok "--plain: no background" test ! -e "$mnt/.background.tiff"
-hdiutil detach -quiet "$mnt"
+detach
 
 assert_fails "an unknown option is refused" zsh "$ROOT/scripts/make-dmg.sh" --nope
 finish
