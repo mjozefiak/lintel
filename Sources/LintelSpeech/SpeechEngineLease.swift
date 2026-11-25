@@ -91,7 +91,8 @@ public final class SpeechEngineLease: Sendable {
 
     /// `inFlight` was already counted by the lease (see `SpeechLease.transcribe`) and is ended here.
     fileprivate func transcribe(
-        _ samples: [Float], with held: Held<any SpeechEngine>, priority: LeasePriority
+        _ samples: [Float], options: SpeechRequestOptions, with held: Held<any SpeechEngine>,
+        priority: LeasePriority
     ) async throws -> SpeechOutcome {
         defer { held.inFlight.end() }
         if priority == .background {
@@ -108,7 +109,7 @@ public final class SpeechEngineLease: Sendable {
         }
         try await turnstile.enter(priority)
         defer { turnstile.leave() }
-        return .transcript(try await held.base.transcribe(samples))
+        return .transcript(try await held.base.transcribe(samples, options: options))
     }
 }
 
@@ -132,8 +133,11 @@ public final class SpeechLease: Sendable {
         self.keepWarm = keepWarm
     }
 
-    /// Transcribes one segment in turn. A `background` lease may get `.spool` back.
-    public func transcribe(_ samples: [Float]) async throws -> SpeechOutcome {
+    /// Transcribes one segment in turn. A `background` lease may get `.spool` back. `options` belong to this one
+    /// request: the engine is shared with other leases, so none of them may leak into another's decoding.
+    public func transcribe(
+        _ samples: [Float], options: SpeechRequestOptions = .none
+    ) async throws -> SpeechOutcome {
         // Checked and counted together: once released, no new call starts, and one that did start keeps the
         // engine loaded until it returns, even when the lease is released (or the plugin shut down) meanwhile.
         let allowed = released.withLock { released -> Bool in
@@ -142,7 +146,7 @@ public final class SpeechLease: Sendable {
             return true
         }
         guard allowed else { throw ModelLeaseError.released }
-        return try await owner.transcribe(samples, with: engine, priority: priority)
+        return try await owner.transcribe(samples, options: options, with: engine, priority: priority)
     }
 
     /// Gives the lease back (once); the engine unloads after the keep-warm time unless someone takes a lease.
