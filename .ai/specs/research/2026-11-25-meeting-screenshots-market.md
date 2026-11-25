@@ -81,6 +81,7 @@ Research do speca #282 (`2026-11-25-meeting-screenshots-and-templates.md`, pytan
 ### Wispr Flow (Notetaker od 05.08.2026)
 - [F] Brak przechwytywania obrazu: notetaker nagrywa mikrofon i dźwięk systemu („It hears only audio available to your computer”, https://docs.wisprflow.ai/articles/4497184932-notetaker-privacy-and-security-overview, dost. 2026-11-25). Screen Recording służy tylko do dźwięku systemu na macOS 13–14.3. Jedyne ustawienie ekranowe działa odwrotnie: ukrywa okna Wispr przed udostępnianiem ekranu (https://docs.wisprflow.ai/articles/9319084321-notetaker-settings-explained-beta).
 - [F] Scratchpad przyjmuje wklejone obrazy (do 10 na notatkę, 5 MB), widoczne w „My thoughts” spotkania na iPhonie (https://docs.wisprflow.ai/articles/9618237082-using-the-scratchpad-to-save-and-edit-notes). Nie znaleziono dowodu, że podsumowanie je czyta.
+- [F] Prywatność: przetwarzanie w chmurze; „Bot-free recording does not notify participants”; opcjonalny komunikat o zgodzie w czacie spotkania („Post a consent notice in the meeting chat”, domyślnie wyłączony, administrator może go wymusić) (https://docs.wisprflow.ai/articles/4497184932-notetaker-privacy-and-security-overview, https://docs.wisprflow.ai/articles/9319084321-notetaker-settings-explained-beta, dost. 2026-11-25).
 - [U] Na r/WisprFlow: podsumowania „are not as good as granola”; nikt nie prosi o zrzuty slajdów (cytaty za https://tldv.io/blog/wispr-flow-notetaker-review/, 25.09.2026).
 
 ### Otter.ai
