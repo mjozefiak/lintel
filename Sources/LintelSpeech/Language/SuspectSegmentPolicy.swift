@@ -25,9 +25,10 @@ public struct SuspectSegmentPolicy: Sendable {
     }
 
     /// Whether `segment` should be decoded again. Without a profile that has a dominant language the answer is
-    /// always no: nothing is rewritten on a guess.
+    /// always no, and so is one with less than `LanguageProfile.minimumRepairSeconds` of confident speech: nothing is
+    /// rewritten on a guess.
     public func isSuspect(_ segment: ProfileSegment, profile: LanguageProfile) -> Bool {
-        guard Self.isShort(segment), let dominant = profile.dominant else { return false }
+        guard Self.isShort(segment), profile.isUsableForRepair, let dominant = profile.dominant else { return false }
         let inProfile = profile.languages()
         let scripts = profile.scripts()
         if let script = TextScript.dominant(in: segment.text), !scripts.isEmpty, !scripts.contains(script) {
@@ -36,6 +37,7 @@ public struct SuspectSegmentPolicy: Sendable {
         if isConfidentlyOutside(segment.text, profile: inProfile) { return true }
         // English filler on a short acknowledgement while the meeting is not in English.
         return dominant != "en" && BackChannelPhrases.isBackChannel(segment.text, language: "en")
+            && !BackChannelPhrases.isBackChannel(segment.text, language: dominant)
     }
 
     /// Whether `text`, a new decoding of a suspect segment, may replace the original. All must hold:
@@ -53,9 +55,11 @@ public struct SuspectSegmentPolicy: Sendable {
         return !isConfidentlyOutside(text, profile: profile.languages())
     }
 
+    /// No hints are passed on purpose: a hint is a prior in favour of the profile's languages and, on the short
+    /// texts this looks at, would make nearly every text look like one of them, which disables the rule and the veto.
     private func isConfidentlyOutside(_ text: String, profile languages: Set<String>) -> Bool {
         guard !languages.isEmpty,
-            let guess = identifier.identify(text, hints: languages.sorted(), constraints: nil)
+            let guess = identifier.identify(text, hints: [], constraints: nil)
         else { return false }
         return guess.confidence >= Self.confidentOutsideProfile && !languages.contains(guess.code)
     }

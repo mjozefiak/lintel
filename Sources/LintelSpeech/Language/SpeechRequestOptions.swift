@@ -13,7 +13,9 @@ public enum WhisperLanguageChoice: Sendable, Equatable {
 /// engine instance**: `SpeechEngineLease` shares one engine between Dictation and Meetings and ignores the engine
 /// a second caller passes, so an option stored in the engine would belong to whoever loaded the model first.
 public struct SpeechRequestOptions: Sendable, Equatable {
-    /// Parakeet: limit the decoder to this script. `nil` sends no hint.
+    /// Parakeet: limit the decoder to this script. `nil` keeps the engine's own default (the language closure it was
+    /// built with; none for `ParakeetEngine()`), it does **not** force "no hint". Step 2.3 removes that closure from
+    /// every call site in the same change that starts sending options, which is what makes `nil` mean "no hint".
     public var scriptHint: ScriptHint?
     /// Whisper: how the language is chosen. `nil` keeps the language the engine was built with.
     public var whisperLanguage: WhisperLanguageChoice?
@@ -23,6 +25,6 @@ public struct SpeechRequestOptions: Sendable, Equatable {
         self.whisperLanguage = whisperLanguage
     }
 
-    /// No hint and no language: the engine behaves as it did before options existed.
+    /// Nothing asked: the engine behaves as it did before options existed (its own defaults apply).
     public static let none = SpeechRequestOptions()
 }

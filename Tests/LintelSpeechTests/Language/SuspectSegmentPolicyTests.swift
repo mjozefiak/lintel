@@ -61,6 +61,30 @@ import Testing
         #expect(!policy.isSuspect(segment("Hola", 1.5), profile: polishWithEnglish))
     }
 
+    @Test func fillerThatIsAlsoFillerInTheMeetingsLanguageIsLeftAlone() {
+        // "OK" and "Mhm" are Polish filler too: a correct short segment must not be decoded again and overwritten.
+        #expect(!policy.isSuspect(segment("OK.", 0.6), profile: polishWithEnglish))
+        #expect(!policy.isSuspect(segment("Mhm", 0.5), profile: polishWithEnglish))
+        #expect(policy.isSuspect(segment("Thank you.", 0.9), profile: polishWithEnglish))
+    }
+
+    @Test func aProfileWithLessThanTenSecondsIsNotUsedToRewriteAnything() {
+        #expect(!policy.isSuspect(segment("Дякую.", 1), profile: confidentProfile(["pl": 9.9])))
+        #expect(policy.isSuspect(segment("Дякую.", 1), profile: confidentProfile(["pl": 10])))
+        #expect(!policy.isSuspect(segment("Thank you.", 1), profile: confidentProfile(["pl": 9.9])))
+        #expect(policy.isSuspect(segment("Thank you.", 1), profile: confidentProfile(["pl": 10])))
+    }
+
+    @Test func theIdentifierIsAskedWithoutHintsBecauseAHintMakesEveryShortTextLookLikeTheProfile() {
+        let identifier = FakeIdentifier()
+        let policy = SuspectSegmentPolicy(identifier: identifier)
+        _ = policy.isSuspect(segment("Guten Tag", 1.5), profile: polishWithEnglish)
+        _ = policy.acceptsReplacement("Guten Tag", profile: polishWithEnglish)
+        let seen = identifier.hintsSeen.withLock { $0 }
+        #expect(seen.count == 2)
+        #expect(seen.allSatisfy { $0.isEmpty })
+    }
+
     @Test func nothingIsSuspectWithoutAProfile() {
         #expect(!policy.isSuspect(segment("Thank you.", 1), profile: LanguageProfile()))
         #expect(!policy.isSuspect(segment("Дякую.", 1), profile: LanguageProfile()))
@@ -128,6 +152,11 @@ import Testing
         #expect(BackChannelPhrases.isBackChannel("Dziękuję", language: "pl"))
         #expect(!BackChannelPhrases.isBackChannel("Dziękuję", language: "en"))
         #expect(!BackChannelPhrases.isBackChannel("anything", language: "xx"))
+    }
+
+    @Test func theRealFrenchAndGermanHallucinationsAreFound() {
+        #expect(BackChannelPhrases.isHallucination("Sous-titres réalisés par la communauté d'Amara.org"))
+        #expect(BackChannelPhrases.isHallucination("Untertitel der Amara.org-Community"))
     }
 
     @Test func hallucinationsAreFoundInsideALongerText() {

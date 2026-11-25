@@ -30,10 +30,10 @@ import Testing
         #expect((guess?.confidence ?? 0) >= LanguageProfile.minimumConfidence)
     }
 
-    @Test func aConstraintLimitsTheAnswerToTheListedLanguages() {
+    @Test func aConstraintLimitsTheAnswerToTheListedLanguages() throws {
         // Ukrainian text, but only Polish and Russian allowed: the answer is one of those, never Ukrainian.
         let guess = identifier.identify(Self.samples[2].text, hints: [], constraints: ["pl", "ru"])
-        #expect(guess == nil || ["pl", "ru"].contains(guess?.code ?? ""))
+        #expect(["pl", "ru"].contains(try #require(guess).code))
     }
 
     /// One word has no signal of its own. (With hints the prior makes even "Tak." look certain, which is why a

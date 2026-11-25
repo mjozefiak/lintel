@@ -4,11 +4,16 @@ import Synchronization
 @testable import LintelSpeech
 
 /// Answers from a table keyed by the exact text; no answer means "says nothing".
-struct FakeIdentifier: TextLanguageIdentifier {
-    var answers: [String: LanguageGuess] = [:]
+final class FakeIdentifier: TextLanguageIdentifier {
+    let answers: [String: LanguageGuess]
+    /// The hints of every call, to assert what a caller passes.
+    let hintsSeen = Mutex<[[String]]>([])
+
+    init(answers: [String: LanguageGuess] = [:]) { self.answers = answers }
 
     func identify(_ text: String, hints: [String], constraints: [String]?) -> LanguageGuess? {
-        answers[text]
+        hintsSeen.withLock { $0.append(hints) }
+        return answers[text]
     }
 }
 
@@ -27,7 +32,7 @@ func confidentProfile(_ spoken: KeyValuePairs<String, TimeInterval>) -> Language
 }
 
 /// An engine that answers with the options of the call, so a test sees what each request carried.
-final class OptionsEngine: SpeechEngine, @unchecked Sendable {
+final class OptionsEngine: SpeechEngine {
     let received = Mutex<[SpeechRequestOptions]>([])
     private let loaded = Mutex(false)
 

@@ -35,7 +35,7 @@ public enum TextScript {
     /// Words as the system's word boundaries see them, so Chinese, Japanese and Thai (no spaces) count too.
     public static func wordCount(_ text: String) -> Int {
         var count = 0
-        text.enumerateSubstrings(in: text.startIndex..., options: [.byWords, .localized]) { word, _, _, _ in
+        text.enumerateSubstrings(in: text.startIndex..., options: [.byWords]) { word, _, _, _ in
             if word != nil { count += 1 }
         }
         return count

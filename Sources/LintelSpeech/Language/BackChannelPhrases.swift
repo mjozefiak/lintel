@@ -44,7 +44,7 @@ public enum BackChannelPhrases {
             "untertitel im auftrag des zdf",
         ],
         "es": ["subtitulos realizados por la comunidad de amara org", "gracias por ver el video"],
-        "fr": ["sous titres realises para la communaute d amara org", "merci d avoir regarde cette video"],
+        "fr": ["sous titres realises par la communaute d amara org", "merci d avoir regarde cette video"],
         "it": ["sottotitoli creati dalla comunita amara org", "grazie per la visione"],
         "ru": ["продолжение следует", "субтитры сделал dimatorzok", "субтитры создавал dimatorzok"],
         "uk": ["субтитри створив dimatorzok", "дякую за перегляд"],
@@ -57,7 +57,7 @@ public enum BackChannelPhrases {
         folded = folded.replacingOccurrences(of: "ł", with: "l").replacingOccurrences(of: "đ", with: "d")
             .replacingOccurrences(of: "ø", with: "o")
         let scalars = folded.unicodeScalars.map { scalar -> Character in
-            // Keep the apostrophe of "d'accord" meaningful by dropping it, like the other punctuation inside a word.
+            // Punctuation, apostrophes included, becomes a space ("d'accord" is "d accord" on both sides of a comparison).
             scalar.properties.isAlphabetic || CharacterSet.decimalDigits.contains(scalar) ? Character(scalar) : " "
         }
         return String(scalars).split(whereSeparator: \.isWhitespace).joined(separator: " ")

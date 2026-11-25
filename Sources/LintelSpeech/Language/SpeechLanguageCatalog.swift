@@ -34,14 +34,14 @@ public enum SpeechLanguageCatalog {
 
     private static let latin =
         "en de es fr pt tr pl ca nl sv it id fi vi ms cs ro da hu no hr la mi cy sk lv lt az sl et br eu is bs sq sw "
-        + "gl af oc uz fo ht tk nn mt lb tl mg haw ln ha jw su sn yo so"
+        + "gl af oc uz fo ht tk mt lb tl mg haw ln ha jw su sn yo so"
     private static let cyrillic = "ru uk bg be mk mn kk tg tt ba"
     private static let greek = "el"
     /// Serbian is written in both Cyrillic and Latin, so it gets no script hint either way.
     private static let other =
         "zh ko ja ar hi he ta th ur fa ml te bn kn hy ne mr pa si km ka sd gu am yi lo ps sa my bo as yue sr"
 
-    /// Every language, in Whisper's order of popularity (the UI sorts by localized name).
+    /// Every language, grouped by script (the UI sorts by localized name).
     public static let all: [SpeechLanguage] = {
         func entries(_ codes: String, _ script: LanguageScript) -> [SpeechLanguage] {
             codes.split(separator: " ").map {

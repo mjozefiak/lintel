@@ -45,7 +45,8 @@ final class CandidateLanguageSampler: TokenSampling, Sendable {
     var choice: ConstrainedLanguagePick.Choice? { chosen.withLock { $0 } }
 
     func update(tokens: [Int], logits: MLMultiArray, logProbs: [Float]) async -> SamplingResult {
-        let scored = candidates.map { candidate in
+        let size = logits.shape.count == 3 ? logits.shape[2].intValue : 0
+        let scored = candidates.filter { $0.token < size }.map { candidate in
             (code: candidate.code, logit: logits[[0, 0, NSNumber(value: candidate.token)]].floatValue)
         }
         guard let pick = ConstrainedLanguagePick.choose(scored),

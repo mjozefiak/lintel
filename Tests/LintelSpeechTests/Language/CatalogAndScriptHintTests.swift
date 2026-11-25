@@ -49,6 +49,10 @@ import Testing
         #expect(SpeechLanguageCatalog.normalize("en_US") == "en")
         #expect(SpeechLanguageCatalog.normalize("nb") == "no")
         #expect(SpeechLanguageCatalog.normalize("nn-NO") == "no")
+        // Every language the catalog lists comes back as itself, so none is unreachable behind an alias.
+        for language in SpeechLanguageCatalog.all {
+            #expect(SpeechLanguageCatalog.normalize(language.code) == language.code, "\(language.code)")
+        }
         #expect(SpeechLanguageCatalog.normalize("yue") == "yue")
         #expect(SpeechLanguageCatalog.normalize("haw") == "haw")
         #expect(SpeechLanguageCatalog.normalize("xx") == nil)
