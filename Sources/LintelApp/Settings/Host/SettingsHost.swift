@@ -97,6 +97,47 @@ final class SettingsHostModel {
         refreshAttention()
     }
 
+    /// The permissions behind the shown banner's System Settings buttons that the system itself reports live and
+    /// that a plugin does not cache: Accessibility and the microphone. A grant of one of these must clear the banner
+    /// without a restart (#71). Full Disk Access and clipboard access are shown from the plugin's own cached state,
+    /// which only changes on its own events, so polling them would redraw for nothing.
+    var livePermissions: [Permission] {
+        let permissions = (banner?.actions ?? []).compactMap { action -> Permission? in
+            if case .systemSettings(let permission) = action.destination { return permission }
+            return nil
+        }
+        return permissions.filter { $0 == .accessibility || $0 == .microphone }
+    }
+
+    /// True while the shown banner waits for one of `livePermissions`.
+    var needsLiveRefresh: Bool { !livePermissions.isEmpty }
+
+    /// Whether the one-second live check should run (the app answers "the main window is visible").
+    @ObservationIgnored var liveGate: @MainActor () -> Bool = { true }
+    /// Live permissions last seen granted, so one grant redraws once, not on every tick until a plugin catches up.
+    @ObservationIgnored private var seenGranted: Set<Permission> = []
+
+    /// One live check. It reads only the waited-for permission, and reads the banner again only when that
+    /// permission turns granted, so a waiting banner does not redraw the pane every second.
+    func liveTick() {
+        guard liveGate() else { return }
+        var turned = false
+        for permission in livePermissions {
+            if reader.status(of: permission) == .granted {
+                if seenGranted.insert(permission).inserted { turned = true }
+            } else {
+                seenGranted.remove(permission)
+            }
+        }
+        if turned { refresh() }
+    }
+
+    /// Reads the shown banner and the dots again whenever the shared permission service sees a state change, so the
+    /// Permissions pane's banner and the sidebar dots follow its live rows (#71).
+    func follow(_ service: PermissionGrantService) {
+        service.onChange = { [weak self] _, _ in self?.refresh() }
+    }
+
     /// `PluginContext.resultsChanged` from the plugin `pluginID`: its dot, and the banner when it is shown.
     func pluginResultsChanged(_ pluginID: String) {
         guard pluginID == paneID else {
@@ -246,6 +287,14 @@ struct SettingsHost: View {
         // the top under the traffic lights, as in the prototype.
         .ignoresSafeArea(.container, edges: .top)
         .task(id: selection) { model.show(selection) }
+        .task(id: model.needsLiveRefresh) {
+            // Granting a permission in System Settings must clear its banner without a restart (#71). The reader
+            // only preflights, so the re-read never prompts.
+            while model.needsLiveRefresh, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                model.liveTick()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refresh()
         }

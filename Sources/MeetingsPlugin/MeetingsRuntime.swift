@@ -90,7 +90,8 @@ struct MeetingsRuntime: Sendable {
         return MeetingSession(
             store: request.store, keys: request.keys, spool: request.spool, mic: microphone,
             system: request.recordsSystemAudio ? makeSystemAudio() : nil,
-            makeVAD: { LazyVAD(modelFolder: vadFolder) }, engine: makeEngine(modelID: request.modelID),
+            makeVAD: { LazyVAD(modelFolder: vadFolder, tuning: MeetingVAD.tuning, recordsProbabilities: true) },
+            engine: makeEngine(modelID: request.modelID),
             modelID: request.modelID, modelFolder: request.modelFolder, sleepAssertion: IOKitSleepAssertion(),
             gate: gate, beforeReady: finalizer.hook, sourceBundleID: request.sourceBundleID,
             keepAudio: { [settings] in settings.keepAudio },
@@ -157,7 +158,8 @@ actor FolderResolvingVAD: VoiceActivityDetector {
     func process(_ samples: [Float]) async throws -> [VADEvent] {
         if detector == nil {
             guard let folder = await folder() else { throw ModelMissing() }
-            detector = try SileroVAD(modelFolder: folder.appending(path: ModelCatalog.sileroVADPath))
+            detector = try SileroVAD(
+                modelFolder: folder.appending(path: ModelCatalog.sileroVADPath), tuning: MeetingVAD.tuning)
         }
         return try await detector?.process(samples) ?? []
     }

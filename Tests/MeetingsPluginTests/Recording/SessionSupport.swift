@@ -550,6 +550,9 @@ struct SessionRig {
         limits.discardBelow = .seconds(15)
         // The older tests expect a track that ends to be lost at once; resuming has its own tests.
         limits.resumeAttempts = 0
+        // The older tests count the samples of a segment; the padding has its own tests (SegmentWindowTests).
+        limits.segmentPreRoll = .zero
+        limits.segmentPostRoll = .zero
         return limits
     }
 

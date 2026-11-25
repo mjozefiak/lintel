@@ -82,6 +82,14 @@ public struct VADEvent: Equatable, Sendable {
 public protocol VoiceActivityDetector: Sendable {
     /// Feeds samples of any length and returns the boundaries found so far.
     func process(_ samples: [Float]) async throws -> [VADEvent]
+
+    /// The speech probabilities (0...1, one per 256 ms chunk) computed since the last call, oldest first; they
+    /// are only kept when the detector was asked to record them. A detector that has none returns `[]`.
+    func drainProbabilities() async -> [Float]
+}
+
+extension VoiceActivityDetector {
+    public func drainProbabilities() async -> [Float] { [] }
 }
 
 /// The recording's samples in memory, dropping what has been handed to the engine. Indexes are counted from

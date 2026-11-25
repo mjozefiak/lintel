@@ -1,4 +1,5 @@
 import Foundation
+import LintelSpeech
 
 /// The session's state in memory (spec: Phasing, "Stany"). `idle` has no row in the database; the others map
 /// to `meeting.status` through `meetingStatus`.
@@ -146,6 +147,16 @@ struct MeetingSessionLimits: Sendable {
     var startRetryDelay: Duration = .milliseconds(1_500)
     /// A gap longer than this is filled with only this much silence; the rest shifts the track on the timeline.
     var longestGapFill: Duration = .seconds(120)
+    /// Audio sent to the engine before the start of the speech range the voice activity detector reports. The
+    /// detector opens a range at the 256 ms chunk that first reaches its threshold, so the first syllables of a
+    /// quiet word can lie before it (issue #135). Never reaches into the previous segment.
+    var segmentPreRoll: Duration = SegmentWindow.preRoll
+    /// Audio sent after the end of the range: the detector closes it at the start of the first quiet chunk,
+    /// so a soft ending can lie after it. Not added where a segment is cut at the model window.
+    var segmentPostRoll: Duration = SegmentWindow.postRoll
+    /// The detector's entry threshold: chunks from `SegmentingStats.nearMissFloor` up to it, while no speech is
+    /// open, are counted as near misses.
+    var vadEntryThreshold: Float = MeetingVAD.tuning.entryThreshold
 
     static func seconds(_ duration: Duration) -> Double {
         let parts = duration.components
