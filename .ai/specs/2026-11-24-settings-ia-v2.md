@@ -72,7 +72,7 @@ Audience: non-technical office workers (personas Anna, Piotr, Kasia in the direc
 | *What Lintel can use / Do czego Lintel ma dostęp* | Microphone / Mikrofon · Hear other people in a call / Słysz innych w rozmowie · Type into other apps / Pisz w innych aplikacjach · (Quick search on) Search everywhere on this Mac / Szukaj wszędzie na tym Macu | `PermissionRow`, 3 states | enabled plugins' `requiredPermissions` | B |
 | *What Lintel keeps / Co Lintel przechowuje* | Meeting audio / Dźwięk spotkań: Delete when notes are ready · 7 · 30 · 90 days | popup | `keepAudio` + `keptAudioDays` | B |
 | | "Notes and transcripts stay until you delete them. Dictations and clipboard items are kept 30 days." / „Notatki i transkrypcje zostają, dopóki ich nie usuniesz. Dyktowania i schowek są przechowywane 30 dni.” (built from the effective values; the clipboard part only while Clipboard history is on) | read-only sentence | `plugins.meetings.retentionDays`, `plugins.dictation.historyEnabled` + `retentionDays`, `plugins.clipboard.retentionDays` | B |
-| | (only on an old install pinned to a limit) Notes and transcripts are deleted after 90 days · Keep Forever / Notatki i transkrypcje są usuwane po 90 dniach · Zachowaj na zawsze | button, one way: writes `0` | `plugins.meetings.retentionDays` | B |
+| | (only on an old install pinned to a limit) Notes and transcripts are deleted after N days (the stored value, 90 when pinned by step 5) · Keep Forever / Notatki i transkrypcje są usuwane po N dniach · Zachowaj na zawsze | button, one way: writes `0` | `plugins.meetings.retentionDays` | B |
 | | Remind me to tell people I'm recording / Przypominaj, by uprzedzić o nagrywaniu | toggle | `plugins.meetings.consentReminder` | M |
 | *Delete / Usuń* | Delete my data… / Usuń moje dane… → sheet; Recently deleted · 12 items › / Ostatnio usunięte · 12 › | button + pointer | contributed data stores | B |
 | **Add-ons / Dodatki** | "Extra tools. All off until you turn them on." / „Dodatkowe narzędzia. Wyłączone, dopóki ich nie włączysz.” | sentence | — | — |
@@ -155,12 +155,13 @@ New `app.*` keys are declared in `SettingsKeys.swift` and added to BC §3.
 | `app.languages` | [String] of `pl`/`en`; missing = system languages ∩ supported, else `["pl"]` | `plugins.{dictation,meetings}.speechLanguage` |
 | `app.inputDevice` | String UID; missing = Automatic (system input) | `plugins.{dictation,meetings}.inputDevice` |
 | `app.settingsMigration.v2` | [String] of finished migration step ids | marker |
+| `app.eraseScheduledAt` | Double (Unix s); missing = no deferred Delete everything (phase 5) | new |
 
 **Migration `SettingsIAMigration`** (`Sources/LintelApp/Migration/`) runs once per step id at launch, after `LegacyDataMigration` and `PluginDefaultsMigration`, before the host reads a switch. BC §3 rules apply: the migration keeps its code for at least one minor release, has a test for each case, and never changes behaviour.
 
 1. **Text model** (phase 3). The winner is the first stored id that is installed, in the order dictation → meetings → notes. With none installed, it is the first stored id. With none stored, nothing is written. The winner goes to `app.assistant.textModel`. A plugin key equal to the winner is deleted. **A plugin key that differs stays** and is read by that plugin as an override (effective = own key if valid, else `assistant.textModelID`). Its plugin contributes the M row "… use a different assistant · Use the Same", which deletes the override. So nobody's notes or cleanup silently switch models, and new installs never get an override.
 2. **Speech model and folder** (phase 3). Same rule over dictation → meetings.
-3. **Languages** (phase 3). This is the union of the stored `speechLanguage` values in the order dictation, meetings. The old keys are deleted after the copy. The Whisper pin reads `languages.first`, which is the dictation value, as today. A meetings value that differed and Whisper selected for meetings keeps a meetings override, by the same rule as 1.
+3. **Languages** (phase 3). This is the union of the stored `speechLanguage` values in the order dictation, meetings. The old keys are deleted after the copy, except a meetings override kept by the rule at the end of this step. The Whisper pin reads `languages.first`, which is the dictation value, as today. A meetings value that differed and Whisper selected for meetings keeps a meetings override, by the same rule as 1.
 4. **Microphone** (phase 3). Same rule as 1 (dictation → meetings).
 5. **Retention pin** (phase 4). On an install that ran before (same test as `PluginDefaultsMigration`) with no stored `plugins.meetings.retentionDays`, the migration writes `90`, the old effective value. A stored value is kept as it is. New installs read the new default `0` (keep forever). Owner decision 2026-11-24 on #253 (Q7) approves this longer default, as BC §3 requires; the BC §3 entry cites it. The pinned install's only way to change it is the one-way Keep Forever button.
 
@@ -170,7 +171,7 @@ New `app.*` keys are declared in `SettingsKeys.swift` and added to BC §3.
 
 This uses additive GRDB migrations per encrypted store, named per BC §2:
 
-- `dictation.sqlite` `v2-soft-delete`, `meetings.sqlite` `v2-soft-delete`, `notes.sqlite` `v2-soft-delete`, `clipboard.sqlite` `v2-soft-delete`: a nullable `deleted_at` column on the top-level row (`dictation`, `meeting`, `note_doc`, `clip_item`) plus an index. FTS triggers skip rows with `deleted_at`. Every list, search, count and `NoteSource.list` filters them out.
+- `dictation.sqlite` `v2-soft-delete`, `meetings.sqlite` `v2-soft-delete`, `notes.sqlite` `v2-soft-delete`, `clipboard.sqlite` `v2-soft-delete`: a nullable `deleted_at` column on the top-level row (`dictation_entry`, `meeting`, `note_doc`, `clip_item`) plus an index. FTS triggers skip rows with `deleted_at`. Every list, search, count and `NoteSource.list` filters them out.
 - "Delete" sets `deleted_at` and touches nothing else. A meeting's spool and kept audio are deleted at once: audio is not kept for restore, because it is the most sensitive data and the notes and transcript survive. The restore sheet says "Audio isn't restored." A meeting in `recording` or `processing` is refused, as today.
 - The hourly retention jobs purge rows with `deleted_at` older than 30 days (`purgeExpired`), then `VACUUM` at most daily. Retention by age also moves rows to Recently deleted first, never straight to a purge.
 - **Delete everything** moves every store's rows and sets `app.eraseScheduledAt`. After 30 days, or on "Delete Now", the plugins' `eraseData()` runs (Keychain items and folders). Until then the data stays encrypted with its key.
@@ -246,7 +247,7 @@ Direction calls (not rule violations): the C8 exception and Claude limited to me
 
 ## 📋 Phasing
 
-Each phase is one `feat/` PR from `main`. Each UI phase starts with gallery scenes approved on the contact sheet (#248 must have its Phase 1 merged first). Each phase passes the validation gate, adds en+pl strings (`StringCatalogTests`) and carries the C1–C19 QA table.
+Each phase is one `feat/` PR from `main`. Each UI phase starts with gallery scenes approved on the contact sheet (#248 must have its Phase 1 merged first; the sheet and toast scenes of phases 4–6 also need #248 Phase 4, the `.sheet` mode). Migration step 5 uses the existing-install test of `PluginDefaultsMigration`, which arrives with #251, so #251 must be merged before phase 4. Each phase passes the validation gate, adds en+pl strings (`StringCatalogTests`) and carries the C1–C19 QA table.
 
 1. **Shell: seven pages, sidebar, search, gates.** Contract part 1, the new sidebar, General (without Languages and Microphone), Add-ons, About & help, old panes hosted inside the new pages, search, pane-id mapping, conventions. Features, Advanced and Permissions disappear as panes.
 2. **Dictation and Meetings & notes pages.** Both plugins and Notes contribute sections: basic rows, More options, app picker, Check call audio, every command's recorder, pointer rows. The jargon leaves the basics.
