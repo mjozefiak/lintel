@@ -640,6 +640,19 @@ run only for the detection itself (use the QA data root so the library is isolat
 - Turn the setting off while a pill is showing: the pill disappears and no further pills come.
 - Honest limits to confirm: a Safari/WebKit-helper-based app may not be detected; the pill is not operable from the
   keyboard (it claims no keys on purpose) but VoiceOver reads it and can press its buttons.
+- **Reading the decisions.** The detector logs every decision at `notice` level (it stays on disk), without window
+  titles, URLs or audio: `/usr/bin/log show --last 1h --info --predicate 'subsystem == "com.lintelapp" AND
+  eventMessage CONTAINS "Meeting detection"'` (in zsh, plain `log` is a builtin). Lines: "input in use by
+  <bundle ID> (app: <the app its executable lives in>), listed as <listed app or none>" for every process that starts
+  using an input, "input no longer in use by …", "suggested a recording for …", "no suggestion for …, skipped:
+  disabled|busy|muted", "waits for the suggestion on screen", "the user answered …", "the suggestion expired
+  unanswered" and "status listening|noData|unavailable". A browser call that shows no pill reads here: no "input in
+  use" line means Core Audio reported nothing (the API, not the matching); "listed as none" means the browser is not
+  in the list (add it in the pane); "skipped: busy" means Lintel was recording or finishing a meeting at the 10 s mark
+  (the app then stays decided until its mic use ends). A helper process is matched by its own bundle ID
+  (`com.google.Chrome.helper` belongs to `com.google.Chrome`) and by the app its executable lives in (Firefox's
+  `org.mozilla.plugincontainer` belongs to `org.mozilla.firefox`).
+- If no app reports microphone use for 30 s after turning the setting on, the pane says
 - If no app reports microphone use for 30 s after turning the setting on, the pane says "Lintel cannot confirm that
   detection works on this Mac" (not "Not available"); starting a call then clears it.
 - A headset or mute flap (mic use stops and restarts within 30 s) gives no second pill; a pill answered "Not now" does
