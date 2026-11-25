@@ -204,6 +204,29 @@ import Testing
         model.inputDevice = nil
         #expect(settings.inputDevice == nil)
     }
+
+    @Test func theChosenMicrophoneKeepsItsNameAndThePreferenceSurvivesAMissingDevice() async throws {
+        let rig = try Rig()
+        defer { rig.harness.tearDown() }
+        let settings = DictationSettings(rig.harness.context.settings)
+        // What the pane does when the user picks a device from the list.
+        settings.setInputDevice("usb-1", name: "USB MICROPHONE")
+        #expect(settings.inputDevice == "usb-1")
+        #expect(settings.inputDeviceName == "USB MICROPHONE")
+        // The device is unplugged: nothing touches the stored choice, only the capture falls back.
+        let resolution = InputDeviceResolution.resolve(
+            requestedUID: settings.inputDevice, requestedName: settings.inputDeviceName, available: [],
+            defaultInputName: "MacBook Pro Microphone")
+        #expect(
+            resolution
+                == .fallback(InputFallback(requestedName: "USB MICROPHONE", usingName: "MacBook Pro Microphone")))
+        #expect(settings.inputDevice == "usb-1")
+        #expect(settings.inputDeviceName == "USB MICROPHONE")
+        // Choosing "System" removes both.
+        settings.setInputDevice(nil)
+        #expect(settings.inputDevice == nil)
+        #expect(settings.inputDeviceName == nil)
+    }
 }
 
 @MainActor

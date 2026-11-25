@@ -50,6 +50,24 @@ AppKit itself may still write window and status-item state to the app's own defa
 If that domain did not exist before a QA session, remove it afterwards with
 `defaults delete com.lintelapp.Lintel`.
 
+### Which plugins are on
+
+A QA profile is a new install: since 2026-11-24 Dictation, Meetings and Notes are on and Apps, Files, Clipboard and
+Windows are off, so the panel finds nothing and the add-ons' panes are dimmed until they are turned on. The recipes
+below for the launcher, file search and clipboard history start with:
+
+```bash
+ADDONS=(--qa-setting plugins.apps.enabled=true --qa-setting plugins.files.enabled=true
+  --qa-setting plugins.clipboard.enabled=true)
+```
+
+The in-memory settings are new on every run, so a run is a new install even when `--qa-data-root` names a folder that
+an earlier run used. To see what an install from before 2026-11-24 gets (`PluginDefaultsMigration`), keep the settings
+too: run once with `--qa-data-root <folder> --qa-persistent-settings` on a folder that already holds a `ranking.sqlite`
+and no `qa-settings.json`. `<folder>/qa-settings.json` then holds `plugins.apps/files/clipboard.enabled = true`,
+`plugins.dictation/meetings.enabled = false` and `app.pluginDefaultsMigrated = true`, and Settings → Features shows the
+old switches. A stored switch is never changed, and a second run changes nothing.
+
 ## Arguments
 
 | Argument | Since | Effect |
@@ -69,7 +87,7 @@ If that domain did not exist before a QA session, remove it afterwards with
 | `--qa-fail-action` | Phase 1 | With `--qa-panel`: once results load, show the failed-action message for the selected row's first action without running it. |
 | `--qa-confirm-action` | main window 6.2 | With `--qa-panel <list mode>`: once results load, show the "Press ⌃X again to delete" footer of the selected row's delete (the first action with a confirmation) without running it and without the 5 s timeout. |
 | `--qa-spotlight on\|off` | Phase 1 | Pretend Spotlight does or does not hold ⌘Space instead of reading the system's symbolic hotkeys. |
-| `--qa-onboarding-step <step id>` | Phase 2; the welcome screen since Phase 4 | Show the welcome screen on one page: `intro`, `shortcut`, a plugin step such as `clipboard.intro`, or the final page `done` ("You're set", which opens the main window). The welcome screen is the single-column layout of the prototype `shell-welcome-*`. |
+| `--qa-onboarding-step <step id>` | Phase 2; the welcome screen since Phase 4 | Show the welcome screen on one page: `intro`, `shortcut` (only while a plugin that searches is on, such as `--qa-setting plugins.apps.enabled=true`; since 2026-11-24 a new profile has none, and then the main shortcut is not registered at all: Settings → General shows "The launcher is off" and the menu bar's "Open Lintel" shows no shortcut; QA mode never registers shortcuts with the system, so check these two places), a plugin step such as `clipboard.intro`, or the final page `done` ("You're set", which opens the main window). The welcome screen is the single-column layout of the prototype `shell-welcome-*`. |
 | `--qa-pasteboard-access allow\|default\|ask\|deny` | Phase 2 | The pasteboard access behaviour plugins see (`NSPasteboard.accessBehavior`), for the clipboard's permission banners. |
 | `--qa-accessibility granted\|denied` | Phase 2 | The Accessibility status plugins see. Without it the real status is read, never changed. |
 | `--qa-full-disk-access granted\|denied` | Phase 3 | The Full Disk Access status plugins see (default `denied` in QA mode). Never read from, or changed in, the system. |
@@ -78,7 +96,7 @@ If that domain did not exist before a QA session, remove it afterwards with
 | `--qa-activity-live` | App suggestions | Run the real activity tracker and the one-time Spotlight seed in QA mode (off by default, so a QA run never records the tester's app switches). |
 | `--qa-notes` | Notes workspace, step 1.2 | The Notes section (registered in every build since step 7.1; the fixtures are DEBUG only) lists fixture notes with invented text (a finished meeting with notes and a transcript, two dictations, a meeting still writing its notes, an interrupted one and a failed one), read through fixture `NoteSource`s that come before the real plugins' sources. Manual notes come with the store (step 4.0), so there is none. Open a note from the explorer; the Notes section handles `openNote` routes (Meetings' ⌘O and the dictation history's "Open in Lintel" action, in every build). Combine with `--qa-window workspace`. |
 | `--qa-snapshot <path>` | Notes workspace, step 3.2 | With `--qa-quit-after`: just before quitting, writes the main window's content as a PNG, rendered by the app itself (`cacheDisplay`), so it works where screen recording is not allowed. The title bar is not part of it. |
-| `--qa-hud dictation:<state>` / `meeting:<state>` | QA fixtures (issue #222) | Draws the real dictation or meeting-recording HUD view in that state in a QA panel, with no microphone, model, system audio or permission (the plugin is switched on in the QA settings and its `activate()` shows the panel). With `--qa-snapshot` the snapshot is the HUD instead of the main window (the HUD window on screen is transparent and has the glass, exactly as in the product; `cacheDisplay` does not draw the glass (the material) and gives its labels the light-mode colour, so the snapshot shows the view on an opaque window-colour backdrop cut to the HUD's own shape (rounded rectangle for the meeting, capsule for dictation, transparent corners) and only the **light** HUD snapshots are faithful; look at a dark HUD on screen instead). **Dictation states:** `allow-microphone`, `recording`, `loading-model`, `countdown`, `finishing`, `pasted`, `pasted-unformatted`, `pasted-partly-unformatted`, `copied-no-accessibility`, `copied`, `model-missing`, `model-unavailable`, `model-failed`, `speech-model-busy`, `microphone-denied`, `no-microphone`, `nothing-heard`, `nothing-to-paste`. **Meeting states:** `allow-microphone`, `recording`, `recording-consent`, `recording-loading-model`, `recording-model-unavailable`, `recording-countdown`, `recording-no-system-audio`, `recording-no-microphone-audio`, `recording-low-disk`, `recording-write-problem`, `recording-device-disconnected`, `recording-system-audio-lost`, `recording-microphone-only`, `finishing`, `processing-transcribing`, `processing-speakers`, `processing-closing`, `saved`, `saved-incomplete`, `model-missing`, `model-unavailable`, `library-unavailable`, `microphone-denied`, `microphone-denied-system-only`, `no-audio-input`, `low-disk-at-start`, `still-processing`, `model-being-removed`, `nothing-heard`, `could-not-start`, `failed`. An unknown state draws nothing and logs an error. Example: `dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-hud meeting:recording-consent --qa-appearance dark --qa-snapshot /tmp/hud.png --qa-quit-after 4`. |
+| `--qa-hud dictation:<state>` / `meeting:<state>` | QA fixtures (issue #222) | Draws the real dictation or meeting-recording HUD view in that state in a QA panel, with no microphone, model, system audio or permission (the plugin is switched on in the QA settings and its `activate()` shows the panel). With `--qa-snapshot` the snapshot is the HUD instead of the main window (the HUD window on screen is transparent and has the glass, exactly as in the product; `cacheDisplay` does not draw the glass (the material) and gives its labels the light-mode colour, so the snapshot shows the view on an opaque window-colour backdrop cut to the HUD's own shape (rounded rectangle for the meeting, capsule for dictation, transparent corners) and only the **light** HUD snapshots are faithful; look at a dark HUD on screen instead). **Dictation states:** `allow-microphone`, `recording`, `recording-microphone-fallback`, `loading-model`, `countdown`, `finishing`, `pasted`, `pasted-unformatted`, `pasted-partly-unformatted`, `copied-no-accessibility`, `copied`, `model-missing`, `model-unavailable`, `model-failed`, `speech-model-busy`, `microphone-denied`, `no-microphone`, `nothing-heard`, `nothing-to-paste`. **Meeting states:** `allow-microphone`, `recording`, `recording-consent`, `recording-loading-model`, `recording-model-unavailable`, `recording-countdown`, `recording-no-system-audio`, `recording-no-microphone-audio`, `recording-low-disk`, `recording-write-problem`, `recording-device-disconnected`, `recording-microphone-not-recorded`, `recording-microphone-retrying`, `recording-microphone-fallback`, `recording-system-audio-lost`, `recording-microphone-only`, `finishing`, `processing-transcribing`, `processing-speakers`, `processing-closing`, `saved`, `saved-incomplete`, `model-missing`, `model-unavailable`, `library-unavailable`, `microphone-denied`, `microphone-denied-system-only`, `no-audio-input`, `low-disk-at-start`, `still-processing`, `model-being-removed`, `nothing-heard`, `could-not-start`, `failed`, and the suggestion pill with a fixture app name ("Google Chrome"): `suggestion-meeting` ("Looks like a meeting in …" with Record, Not now, Don't ask for this app) and `suggestion-end-recording` ("End the recording?"). An unknown state draws nothing and logs an error. Example: `dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-hud meeting:recording-consent --qa-appearance dark --qa-snapshot /tmp/hud.png --qa-quit-after 4`. |
 | (QA identity) | QA fixtures (issue #222) | A `--qa` run never shows the tester's account name or a path from their home folder: Settings → Meetings → "Your name" suggests `Ada Example` (`plugins.meetings.qaAccountName`), and "Choose File…" of the notes provider answers with `/opt/lintel-qa/bin/claude` (`plugins.meetings.qaProviderBinary`) without opening a file panel. Both can be overridden with `--qa-setting`, with fictional values only. Other file panels (model folder, exports) are real: do not use them in evidence runs. The meeting fixture's notes (`--qa-notes`) have the production format: no `[mm:ss]` times, no Source column, tasks as a checklist; times are only in the transcript. **Before publishing any screenshot** (push of a `qa-evidence-*` branch, a PR comment), look at it for home-folder paths, the account name and the host name. |
 | `--qa-setting plugins.notes.qaOpen=<key>[@<layer>],…` | Notes workspace, step 3.2 | With `--qa-notes`: opens these fixture notes in tabs (the last one current) and shows the layer after `@` (`transcript`, `original`). For example `meetings:00000000-0000-0000-0000-000000000001@transcript`. |
 | `--qa-setting plugins.notes.qaSearch=<text>` | Notes workspace, step 3.4 | With `--qa-notes`: types the text into the explorer's search field once the first list is in, so a QA run shows the search results or the no-results message (the fixture sources match the title and the text of a note, e.g. `ship`; `invoice 2019` finds nothing). |
@@ -121,16 +139,16 @@ never shows which apps (for example which password manager) the tester has insta
 when capturing the Clipboard History settings pane.
 
 ```bash
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting plugins.clipboard.qaSeed=demo \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting plugins.clipboard.qaSeed=demo \
   --qa-accessibility granted --qa-panel clipboard --qa-appearance light
 # Recording paused, Accessibility missing, access set to ask:
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting plugins.clipboard.qaSeed=demo \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting plugins.clipboard.qaSeed=demo \
   --qa-setting plugins.clipboard.paused=true --qa-accessibility denied --qa-pasteboard-access ask \
   --qa-panel clipboard
 # Empty history, settings pane, onboarding step:
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-accessibility granted --qa-panel clipboard
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting plugins.clipboard.qaSeed=demo --qa-settings clipboard
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-onboarding-step clipboard.intro
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-accessibility granted --qa-panel clipboard
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting plugins.clipboard.qaSeed=demo --qa-settings clipboard
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-onboarding-step clipboard.intro
 ```
 
 Pasting (Return posts ⌘V into the previous app) needs Accessibility and a real target app, so it is a
@@ -147,7 +165,7 @@ mkdir -p "$FIXTURES/Notes Demo.app/Contents"
 plutil -create xml1 "$FIXTURES/Notes Demo.app/Contents/Info.plist"
 plutil -insert CFBundleIdentifier -string com.example.notes "$FIXTURES/Notes Demo.app/Contents/Info.plist"
 # … more bundles …
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" \
   --qa-setting "plugins.apps.roots=$FIXTURES" --qa-setting plugins.apps.spotlight=false \
   --qa-record-use apps:com.example.notes --qa-panel search --qa-query no --qa-appearance dark
 ```
@@ -173,7 +191,7 @@ for app in Mail:com.example.mail Notes:com.example.notes Maps:com.example.maps M
   plutil -create xml1 "$FIX/${app%%:*} Demo.app/Contents/Info.plist"
   plutil -insert CFBundleIdentifier -string "${app#*:}" "$FIX/${app%%:*} Demo.app/Contents/Info.plist"
 done
-COMMON=(--qa --qa-setting "plugins.apps.roots=$FIX" --qa-setting plugins.apps.spotlight=false
+COMMON=(--qa "${ADDONS[@]}" --qa-setting "plugins.apps.roots=$FIX" --qa-setting plugins.apps.spotlight=false
   --qa-activity com.example.mail=5 --qa-activity com.example.notes=3 --qa-activity com.example.maps)
 # The empty panel with "Suggested" (⌘1–⌘3 open the rows, ⌃X hides the selected one):
 dist/Lintel-QA.app/Contents/MacOS/Lintel-QA "${COMMON[@]}" --qa-panel search --qa-appearance dark
@@ -208,15 +226,15 @@ FIX=/tmp/lintel-p3-qa
 mkdir -p "$FIX/home/Projects/Website" "$FIX/home/Desktop" "$FIX/home/Documents" "$FIX/apps"
 touch "$FIX/home/Projects/Quarterly Report.txt" "$FIX/home/Projects/Website/notes.txt" \
   "$FIX/home/Desktop/desk-plan.txt" "$FIX/home/Documents/tax-form.txt"
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" \
   --qa-setting "plugins.files.qaHome=$FIX/home" --qa-setting "plugins.files.roots=$FIX/home" \
   --qa-setting plugins.files.setupCompleted=true --qa-full-disk-access denied \
   --qa-setting "plugins.apps.roots=$FIX/apps" --qa-setting plugins.apps.spotlight=false \
   --qa-panel search --qa-query report
 # The Full Disk Access onboarding step and the Files settings pane:
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting "plugins.files.qaHome=$FIX/home" \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting "plugins.files.qaHome=$FIX/home" \
   --qa-onboarding-step files.fullDiskAccess
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting "plugins.files.qaHome=$FIX/home" \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting "plugins.files.qaHome=$FIX/home" \
   --qa-setting plugins.files.setupCompleted=true --qa-settings files
 ```
 
@@ -235,7 +253,7 @@ folders (file path search spec). In QA mode `~` is the fake home, so build the f
 mkdir -p "$FIX/home/Projects/ng/.ai/runs/2026-10-27-qa-fixes/screenshots" "$FIX/home/Documents/Invoices"
 touch "$FIX/home/Projects/ng/.ai/runs/2026-10-27-qa-fixes/plan.txt" \
   "$FIX/home/Projects/ng/.ai/runs/2026-10-27-qa-fixes/.hidden.txt" "$FIX/home/Documents/Invoices/march.txt"
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" \
   --qa-setting "plugins.files.qaHome=$FIX/home" --qa-setting "plugins.files.roots=$FIX/home" \
   --qa-setting plugins.files.setupCompleted=true --qa-full-disk-access denied \
   --qa-panel search --qa-query "~/Projects/ng/.ai/runs/2026-10-27-qa-fixes/"
@@ -259,7 +277,7 @@ unless a button is clicked.
 
 ```bash
 FIX=/tmp/lintel-p4-qa; mkdir -p "$FIX/home" "$FIX/apps"
-COMMON=(--qa --qa-setting "plugins.files.qaHome=$FIX/home" --qa-setting "plugins.files.roots=$FIX/home"
+COMMON=(--qa "${ADDONS[@]}" --qa-setting "plugins.files.qaHome=$FIX/home" --qa-setting "plugins.files.roots=$FIX/home"
   --qa-setting "plugins.apps.roots=$FIX/apps" --qa-setting plugins.apps.spotlight=false
   --qa-setting plugins.clipboard.qaSeed=demo --qa-spotlight off)
 # The welcome screen, from the first page or on one page:
@@ -349,7 +367,7 @@ Needs a real Keychain and the app built by `scripts/make-app.sh` (not `--qa`, wh
 
 ### Dictation vocabulary panel (DICT-1.2, part A of the mockup)
 
-Settings → Dictation → Vocabulary sits between Basics and Advanced. In a `--qa` run Dictation is off by default and the
+Settings → Dictation → Vocabulary sits between Basics and Advanced. In a `--qa` run Dictation is on (since 2026-11-24) and the
 vocabulary file is the QA run's own, so seed it with the DEBUG key `plugins.dictation.qaVocabulary=<state>` (not a
 contract; invented terms only, the seed file is rewritten at every launch):
 
@@ -435,7 +453,7 @@ isolates the Keychain; audio permissions are per app, not per `--qa` data folder
 
 ## Meetings (Phase 1)
 
-The plugin is off by default: turn it on with `--qa-setting plugins.meetings.enabled=true`, or in Settings → Features.
+The plugin is on by default since 2026-11-24 (the recipes below still pass `--qa-setting plugins.meetings.enabled=true`, which changes nothing).
 The Keychain is the in-memory one in QA mode, so the library key never reaches the real Keychain, and the data root is
 fresh unless `--qa-data-root` is given. Real capture is never started in QA mode: the audio comes from WAV files.
 
@@ -640,6 +658,19 @@ run only for the detection itself (use the QA data root so the library is isolat
 - Turn the setting off while a pill is showing: the pill disappears and no further pills come.
 - Honest limits to confirm: a Safari/WebKit-helper-based app may not be detected; the pill is not operable from the
   keyboard (it claims no keys on purpose) but VoiceOver reads it and can press its buttons.
+- **Reading the decisions.** The detector logs every decision at `notice` level (it stays on disk), without window
+  titles, URLs or audio: `/usr/bin/log show --last 1h --info --predicate 'subsystem == "com.lintelapp" AND
+  eventMessage CONTAINS "Meeting detection"'` (in zsh, plain `log` is a builtin). Lines: "input in use by
+  <bundle ID> (app: <the app its executable lives in>), listed as <listed app or none>" for every process that starts
+  using an input, "input no longer in use by …", "suggested a recording for …", "no suggestion for …, skipped:
+  disabled|busy|muted", "waits for the suggestion on screen", "the user answered …", "the suggestion expired
+  unanswered" and "status listening|noData|unavailable". A browser call that shows no pill reads here: no "input in
+  use" line means Core Audio reported nothing (the API, not the matching); "listed as none" means the browser is not
+  in the list (add it in the pane); "skipped: busy" means Lintel was recording or finishing a meeting at the 10 s mark
+  (the app then stays decided until its mic use ends). A helper process is matched by its own bundle ID
+  (`com.google.Chrome.helper` belongs to `com.google.Chrome`) and by the app its executable lives in (Firefox's
+  `org.mozilla.plugincontainer` belongs to `org.mozilla.firefox`).
+- If no app reports microphone use for 30 s after turning the setting on, the pane says
 - If no app reports microphone use for 30 s after turning the setting on, the pane says "Lintel cannot confirm that
   detection works on this Mac" (not "Not available"); starting a call then clears it.
 - A headset or mute flap (mic use stops and restarts within 30 s) gives no second pill; a pill answered "Not now" does
@@ -684,6 +715,21 @@ that zone would), `import <path>`, `export <selected|all> <path>` (the mode come
 start with `#` and empty lines are ignored; a line is run when its newline arrives, and only whole lines are decoded. The route starts at the end of an existing file, so a relaunch does not replay an earlier run: `--qa-command-replay` runs what is already in it. A file that was replaced or rewritten (a different file, or different bytes where the last read ended) is read again from its start. A QA run never opens an open or save
 panel (they write their sizes and the Go To sheet's frame into the real defaults domain): files and the "Add App…"
 picker are scripted by the verbs above (`plugins.windows.qaScriptedFiles`, on in every `--qa` run).
+
+**Dictation from a WAV file.** `qa dictation play <output prefix> <wav path>` (DEBUG, route above) dictates the file
+through the whole session instead of the microphone: voice activity detection, the speech model, the cleanup model and
+the paste into the QA pasteboard (the keystroke is only logged). It needs no microphone permission, no hotkey and no
+Accessibility grant of the tester (`--qa-accessibility granted` makes the paste report "Pasted"). The file may have any
+sample rate; a second of silence follows it. The speech and cleanup models must be installed under the QA data root:
+link the real folder (`ln -s ~/Library/Application\ Support/Lintel/Models <qa data root>/Models`) and switch the plugin on
+with `--qa-setting plugins.dictation.enabled=true`, `plugins.dictation.mode=cleanup`, `plugins.dictation.llmSource=builtIn`
+and `plugins.dictation.builtInLLMModel=<model id>`. The verb waits for the paste (up to 4 minutes, the first run loads
+the models), then writes `<prefix>.json` (what the speech model heard, the pasted text, the last HUD state) and the
+result card as `<prefix>-light.png` and `<prefix>-dark.png` (the real HUD view in the state the flow ended in, then the
+two texts; written by the app itself, so it works without screen recording). The command log answers
+`ok: <HUD state>; 2 screenshots`. The transcripts are the tester's own test sentences: check a card before publishing it.
+Start the app with `run_in_background` or a plain `&` from a shell that stays alive; a process started from a finished
+tool call may be killed with it.
 
 | # | Scenario | Expect |
 |---|---|---|

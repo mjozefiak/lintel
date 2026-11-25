@@ -4,10 +4,10 @@ import Testing
 @testable import LintelKit
 
 @Suite @MainActor struct SkeletonTests {
-    @Test func theManifestIsOffByDefaultAndStable() {
+    @Test func theManifestIsOnByDefaultAndStable() {
         let manifest = DictationPlugin.manifest
         #expect(manifest.id == "dictation")
-        #expect(manifest.defaultEnabled == false)
+        #expect(manifest.defaultEnabled)
         #expect(manifest.order > 30)
     }
 }

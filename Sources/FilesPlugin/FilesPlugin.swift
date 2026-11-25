@@ -32,6 +32,8 @@ public final class FilesPlugin: LintelPlugin {
         displayName: LocalizedStringResource("Files", comment: "Results section and plugin name for files"),
         symbolName: "doc",
         order: 20,
+        // An add-on since the owner decision of 2026-11-24: off until the user turns it on.
+        defaultEnabled: false,
         settingsGroup: .search,
         summary: LocalizedStringResource("Find files by name.", comment: "Settings → Features: what Files does")
     )

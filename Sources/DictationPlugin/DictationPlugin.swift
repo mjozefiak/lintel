@@ -24,7 +24,8 @@ public final class DictationPlugin: LintelPlugin {
         displayName: LocalizedStringResource("Dictation", comment: "Plugin name of voice dictation"),
         symbolName: "mic",
         order: 40,
-        defaultEnabled: false,
+        // The core since the owner decision of 2026-11-24: on for a new install.
+        defaultEnabled: true,
         settingsGroup: .voice,
         summary: LocalizedStringResource(
             "Speak instead of typing.", comment: "Settings → Features: what Dictation does")
@@ -51,6 +52,9 @@ public final class DictationPlugin: LintelPlugin {
     private let settingsModel: DictationSettingsModel
     #if DEBUG
     private var qaHUD: DictationHUDQA?
+    /// `qa dictation play` (`DictationQAPlayback`): the WAV file played instead of the microphone, and the HUD wrapper.
+    let qaPlayback = DictationQAPlayback()
+    private(set) var qaRecorder: DictationQARecorder?
     #endif
     private let formattingModel: FormattingSettingsModel
     private let transport: any HTTPTransport
@@ -154,6 +158,9 @@ public final class DictationPlugin: LintelPlugin {
             onCancel: { relay.controller?.cancel() }, onOpenSettings: { openSettings() },
             onOpenModels: { openModels(settings.speechModelID) })
         self.relay = relay
+        #if DEBUG
+        qaRecorder = DictationQARecorder(wrapping: hud)
+        #endif
     }
 
     /// Internal so tests can hand `modelUsage` a controller.
@@ -215,14 +222,31 @@ public final class DictationPlugin: LintelPlugin {
         let history = history
         let builtInLLM = builtInLLM
         let vocabulary = vocabulary
+        #if DEBUG
+        let qaPlayback = qaPlayback
+        let qaRecorder = qaRecorder
+        let authorizer: any MicrophoneAuthorizer = DictationQAAuthorizer(playback: qaPlayback, base: self.authorizer)
+        let hud: any HUDPresenter = qaRecorder ?? self.hud
+        #else
+        let authorizer = self.authorizer
+        let hud: any HUDPresenter = self.hud
+        #endif
         let controller = DictationController(
             .init(
                 authorizer: authorizer, models: models,
                 package: { ModelCatalog.package(id: settings.speechModelID) ?? ModelCatalog.parakeetUltra },
                 customFolder: { settings.speechModelFolder },
                 makeSession: { folder, onEvent in
-                    DictationSession(
-                        audio: MicrophoneCapture(deviceUID: settings.inputDevice),
+                    #if DEBUG
+                    let audio: any AudioInput =
+                        qaPlayback.url.map { WAVFileAudioInput(url: $0) }
+                        ?? MicrophoneCapture(deviceUID: settings.inputDevice, deviceName: settings.inputDeviceName)
+                    #else
+                    let audio: any AudioInput = MicrophoneCapture(
+                        deviceUID: settings.inputDevice, deviceName: settings.inputDeviceName)
+                    #endif
+                    return DictationSession(
+                        audio: audio,
                         vad: LazyVAD(modelFolder: folder.appending(path: ModelCatalog.sileroVADPath)),
                         engine: engine,
                         formatter: Self.formatter(
@@ -238,7 +262,12 @@ public final class DictationPlugin: LintelPlugin {
                     restoresClipboard: { settings.restoresClipboard }, logger: context.logger),
                 hud: hud, claimEscape: context.claimEscapeKey, openSettings: context.openSettings,
                 clock: context.clock,
-                recordHistory: { history.record($0) },
+                recordHistory: {
+                    #if DEBUG
+                    qaRecorder?.record($0)
+                    #endif
+                    history.record($0)
+                },
                 frontmostBundleID: { context.workspace.frontmostApplication?.bundleIdentifier },
                 formatMode: { settings.mode == .cleanup ? .clean : .raw },
                 speechModelID: { settings.speechModelID },

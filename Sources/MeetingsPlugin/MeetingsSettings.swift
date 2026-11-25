@@ -12,6 +12,7 @@ struct MeetingsSettings: Sendable {
         static let speechModelFolder = "speechModelFolder"
         static let diarizationModelFolder = "diarizationModelFolder"
         static let inputDevice = "inputDevice"
+        static let inputDeviceName = "inputDeviceName"
         static let voiceProcessing = "voiceProcessing"
         static let systemAudio = "systemAudio"
         static let diarization = "diarization"
@@ -250,8 +251,20 @@ struct MeetingsSettings: Sendable {
         }
     }
 
-    func setInputDevice(_ uid: String?) {
+    /// The chosen device's name as Settings showed it, kept so the message "Microphone … is unavailable" can name a
+    /// device that is unplugged; `nil` when the choice predates the name (the UID may still tell, for USB).
+    var inputDeviceName: String? {
+        guard let name = settings.string(Key.inputDeviceName), !name.isEmpty else { return nil }
+        return name
+    }
+
+    func setInputDevice(_ uid: String?, name: String? = nil) {
         if let uid { settings.set(uid, for: Key.inputDevice) } else { settings.removeValue(for: Key.inputDevice) }
+        if uid != nil, let name, !name.isEmpty {
+            settings.set(name, for: Key.inputDeviceName)
+        } else {
+            settings.removeValue(for: Key.inputDeviceName)
+        }
     }
 
     func setVoiceProcessing(_ value: Bool) { settings.set(value, for: Key.voiceProcessing) }
