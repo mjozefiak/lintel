@@ -25,6 +25,8 @@ public final class AppsPlugin: LintelPlugin {
         displayName: LocalizedStringResource("Apps", comment: "Plugin name of app search in Settings"),
         symbolName: "square.grid.2x2",
         order: 10,
+        // An add-on since the owner decision of 2026-11-24: off until the user turns it on.
+        defaultEnabled: false,
         settingsGroup: .search,
         summary: LocalizedStringResource("Find and open apps.", comment: "Settings → Features: what Apps does"),
         // The launcher keeps its heading (prototype `lintel-brand`); Settings says "Apps" (prototype `set-apps`).

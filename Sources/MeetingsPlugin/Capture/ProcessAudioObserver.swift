@@ -9,6 +9,13 @@ struct ProcessAudioEvent: Equatable, Sendable {
     /// `nil` when Core Audio does not know it (and always `nil` for a process that is gone).
     var bundleID: String?
     var isRunningInput: Bool
+    /// The bundle ID of the app whose bundle holds the process's executable (the outermost `.app` of its path,
+    /// so a browser's helper process names the browser even when its own ID has another prefix, as Firefox's
+    /// `org.mozilla.plugincontainer` does) or `nil` when the process does not live in an app. Read only while
+    /// the process uses an input.
+    var responsibleBundleID: String?
+    /// The Unix pid, for the log only; `nil` when unknown.
+    var pid: Int32?
 }
 
 enum ProcessAudioError: Error, Equatable, Sendable {

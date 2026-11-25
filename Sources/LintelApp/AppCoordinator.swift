@@ -201,7 +201,10 @@ final class AppCoordinator {
             actions: ShellMenuActions(
                 openPanel: { [weak self] in self?.panelModel.show() },
                 openSettings: { [weak self] in self?.openSettingsFromMenu() },
-                mainShortcut: { [weak self] in self?.hotkeys.mainShortcut },
+                mainShortcut: { [weak self] in
+                    guard let hotkeys = self?.hotkeys, hotkeys.isMainShortcutActive else { return nil }
+                    return hotkeys.mainShortcut
+                },
                 runCommand: { [weak self] command in self?.perform(command) },
                 commandShortcut: { [weak self] id in self?.hotkeys.commandShortcut(id) },
                 showAbout: { [weak self] in self?.showAbout() },
@@ -228,7 +231,7 @@ final class AppCoordinator {
         startQACommandRoute()
         #endif
         observeActivationForRecovery()
-        hotkeys.start { [weak self] in self?.panelModel.toggle() }
+        hotkeys.start(onMainShortcut: { [weak self] in self?.panelModel.toggle() }, active: !host.activeSources.isEmpty)
         syncCommands()
         statusItem?.rebuildMenu()
         logger.info("Started with \(host.entries.count, privacy: .public) plugins")
@@ -378,6 +381,8 @@ final class AppCoordinator {
     }
 
     private func syncCommands() {
+        // The launcher shortcut follows the plugins that search (Apps, Files, Windows): registered while one is active.
+        hotkeys.setMainShortcutActive(!host.activeSources.isEmpty)
         hotkeys.syncCommands(
             host.activeCommands,
             perform: { [weak self] command in self?.perform(command) },
@@ -438,6 +443,7 @@ final class AppCoordinator {
             host.entries.filter(\.state.isActive).flatMap(\.plugin.onboardingSteps)
         }
         onboarding.activatesApp = environment.registersGlobalHotkeys
+        onboarding.launcherIsActive = { !host.activeSources.isEmpty }
         onboarding.openMainWindow = { [weak self] in self?.router.openMainWindow() }
         self.onboarding = onboarding
 
@@ -515,7 +521,8 @@ final class AppCoordinator {
         let reader = environment.permissionsReader
         return [
             SettingsShellPane.general.rawValue: {
-                ShellPaneBanners.general(shortcut: hotkeys.mainShortcut?.displayString)
+                ShellPaneBanners.general(
+                    shortcut: hotkeys.mainShortcut?.displayString, launcherIsActive: hotkeys.isMainShortcutActive)
             },
             SettingsShellPane.features.rawValue: { ShellPaneBanners.features(host: host) },
             SettingsShellPane.permissions.rawValue: {
