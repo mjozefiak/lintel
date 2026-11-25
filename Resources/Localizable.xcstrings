@@ -10297,6 +10297,114 @@
         }
       }
     },
+    "“%@” unavailable – using “%@”" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholders are device names",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” unavailable – using “%@”"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%1$@” niedostępny – używam „%2$@”"
+          }
+        }
+      }
+    },
+    "“%@” unavailable – using the system input" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholder is its name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” unavailable – using the system input"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@” niedostępny – używam wejścia systemowego"
+          }
+        }
+      }
+    },
+    "Chosen microphone unavailable – using “%@”" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholder is the name of the input used",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chosen microphone unavailable – using “%@”"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybrany mikrofon niedostępny – używam „%@”"
+          }
+        }
+      }
+    },
+    "Chosen microphone unavailable – using the system input" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chosen microphone unavailable – using the system input"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybrany mikrofon niedostępny – używam wejścia systemowego"
+          }
+        }
+      }
+    },
+    "Your microphone is not being recorded" : {
+      "comment" : "Meeting HUD notice when the microphone could not be started, only the system audio is recorded",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your microphone is not being recorded"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twój mikrofon nie jest nagrywany"
+          }
+        }
+      }
+    },
+    "Trying the microphone again…" : {
+      "comment" : "Meeting HUD notice while the microphone is being started again after 'Try again'",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trying the microphone again…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponawiam próbę z mikrofonem…"
+          }
+        }
+      }
+    },
     "System audio stopped" : {
       "comment" : "Meeting HUD notice when the system track ended",
       "extractionState" : "manual",

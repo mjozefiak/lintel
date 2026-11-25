@@ -62,6 +62,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         var audioSeconds = 5.0
         var ranges = [(1 * AudioFormat.sampleRate)..<(2 * AudioFormat.sampleRate)]
         var audioStarted = 0
+        var inputFallback: InputFallback?
         var formatter: (any TextFormatter)?
         var replaceTerms: @Sendable (String) -> String = { $0 }
         var recorded: [DictationEntry] = []
@@ -103,7 +104,8 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
                     makeSession: { folder, onEvent in
                         rig.audioStarted += 1
                         return DictationSession(
-                            audio: ScriptedAudioInput(seconds: rig.audioSeconds), vad: RangeVAD(rig.ranges),
+                            audio: ScriptedAudioInput(seconds: rig.audioSeconds, fallback: rig.inputFallback),
+                            vad: RangeVAD(rig.ranges),
                             engine: engine, formatter: rig.formatter, replaceTerms: rig.replaceTerms,
                             modelFolder: folder, lease: lease,
                             keepWarm: { keepWarm }, onEvent: onEvent)
@@ -192,6 +194,43 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         // The key-up of the cancelled press does nothing.
         controller.keyEvent(.up)
         #expect(!controller.isBusy)
+    }
+
+    @Test func anUnavailableMicrophoneIsSaidInTheHUDWhileRecordingGoesOn() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.inputFallback = InputFallback(requestedName: "USB MICROPHONE", usingName: "MacBook Pro Microphone")
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        await waitUntil {
+            rig.hud.states.contains { if case .recording(let r) = $0 { r.fallback != nil } else { false } }
+        }
+        guard
+            case .recording(let recording)? = rig.hud.states.last(where: {
+                if case .recording(let r) = $0 { r.fallback != nil } else { false }
+            })
+        else {
+            Issue.record("no recording state with a fallback")
+            return
+        }
+        let state = HUDState.recording(recording)
+        #expect(state.notice == "“USB MICROPHONE” unavailable – using “MacBook Pro Microphone”")
+        #expect(state.announcement == state.notice)
+        #expect(state.accessibilityLabel.contains("USB MICROPHONE"))
+        #expect(!(state.notice ?? "").contains("AppleUSBAudioEngine"))
+        #expect(state.offersCancel)
+        controller.cancel()
+    }
+
+    @Test func aRecordingOnTheChosenMicrophoneHasNoNotice() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        #expect(rig.hud.states.allSatisfy { $0.notice == nil })
+        controller.cancel()
     }
 
     @Test func theHUDSaysWhenEscapeCouldNotBeClaimed() async throws {
