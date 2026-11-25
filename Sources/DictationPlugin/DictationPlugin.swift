@@ -225,10 +225,10 @@ public final class DictationPlugin: LintelPlugin {
         let qaPlayback = qaPlayback
         let qaRecorder = qaRecorder
         let authorizer: any MicrophoneAuthorizer = DictationQAAuthorizer(playback: qaPlayback, base: self.authorizer)
-        let presenter: any HUDPresenter = qaRecorder ?? hud
+        let hud: any HUDPresenter = qaRecorder ?? self.hud
         #else
         let authorizer = self.authorizer
-        let presenter: any HUDPresenter = hud
+        let hud: any HUDPresenter = self.hud
         #endif
         let controller = DictationController(
             .init(
@@ -258,7 +258,7 @@ public final class DictationPlugin: LintelPlugin {
                     pasteboard: context.pasteboard, events: context.events, workspace: context.workspace,
                     permissions: context.permissions, clock: context.clock,
                     restoresClipboard: { settings.restoresClipboard }, logger: context.logger),
-                hud: presenter, claimEscape: context.claimEscapeKey, openSettings: context.openSettings,
+                hud: hud, claimEscape: context.claimEscapeKey, openSettings: context.openSettings,
                 clock: context.clock,
                 recordHistory: {
                     #if DEBUG
