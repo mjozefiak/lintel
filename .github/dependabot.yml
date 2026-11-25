@@ -22,7 +22,8 @@ updates:
     commit-message:
       prefix: "chore(ci)"
     labels:
-      - dependencies
+      - type:chore
+      - area:app
   - package-ecosystem: swift
     directory: /
     schedule:
@@ -39,4 +40,5 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     labels:
-      - dependencies
+      - type:chore
+      - area:app

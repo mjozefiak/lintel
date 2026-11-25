@@ -109,3 +109,13 @@ For any UI change:
 | **Major** | Feature logic in `LintelKit` / `LintelCore`, one plugin able to break search for others, a trap (`fatalError`, `try!`, force unwrap) in plugin code, unjustified `@unchecked Sendable`, blocking work on the main actor, a missing UI state or permission-degraded path, missing tests for a new `SearchSource` / `ResultAction`, a spec budget regression. |
 | **Minor** | HIG deviations (hard-coded colour or font, missing SF Symbol, missing VoiceOver label), missing Reduce Motion / Transparency handling on a non-critical view, naming, small duplication. |
 | **Nit** | Optional suggestions. Never block on a nit. |
+
+## What happens to findings
+
+Every finding is settled inside the PR under review (`SDLC.md`, "Review findings and follow-ups"):
+
+- **Blocker, Major, Minor:** fixed in the same PR before the review passes.
+- **Nit:** fixed in the same PR when it is cheap, otherwise dropped. Dropped nits are listed in one line of the review's summary comment. A nit is never filed as a new issue, never collected in a follow-up list and never turned into a tech-debt ticket.
+- **A real bug outside the PR's scope** (a defect a user could hit) is the only finding that becomes a new issue: `type:bug`, one `area:*`, no priority label.
+- **A flaky test** seen during review goes into the "Flaky tests" umbrella issue (#240) as a checklist line, not into a new issue.
+- The review applies no pipeline labels (`review`, `changes-requested`, `merge-queue` are retired) and posts no label-rationale comment; the verdict is the review itself and its summary comment.
