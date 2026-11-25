@@ -96,11 +96,11 @@ import Testing
         await rig.service.refreshAvailability()
         #expect(rig.service.board.snapshot.awaitingModel.isEmpty)
         #expect(!rig.service.board.snapshot.needsModel(for: id))
-        // At most the look already under way, then none.
-        try await Task.sleep(for: .milliseconds(60))
-        let stopped = rig.modelLookups.get()
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(rig.modelLookups.get() == stopped)
+        // At most the one look whose wait was already under way, then none (a watch still running would look about
+        // ten more times at this interval). One bound, so a slow main actor cannot make it fail.
+        let atClear = rig.modelLookups.get()
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(rig.modelLookups.get() <= atClear + 1)
 
         rig.settings.setNotesEnabled(true)
         rig.file.update { $0 = URL(filePath: "/models/llm/notes-test.gguf") }
