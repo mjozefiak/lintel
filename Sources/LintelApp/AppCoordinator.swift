@@ -24,6 +24,11 @@ final class AppCoordinator {
     private var mainMenu: MainMenuController?
     /// The one banner of the main window's Settings mode (spec step 2.2); built with the Settings mode.
     private var settingsHost: SettingsHostModel?
+    /// The one permission service (live states and asking), shared by Settings → Permissions and, later, the
+    /// onboarding Access step.
+    private(set) lazy var permissionGrant = PermissionGrantService(reader: environment.permissionsReader) {
+        NSWorkspace.shared.open($0)
+    }
     /// Settings → Models (spec step 3.2).
     private var modelsPane: ModelsPaneModel?
     /// Shows the welcome screen's pending steps. Set in `start()` outside QA mode; tests replace it.
@@ -418,7 +423,9 @@ final class AppCoordinator {
             case .features:
                 return AnyView(FeaturesPane(host: host, settings: settings) { self?.pluginsChanged() })
             case .permissions:
-                let model = PermissionsModel(host: host, reader: environment.permissionsReader) { url in
+                let model = PermissionsModel(
+                    host: host, reader: environment.permissionsReader, service: self?.permissionGrant
+                ) { url in
                     NSWorkspace.shared.open(url)
                 }
                 return AnyView(PermissionsPane(model: model))

@@ -97,6 +97,20 @@ final class SettingsHostModel {
         refreshAttention()
     }
 
+    /// True while the shown banner sends the user to System Settings: a grant given there must clear it without
+    /// a restart (#71), so the host re-reads it every second (`liveTick`).
+    var needsLiveRefresh: Bool {
+        banner?.actions.contains { action in
+            if case .systemSettings = action.destination { return true }
+            return false
+        } ?? false
+    }
+
+    /// One live re-read: the banner and the dots, only while a permission banner is shown.
+    func liveTick() {
+        if needsLiveRefresh { refresh() }
+    }
+
     /// `PluginContext.resultsChanged` from the plugin `pluginID`: its dot, and the banner when it is shown.
     func pluginResultsChanged(_ pluginID: String) {
         guard pluginID == paneID else {
@@ -246,6 +260,14 @@ struct SettingsHost: View {
         // the top under the traffic lights, as in the prototype.
         .ignoresSafeArea(.container, edges: .top)
         .task(id: selection) { model.show(selection) }
+        .task(id: model.needsLiveRefresh) {
+            // Granting a permission in System Settings must clear its banner without a restart (#71). The reader
+            // only preflights, so the re-read never prompts.
+            while model.needsLiveRefresh, !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                model.liveTick()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refresh()
         }

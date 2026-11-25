@@ -20,22 +20,22 @@ struct PermissionRequirement: Identifiable, Equatable {
 @Observable
 final class PermissionsModel {
     @ObservationIgnored let host: PluginHost
-    @ObservationIgnored private let reader: any PermissionsReader
-    @ObservationIgnored private let openURL: (URL) -> Void
-    @ObservationIgnored private let requester: any PermissionRequester
+    /// The states and the asking live in the shell's one `PermissionGrantService`: it re-reads every second while
+    /// the pane is visible, so a grant given in System Settings shows without a restart (#71).
+    @ObservationIgnored let service: PermissionGrantService
 
-    /// The last read state of each required permission; refreshed by `refresh()`.
-    private(set) var statuses: [Permission: PermissionStatus] = [:]
-
+    /// - Parameter service: the shell's service; a model built without one gets its own over `reader`.
     init(
         host: PluginHost, reader: any PermissionsReader,
         requester: any PermissionRequester = SystemPermissionRequester(),
+        service: PermissionGrantService? = nil,
         openURL: @escaping (URL) -> Void
     ) {
         self.host = host
-        self.reader = reader
-        self.requester = requester
-        self.openURL = openURL
+        self.service =
+            service
+            ?? PermissionGrantService(
+                reader: reader, requester: requester, openURL: openURL, notificationCenter: nil)
     }
 
     /// The rows to draw, one per permission in `Permission.allCases` order; the ones no enabled feature needs are
@@ -50,8 +50,7 @@ final class PermissionsModel {
 
     /// "Allow Microphone": the user's click, so the system prompt may appear. Reads the states again after.
     func allow(_ permission: Permission) async {
-        await requester.request(permission)
-        refresh()
+        await service.allow(permission)
     }
 
     /// The permissions of the enabled plugins, in `Permission.allCases` order.
@@ -71,23 +70,19 @@ final class PermissionsModel {
     }
 
     func status(of permission: Permission) -> PermissionStatus {
-        // A model that has not refreshed yet (the host rebuilt it) still answers with the real state: the reader
-        // only preflights, so reading it here never shows a prompt.
-        statuses[permission] ?? (permission.isReadable ? reader.status(of: permission) : .notDetermined)
+        // The service answers with the real state even before its first refresh: the reader only preflights, so
+        // reading it never shows a prompt.
+        service.status(of: permission)
     }
 
     /// Re-reads every readable permission ("Check Again", the pane appearing, Lintel becoming active).
     func refresh() {
-        var result: [Permission: PermissionStatus] = [:]
-        for permission in Permission.allCases where permission.isReadable {
-            result[permission] = reader.status(of: permission)
-        }
-        statuses = result
+        service.refresh()
     }
 
     /// Opens the permission's page in System Settings.
     func openSettings(for permission: Permission) {
-        openURL(permission.settingsURL)
+        service.openSettings(for: permission)
     }
 }
 
@@ -254,7 +249,11 @@ struct PermissionsPane: View {
 
     var body: some View {
         mainForm
-            .onAppear { model.refresh() }
+            .onAppear {
+                model.refresh()
+                model.service.beginWatching()
+            }
+            .onDisappear { model.service.endWatching() }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 model.refresh()
             }
