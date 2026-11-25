@@ -40,14 +40,14 @@ The steps follow the sketch's `onbSteps()`. Goal "Dictation" skips First meeting
 |---|---|---|---|
 | 1 | Your goal | "What would you like Lintel to do?": Type what I say / Write my meeting notes / Both (default). "You can change this later in Settings." | "Set Up Both" / "Set Up Dictation" / "Set Up Meeting Notes" |
 | 2 | Privacy | "Your words stay on this Mac", three points (saved on this Mac, encrypted; nothing sent anywhere, Claude only if chosen later and Lintel asks first; no account). With meetings: the consent sentence. | "Next: Allow Access" |
-| 3 | Access | "Lintel needs your OK for a few things": one row per permission the chosen goal needs, each with the reason in plain words and a 3-state control (C14): **Allowed ✓** / **Allow** / **Not needed now**. "You can skip any of these and allow them later in Settings → Privacy & data." | "Next: Try Dictation" (or the next step's name) |
+| 3 | Access | "Lintel needs your OK for a few things": one row per permission the chosen goal needs, each with the reason in plain words and a 3-state control (C14, same words as Settings → Privacy & data in the settings IA v2 spec): **Allowed ✓** / **Needs your OK** with an Allow button / **Not needed now**. "You can skip any of these and allow them later in Settings → Privacy & data." | "Next: Try Dictation" (or the next step's name) |
 | 4 | Try dictation | The sample email, Hold to Talk or the shortcut (⌥ Space) with **Change Shortcut** (the plugin's shortcut recorder), success line and Try Again. "Can't talk right now? Continue, and try it later from the menu bar." If the speech files are still downloading: progress in place of the Hold button. | "Next: First Meeting" / "Open Lintel" |
 | 5 | First meeting | A picture of the call suggestion (not a live button), "You can also press Record Meeting in the Lintel window.", the Record a meeting shortcut (⌃⌥M) with Change Shortcut, **Check call audio**, **Notes on this Mac** with a download offer (#252), and the consent sentence. | "Open Lintel" (lands on the empty notes view) |
 
 - **The goal decides which core feature is on.** "Both" leaves Dictation and Meetings on (the #251 defaults). "Dictation" and "Meeting notes" write `plugins.meetings.enabled = false` or `plugins.dictation.enabled = false`, as an explicit user value that can be switched back in Settings. Add-ons are never mentioned.
 - **Downloads.** Leaving step 1 starts the download of the speech files the chosen goal needs (the ones the plugins report through `modelUsage`). It runs in the background, and the step rail shows "Getting dictation ready · 40 %". It never blocks Continue. The notes model (about 2.5 GB, the size from `LLMModelCatalog` for this Mac's memory) is **only offered**, in step 5: "Notes on this Mac: Lintel writes your meeting notes here, without the internet. Download (2.5 GB)". Before either download, the free disk space is checked, and an error follows the R9 pattern.
 - **Shortcuts.** On a new install dictation defaults to **⌥ Space** (owner decision 7). Today it is ⌃⌥D (`DictationPlugin.swift:295`). Record a meeting stays ⌃⌥M. If ⌥ Space can't be registered because another app holds it, Lintel registers ⌃⌥D instead, and step 4 says "⌥ Space is used by another app, so Lintel uses ⌃⌥D. Change Shortcut". The same recorders stay in Settings → Dictation and Meetings & notes.
-- **When it shows.** The new flow opens automatically **only on a new install** (the new-install test of `PluginDefaultsMigration` from #251). An install that finished the old welcome screen never sees it again on its own. Settings → About & help → **Show welcome again** opens it at any time and never repeats a download that already finished.
+- **When it shows.** The new flow opens automatically **only on a new install** (the new-install test of `PluginDefaultsMigration` from #251). An install that finished the old welcome screen never sees it again on its own. Settings → About & help → **Show welcome again** (today: Settings → Advanced → Show Again, `AdvancedPane.showWelcome`; it moves to About & help with settings IA v2 Phase 1) opens it at any time and never repeats a download that already finished.
 - **Before step 3:** if Lintel runs from the DMG or a translocated path, `MoveToApplicationsPrompt` (existing) runs first, because grants given to a translocated copy are lost.
 
 ### 3. Permission granting
@@ -123,7 +123,7 @@ Prototype: `.ai/prototypes/lintel-direction/lintel.html` (screen `onb`, steps go
 - **Onboarding:**
   - Goal: three selections.
   - Privacy: with and without the consent line.
-  - Access: rows in every state (Allow, Allowed ✓, Not needed now), all allowed, the call-audio check running, the check failed.
+  - Access: rows in every state (Needs your OK + Allow, Allowed ✓, Not needed now), all allowed, the call-audio check running, the check failed.
   - Try dictation: idle, listening, typing, done, speech files downloading, download failed, ⌥ Space taken (fallback ⌃⌥D), recorder open, microphone denied.
   - First meeting: notes model not downloaded, downloading, downloaded, not enough disk space, download failed.
   - The step rail with a running download.
@@ -207,7 +207,7 @@ Each phase is one `feat/` PR based on `main`, referencing this spec (`Refs #<spe
 3.2 Gallery scenes for Goal, Privacy, Access and the step rail (all states), owner-approved contact sheet.
 3.3 `OnboardingFlow` (pure): steps per goal, button titles, completion, Esc rules. Tests for each goal, every skip, and back/forward.
 3.4 Pages and window (820 × 580, step rail). The Access page uses `PermissionGrantService` and the plugins' reasons and moves on when a row turns Allowed. Dictation and Meetings declare their goals and reasons. Tests: the goal choice writes only the expected `plugins.<id>.enabled` values.
-3.5 Keys `app.onboarding.goal` and `app.onboarding.flowVersion`, new-install-only display, Show welcome again (today's About entry), BACKWARD_COMPATIBILITY.md §3. Tests: a new install shows the flow, an existing install (with `ranking.sqlite`) doesn't, a closed flow isn't forced again, and `shortcutCompleted` is still written.
+3.5 Keys `app.onboarding.goal` and `app.onboarding.flowVersion`, new-install-only display, Show welcome again (today's Settings → Advanced → Show Again; About & help once settings IA v2 Phase 1 has landed), BACKWARD_COMPATIBILITY.md §3. Tests: a new install shows the flow, an existing install (with `ranking.sqlite`) doesn't, a closed flow isn't forced again, and `shortcutCompleted` is still written.
 3.6 The C1–C19 table and manual QA (`--qa`, a clean profile) in light/dark, en/pl, M/XL.
 
 ### Phase 4: Practice and first meeting
