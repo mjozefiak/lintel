@@ -1,4 +1,5 @@
 import Foundation
+import LintelSpeech
 
 /// What the dictation HUD shows (spec: UI/UX → HUD). Pure data, so every state, its texts and its
 /// accessibility announcements are testable without a window.
@@ -23,6 +24,8 @@ enum HUDState: Equatable, Sendable {
         var secondsLeft: Int?
         /// Whether Esc cancels; otherwise only the ✕ does.
         var escapeCancels = true
+        /// The chosen microphone is unplugged and the system's input is used; the HUD says so.
+        var fallback: InputFallback?
     }
 
     enum Problem: Equatable, Sendable {
@@ -89,6 +92,12 @@ extension HUDState {
                 localized: "No dictation to paste yet",
                 comment: "Dictation HUD when there is no earlier dictation to paste again")
         }
+    }
+
+    /// A sentence under the capsule: the stored microphone is unavailable and another input is recording.
+    var notice: String? {
+        if case .recording(let recording) = self { return recording.fallback?.message }
+        return nil
     }
 
     /// The second line: how to cancel, or the countdown.
@@ -166,6 +175,8 @@ extension HUDState {
     /// changes and the countdown tick stay silent.
     var announcement: String? {
         switch self {
+        case .recording(let recording) where recording.fallback != nil && !recording.loadingModel:
+            recording.fallback?.message
         case .recording(let recording) where !recording.loadingModel && recording.secondsLeft == nil:
             String(localized: "Recording started", comment: "VoiceOver announcement when dictation starts")
         case .finishing:
@@ -179,6 +190,6 @@ extension HUDState {
 
     /// The label of the whole HUD for VoiceOver.
     var accessibilityLabel: String {
-        [title, detail].compactMap { $0 }.joined(separator: ". ")
+        [title, notice, detail].compactMap { $0 }.joined(separator: ". ")
     }
 }

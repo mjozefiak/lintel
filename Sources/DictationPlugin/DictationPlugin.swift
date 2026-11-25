@@ -239,9 +239,10 @@ public final class DictationPlugin: LintelPlugin {
                     #if DEBUG
                     let audio: any AudioInput =
                         qaPlayback.url.map { WAVFileAudioInput(url: $0) }
-                        ?? MicrophoneCapture(deviceUID: settings.inputDevice)
+                        ?? MicrophoneCapture(deviceUID: settings.inputDevice, deviceName: settings.inputDeviceName)
                     #else
-                    let audio: any AudioInput = MicrophoneCapture(deviceUID: settings.inputDevice)
+                    let audio: any AudioInput = MicrophoneCapture(
+                        deviceUID: settings.inputDevice, deviceName: settings.inputDeviceName)
                     #endif
                     return DictationSession(
                         audio: audio,

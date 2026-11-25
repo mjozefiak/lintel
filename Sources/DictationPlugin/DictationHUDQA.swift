@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import LintelSpeech
 import LintelUI
 import SwiftUI
 
@@ -15,6 +16,13 @@ final class DictationHUDQA {
     static let states: [(name: String, state: HUDState)] = [
         ("allow-microphone", .allowMicrophone),
         ("recording", .recording(.init(level: 0.6))),
+        (
+            "recording-microphone-fallback",
+            .recording(
+                .init(
+                    level: 0.6,
+                    fallback: InputFallback(requestedName: "USB MICROPHONE", usingName: "MacBook Pro Microphone")))
+        ),
         ("loading-model", .recording(.init(level: 0, loadingModel: true))),
         ("countdown", .recording(.init(level: 0.4, secondsLeft: 10))),
         ("finishing", .finishing),
@@ -49,7 +57,7 @@ final class DictationHUDQA {
         let panel = panel ?? makePanel()
         self.panel = panel
         if let frame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame {
-            panel.setFrameOrigin(NSPoint(x: frame.midX - 140, y: frame.minY + 48))
+            panel.setFrameOrigin(NSPoint(x: frame.midX - DictationHUDView.panelSize.width / 2, y: frame.minY + 48))
         }
         panel.orderFrontRegardless()
         return true
@@ -59,7 +67,7 @@ final class DictationHUDQA {
 
     private func makePanel() -> NSPanel {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 280, height: 56),
+            contentRect: NSRect(origin: .zero, size: DictationHUDView.panelSize),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         panel.identifier = NSUserInterfaceItemIdentifier(Self.panelIdentifier)
         panel.level = .statusBar
@@ -75,7 +83,7 @@ final class DictationHUDQA {
         host.backdropShape = { bounds in
             let size = DictationHUDView.size
             let capsule = NSRect(
-                x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2,
+                x: bounds.midX - size.width / 2, y: DictationHUDView.bottomInset,
                 width: size.width, height: size.height)
             return SnapshotBackdropHostingView<DictationHUDView>.roundedPath(capsule, radius: size.height / 2)
         }

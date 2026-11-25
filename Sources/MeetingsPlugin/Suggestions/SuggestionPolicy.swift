@@ -77,7 +77,32 @@ struct SuggestionPolicy: Sendable {
         case askToEnd(bundleID: String)
     }
 
+    /// What the policy saw and decided, for the detector's log (`MeetingDetector.log`). Bundle IDs and the
+    /// decision only: no window titles, no URLs, no contents. Drained with `drainNotes()`.
+    enum Note: Equatable, Sendable {
+        /// A process started using an input. `listed` is the listed app it belongs to (`nil`: not one of ours).
+        case inputStarted(reported: String?, responsible: String?, listed: String?)
+        /// The last process of a listed app stopped using the input.
+        case inputEnded(app: String)
+        case suggested(app: String)
+        /// The app reached the threshold and was not suggested, for good (`decided`).
+        case skipped(app: String, reason: SkipReason)
+        /// The app reached the threshold while another suggestion was on screen; it is offered after that.
+        case waiting(app: String)
+        case askedToEnd(app: String)
+    }
+
+    enum SkipReason: String, Equatable, Sendable {
+        /// `plugins.meetings.suggestMeetings` is off.
+        case disabled
+        /// Lintel records or finishes a meeting.
+        case busy
+        /// The user muted the app.
+        case muted
+    }
+
     private struct Use {
+        var waitingNoted = false
         var processes: Set<UInt32> = []
         /// Start of the current mic-use session; `nil` while no process of the app uses the input.
         var since: Duration?
@@ -99,16 +124,29 @@ struct SuggestionPolicy: Sendable {
     /// attributed correctly.
     private var appOfProcess: [UInt32: String] = [:]
     private var recording: Recording?
+    private var notes: [Note] = []
+
+    /// The notes since the last call.
+    mutating func drainNotes() -> [Note] {
+        defer { notes = [] }
+        return notes
+    }
 
     // MARK: Input
 
     mutating func handle(_ event: ProcessAudioEvent, now: Duration, config: SuggestionConfig) {
         if event.isRunningInput {
-            guard let bundleID = event.bundleID, let app = config.listedApp(for: bundleID) else { return }
+            // The process's own bundle ID first, then the app its executable lives in.
+            let listed = [event.bundleID, event.responsibleBundleID].lazy.compactMap { $0 }
+                .compactMap { config.listedApp(for: $0) }.first
+            notes.append(
+                .inputStarted(reported: event.bundleID, responsible: event.responsibleBundleID, listed: listed))
+            guard let app = listed else { return }
             appOfProcess[event.processObjectID] = app
             var use = uses[app] ?? Use()
             if use.processes.isEmpty {
                 use.since = now
+                use.waitingNoted = false
                 if let endedAt = use.endedAt, use.decided, now - endedAt < Self.flapGrace {
                     // The same session after a flap: `decided` stays.
                 } else {
@@ -124,6 +162,7 @@ struct SuggestionPolicy: Sendable {
             }
             use.processes.remove(event.processObjectID)
             if use.processes.isEmpty {
+                notes.append(.inputEnded(app: app))
                 use.since = nil
                 if use.decided {
                     use.endedAt = now
@@ -181,10 +220,21 @@ struct SuggestionPolicy: Sendable {
             }
             guard let since = use.since, !use.decided, now - since >= Self.inputThreshold else { continue }
             let wouldSuggest = config.enabled && !isBusy && !config.isMuted(app)
-            if wouldSuggest, offered { continue }
+            if wouldSuggest, offered {
+                if !use.waitingNoted {
+                    uses[app]?.waitingNoted = true
+                    notes.append(.waiting(app: app))
+                }
+                continue
+            }
             uses[app]?.decided = true
-            guard wouldSuggest else { continue }
+            guard wouldSuggest else {
+                let reason: SkipReason = !config.enabled ? .disabled : isBusy ? .busy : .muted
+                notes.append(.skipped(app: app, reason: reason))
+                continue
+            }
             offered = true
+            notes.append(.suggested(app: app))
             effects.append(.suggest(bundleID: app))
         }
         if let recording, !recording.asked, config.enabled,
@@ -192,6 +242,7 @@ struct SuggestionPolicy: Sendable {
             now - recording.lastSound >= Self.quietThreshold
         {
             self.recording?.asked = true
+            notes.append(.askedToEnd(app: recording.source))
             effects.append(.askToEnd(bundleID: recording.source))
         }
         return effects
