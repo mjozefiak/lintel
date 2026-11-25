@@ -67,6 +67,8 @@ import Testing
         let wordy = check("INTRO: Zaczynamy \(long). Potem \(long). I jeszcze coś o budżecie.\nPOINT | A.").draft
             .summary
         #expect((wordy ?? "").split(separator: " ").count <= NotesFactGuard.maxSummaryWords)
+        // The first sentence that does not fit ends the intro; a later short one never follows a skipped one.
+        #expect(!(wordy ?? "").contains("I jeszcze coś"))
         let huge = (1...100).map { _ in "budżet" }.joined(separator: " ")
         // A sentence over the limit is left out whole, never cut in the middle.
         let cut = check("INTRO: \(huge).\nPOINT | A.").draft.summary

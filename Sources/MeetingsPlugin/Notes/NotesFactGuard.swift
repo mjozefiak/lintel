@@ -179,19 +179,18 @@ struct NotesFactGuard: Sendable {
             }
         }
         if flat.changed, !kept.isEmpty { report.shapeStripped += 1 }
-        // At most three sentences and 70 words: whole sentences only; a sentence longer than the limit is left out.
+        // At most three sentences and 70 words: a prefix of whole sentences that fits the limits.
         var shown: [String] = []
         var words = 0
         for sentence in kept {
             let count = sentence.split(whereSeparator: \.isWhitespace).count
-            if shown.count >= Self.maxSummarySentences || (!shown.isEmpty && words + count > Self.maxSummaryWords) {
+            // The intro is a prefix of whole sentences: the first one that does not fit ends it, so a later sentence
+            // never follows a skipped one without the sentence it refers to (and nothing is cut in the middle).
+            if shown.count >= Self.maxSummarySentences || count > Self.maxSummaryWords
+                || words + count > Self.maxSummaryWords
+            {
                 report.cutToLimit += 1
-                continue
-            }
-            if count > Self.maxSummaryWords {
-                // Never cut a sentence in the middle: the rest could hold a negation or a condition.
-                report.cutToLimit += 1
-                continue
+                break
             }
             shown.append(sentence)
             words += count
