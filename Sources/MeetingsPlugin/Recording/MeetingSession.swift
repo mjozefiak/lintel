@@ -101,6 +101,19 @@ actor MeetingSession {
     private var startWaiters: [CheckedContinuation<Void, Never>] = []
     private var heartbeatTask: Task<Void, Never>?
     private let sleep: @Sendable (Duration) async throws -> Void
+    /// Whether a microphone that does not start is started again (false for a system-audio-only recording,
+    /// whose microphone is `UnavailableAudioInput`).
+    private let retriesMicrophone: Bool
+    /// The default input as a log line (name, UID, sample rate, channels); read when the microphone fails.
+    private let inputDiagnostics: @Sendable () -> String
+    private let defaultInputChanges: (@Sendable () -> AsyncStream<Void>)?
+    /// The microphone that has not recorded a sample yet: its start failed, its spool stays open and it
+    /// becomes a track when a later attempt works.
+    private var pendingMic: PendingMicrophone?
+    private var reviving = false
+    private var micUnavailableAnnounced = false
+    private var micRetryTask: Task<Void, Never>?
+    private var inputWatchTask: Task<Void, Never>?
 
     private let limitSamples: Int
     private let warningSamples: Int
@@ -124,8 +137,13 @@ actor MeetingSession {
         beforeReady: (@Sendable (Int64, UUID) async -> Void)? = nil,
         sourceBundleID: String? = nil, keepAudio: @escaping @Sendable () -> Bool = { false },
         recordCounters: @escaping @Sendable (CaptureCounters) -> Void = { _ in },
+        retriesMicrophone: Bool = true, inputDiagnostics: @escaping @Sendable () -> String = { "" },
+        defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = nil,
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "meetings")
     ) {
+        self.retriesMicrophone = retriesMicrophone
+        self.inputDiagnostics = inputDiagnostics
+        self.defaultInputChanges = defaultInputChanges
         self.recordCounters = recordCounters
         self.keepAudio = keepAudio
         self.sourceBundleID = sourceBundleID
@@ -183,6 +201,7 @@ actor MeetingSession {
         }
         setState(.recording)
         startHeartbeat()
+        startMicrophoneRecovery()
         // A finish requested while starting, or the only track having ended meanwhile, takes effect now.
         if pendingFinish || !tracks.values.contains(where: \.alive) { _ = beginFinish() }
         wakeStartWaiters()
@@ -256,6 +275,7 @@ actor MeetingSession {
     }
 
     private func startAudio(writers: [AudioChannel: SpoolWriter]) async throws {
+        let attemptedAt = now()
         for input in inputs {
             let channel = input.channel
             let continuation = continuation
@@ -273,12 +293,23 @@ actor MeetingSession {
                 tracks[channel] = track
                 consume(track, stream)
             } catch {
-                logger.error("Audio track \(channel.rawValue, privacy: .public) did not start")
-                continuation.yield(.trackUnavailable(channel))
-                if let writer = writers[channel] { try? writer.abandon() }
+                logStartFailure(channel, error, attempt: nil)
+                if channel == .mic, retriesMicrophone {
+                    // Kept for a later attempt (`startMicrophoneRecovery`); the HUD hears about it only when
+                    // those fail, so a start that works on the second try shows no warning.
+                    pendingMic = PendingMicrophone(
+                        audio: input.audio, spool: writers[channel], levelGate: levelGate, onLevel: onLevel,
+                        attemptedAt: attemptedAt)
+                } else {
+                    continuation.yield(.trackUnavailable(channel))
+                    if let writer = writers[channel] { try? writer.abandon() }
+                }
             }
         }
-        if tracks.isEmpty { throw MeetingSessionError.noAudioInput }
+        if tracks.isEmpty {
+            pendingMic = nil
+            throw MeetingSessionError.noAudioInput
+        }
         startedAt = now()
         lastDiskCheckAt = startedAt
     }
@@ -297,6 +328,7 @@ actor MeetingSession {
     private func abortStart() async {
         heartbeatTask?.cancel()
         heartbeatTask = nil
+        pendingMic = nil
         for track in tracks.values {
             track.consume?.cancel()
             await track.audio.stop()
@@ -320,6 +352,144 @@ actor MeetingSession {
         started = false
         pendingFinish = false
         nextSegmentID = 0
+    }
+
+    // MARK: Microphone recovery
+
+    private func logStartFailure(_ channel: AudioChannel, _ error: any Error, attempt: Int?) {
+        let kind = String(describing: error)
+        let input = inputDiagnostics()
+        let suffix = attempt.map { " (retry \($0) of \(limits.startRetryAttempts))" } ?? ""
+        logger.error(
+            "Audio track \(channel.rawValue, privacy: .public) did not start\(suffix, privacy: .public): \(kind, privacy: .public); default input: \(input, privacy: .public)"
+        )
+    }
+
+    /// The microphone track that is not recording and could be started: the one that never started, or one
+    /// that was lost.
+    private func microphoneToRevive() -> MicrophoneRevival? {
+        if let pendingMic { return .pending(pendingMic) }
+        if let track = tracks[.mic], !track.alive, !track.resuming { return .lost(track) }
+        return nil
+    }
+
+    /// A microphone that did not start is tried again a few times in the first seconds, and again whenever the
+    /// system's default input changes (a Bluetooth headset connecting or switching profile).
+    private func startMicrophoneRecovery() {
+        guard retriesMicrophone else { return }
+        if pendingMic != nil {
+            micRetryTask = Task { [weak self] in
+                _ = await self?.reviveMicrophone(attempts: self?.limits.startRetryAttempts ?? 0)
+            }
+        }
+        if let makeChanges = defaultInputChanges {
+            let changes = makeChanges()
+            inputWatchTask = Task { [weak self] in
+                for await _ in changes {
+                    guard let self, !Task.isCancelled else { return }
+                    await self.defaultInputChanged()
+                }
+            }
+        }
+    }
+
+    private func defaultInputChanged() async {
+        guard state == .recording, finishTask == nil else { return }
+        let input = inputDiagnostics()
+        logger.notice("The default input changed: \(input, privacy: .public)")
+        guard microphoneToRevive() != nil else { return }
+        // The new device needs a moment before it answers.
+        do { try await sleep(limits.startRetryDelay) } catch { return }
+        _ = await reviveMicrophone(attempts: limits.startRetryAttempts)
+    }
+
+    /// "Spróbuj ponownie": starts a microphone that is not recording. Returns whether it records now.
+    @discardableResult
+    func retryMicrophone() async -> Bool {
+        await reviveMicrophone(attempts: limits.startRetryAttempts)
+    }
+
+    /// Starts the microphone that is not recording, up to `attempts` times with `startRetryDelay` between
+    /// them. A late microphone lands at its real place on the timeline: the time it was missing is filled
+    /// with silence in full (not capped like an interruption's gap), so it stays aligned with the system
+    /// track for the echo check and the order of the transcript. Returns whether it records now.
+    private func reviveMicrophone(attempts: Int) async -> Bool {
+        guard retriesMicrophone, !reviving, state == .recording, finishTask == nil,
+            let target = microphoneToRevive()
+        else { return false }
+        reviving = true
+        defer { reviving = false }
+        for attempt in 1...max(1, attempts) {
+            if attempt > 1 {
+                do { try await sleep(limits.startRetryDelay) } catch { return false }
+            }
+            guard state == .recording, finishTask == nil, microphoneToRevive()?.identity == target.identity else {
+                return false
+            }
+            do {
+                let stream = try await target.audio.start(onLevel: target.onLevel ?? { _ in })
+                guard state == .recording, finishTask == nil else {
+                    await target.audio.stop()
+                    return false
+                }
+                await adopt(target, stream: stream)
+                let input = inputDiagnostics()
+                logger.notice(
+                    "Audio track mic started after retry \(attempt, privacy: .public); default input: \(input, privacy: .public)"
+                )
+                return true
+            } catch {
+                logStartFailure(.mic, error, attempt: attempt)
+            }
+        }
+        if pendingMic != nil, !micUnavailableAnnounced {
+            micUnavailableAnnounced = true
+            continuation.yield(.trackUnavailable(.mic))
+        }
+        return false
+    }
+
+    /// Puts a started microphone into the recording, silence first for the time it was missing.
+    private func adopt(_ target: MicrophoneRevival, stream: AsyncStream<[Float]>) async {
+        let channel = AudioChannel.mic
+        let track: TrackState
+        switch target {
+        case .lost(let lost):
+            track = lost
+        case .pending(let pending):
+            track = TrackState(channel: channel, audio: pending.audio, vad: makeVAD())
+            track.levelGate = pending.levelGate
+            track.onLevel = pending.onLevel
+            track.spool = pending.spool
+            track.lastAudioAt = pending.attemptedAt
+            pendingMic = nil
+        }
+        micUnavailableAnnounced = false
+        track.alive = true
+        // Blocks a stall check and `streamEnded` while the silence goes in.
+        track.resuming = true
+        tracks[channel] = track
+        var remaining = Int(max(0, now().timeIntervalSince(track.lastAudioAt)) * Double(AudioFormat.sampleRate))
+        track.lastAudioAt = now()
+        if remaining > 0 {
+            counters[channel].gapFillSamples += remaining
+            noteAudioGap()
+        }
+        while remaining > 0, finishTask == nil, state == .recording {
+            let count = min(remaining, 10 * AudioFormat.sampleRate)
+            remaining -= count
+            await receive(track, [Float](repeating: 0, count: count))
+        }
+        track.resuming = false
+        guard finishTask == nil, state == .recording else {
+            await track.audio.stop()
+            return
+        }
+        track.lastAudioAt = now()
+        track.levelGate.open()
+        consume(track, stream)
+        counters[channel].resumes += 1
+        continuation.yield(.trackResumed(channel))
     }
 
     // MARK: Heartbeat
@@ -794,6 +964,15 @@ actor MeetingSession {
     private func runFinish() async -> Outcome {
         heartbeatTask?.cancel()
         heartbeatTask = nil
+        micRetryTask?.cancel()
+        micRetryTask = nil
+        inputWatchTask?.cancel()
+        inputWatchTask = nil
+        if let pending = pendingMic {
+            // A microphone that never recorded has nothing to keep.
+            try? pending.spool?.abandon()
+            pendingMic = nil
+        }
         setState(.finishing)
         if let id = meetingID {
             do {
@@ -1156,6 +1335,53 @@ private final class TrackState: @unchecked Sendable {
         self.channel = channel
         self.audio = audio
         self.vad = vad
+    }
+}
+
+/// A microphone whose first start failed: what a track needs, kept until a later attempt works.
+private final class PendingMicrophone: @unchecked Sendable {
+    let audio: any AudioInput
+    let spool: SpoolWriter?
+    let levelGate: LevelGate
+    let onLevel: @Sendable (Float) -> Void
+    let attemptedAt: Date
+
+    init(
+        audio: any AudioInput, spool: SpoolWriter?, levelGate: LevelGate,
+        onLevel: @escaping @Sendable (Float) -> Void, attemptedAt: Date
+    ) {
+        self.audio = audio
+        self.spool = spool
+        self.levelGate = levelGate
+        self.onLevel = onLevel
+        self.attemptedAt = attemptedAt
+    }
+}
+
+/// The microphone that `reviveMicrophone` starts: one that never started, or one that was lost.
+private enum MicrophoneRevival {
+    case pending(PendingMicrophone)
+    case lost(TrackState)
+
+    var audio: any AudioInput {
+        switch self {
+        case .pending(let pending): pending.audio
+        case .lost(let track): track.audio
+        }
+    }
+
+    var onLevel: (@Sendable (Float) -> Void)? {
+        switch self {
+        case .pending(let pending): pending.onLevel
+        case .lost(let track): track.onLevel
+        }
+    }
+
+    var identity: ObjectIdentifier {
+        switch self {
+        case .pending(let pending): ObjectIdentifier(pending)
+        case .lost(let track): ObjectIdentifier(track)
+        }
     }
 }
 

@@ -32,6 +32,14 @@ final class MeetingHUDQA {
         ("recording-low-disk", recording { $0.lowDisk = true }),
         ("recording-write-problem", recording { $0.writeProblem = true }),
         ("recording-device-disconnected", recording { $0.lost = [.mic] }),
+        ("recording-microphone-not-recorded", recording { $0.unavailable = [.mic] }),
+        (
+            "recording-microphone-retrying",
+            recording {
+                $0.unavailable = [.mic]
+                $0.retryingMicrophone = true
+            }
+        ),
         ("recording-system-audio-lost", recording { $0.lost = [.system] }),
         ("recording-microphone-only", recording { $0.recordsSystem = false }),
         ("finishing", .finishing),

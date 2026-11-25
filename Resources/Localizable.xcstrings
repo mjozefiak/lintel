@@ -10261,6 +10261,42 @@
         }
       }
     },
+    "Your microphone is not being recorded" : {
+      "comment" : "Meeting HUD notice when the microphone could not be started, only the system audio is recorded",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your microphone is not being recorded"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twój mikrofon nie jest nagrywany"
+          }
+        }
+      }
+    },
+    "Trying the microphone again…" : {
+      "comment" : "Meeting HUD notice while the microphone is being started again after 'Try again'",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trying the microphone again…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponawiam próbę z mikrofonem…"
+          }
+        }
+      }
+    },
     "System audio stopped" : {
       "comment" : "Meeting HUD notice when the system track ended",
       "extractionState" : "manual",

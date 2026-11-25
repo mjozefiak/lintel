@@ -140,6 +140,28 @@ import Testing
         #expect(recording { $0.loadingModel = true }.announcement == "Meeting recording started")
     }
 
+    @Test func aMicrophoneThatDidNotStartSaysSoOffersTryAgainAndShowsProgress() {
+        var value = MeetingHUDState.Recording()
+        value.unavailable = [.mic]
+        #expect(value.notice == .microphoneNotRecorded)
+        #expect(MeetingHUDState.recording(value).actions == [.retryMicrophone, .stop])
+        #expect(MeetingHUDState.recording(value).detail == "Your microphone is not being recorded")
+        value.retryingMicrophone = true
+        #expect(value.notice == .retryingMicrophone)
+        #expect(MeetingHUDState.recording(value).actions == [.stop])
+        value.retryingMicrophone = false
+        // A lost microphone gets the same button.
+        value.unavailable = []
+        value.lost = [.mic]
+        #expect(MeetingHUDState.recording(value).actions == [.retryMicrophone, .stop])
+        // A system-audio-only recording has no microphone to warn about.
+        value.lost = []
+        value.unavailable = [.mic]
+        value.recordsMicrophone = false
+        #expect(value.notice == nil)
+        #expect(MeetingHUDState.recording(MeetingHUDState.Recording()).title(for: .retryMicrophone) == "Try again")
+    }
+
     @Test func theSilentMicrophoneNoticeNeedsAMicrophoneTrackAndYieldsToALostDevice() {
         var value = MeetingHUDState.Recording()
         value.noMicrophoneAudio = true

@@ -18,6 +18,10 @@ struct MeetingsRuntime: Sendable {
     let logger: Logger
     var makeMicrophone: @Sendable (String?) -> any AudioInput = { MicrophoneCapture(deviceUID: $0) }
     var makeSystemAudio: @Sendable () -> any AudioInput = { SystemAudioSource(backend: CoreAudioProcessTapBackend()) }
+    /// The default input as a log line, read when the microphone does not start.
+    var inputDiagnostics: @Sendable () -> String = { DefaultInputObserver.diagnostics() }
+    /// Yields when the system's default input changes while recording.
+    var defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = { DefaultInputObserver.changes() }
 
     @MainActor
     init(context: PluginContext, settings: MeetingsSettings) {
@@ -89,7 +93,8 @@ struct MeetingsRuntime: Sendable {
             keepAudio: { [settings] in settings.keepAudio },
             recordCounters: Self.counterRecorder(
                 directory: request.spool.root.deletingLastPathComponent(), logger: logger),
-            logger: logger)
+            retriesMicrophone: request.recordsMicrophone, inputDiagnostics: inputDiagnostics,
+            defaultInputChanges: defaultInputChanges, logger: logger)
     }
 
     /// Writes a finished meeting's counters (numbers only) next to the library; a failure is logged and nothing else.

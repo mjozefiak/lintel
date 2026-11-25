@@ -9,6 +9,12 @@ protocol RecordingSession: Sendable {
     var events: AsyncStream<MeetingSessionEvent> { get }
     func start() async throws -> Int64
     func finish() async -> MeetingSessionOutcome
+    /// Starts a microphone that is not recording again. Returns whether it records now.
+    @discardableResult func retryMicrophone() async -> Bool
+}
+
+extension RecordingSession {
+    @discardableResult func retryMicrophone() async -> Bool { false }
 }
 
 extension MeetingSession: RecordingSession {}
@@ -224,6 +230,25 @@ final class MeetingController {
         }
     }
 
+    /// "Try again": the microphone is started again; the pill says so meanwhile. A second press while one runs
+    /// does nothing.
+    private func retryMicrophone() {
+        guard phase == .recording, let session, !recording.retryingMicrophone else { return }
+        recording.retryingMicrophone = true
+        refresh()
+        let token = runToken
+        Task { [weak self] in
+            let started = await session.retryMicrophone()
+            guard let self, self.runToken == token, self.session != nil else { return }
+            self.recording.retryingMicrophone = false
+            if started {
+                self.recording.unavailable.remove(.mic)
+                self.recording.lost.remove(.mic)
+            }
+            self.refresh()
+        }
+    }
+
     /// "Copy message": the sentence goes to the pasteboard in the system language and the time is stored with the
     /// meeting (never the text). A click before the meeting has an id is stored as soon as it has one.
     private func copyConsentText() {
@@ -253,6 +278,7 @@ final class MeetingController {
         case .stop: stop()
         case .openSettings: deps.openSettings()
         case .copyConsentText: copyConsentText()
+        case .retryMicrophone: retryMicrophone()
         case .openModels: deps.openModels(deps.settings.speechModelID)
         case .openMicrophoneSettings:
             if let url = Self.microphonePrivacyURL { deps.openURL(url) }
@@ -474,7 +500,12 @@ final class MeetingController {
         case .replaying(let remaining):
             enterFinishing()
             deps.hud.show(.processing(.transcribing(remaining: remaining)))
-        case .limitReached, .echoMayRemain, .segmentSaved, .nothingHeard, .trackResumed:
+        case .trackResumed(let channel):
+            // A track that was unavailable at the start or lost is recording again.
+            recording.unavailable.remove(channel)
+            recording.lost.remove(channel)
+            refresh()
+        case .limitReached, .echoMayRemain, .segmentSaved, .nothingHeard:
             break
         case .finished(let outcome):
             conclude(outcome)

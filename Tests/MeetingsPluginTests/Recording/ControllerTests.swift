@@ -544,6 +544,43 @@ import Testing
         #expect(rig.controller.phase == .recording)
     }
 
+    @Test func aMicrophoneThatDidNotStartIsShownAndTheWarningGoesWhenItRecords() async throws {
+        let rig = try ControllerRig()
+        await rig.startRecording()
+        rig.session?.send(.trackUnavailable(.mic))
+        await eventually { rig.hud.lastRecording?.notice == .microphoneNotRecorded }
+        #expect(rig.hud.last?.actions == [.retryMicrophone, .stop])
+        rig.session?.send(.trackResumed(.mic))
+        await eventually { rig.hud.lastRecording?.unavailable.isEmpty == true }
+        #expect(rig.hud.lastRecording?.notice != .microphoneNotRecorded)
+    }
+
+    @Test func tryAgainAsksTheSessionAndClearsTheWarningWhenTheMicrophoneStarts() async throws {
+        let rig = try ControllerRig()
+        await rig.startRecording()
+        rig.session?.send(.trackUnavailable(.mic))
+        await eventually { rig.hud.lastRecording?.notice == .microphoneNotRecorded }
+        rig.session?.answerRetries(with: true)
+        rig.controller.perform(.retryMicrophone)
+        await eventually { rig.session?.retryCount == 1 }
+        await eventually { rig.hud.lastRecording?.unavailable.isEmpty == true }
+        #expect(rig.hud.lastRecording?.notice != .microphoneNotRecorded)
+        #expect(rig.hud.lastRecording?.retryingMicrophone == false)
+    }
+
+    @Test func tryAgainThatFailsKeepsTheWarningAndAllowsAnotherTry() async throws {
+        let rig = try ControllerRig()
+        await rig.startRecording()
+        rig.session?.send(.trackLost(.mic))
+        await eventually { rig.hud.lastRecording?.notice == .deviceDisconnected }
+        rig.controller.perform(.retryMicrophone)
+        await eventually { rig.session?.retryCount == 1 }
+        await eventually { rig.hud.lastRecording?.retryingMicrophone == false }
+        #expect(rig.hud.lastRecording?.notice == .deviceDisconnected)
+        rig.controller.perform(.retryMicrophone)
+        await eventually { rig.session?.retryCount == 2 }
+    }
+
     @Test func theSystemTrackStaysSilentFor20SecondsAndTheHUDSaysSo() async throws {
         let rig = try ControllerRig()
         await rig.startRecording()

@@ -17,17 +17,22 @@ final class ControlledInput: AudioInput {
         var stops = 0
         var failStart = false
         var endOnStart = false
+        var attempts = 0
+        var failuresLeft = 0
     }
 
     private let state = Mutex(State())
 
     var starts: Int { state.withLock { $0.starts } }
     var stops: Int { state.withLock { $0.stops } }
+    /// Every call of `start`, failed or not.
+    var attempts: Int { state.withLock { $0.attempts } }
 
-    init(failStart: Bool = false, endOnStart: Bool = false) {
+    init(failStart: Bool = false, endOnStart: Bool = false, failFirstStarts: Int = 0) {
         state.withLock {
             $0.failStart = failStart
             $0.endOnStart = endOnStart
+            $0.failuresLeft = failFirstStarts
         }
     }
 
@@ -36,7 +41,15 @@ final class ControlledInput: AudioInput {
     struct StartFailure: Error {}
 
     func start(onLevel: @escaping @Sendable (Float) -> Void) async throws -> AsyncStream<[Float]> {
-        if state.withLock({ $0.failStart }) { throw StartFailure() }
+        let fails = state.withLock { state -> Bool in
+            state.attempts += 1
+            if state.failuresLeft > 0 {
+                state.failuresLeft -= 1
+                return true
+            }
+            return state.failStart
+        }
+        if fails { throw StartFailure() }
         let (stream, continuation) = AsyncStream<[Float]>.makeStream(bufferingPolicy: .unbounded)
         state.withLock {
             $0.continuation = continuation
@@ -489,7 +502,8 @@ struct SessionRig {
         withSystem: Bool = true, clock: TestClock? = nil, realTime: Bool = false, micAudio: (any AudioInput)? = nil,
         beforeReady: (@Sendable (Int64, UUID) async -> Void)? = nil, sourceBundleID: String? = nil,
         keepAudio: Bool = false, systemAudio: (any AudioInput)? = nil,
-        recordCounters: @escaping @Sendable (CaptureCounters) -> Void = { _ in }
+        recordCounters: @escaping @Sendable (CaptureCounters) -> Void = { _ in }, retriesMicrophone: Bool = true,
+        defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = nil, micStartsLate: Bool = false
     ) -> MeetingSession {
         // Every session runs on a clock of its own that only the test moves, so a loaded machine cannot make the
         // heartbeat see a stalled stream; `realTime: true` is for a test that needs the wall clock.
@@ -500,7 +514,10 @@ struct SessionRig {
             nowFn = clock.now
             sleepFn = clock.sleeper
         }
-        let vads = Mutex<[ScriptedVAD]>([micScript.vad] + (systemScript.map { [$0.vad] } ?? []))
+        // The detectors are handed out in the order the tracks are created: a microphone that starts late is
+        // created after the system track.
+        let scripted = [micScript.vad] + (systemScript.map { [$0.vad] } ?? [])
+        let vads = Mutex<[ScriptedVAD]>(micStartsLate ? scripted.reversed() : scripted)
         return MeetingSession(
             store: store, keys: keys, spool: spool, mic: micAudio ?? micInput ?? mic,
             system: withSystem ? (systemAudio ?? systemInput ?? system) : nil,
@@ -510,7 +527,9 @@ struct SessionRig {
             gate: gate ?? self.gate, limits: limits ?? shortLimits, freeSpace: freeSpace, uuid: uuid,
             now: nowFn, sleep: sleepFn,
             beforeReady: beforeReady, sourceBundleID: sourceBundleID,
-            keepAudio: { keepAudio }, recordCounters: recordCounters)
+            keepAudio: { keepAudio }, recordCounters: recordCounters, retriesMicrophone: retriesMicrophone,
+            inputDiagnostics: { "name=Test input, uid=test, sampleRate=48000, channels=1" },
+            defaultInputChanges: defaultInputChanges)
     }
 
     var shortLimits: MeetingSessionLimits {

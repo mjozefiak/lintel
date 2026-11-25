@@ -21,10 +21,40 @@ public struct SystemMicrophoneAuthorizer: MicrophoneAuthorizer {
     }
 }
 
-public enum CaptureError: Error {
+public enum CaptureError: Error, CustomStringConvertible {
     case noInputDevice
     case converterUnavailable
     case engineFailed(String)
+
+    /// The case only (and the system's error text for `engineFailed`), for a log line: never audio.
+    public var description: String {
+        switch self {
+        case .noInputDevice: "noInputDevice"
+        case .converterUnavailable: "converterUnavailable"
+        case .engineFailed(let message): "engineFailed(\(message))"
+        }
+    }
+}
+
+/// What Core Audio says about an input device, for a diagnostic log line when the microphone does not start:
+/// the device's name and UID, its nominal sample rate and its input channel count. No audio.
+public struct InputDeviceInfo: Equatable, Sendable {
+    public let name: String
+    public let uid: String
+    public let sampleRate: Double
+    public let channels: Int
+
+    public init(name: String, uid: String, sampleRate: Double, channels: Int) {
+        self.name = name
+        self.uid = uid
+        self.sampleRate = sampleRate
+        self.channels = channels
+    }
+
+    /// `name=..., uid=..., sampleRate=..., channels=...`
+    public var logDescription: String {
+        "name=\(name), uid=\(uid), sampleRate=\(Int(sampleRate)), channels=\(channels)"
+    }
 }
 
 /// `AVAudioEngine` on the chosen input (or the system's), converted to 16 kHz mono `Float32` and handed out
@@ -169,17 +199,45 @@ public final class MicrophoneCapture: AudioInput, @unchecked Sendable {
     }
 
     private static func hasInput(_ device: AudioDeviceID) -> Bool {
+        inputChannelCount(device) > 0
+    }
+
+    private static func inputChannelCount(_ device: AudioDeviceID) -> Int {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration, mScope: kAudioObjectPropertyScopeInput,
             mElement: kAudioObjectPropertyElementMain)
         var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr, size > 0 else { return false }
+        guard AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr, size > 0 else { return 0 }
         let raw = UnsafeMutableRawPointer.allocate(
             byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
         defer { raw.deallocate() }
-        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, raw) == noErr else { return false }
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, raw) == noErr else { return 0 }
         let list = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
-        return list.reduce(0) { $0 + Int($1.mNumberChannels) } > 0
+        return list.reduce(0) { $0 + Int($1.mNumberChannels) }
+    }
+
+    /// The system's default input right now, or `nil` when there is none (or Core Audio does not answer). It
+    /// reads properties only and never opens the device.
+    public static func defaultInputInfo() -> InputDeviceInfo? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var device = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard
+            AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device)
+                == noErr, device != 0
+        else { return nil }
+        var rateAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var rate = Float64(0)
+        var rateSize = UInt32(MemoryLayout<Float64>.size)
+        _ = AudioObjectGetPropertyData(device, &rateAddress, 0, nil, &rateSize, &rate)
+        return InputDeviceInfo(
+            name: string(kAudioObjectPropertyName, of: device) ?? "unknown",
+            uid: string(kAudioDevicePropertyDeviceUID, of: device) ?? "unknown", sampleRate: rate,
+            channels: inputChannelCount(device))
     }
 
     private static func string(_ selector: AudioObjectPropertySelector, of device: AudioDeviceID) -> String? {
