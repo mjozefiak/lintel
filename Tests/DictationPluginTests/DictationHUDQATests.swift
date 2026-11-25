@@ -21,7 +21,7 @@ import Testing
         #expect(states.contains(.problem(.nothingToPaste)))
         #expect(states.contains(.problem(.speechModelBusy)))
         let recordings = states.filter { if case .recording = $0 { true } else { false } }
-        #expect(recordings.count == 3)
+        #expect(recordings.count == 4)
         // Every state has its words; none is blank.
         for state in states { #expect(!state.title.isEmpty) }
     }

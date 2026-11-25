@@ -34,8 +34,10 @@ import Testing
     @Test func noSourceFileImportsARepositoryTarget() throws {
         let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources/LintelSpeech", directoryHint: .isDirectory)
-        let files = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "swift" }
+        // Recursive: `Language/` is a subfolder.
+        let enumerator = try #require(FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil))
+        let files = enumerator.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
+        #expect(files.contains { $0.pathComponents.contains("Language") })
         #expect(!files.isEmpty)
         for file in files {
             let text = try String(contentsOf: file, encoding: .utf8)

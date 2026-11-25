@@ -222,7 +222,7 @@ public final class DictationPlugin: LintelPlugin {
                 customFolder: { settings.speechModelFolder },
                 makeSession: { folder, onEvent in
                     DictationSession(
-                        audio: MicrophoneCapture(deviceUID: settings.inputDevice),
+                        audio: MicrophoneCapture(deviceUID: settings.inputDevice, deviceName: settings.inputDeviceName),
                         vad: LazyVAD(modelFolder: folder.appending(path: ModelCatalog.sileroVADPath)),
                         engine: engine,
                         formatter: Self.formatter(

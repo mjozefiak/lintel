@@ -145,6 +145,8 @@ final class DictationController {
             recordingState.loadingModel = false
         case .limitApproaching(let seconds):
             recordingState.secondsLeft = seconds
+        case .microphoneFallback(let fallback):
+            recordingState.fallback = fallback
         case .loadFailed(let busy):
             // No point in recording for a model that will not come: tell the user now.
             let session = session
@@ -153,7 +155,11 @@ final class DictationController {
             Task { await session?.cancel() }
             return
         case .limitReached, .audioLost:
-            // What was said so far is still finished and pasted.
+            // What was said so far is still finished and pasted. The capture restarts itself after an audio
+            // configuration change, so `audioLost` means no input could be started again.
+            logger.notice(
+                "Recording ended by \(event == .audioLost ? "the audio input being lost" : "the time limit", privacy: .public)"
+            )
             menu()
             return
         }

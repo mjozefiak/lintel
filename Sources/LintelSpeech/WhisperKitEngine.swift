@@ -32,20 +32,54 @@ public actor WhisperKitEngine: SpeechEngine {
     }
 
     public func transcribe(_ samples: [Float]) async throws -> TranscriptSegment {
-        guard let kit else { throw EngineError.notLoaded }
-        // The language is always pinned (no detection), and a VAD segment is one window, not 30 s chunks.
-        let options = DecodingOptions(
+        try await transcribe(samples, options: .none)
+    }
+
+    /// Whisper's decoding options for a pinned language: always `transcribe` (never translate), no detection in
+    /// the decoder, one window per VAD segment. The one place they are built, so a pinned request decodes exactly
+    /// as it did before request options existed.
+    static func decodingOptions(language: String) -> DecodingOptions {
+        DecodingOptions(
             task: .transcribe,
-            language: language(),
+            language: language,
             temperature: 0,
             usePrefillPrompt: true,
             detectLanguage: false,
             skipSpecialTokens: true,
             withoutTimestamps: true,
             wordTimestamps: false)
-        let results = try await kit.transcribe(audioArray: samples, decodeOptions: options)
+    }
+
+    public func transcribe(_ samples: [Float], options requested: SpeechRequestOptions) async throws
+        -> TranscriptSegment
+    {
+        guard let kit else { throw EngineError.notLoaded }
+        let chosen = await resolveLanguage(requested.whisperLanguage, for: samples, kit: kit)
+        let results = try await kit.transcribe(
+            audioArray: samples, decodeOptions: Self.decodingOptions(language: chosen))
         let text = results.map(\.text).joined(separator: " ")
-        return TranscriptSegment(text: RepetitionFilter.clean(text))
+        let windows = results.flatMap(\.segments)
+        return TranscriptSegment(
+            text: RepetitionFilter.clean(text),
+            noSpeechProb: windows.map(\.noSpeechProb).max(),
+            avgLogProb: windows.isEmpty ? nil : windows.map(\.avgLogprob).reduce(0, +) / Float(windows.count))
+    }
+
+    /// The language one request is decoded in: the request's own choice, else the language the engine was built
+    /// with. A detection never throws (see `detectLanguage`).
+    func resolveLanguage(_ choice: WhisperLanguageChoice?, for samples: [Float], kit: WhisperKit) async -> String {
+        switch choice {
+        case nil: return language()
+        case .pinned(let code): return code
+        case .detect(let candidates, let fallback):
+            return await detectLanguage(samples, among: candidates, fallback: fallback, kit: kit)
+        }
+    }
+
+    /// For the local evaluation (`LanguageEvalTests`): the language `choice` would give for `samples`.
+    func resolvedLanguage(_ choice: WhisperLanguageChoice?, for samples: [Float]) async throws -> String {
+        guard let kit else { throw EngineError.notLoaded }
+        return await resolveLanguage(choice, for: samples, kit: kit)
     }
 
     public func unload() async {
@@ -141,6 +175,10 @@ public actor SwitchingEngine: SpeechEngine {
 
     public func transcribe(_ samples: [Float]) async throws -> TranscriptSegment {
         try await current().engine.transcribe(samples)
+    }
+
+    public func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
+        try await current().engine.transcribe(samples, options: options)
     }
 
     public func unload() async {
