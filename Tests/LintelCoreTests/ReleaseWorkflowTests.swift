@@ -227,7 +227,15 @@ import Testing
             build.contains(
                 "if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')\n"
                     + "        timeout-minutes: 16\n"
-                    + "        run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test\n"))
+                    + "        run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test --skip-build\n")
+        )
+        // The test targets compile in their own step first, so the watchdog covers only running the tests (#263).
+        #expect(
+            build.contains(
+                "      - name: Build tests\n"
+                    + "        if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')\n"
+                    + "        timeout-minutes: 15\n"
+                    + "        run: swift build --build-tests\n"))
         #expect(
             build.contains(
                 "        if: failure() || cancelled()\n"

@@ -140,10 +140,18 @@ jobs:
           sw_vers
 
       # A push to main is tested by ci.yml on the same commit; here it only checks that the app still packages.
+      # The test targets are compiled in their own step (issue #263): the 800 s watchdog below used to include a cold
+      # compile (about 4 min) and sat at 765-801 s. Now it covers only running the tests, and a slow compile fails on
+      # this step's own timeout with its own name in the log. No test is dropped or filtered.
+      - name: Build tests
+        if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
+        timeout-minutes: 15
+        run: swift build --build-tests
+
       - name: Test
         if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
         timeout-minutes: 16
-        run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test
+        run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test --skip-build
 
       # A hung test run leaves stack samples and the names of the unfinished tests here (never test output).
       - name: Upload watchdog diagnostics
