@@ -112,7 +112,9 @@ nonisolated struct SystemPasteboardClient: PasteboardClient {
 /// layouts; Phase 0 only provides the port.
 nonisolated struct SystemEventPoster: EventPoster {
     @MainActor func postPaste() throws(EventPosterError) {
-        guard CGPreflightPostEventAccess() else { throw EventPosterError.notPermitted }
+        guard
+            AccessibilityAccess.canPostEvents(axTrusted: AXIsProcessTrusted(), postEvent: CGPreflightPostEventAccess())
+        else { throw EventPosterError.notPermitted }
         guard !IsSecureEventInputEnabled() else { throw EventPosterError.secureEventInput }
         let source = CGEventSource(stateID: .combinedSessionState)
         let keyCode = KeyboardLayout.pasteKeyCode()
@@ -295,19 +297,24 @@ nonisolated struct SystemPermissionsReader: PermissionsReader {
     let pasteboardAccessOverride: PasteboardAccess?
     /// QA mode only: reports this microphone status instead of asking the system.
     let microphoneOverride: PermissionStatus?
+    /// Whether this process is trusted for Accessibility. A closure so a test can flip it; the system answer is
+    /// read live on every call (`AXIsProcessTrusted()`), which is what makes a grant show without a restart (#71).
+    let accessibilityTrusted: @Sendable () -> Bool
 
     init(
         pasteboardName: NSPasteboard.Name? = nil,
         accessibilityOverride: PermissionStatus? = nil,
         fullDiskAccessOverride: PermissionStatus? = nil,
         pasteboardAccessOverride: PasteboardAccess? = nil,
-        microphoneOverride: PermissionStatus? = nil
+        microphoneOverride: PermissionStatus? = nil,
+        accessibilityTrusted: @escaping @Sendable () -> Bool = { AXIsProcessTrusted() }
     ) {
         self.pasteboardName = pasteboardName
         self.accessibilityOverride = accessibilityOverride
         self.fullDiskAccessOverride = fullDiskAccessOverride
         self.pasteboardAccessOverride = pasteboardAccessOverride
         self.microphoneOverride = microphoneOverride
+        self.accessibilityTrusted = accessibilityTrusted
     }
 
     @MainActor func status(of permission: Permission) -> PermissionStatus {
@@ -316,7 +323,7 @@ nonisolated struct SystemPermissionsReader: PermissionsReader {
             if let accessibilityOverride {
                 return accessibilityOverride
             }
-            return CGPreflightPostEventAccess() ? .granted : .denied
+            return AccessibilityAccess.status(axTrusted: accessibilityTrusted())
         case .fullDiskAccess:
             if let fullDiskAccessOverride {
                 return fullDiskAccessOverride
