@@ -1,6 +1,6 @@
 # Lintel UX direction
 
-> Status: **revision 2, draft for the owner's decision**, 2026-11-24. Design-only: no Swift, no settings keys, no strings in `Localizable.xcstrings`. Sketch: `.ai/prototypes/lintel-direction/lintel.html`. Revision 1 (2026-11-23, three directions A, B, C with a Home dashboard) is in the PR history.
+> Status: **revision 2, accepted by the owner on 2026-11-24** (decisions in "Owner decisions" below, which win over any older wording in this doc or the sketch). Design-only: no Swift, no settings keys, no strings in `Localizable.xcstrings`. Sketch: `.ai/prototypes/lintel-direction/lintel.html`. Revision 1 (2026-11-23, three directions A, B, C with a Home dashboard) is in the PR history.
 
 ## What changed in revision 2
 
@@ -64,7 +64,7 @@ The cut ring from the logo is the one element that carries the brand inside the 
 | Note type | every row and the Meetings / Dictations filters | meeting = ring with the centre dot, dictation = ring without it, always with the word in the meta line (never shape alone) |
 | Empty | empty notes view | an outlined ring and one sentence with one action |
 
-**Verdigris** (#267C6C light, #6BBDAB dark; text #036152 / #7FCDBB) appears only on the primary button, the selection (sidebar, list, onboarding step, chosen option; a 14 % tint with a 3 pt bar) and live state (the ring, the recording pill, "Writing notes…", the status line of a ready feature). Switches and checkboxes use it for "on", as macOS does; links use the accent text colour (open decision 4). No gradients, glow, sparkles or purple-blue.
+**Verdigris** (#267C6C light, #6BBDAB dark; text #036152 / #7FCDBB) appears only on the primary button, the selection (sidebar, list, onboarding step, chosen option; a 14 % tint with a 3 pt bar) and live state (the ring, the recording pill, "Writing notes…", the status line of a ready feature). Switches and checkboxes use it for "on", as macOS does; links are neutral text (owner decision 4). No gradients, glow, sparkles or purple-blue.
 
 **Warmth** (from C): warm neutral surfaces (#F8F6F2 window, #EFECE6 sidebar; dark #1D1B18 / #242220), 10-12 pt corners on groups and cards, the outlined ring in empty states, and a warm step rail with the ring and "Your words, on this Mac." in onboarding. Not taken from C: icon circles on every row, rounded type, and questions as section headings.
 
@@ -84,7 +84,7 @@ Three columns, like Mail and Notes.
 - **Recording**: the toolbar button becomes a live pill (ring, time, Stop); a "Now" row is selected; the preview shows the live panel ("Lintel hears you and the other people in the call.", Stop and Write Notes), a consent reminder and a My notes pad for typing during the call. If Lintel hears only the microphone, a warning says so with a Fix Call Audio button.
 - **Notes not written**: the preview says what happened, that the recording and transcript are safe, and offers Try Again.
 - **Empty**: outlined ring, "Your notes will appear here", one sentence about recording and dictating, Try Dictation (Record Meeting stays the one primary in the toolbar).
-- **Dictionary**: a page in the main window (its only home): search, Add Word, each word with "Added by you" or "Learned from your corrections" and Remove.
+- **Dictionary**: a page in the main window (its only home): search, Add Word, each word with Remove. (The sketch's "Added by you" / "Learned from your corrections" labels are dropped until Lintel learns words: #255 Q10.) Empty state: "Add names you use often, like clients and colleagues." + Add Word.
 
 ### Settings (separate window, ⌘,)
 
@@ -94,9 +94,9 @@ Sidebar: **General · Dictation · Meetings & notes · AI assistant · Privacy &
 |---|---|---|
 | General | Languages I speak · Microphone (Automatic) · Text size (M/L/XL) · Open Lintel when I log in · Show Lintel in the Dock | Try new features early |
 | Dictation | status "Ready to dictate" · Shortcut (⌥ Space) · Tidy up my text · Dictionary (12 words, Open) · "Dictations are kept for 30 days" › Privacy & data | After pasting, put back what I had copied · Paste my last dictation unedited (shortcut) |
-| Meetings & notes | status (e.g. "Hears only you for now", Allow…) · Record a meeting (shortcut) · Suggest recording when a call starts · Your name in notes · Notes written by: This Mac › AI assistant · Export all notes | Write notes after each meeting · Never suggest recording in (app picker) · Check call audio |
+| Meetings & notes | status (e.g. "Hears only you for now", Allow…) · Record a meeting (⌃⌥M) · Suggest recording when a call starts · Your name in notes · Notes written by: This Mac › AI assistant · Export all notes | Write notes after each meeting · Never suggest recording in (app picker) · Check call audio |
 | AI assistant | status · one choice "Who writes your notes and tidies your text": This Mac (private, offline) / Claude (your account, words sent to Anthropic); with Claude: Use Claude for Meeting notes ☑ / Dictation ☐ and "Lintel asks you before the first meeting is sent." | Assistant on this Mac (Recommended for this Mac) · Downloaded files 3.7 GB (Show, Remove…) · Use my own AI server |
-| Privacy & data | "Recordings, notes and dictations stay on this Mac." · What Lintel can use: Microphone, Hear other people in a call, Type into other apps (Allowed ✓ / Allow…) · What Lintel keeps: Meeting audio (Delete when notes are ready), Dictations (30 days) · Delete my data… (sheet: dictations 128 / meetings and notes 42 / everything, button "Delete 42 Meetings", Cancel is the default) | Notes and transcripts (Keep forever) · Remind me to tell people I'm recording |
+| Privacy & data | "Recordings, notes and dictations stay on this Mac." · What Lintel can use: Microphone, Hear other people in a call, Type into other apps (Allowed ✓ / Allow…) · What Lintel keeps: Meeting audio (Delete when notes are ready), the only retention choice, plus a read-only sentence for the rest (notes and transcripts kept until deleted) · Delete my data… (sheet: dictations 128 / meetings and notes 42 / everything, button "Delete 42 Meetings", Cancel is the default) · Recently deleted (30 days) | Remind me to tell people I'm recording |
 | Add-ons | "Extra tools. All off until you turn them on." · Quick search · Clipboard history · Window layouts, each with "Off" next to its switch | — |
 | ↳ Quick search (when on) | status "Choose a shortcut to start" · Shortcut (chosen by the user, never ⌘Space by default) · Also search files · Folders | Result order · Show hidden files · Skip these folders · Start over |
 | ↳ Clipboard history / Window layouts | Shortcut · Never save from these apps (password managers preset) / Shortcut · Space between windows | the rest of today's controls |
@@ -114,7 +114,7 @@ Steps adapt to the goal: Dictation skips First meeting and the call-audio permis
 2. **Privacy**: "Your words stay on this Mac": saved on this Mac, encrypted; nothing sent anywhere, Claude only if chosen later and Lintel asks first; no account. With meetings: "When you record a meeting, tell the other people. Lintel reminds you."
 3. **Access**: "Lintel needs your OK for a few things": one row per permission with the reason in plain words and Allow; "(Opens System Settings)" where macOS does that; "You can skip any of these and allow them later in Settings → Privacy & data." Continue is always active.
 4. **Try dictation**: the sample email, Hold to Talk or ⌥ Space, Change shortcut. **Copy fixes**: the false promise "No microphone handy? Press and hold the button instead." is replaced by "Can't talk right now? Continue, and try it later from the menu bar."; Continue is never greyed out.
-5. **First meeting**: what the call suggestion looks like (a picture, not a live button), "You can also press Record Meeting in the Lintel window.", Check call audio, the consent sentence, and **Open Lintel**, which lands on the empty notes view.
+5. **First meeting**: what the call suggestion looks like (a picture, not a live button), "You can also press Record Meeting in the Lintel window.", the Record a meeting shortcut (⌃⌥M) with Change Shortcut, Check call audio, the consent sentence, and **Open Lintel**, which lands on the empty notes view.
 
 No account, no marketing questions, no add-ons.
 
@@ -169,19 +169,19 @@ Method: the sketch's `audit=1` mode checked each of 24 screen states in English 
 
 What the ✗ and ◐ marks mean:
 
-- **C8 ✗ Privacy & data** has 6 basic rows (3 permissions, 2 retention rows, Delete). Options: accept it as the one cross-cutting page, or give permissions their own page (8 sidebar items). Open decision 3.
-- **C13 ✗ Dictionary**: its empty state is not sketched yet (proposed: "Add names you use often, like clients and colleagues." + Add Word). Search with no results shows a hint but no action (◐).
-- **C3 ◐ Onboarding 1-4**: one filled button, but "Continue" does not name a result (wizard convention; the last step says "Open Lintel"). Settings pages have no filled button on purpose (changes apply at once, as on macOS), hence "–".
+- **C8 ✗ Privacy & data** has 6 basic rows (3 permissions, 2 retention rows, Delete). **Accepted exception** (owner decision 3: one page, permissions included).
+- **C13 ✗ Dictionary**: its empty state is not sketched yet (proposed: "Add names you use often, like clients and colleagues." + Add Word). Search with no results shows a hint but no action (◐). Follow-up: designed as a gallery scene in the main-window spec (#255 states table), not in this sketch.
+- **C3 ◐ Onboarding 1-4**: one filled button, but "Continue" does not name a result (wizard convention; the last step says "Open Lintel"). Resolved by owner decision 5: each button names the step's result (wording in the onboarding spec, #254). Settings pages have no filled button on purpose (changes apply at once, as on macOS), hence "–".
 - **C6 ◐**: self-explanatory rows have no help line (for example "Open Lintel when I log in", "Your name in notes", "What's new"); every help line that exists is under 15 words and describes the effect. Either the rule becomes "help where the label is not enough" or those rows get a line.
 - **C11 ◐**: Dictionary's Remove, AI assistant's Remove… (downloads) and Quick search's Start Over need their confirmation or undo designed in the specs; only Delete my data is sketched (names the object and count, Cancel is the default, the destructive button says "Delete 42 Meetings").
 - **C16 ◐ everywhere**: computed from the tokens, text is 4.6:1 or more and controls 3.1:1 or more in all four tone/theme combinations (after darkening the warning text to #8A4F00 and lightening dark red to #FFA8A0); Increase Contrast cannot be checked in HTML.
 - **C17 ◐ everywhere**: every control is a real button or field with a visible focus ring, Esc and ⌘, work, Reduce Motion stops the ring and the typing; VoiceOver was not run.
-- **C19 ◐**: links ("Change in Privacy & data ›", "Change shortcut") use the accent text colour as macOS does; strict reading allows Verdigris only on the primary button, the selection and live state. Open decision 4.
+- **C19 ◐**: links ("Change in Privacy & data ›", "Change shortcut") use the accent text colour in the sketch. Resolved by owner decision 4: links are neutral, Verdigris only on primary, selection and live state.
 - **C12 ✓ explorer** covers the "notes not written" state; **C15 ✓** means no truncation in Polish at XL at the default window size (list titles wrap to up to 3 lines; panes scroll vertically).
 
 ## Validation plan
 
-**Before the specs (cheap, no build):**
+**Later, after the specs (owner decision 9: no test group now; cheap, no build):**
 
 1. **Tree test, 20 tasks** (sidebar and page names as text only, no search), 5-8 people moderated first, then 30+ remote. Pass: at least 80 % success per task and at least 70 % correct first clicks. A task under the bar leads to a rename or a pointer row, never a second home. The most uncertain are tasks 2, 4, 10 and 18.
 
@@ -198,7 +198,7 @@ What the ✗ and ◐ marks mean:
 | 9 | Stop Lintel changing my words | Dictation › Tidy up my text |
 | 10 | Use my headset microphone | General › Microphone |
 | 11 | Stop recording suggestions in Slack huddles | Meetings & notes › More options › Never suggest recording in |
-| 12 | Keep my notes forever | Privacy & data › More options › Notes and transcripts |
+| 12 | Get back clipboard items I cleared by mistake | Privacy & data › Recently deleted |
 | 13 | Export all notes | Meetings & notes › Export all notes |
 | 14 | Turn off the "tell people" reminder | Privacy & data › More options › Remind me… |
 | 15 | Make the text bigger | General › Text size |
@@ -215,23 +215,34 @@ What the ✗ and ◐ marks mean:
 
 ## Follow-ups outside this PR
 
-- **Invert the plugin defaults** (dictation and meetings on; apps, files, clipboard and windows off for new installs; existing users keep their values): a code PR with a BACKWARD_COMPATIBILITY review.
-- **AI assistant as one choice**: an ADR and an additive contract for one shared assistant setting (today's three text-model pickers and two speech-model pickers).
-- **Settings rebuild spec** (`settings-ia-v2`) after the tree test; update `.uxproof/conventions.md` with it, since today's conventions still prescribe the Models and Advanced panes.
-- **Main window spec** (explorer, recording, note tabs, failed state) and **onboarding spec**, each citing this doc and the accepted sketch.
+- **Invert the plugin defaults** (dictation and meetings on; apps, files, clipboard and windows off for new installs; existing users keep their values): code PR #251 with a BACKWARD_COMPATIBILITY review.
+- **SwiftUI design gallery** (#248): tokens and the snapshot workflow; its Phase 1 and #251 land before the UI phases of the three specs below.
+- **AI assistant as one choice**: an ADR and an additive contract for one shared assistant setting (today's three text-model pickers and two speech-model pickers), in the settings spec.
+- **Settings rebuild spec** (`settings-ia-v2`, #253), written now (owner decision 9); update `.uxproof/conventions.md` with it, since today's conventions still prescribe the Models and Advanced panes.
+- **Main window spec** (#255: explorer, recording, note tabs, failed state, Recently deleted, Dictionary) and **onboarding spec** (#254: steps, DMG window, permission helper), each citing this doc and the accepted sketch.
 - A jargon gate: check C5 as a test over the basic-row strings in `Localizable.xcstrings`.
 
-## Open decisions (owner)
+## Owner decisions (2026-11-24)
 
-1. **Direction**: accept "Quiet Native with warmth" with the working ring as the brand signature.
-2. **Tone**: warm neutrals (default) or neutral greys (variant).
-3. **Privacy & data with 6 basic rows** (C8): keep as the one cross-cutting page, or split permissions into their own page.
-4. **Accent on links** (C19): keep the macOS convention or make links neutral and keep Verdigris strictly for primary, selection and live.
-5. **Onboarding buttons** (C3): keep "Continue" or name each step's result.
-6. **Mine vs AI as tabs** (Notes · My notes · Transcript), consistent with the 2026-11-19 decision against per-line marks.
-7. **Default shortcuts**: dictation ⌥ Space; Record a meeting has no default until the user sets one (or pick one now).
-8. **Deleting**: permanent ("This can't be undone.") or a 30-day Recently deleted (needs engineering).
-9. **Order of work**: run the tree test and the five-second test before the three specs, or write the specs now and test the prototype.
+From the owner's comment on #247 (all nine open decisions of this revision), plus the retention decisions of the same day on #253. They win over older wording in this doc and over the sketch.
+
+1. **Direction**: "Quiet Native with warmth" with the working ring as the brand signature, accepted.
+2. **Tone**: warm neutrals (`tone=neutral` stays a sketch variant only).
+3. **Privacy & data** stays one page, permissions included (the C8 exception).
+4. **Links are neutral**; Verdigris only on the primary button, the selection and live state.
+5. **Onboarding buttons name the step's result** (no plain "Continue").
+6. **Mine vs AI as tabs**: Notes · My notes · Transcript.
+7. **Default shortcuts**: dictation ⌥ Space, Record a meeting ⌃⌥M (as in #251); the user can record any shortcut in onboarding and at any time in Settings.
+8. **Deleting** goes to **Recently deleted for 30 days** with Restore, plus an immediate **Undo** toast after every delete (no "This can't be undone." for a move to Recently deleted).
+9. **Order of work**: no test group now; the specs are written now and the tree test and five-second test stay as the later validation plan above.
+10. **Retention (#253, Q7)**: notes and transcripts are kept forever on new installs (existing installs keep their value, 90 days if none stored); the only retention choice in Settings is how long meeting audio stays on disk.
+11. **Clipboard (#253, Q9)**: every delete, clipboard Clear included, goes to Recently deleted for 30 days, encrypted, with Restore and Undo; no exception.
+
+Added scope for the installer (onboarding spec, #254): a designed DMG window (drag to Applications) and a floating helper with the Lintel icon to drag into the System Settings permission list.
+
+**Where the sketch predates these decisions** (not redrawn; the gallery scenes of each spec are the source of truth): links in the accent colour (4); "Continue" on onboarding steps 1-4 (5); Record a meeting with "Set Shortcut" and no default (7); "This can't be undone." in the Delete my data sheet (8); a Dictations 30 days retention row and Notes and transcripts in More options (10); Dictionary source labels (#255 Q10).
+
+**Still to settle across the specs**: where Recently deleted lives (one home: a main-window sidebar row in #255, a Privacy & data sub-page in #253) and whether bulk erasures, retention by age and the panel's ⌃X follow decision 11 (#255 Q2, Q3, Q13 say otherwise).
 
 ## Evidence limits
 

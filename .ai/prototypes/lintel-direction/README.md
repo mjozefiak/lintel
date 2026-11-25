@@ -1,6 +1,6 @@
 # lintel-direction: one direction, "Quiet Native with warmth" (draft, revision 2, 2026-11-24)
 
-Clickable sketch for the shared UX direction in `.ai/specs/research/2026-11-23-lintel-ux-direction.md`. Nothing here is accepted until the owner says so. Revision 1 (three directions A, B, C) is in the PR history.
+Clickable sketch for the shared UX direction in `.ai/specs/research/2026-11-23-lintel-ux-direction.md`. Accepted by the owner on 2026-11-24; where the sketch predates the owner decisions (neutral links, named onboarding buttons, ⌃⌥M, Recently deleted), the "Owner decisions" section of the direction doc wins. Revision 1 (three directions A, B, C) is in the PR history.
 
 - Files: `lintel.html` (styles, tokens for warm and neutral tone, light and dark) and `lintel.js` (copy in English and Polish, screens, interactions, the settings search index, the audit mode).
 - Open: open `lintel.html` in a browser, or `cd .ai/prototypes/lintel-direction && python3 -m http.server 8766 --bind 127.0.0.1`.
