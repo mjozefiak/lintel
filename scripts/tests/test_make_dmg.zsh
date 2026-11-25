@@ -69,7 +69,9 @@ for key in ShowToolbar ShowSidebar ShowStatusBar ShowPathbar; do assert_contains
 detach
 
 # --plain keeps the old undecorated image (no layout, no background).
+# hdiutil create can fail once right after a detach on a busy machine (seen once, no output); one retry keeps the test from flaking.
 out="$(zsh "$ROOT/scripts/make-dmg.sh" --skip-build --plain 2>&1)"; rc=$?
+if (( rc != 0 )); then sleep 3; out="$(zsh "$ROOT/scripts/make-dmg.sh" --skip-build --plain 2>&1)"; rc=$?; fi
 assert_eq "0" "$rc" "make-dmg --plain builds ($out)"
 hdiutil attach -quiet -readonly -nobrowse -noverify -mountpoint "$mnt" "$DIST_DIR/Lintel.dmg" >/dev/null 2>&1
 assert_ok "--plain: the app is in the image" test -d "$mnt/Lintel.app/Contents"
