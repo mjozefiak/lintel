@@ -50,10 +50,11 @@ final class DictationController {
 
     var isBusy: Bool { gesture.state != .idle }
 
-    /// `.recording` while the microphone is captured, `.processing` while the text is produced and pasted.
+    /// `.recording` while the microphone is captured, `.processing` while the text is produced and pasted and
+    /// until the previous clipboard has been put back (or the restore was skipped).
     var busyReason: BusyReason? {
         switch gesture.state {
-        case .idle: nil
+        case .idle: deps.paster.isRestorePending ? .processing : nil
         case .finishing: .processing
         case .pressed, .toggle, .stopPressed: .recording
         }

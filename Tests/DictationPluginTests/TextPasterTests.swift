@@ -108,6 +108,40 @@ final class HookClock: Clock, @unchecked Sendable {
         #expect(rig.clock.sleeps.contains(TextPaster.restoreDelay))
     }
 
+    @Test func theRestoreIsPendingDuringItsDelayAndDoneAfterIt() async {
+        let rig = Rig()
+        defer { rig.pasteboard.release() }
+        rig.pasteboard.setString("before")
+        let paster = rig.paster()
+        #expect(!paster.isRestorePending)
+        var duringDelay: [Bool] = []
+        rig.clock.onSleep { duration in
+            if duration == TextPaster.restoreDelay { duringDelay.append(paster.isRestorePending) }
+        }
+
+        await paster.paste("dictated")
+        #expect(paster.isRestorePending)
+        await paster.pendingRestore?.value
+        #expect(duringDelay == [true])
+        #expect(!paster.isRestorePending)
+        #expect(rig.pasteboard.string() == "before")
+    }
+
+    @Test func aSkippedRestoreIsNotPendingEither() async {
+        let rig = Rig()
+        defer { rig.pasteboard.release() }
+        rig.pasteboard.setString("before")
+        let paster = rig.paster()
+        await paster.paste("dictated")
+        rig.pasteboard.setString("copied meanwhile")
+        await paster.pendingRestore?.value
+        #expect(!paster.isRestorePending)
+        // Nothing to restore: copy-only outcomes and a disabled restore never set it.
+        rig.restore = false
+        await paster.paste("again")
+        #expect(!paster.isRestorePending)
+    }
+
     @Test func withoutAccessibilityTheTextIsOnlyCopiedAndNothingIsRestored() async {
         let rig = Rig()
         defer { rig.pasteboard.release() }
