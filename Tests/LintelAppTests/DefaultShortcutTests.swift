@@ -21,14 +21,16 @@ import Testing
         #expect(ids == ["apps", "files", "clipboard", "dictation", "meetings", "notes", "windows"])
     }
 
-    @Test func meetingsIsOffUntilTheUserTurnsItOn() throws {
+    @Test func meetingsIsOnForANewInstallAndStaysOffForAnOldOneThatNeverTurnedItOn() throws {
         let env = try TestEnvironment()
         defer { env.tearDown() }
-        let host = env.makeHost(PluginRegistry.all)
-        #expect(host.isEnabled("meetings") == false)
-        // The plugin has the command, but a disabled plugin registers none, so ⌃⌥M stays free for other apps.
+        #expect(env.makeHost(PluginRegistry.all).isEnabled("meetings"))
+        let old = try TestEnvironment()
+        defer { old.tearDown() }
+        PluginDefaultsMigration.run(settings: old.settings, isExistingInstall: true)
+        // An old install keeps Meetings off, so ⌃⌥M stays free for other apps there.
+        #expect(old.makeHost(PluginRegistry.all).isEnabled("meetings") == false)
         #expect(try registeredCommands().contains { $0.command.id == "meetings.record" })
-        #expect(!host.activeCommands.contains { $0.id == "meetings.record" })
     }
 
     @Test func everyDefaultShortcutIsUnique() throws {

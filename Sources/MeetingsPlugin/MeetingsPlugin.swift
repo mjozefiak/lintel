@@ -19,7 +19,8 @@ public final class MeetingsPlugin: LintelPlugin {
         displayName: LocalizedStringResource("Meetings", comment: "Plugin name of meeting transcription"),
         symbolName: "person.2.wave.2",
         order: 50,
-        defaultEnabled: false,
+        // The core since the owner decision of 2026-11-24: on for a new install.
+        defaultEnabled: true,
         settingsGroup: .voice,
         summary: LocalizedStringResource(
             "Record meetings, keep notes.", comment: "Settings → Features: what Meetings does")

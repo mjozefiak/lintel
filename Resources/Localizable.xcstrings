@@ -163,6 +163,24 @@
         }
       }
     },
+    "The launcher is off" : {
+      "comment" : "Settings → General banner: no plugin searches",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The launcher is off"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wyszukiwarka jest wyłączona"
+          }
+        }
+      }
+    },
     "Toggle Raw Markdown" : {
       "comment" : "Notes menu: switches the editor between Formatted and Raw",
       "extractionState" : "manual",
@@ -195,6 +213,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Naciśnij %@ ponownie, aby usunąć"
+          }
+        }
+      }
+    },
+    "Turn on Apps, Files or Window Management in Features to use the shortcut." : {
+      "comment" : "Settings → General banner detail: the main shortcut works once a search add-on is on",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Apps, Files or Window Management in Features to use the shortcut."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włącz Aplikacje, Pliki lub Zarządzanie oknami w Funkcjach, aby używać skrótu."
           }
         }
       }
@@ -4033,20 +4069,20 @@
         }
       }
     },
-    "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac." : {
+    "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings." : {
       "comment" : "Welcome screen: text of the first page",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac."
+            "value" : "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Szukaj aplikacji i plików, wklejaj z historii, dyktuj, miej notatki ze spotkań. Wszystko na tym Macu."
+            "value" : "Dyktuj w dowolnej aplikacji i miej notatki ze spotkań, wszystko na tym Macu. Wyszukiwanie, historię schowka i inne dodatki włączysz w Ustawieniach."
           }
         }
       }

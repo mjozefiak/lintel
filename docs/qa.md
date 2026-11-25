@@ -50,6 +50,24 @@ AppKit itself may still write window and status-item state to the app's own defa
 If that domain did not exist before a QA session, remove it afterwards with
 `defaults delete com.lintelapp.Lintel`.
 
+### Which plugins are on
+
+A QA profile is a new install: since 2026-11-24 Dictation, Meetings and Notes are on and Apps, Files, Clipboard and
+Windows are off, so the panel finds nothing and the add-ons' panes are dimmed until they are turned on. The recipes
+below for the launcher, file search and clipboard history start with:
+
+```bash
+ADDONS=(--qa-setting plugins.apps.enabled=true --qa-setting plugins.files.enabled=true
+  --qa-setting plugins.clipboard.enabled=true)
+```
+
+The in-memory settings are new on every run, so a run is a new install even when `--qa-data-root` names a folder that
+an earlier run used. To see what an install from before 2026-11-24 gets (`PluginDefaultsMigration`), keep the settings
+too: run once with `--qa-data-root <folder> --qa-persistent-settings` on a folder that already holds a `ranking.sqlite`
+and no `qa-settings.json`. `<folder>/qa-settings.json` then holds `plugins.apps/files/clipboard.enabled = true`,
+`plugins.dictation/meetings.enabled = false` and `app.pluginDefaultsMigrated = true`, and Settings → Features shows the
+old switches. A stored switch is never changed, and a second run changes nothing.
+
 ## Arguments
 
 | Argument | Since | Effect |
@@ -69,7 +87,7 @@ If that domain did not exist before a QA session, remove it afterwards with
 | `--qa-fail-action` | Phase 1 | With `--qa-panel`: once results load, show the failed-action message for the selected row's first action without running it. |
 | `--qa-confirm-action` | main window 6.2 | With `--qa-panel <list mode>`: once results load, show the "Press ⌃X again to delete" footer of the selected row's delete (the first action with a confirmation) without running it and without the 5 s timeout. |
 | `--qa-spotlight on\|off` | Phase 1 | Pretend Spotlight does or does not hold ⌘Space instead of reading the system's symbolic hotkeys. |
-| `--qa-onboarding-step <step id>` | Phase 2; the welcome screen since Phase 4 | Show the welcome screen on one page: `intro`, `shortcut`, a plugin step such as `clipboard.intro`, or the final page `done` ("You're set", which opens the main window). The welcome screen is the single-column layout of the prototype `shell-welcome-*`. |
+| `--qa-onboarding-step <step id>` | Phase 2; the welcome screen since Phase 4 | Show the welcome screen on one page: `intro`, `shortcut` (only while a plugin that searches is on, such as `--qa-setting plugins.apps.enabled=true`; since 2026-11-24 a new profile has none, and then the main shortcut is not registered at all: Settings → General shows "The launcher is off" and the menu bar's "Open Lintel" shows no shortcut; QA mode never registers shortcuts with the system, so check these two places), a plugin step such as `clipboard.intro`, or the final page `done` ("You're set", which opens the main window). The welcome screen is the single-column layout of the prototype `shell-welcome-*`. |
 | `--qa-pasteboard-access allow\|default\|ask\|deny` | Phase 2 | The pasteboard access behaviour plugins see (`NSPasteboard.accessBehavior`), for the clipboard's permission banners. |
 | `--qa-accessibility granted\|denied` | Phase 2 | The Accessibility status plugins see. Without it the real status is read, never changed. |
 | `--qa-full-disk-access granted\|denied` | Phase 3 | The Full Disk Access status plugins see (default `denied` in QA mode). Never read from, or changed in, the system. |
@@ -121,16 +139,16 @@ never shows which apps (for example which password manager) the tester has insta
 when capturing the Clipboard History settings pane.
 
 ```bash
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting plugins.clipboard.qaSeed=demo \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting plugins.clipboard.qaSeed=demo \
   --qa-accessibility granted --qa-panel clipboard --qa-appearance light
 # Recording paused, Accessibility missing, access set to ask:
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting plugins.clipboard.qaSeed=demo \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting plugins.clipboard.qaSeed=demo \
   --qa-setting plugins.clipboard.paused=true --qa-accessibility denied --qa-pasteboard-access ask \
   --qa-panel clipboard
 # Empty history, settings pane, onboarding step:
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-accessibility granted --qa-panel clipboard
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting plugins.clipboard.qaSeed=demo --qa-settings clipboard
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-onboarding-step clipboard.intro
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-accessibility granted --qa-panel clipboard
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting plugins.clipboard.qaSeed=demo --qa-settings clipboard
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-onboarding-step clipboard.intro
 ```
 
 Pasting (Return posts ⌘V into the previous app) needs Accessibility and a real target app, so it is a
@@ -147,7 +165,7 @@ mkdir -p "$FIXTURES/Notes Demo.app/Contents"
 plutil -create xml1 "$FIXTURES/Notes Demo.app/Contents/Info.plist"
 plutil -insert CFBundleIdentifier -string com.example.notes "$FIXTURES/Notes Demo.app/Contents/Info.plist"
 # … more bundles …
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" \
   --qa-setting "plugins.apps.roots=$FIXTURES" --qa-setting plugins.apps.spotlight=false \
   --qa-record-use apps:com.example.notes --qa-panel search --qa-query no --qa-appearance dark
 ```
@@ -173,7 +191,7 @@ for app in Mail:com.example.mail Notes:com.example.notes Maps:com.example.maps M
   plutil -create xml1 "$FIX/${app%%:*} Demo.app/Contents/Info.plist"
   plutil -insert CFBundleIdentifier -string "${app#*:}" "$FIX/${app%%:*} Demo.app/Contents/Info.plist"
 done
-COMMON=(--qa --qa-setting "plugins.apps.roots=$FIX" --qa-setting plugins.apps.spotlight=false
+COMMON=(--qa "${ADDONS[@]}" --qa-setting "plugins.apps.roots=$FIX" --qa-setting plugins.apps.spotlight=false
   --qa-activity com.example.mail=5 --qa-activity com.example.notes=3 --qa-activity com.example.maps)
 # The empty panel with "Suggested" (⌘1–⌘3 open the rows, ⌃X hides the selected one):
 dist/Lintel-QA.app/Contents/MacOS/Lintel-QA "${COMMON[@]}" --qa-panel search --qa-appearance dark
@@ -208,15 +226,15 @@ FIX=/tmp/lintel-p3-qa
 mkdir -p "$FIX/home/Projects/Website" "$FIX/home/Desktop" "$FIX/home/Documents" "$FIX/apps"
 touch "$FIX/home/Projects/Quarterly Report.txt" "$FIX/home/Projects/Website/notes.txt" \
   "$FIX/home/Desktop/desk-plan.txt" "$FIX/home/Documents/tax-form.txt"
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" \
   --qa-setting "plugins.files.qaHome=$FIX/home" --qa-setting "plugins.files.roots=$FIX/home" \
   --qa-setting plugins.files.setupCompleted=true --qa-full-disk-access denied \
   --qa-setting "plugins.apps.roots=$FIX/apps" --qa-setting plugins.apps.spotlight=false \
   --qa-panel search --qa-query report
 # The Full Disk Access onboarding step and the Files settings pane:
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting "plugins.files.qaHome=$FIX/home" \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting "plugins.files.qaHome=$FIX/home" \
   --qa-onboarding-step files.fullDiskAccess
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-setting "plugins.files.qaHome=$FIX/home" \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" --qa-setting "plugins.files.qaHome=$FIX/home" \
   --qa-setting plugins.files.setupCompleted=true --qa-settings files
 ```
 
@@ -235,7 +253,7 @@ folders (file path search spec). In QA mode `~` is the fake home, so build the f
 mkdir -p "$FIX/home/Projects/ng/.ai/runs/2026-10-27-qa-fixes/screenshots" "$FIX/home/Documents/Invoices"
 touch "$FIX/home/Projects/ng/.ai/runs/2026-10-27-qa-fixes/plan.txt" \
   "$FIX/home/Projects/ng/.ai/runs/2026-10-27-qa-fixes/.hidden.txt" "$FIX/home/Documents/Invoices/march.txt"
-dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa "${ADDONS[@]}" \
   --qa-setting "plugins.files.qaHome=$FIX/home" --qa-setting "plugins.files.roots=$FIX/home" \
   --qa-setting plugins.files.setupCompleted=true --qa-full-disk-access denied \
   --qa-panel search --qa-query "~/Projects/ng/.ai/runs/2026-10-27-qa-fixes/"
@@ -259,7 +277,7 @@ unless a button is clicked.
 
 ```bash
 FIX=/tmp/lintel-p4-qa; mkdir -p "$FIX/home" "$FIX/apps"
-COMMON=(--qa --qa-setting "plugins.files.qaHome=$FIX/home" --qa-setting "plugins.files.roots=$FIX/home"
+COMMON=(--qa "${ADDONS[@]}" --qa-setting "plugins.files.qaHome=$FIX/home" --qa-setting "plugins.files.roots=$FIX/home"
   --qa-setting "plugins.apps.roots=$FIX/apps" --qa-setting plugins.apps.spotlight=false
   --qa-setting plugins.clipboard.qaSeed=demo --qa-spotlight off)
 # The welcome screen, from the first page or on one page:
@@ -349,7 +367,7 @@ Needs a real Keychain and the app built by `scripts/make-app.sh` (not `--qa`, wh
 
 ### Dictation vocabulary panel (DICT-1.2, part A of the mockup)
 
-Settings → Dictation → Vocabulary sits between Basics and Advanced. In a `--qa` run Dictation is off by default and the
+Settings → Dictation → Vocabulary sits between Basics and Advanced. In a `--qa` run Dictation is on (since 2026-11-24) and the
 vocabulary file is the QA run's own, so seed it with the DEBUG key `plugins.dictation.qaVocabulary=<state>` (not a
 contract; invented terms only, the seed file is rewritten at every launch):
 
@@ -435,7 +453,7 @@ isolates the Keychain; audio permissions are per app, not per `--qa` data folder
 
 ## Meetings (Phase 1)
 
-The plugin is off by default: turn it on with `--qa-setting plugins.meetings.enabled=true`, or in Settings → Features.
+The plugin is on by default since 2026-11-24 (the recipes below still pass `--qa-setting plugins.meetings.enabled=true`, which changes nothing).
 The Keychain is the in-memory one in QA mode, so the library key never reaches the real Keychain, and the data root is
 fresh unless `--qa-data-root` is given. Real capture is never started in QA mode: the audio comes from WAV files.
 
