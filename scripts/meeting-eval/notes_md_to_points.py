@@ -74,7 +74,10 @@ def main(argv=None):
         return 2
     result = build(markdown, args.meeting)
     out = args.out or os.path.splitext(args.notes)[0] + ".points.json"
-    with open(out, "w", encoding="utf-8") as handle:
+    # The file holds note text: owner-only, like the notes file it comes from.
+    descriptor = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(descriptor, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(result, handle, ensure_ascii=False, indent=1)
     counts = {}
     for point in result["points"]:

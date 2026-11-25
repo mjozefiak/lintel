@@ -122,6 +122,12 @@ class MarkdownToPointsTests(unittest.TestCase):
             self.assertIn("points=6", buffer.getvalue())
             with open(out, encoding="utf-8") as handle:
                 self.assertEqual(json.load(handle)["schema"], 1)
+            # The file holds note text: owner-only, also when it already existed with wider rights.
+            self.assertEqual(os.stat(out).st_mode & 0o777, 0o600)
+            os.chmod(out, 0o644)
+            with contextlib.redirect_stdout(io.StringIO()):
+                tool.main(["--notes", path, "--meeting", "demo", "--out", out])
+            self.assertEqual(os.stat(out).st_mode & 0o777, 0o600)
 
     def test_missing_file_is_a_usage_error(self):
         self.assertEqual(tool.main(["--notes", "/nonexistent/x.md", "--meeting", "m"]), 2)

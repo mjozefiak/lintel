@@ -61,6 +61,15 @@ class StructureTests(unittest.TestCase):
         res = result(topic("A", 3) + topic("B", 3) + topic("Inne", 1), minutes=40)
         self.assertEqual(failed(res), [])
 
+    def test_other_comes_on_top_of_the_limit(self):
+        # 38 minutes: limit 6; six named topics plus "Other" is conforming.
+        res = result("".join(topic("T%d" % i, 2) for i in range(6)) + topic("Inne", 2), minutes=38)
+        self.assertEqual(failed(res), [])
+
+    def test_a_long_meeting_cannot_be_one_flat_list(self):
+        flat = "Intro.\n\n" + "".join("- point %d.\n" % i for i in range(20))
+        self.assertEqual(failed(result(flat, minutes=40)), ["no_headingless_points"])
+
     def test_a_short_meeting_has_no_topic_headings(self):
         flat = "Krótka rozmowa o kurierze.\n\n- one.\n- two.\n- three.\n"
         self.assertEqual(failed(result(flat, minutes=8)), [])

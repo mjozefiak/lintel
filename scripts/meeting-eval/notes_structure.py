@@ -11,7 +11,8 @@ Prints rule names, pass/fail and numbers only, never note text. Exit code: 0 eve
 trace or the draft, which this tool does not see): the section must then be present.
 
 Rules (spec "Plan pomiaru", metric 3):
-  topics_within_max      number of topic headings <= min(10, max(2, minutes // 6)); a short meeting has none
+  no_headingless_points  a meeting that is not short has no list of points outside every heading
+  topics_within_max      number of named topic headings ("Other" is extra) <= min(10, max(2, minutes // 6)); a short meeting has none
   points_per_topic       2..6 points under each topic heading ("Other" 1..6), unless the meeting is short
   decisions_section      a decisions section exists when --expect-decisions
   next_steps_section     a next-steps section exists when --expect-next-steps
@@ -80,6 +81,9 @@ def analyse(markdown, minutes, lang, expect_decisions=False, expect_next_steps=F
     for s in doc.sections:
         if s.kind in ("topic", "other", "topics"):
             flat_points += len(_points_of(s))
+    # Points that stand under no heading at all (a flat list after the intro).
+    headingless = sum(1 for s in doc.of_kind("intro") for i in s.items if i.bullet and i.depth == 0)
+    flat_points += headingless
     intro_items = [i for s in doc.of_kind("intro", "summary") for i in s.items if not i.bullet]
     short = minutes < SHORT_MINUTES or flat_points < SHORT_POINTS
     rules = []
@@ -88,10 +92,14 @@ def analyse(markdown, minutes, lang, expect_decisions=False, expect_next_steps=F
         rules.append({"rule": name, "pass": bool(ok), "value": value, "limit": limit})
 
     limit = max_topics(minutes)
+    named = [s for s in topics if s.kind == "topic"]
     if short:
         rule("topics_within_max", len(topics) == 0, len(topics), 0)
+        rule("no_headingless_points", True, headingless, None)
     else:
-        rule("topics_within_max", len(topics) <= limit, len(topics), limit)
+        # "Other" comes on top of the limit (spec: at most `maxTopics` topics, plus the closing "Other").
+        rule("topics_within_max", len(named) <= limit, len(named), limit)
+        rule("no_headingless_points", headingless == 0, headingless, 0)
     if short:
         rule("points_per_topic", True, 0, None)
     else:
