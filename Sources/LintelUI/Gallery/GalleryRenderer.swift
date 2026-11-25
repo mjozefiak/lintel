@@ -85,6 +85,8 @@ import SwiftUI
         guard let latest, latest.pixelsWide > 0, latest.pixelsHigh > 0 else {
             throw GalleryError.emptyRender(state.id)
         }
+        // An unsettled picture is never returned as if it were a golden.
+        guard stableRenders >= 2 else { throw GalleryError.didNotSettle(state.id) }
         return latest
     }
 
@@ -111,7 +113,7 @@ import SwiftUI
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.005))
     }
 
-    /// An sRGB bitmap of exactly `scale` pixels per point: `cacheDisplay` draws the view scaled into it, so the
+    /// A bitmap of exactly `scale` pixels per point (retagged sRGB where it is written or compared, `GalleryPixels`): `cacheDisplay` draws the view scaled into it, so the
     /// picture does not depend on the backing scale of the machine's displays (a CI VM may report 1).
     private static func makeBitmap(size: NSSize) throws -> NSBitmapImageRep {
         let pixelsWide = Int((size.width * scale).rounded(.up))

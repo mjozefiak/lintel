@@ -29,30 +29,53 @@ struct GalleryScenesTests {
         }
     }
 
-    @Test("every state draws something, and none of them reaches the real system")
+    /// A state that is empty on purpose: Local with notes off hides the whole section.
+    private static let emptyOnPurpose: Set<String> = ["local-notes-off"]
+
+    private static func hasContent(_ bitmap: NSBitmapImageRep) -> Bool {
+        guard let data = bitmap.bitmapData else { return false }
+        let count = bitmap.pixelsWide * bitmap.pixelsHigh
+        var distinct = Set<UInt32>()
+        for index in stride(from: 0, to: count, by: 7) {
+            let base = index * 4
+            distinct.insert(UInt32(data[base]) << 16 | UInt32(data[base + 1]) << 8 | UInt32(data[base + 2]))
+            if distinct.count > 8 { return true }
+        }
+        return false
+    }
+
+    @Test("every state draws real content in both CI appearances, and none of them reaches the real system")
     func everyStateDrawsWithoutTheRealSystem() async throws {
         MeetingsSystem.installQuiet()
         for scene in GalleryTestSupport.scenes {
             for state in scene.states {
-                let bitmap = try await GalleryRenderer.render(state, Self.lightM)
-                #expect(bitmap.pixelsWide > 0 && bitmap.pixelsHigh > 0, "\(state.id) is empty")
+                for variant in state.variants where variant.language == "en" {
+                    let bitmap = try await GalleryRenderer.render(state, variant)
+                    #expect(bitmap.pixelsWide > 0 && bitmap.pixelsHigh > 0, "\(state.id) is empty")
+                    if !Self.emptyOnPurpose.contains(state.id) {
+                        #expect(Self.hasContent(bitmap), "\(state.id) \(variant.name) drew a blank picture")
+                    }
+                }
             }
         }
         #expect(MeetingsSystem.liveUses.isEmpty, "a gallery scene built the real \(MeetingsSystem.liveUses.sorted())")
     }
 
-    @Test("a state is made fresh each time, so a render never sees an earlier state's models")
+    @Test("a state is made fresh each time: in another order every picture is exactly the same")
     func statesAreIndependent() async throws {
-        let scene = try #require(GalleryTestSupport.scenes.first)
-        let state = try #require(scene.states.first { $0.id == "ready-sonnet" })
-        let first = try await GalleryRenderer.render(state, Self.lightM)
-        let second = try await GalleryRenderer.render(state, Self.lightM)
-        let (result, _) = GalleryDiff.compare(first, second)
-        #expect(result.passes(shareLimit: 0))
+        let states = try #require(GalleryTestSupport.scenes.first).states
+        var first: [String: NSBitmapImageRep] = [:]
+        for state in states { first[state.id] = try await GalleryRenderer.render(state, Self.lightM) }
+        for state in states.reversed() {
+            let again = try await GalleryRenderer.render(state, Self.lightM)
+            let (result, _) = GalleryDiff.compare(try #require(first[state.id]), again)
+            #expect(result.passes(shareLimit: 0), "\(state.id) differs after the other states were drawn")
+        }
     }
 
     @Test("the fake notes control counts calls and holds no data of its own")
     func theControlCounts() async {
+        MeetingsSystem.installQuiet()
         let control = GalleryNotesControl(jobRunning: true)
         #expect(control.isBusy)
         await control.refreshAvailability()
@@ -61,6 +84,8 @@ struct GalleryScenesTests {
         control.writeOnThisMac(1)
         #expect(control.calls == ["refreshAvailability", "selectionChanged", "regenerate", "writeOnThisMac"])
         #expect(!GalleryNotesControl().isBusy)
+        #expect(
+            MeetingsSystem.liveUses.isEmpty, "the fake control reached the real \(MeetingsSystem.liveUses.sorted())")
     }
 
     @Test("a provider chosen in a state shows the notice; Local with notes off shows nothing")

@@ -43,7 +43,9 @@ for language in en pl; do
     -AppleLanguages "($language)" -AppleLocale "$language"
 done
 
-# The contact sheet: relative image paths only, nothing loaded from outside.
+# The contact sheet: relative image paths only, nothing loaded from outside. Each state shows its summary (what the
+# owner approves) and its caveat (what the picture does not show), written next to the pictures by the export.
+esc() { print -rn -- "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 INDEX="$OUT/index.html"
 {
   print -r -- '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
@@ -51,6 +53,7 @@ INDEX="$OUT/index.html"
   print -r -- 'body{font:14px -apple-system,sans-serif;margin:24px;background:#f5f5f5;color:#111}'
   print -r -- 'h2{margin:32px 0 4px}h3{margin:20px 0 6px;font:600 13px ui-monospace,monospace}'
   print -r -- '.row{display:flex;flex-wrap:wrap;gap:12px}figure{margin:0}figcaption{font:11px ui-monospace,monospace;color:#555}'
+  print -r -- 'p.s{margin:0 0 6px}p.c{margin:0 0 6px;color:#a15c00;font-size:12px}'
   print -r -- 'img{max-width:420px;border:1px solid #ccc;background:#fff}'
   print -r -- '@media (prefers-color-scheme:dark){body{background:#1c1c1e;color:#eee}img{border-color:#444}figcaption{color:#aaa}}'
   print -r -- '</style></head><body><h1>Lintel design gallery</h1>'
@@ -59,7 +62,10 @@ INDEX="$OUT/index.html"
     print -r -- "<h2>${scene}</h2>"
     for state_dir in "$scene_dir"/*(/N); do
       state="${state_dir:t}"
-      print -r -- "<h3>${state}</h3><div class=\"row\">"
+      print -r -- "<h3>${state}</h3>"
+      [[ -f "$state_dir/summary.txt" ]] && print -r -- "<p class=\"s\">$(esc "$(<"$state_dir/summary.txt")")</p>"
+      [[ -s "$state_dir/caveat.txt" ]] && print -r -- "<p class=\"c\">$(esc "$(<"$state_dir/caveat.txt")")</p>"
+      print -r -- '<div class="row">'
       for png in "$state_dir"/*.png(N); do
         variant="${png:t:r}"
         print -r -- "<figure><img loading=\"lazy\" src=\"${scene}/${state}/${png:t}\" alt=\"${scene} ${state} ${variant}\"><figcaption>${variant}</figcaption></figure>"

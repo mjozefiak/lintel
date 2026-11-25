@@ -173,6 +173,9 @@ public enum GalleryError: Error, Equatable, CustomStringConvertible {
     case languageMismatch(state: String, variant: String, process: String)
     /// The bitmap could not be made or written.
     case bitmap(String)
+    /// Two renders in a row never came out the same within the settle limit (an animation that does not stop, a task
+    /// that keeps changing the view): the picture would not be a golden.
+    case didNotSettle(String)
 
     public var description: String {
         switch self {
@@ -180,6 +183,7 @@ public enum GalleryError: Error, Equatable, CustomStringConvertible {
         case .languageMismatch(let state, let variant, let process):
             "gallery state \(state): variant \(variant) is not drawn in this process (language \(process))"
         case .bitmap(let message): "gallery bitmap: \(message)"
+        case .didNotSettle(let id): "gallery state \(id) did not settle: two renders in a row never matched"
         }
     }
 }

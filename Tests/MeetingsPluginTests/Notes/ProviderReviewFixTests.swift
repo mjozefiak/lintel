@@ -27,13 +27,17 @@ import Testing
         #expect(!ProviderChoiceModel.surfacesProvider(notesEnabled: false, isLocal: true))
         // The pane shows the sections through `NotesWrittenBySections`, which decides through `surfacesProvider` (the
         // same view the design gallery draws); the banner decides in `MeetingsPlugin+Status`.
-        for file in [
-            "Sources/MeetingsPlugin/Notes/ProviderChoiceViews.swift",
-            "Sources/MeetingsPlugin/MeetingsPlugin+Status.swift",
-        ] {
-            let source = try String(contentsOf: Self.root.appending(path: file), encoding: .utf8)
-            #expect(source.contains("surfacesProvider("), "\(file) must decide through surfacesProvider")
-        }
+        let views = try String(
+            contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/Notes/ProviderChoiceViews.swift"),
+            encoding: .utf8)
+        let sections = try #require(views.range(of: "struct NotesWrittenBySections"), "NotesWrittenBySections is gone")
+        #expect(
+            views[sections.upperBound...].contains("surfacesProvider("),
+            "NotesWrittenBySections must decide through surfacesProvider")
+        let status = try String(
+            contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/MeetingsPlugin+Status.swift"),
+            encoding: .utf8)
+        #expect(status.contains("surfacesProvider("), "MeetingsPlugin+Status must decide through surfacesProvider")
         let pane = try String(
             contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/UI/MeetingsSettingsPane.swift"),
             encoding: .utf8)

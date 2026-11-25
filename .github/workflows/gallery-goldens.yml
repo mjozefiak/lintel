@@ -9,12 +9,6 @@ name: Gallery goldens
 # section and `needs-qa`; nobody records new goldens just to make a test pass.
 
 on:
-  # TEMPORARY (bootstrap of the PR that adds this workflow, removed before merge): GitHub offers workflow_dispatch only
-  # for a workflow that already exists on the default branch, so the first goldens of this branch are recorded by a push
-  # that touches this file.
-  push:
-    branches: [feat/swiftui-gallery-f1]
-    paths: [.github/workflows/gallery-goldens.yml]
   workflow_dispatch:
     inputs:
       scene:
@@ -55,32 +49,27 @@ jobs:
           xcodebuild -version
           sw_vers
 
-      - name: Build
-        timeout-minutes: 12
-        run: swift build
-
-      # English: through `swift test`, the same mechanism that compares (GallerySnapshotTests).
-      - name: Record English goldens
-        timeout-minutes: 8
-        env:
-          LINTEL_SNAPSHOTS: record
-          LINTEL_GALLERY_RUN: ${{ github.run_id }}
-        run: swift test --filter GallerySnapshotTests
-
-      # Polish: from the app bundle with -AppleLanguages "(pl)" (Q11), then the full matrix of both languages.
-      - name: Record Polish goldens and export the full matrix
-        timeout-minutes: 12
+      # Both languages come from the app bundle, the build the owner approves and CI compares (the accent colour and the
+      # compiled string catalog are only there); the language is a property of the process (Q11).
+      - name: Record the goldens and export the full matrix
+        timeout-minutes: 20
         env:
           LINTEL_GALLERY_RUN: ${{ github.run_id }}
+          SCENE: ${{ inputs.scene }}
         run: |
           set -euo pipefail
           CONFIGURATION=debug scripts/make-app.sh
           app="dist/Lintel-QA.app/Contents/MacOS/Lintel-QA"
           goldens="Tests/MeetingsPluginTests/Gallery/Goldens"
-          "$app" --qa --qa-gallery-record "$goldens" --qa-gallery-language pl -AppleLanguages "(pl)" -AppleLocale pl
-          scene_args=()
-          if [ -n "${{ inputs.scene }}" ]; then scene_args=(--scene "${{ inputs.scene }}"); fi
-          scripts/gallery-export.sh "$RUNNER_TEMP/gallery-sheet" --no-build "${scene_args[@]}"
+          for language in en pl; do
+            "$app" --qa --qa-gallery-record "$goldens" --qa-gallery-language "$language" \
+              -AppleLanguages "($language)" -AppleLocale "$language"
+          done
+          if [ -n "$SCENE" ]; then
+            scripts/gallery-export.sh "$RUNNER_TEMP/gallery-sheet" --no-build --scene "$SCENE"
+          else
+            scripts/gallery-export.sh "$RUNNER_TEMP/gallery-sheet" --no-build
+          fi
 
       - name: Collect
         run: |

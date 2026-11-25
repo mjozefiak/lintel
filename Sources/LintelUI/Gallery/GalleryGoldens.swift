@@ -75,10 +75,16 @@ public struct GalleryGoldenManifest: Codable, Equatable, Sendable {
         let current = GalleryFingerprint.current
         let manifest = loadManifest(in: directory)
         if let artifacts { writeFingerprint(current, to: artifacts) }
-        if let manifest, !ignoringFingerprint, let reason = manifest.fingerprint.mismatch(comparedTo: current) {
-            report.notCompared =
-                "renderer fingerprint changed (\(reason)): run gallery-goldens.yml and record the goldens again"
-            return report
+        if !ignoringFingerprint {
+            guard let manifest else {
+                report.notCompared = "no \(manifestName) in \(directory.lastPathComponent): run gallery-goldens.yml"
+                return report
+            }
+            if let reason = manifest.fingerprint.mismatch(comparedTo: current) {
+                report.notCompared =
+                    "renderer fingerprint changed (\(reason)): run gallery-goldens.yml and record the goldens again"
+                return report
+            }
         }
         let channel = UInt8(clamping: manifest?.threshold.channel ?? Int(GalleryDiff.defaultChannelTolerance))
         let share = manifest?.threshold.share ?? GalleryDiff.defaultShareLimit
@@ -141,7 +147,10 @@ public struct GalleryGoldenManifest: Codable, Equatable, Sendable {
         if let runID { next.recordRun = runID }
         let suffix = "-\(language).png"
         let wanted = expectedFiles(scenes, language: language)
-        for stale in next.files.keys where stale.hasSuffix(suffix) && !wanted.contains(stale) {
+        // Only the scenes being recorded are tidied: recording one scene (`--qa-gallery-scene`) keeps the others.
+        let recordedScenes = Set(scenes.map { "\($0.id)/" })
+        for stale in next.files.keys
+        where stale.hasSuffix(suffix) && !wanted.contains(stale) && recordedScenes.contains(where: stale.hasPrefix) {
             next.files[stale] = nil
             try? fileManager.removeItem(at: directory.appending(path: stale))
         }

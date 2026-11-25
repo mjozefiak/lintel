@@ -54,41 +54,6 @@ jobs:
         timeout-minutes: 16
         run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test
 
-      # The design gallery's golden images (spec 2026-11-23-swiftui-design-gallery). Straight after "Test", before the
-      # TSan steps: those build with other flags, so a step after them would build everything again. It is the same build
-      # (English pictures: `swift test` runs in the test runner's bundle). A change of the renderer fingerprint (macOS
-      # build, Xcode) fails here on every open PR until the goldens are recorded again (gallery-goldens.yml).
-      - name: Gallery snapshots
-        timeout-minutes: 4
-        env:
-          LINTEL_SNAPSHOTS: compare
-          LINTEL_SNAPSHOT_ARTIFACTS: ${{ runner.temp }}/gallery-diffs
-        run: |
-          echo "LINTEL_GALLERY_XCODE=$(xcodebuild -version | tr '\n' ' ')" >> "$GITHUB_ENV"
-          LINTEL_GALLERY_XCODE="$(xcodebuild -version | tr '\n' ' ')" \
-            scripts/test-with-watchdog.sh --limit 200 --name gallery -- swift test --filter GallerySnapshotTests
-
-      # Polish pictures need the compiled string catalog, which only the app bundle has (Q11).
-      - name: Gallery snapshots (pl)
-        timeout-minutes: 6
-        env:
-          LINTEL_SNAPSHOT_ARTIFACTS: ${{ runner.temp }}/gallery-diffs
-        run: |
-          CONFIGURATION=debug scripts/make-app.sh
-          dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
-            --qa-gallery-compare Tests/MeetingsPluginTests/Gallery/Goldens --qa-gallery-language pl \
-            -AppleLanguages "(pl)" -AppleLocale pl
-
-      # `actual.png`, `diff.png` and `fingerprint.json` of the pictures that differ, only on a failure.
-      - name: Upload gallery diffs
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: gallery-diffs
-          path: ${{ runner.temp }}/gallery-diffs
-          if-no-files-found: ignore
-          retention-days: 14
-
       - name: Test PluginHost under Thread Sanitizer
         timeout-minutes: 17
         run: scripts/test-with-watchdog.sh --limit 900 --name tsan-pluginhost -- swift test --sanitize=thread --filter "PluginHostTests|RecoveryOrderingTests|PluginServicesTests"
@@ -121,6 +86,38 @@ jobs:
       - name: Format lint
         timeout-minutes: 3
         run: swift format lint --strict -r Sources Tests
+
+      # The design gallery's golden images (spec 2026-11-23-swiftui-design-gallery). Last, so that a red gallery never
+      # hides the Thread Sanitizer steps or the lint. Both languages come from the app bundle, the build the owner
+      # approves (it has the accent colour and the compiled string catalog that `swift test` lacks); the language is
+      # a property of the process (`-AppleLanguages`). A change of the renderer fingerprint (macOS build, Xcode) fails
+      # here on every open PR until the goldens are recorded again (gallery-goldens.yml).
+      - name: Gallery snapshots
+        timeout-minutes: 8
+        env:
+          LINTEL_SNAPSHOT_ARTIFACTS: ${{ runner.temp }}/gallery-diffs
+        run: |
+          set -euo pipefail
+          LINTEL_GALLERY_XCODE="$(xcodebuild -version | tr '\n' ' ')"
+          export LINTEL_GALLERY_XCODE
+          CONFIGURATION=debug scripts/make-app.sh
+          status=0
+          for language in en pl; do
+            dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+              --qa-gallery-compare Tests/MeetingsPluginTests/Gallery/Goldens --qa-gallery-language "$language" \
+              -AppleLanguages "($language)" -AppleLocale "$language" || status=1
+          done
+          exit "$status"
+
+      # `actual.png`, `diff.png` and `fingerprint.json` of the pictures that differ, only on a failure.
+      - name: Upload gallery diffs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gallery-diffs
+          path: ${{ runner.temp }}/gallery-diffs
+          if-no-files-found: ignore
+          retention-days: 14
 
       # A hung test run leaves stack samples and the names of the unfinished tests here (never test output).
       - name: Upload watchdog diagnostics

@@ -34,7 +34,7 @@ import LintelUI
 
 /// `--qa-gallery-export`, `--qa-gallery-compare` and `--qa-gallery-record`: draw and quit, with a nonzero exit code when
 /// something differs or fails. Nothing of the app starts (no plugin, no data root, no window); the same
-/// `GalleryRenderer` and `GalleryGoldens` the plugins' tests use do the work. Never logs more than state names.
+/// `GalleryRenderer` and `GalleryGoldens` the plugins' tests use do the work. Logs only state names and counts.
 @MainActor enum GalleryBatch {
     /// The language the batch draws: the one asked for, which must be the language of this process.
     static func language(_ options: QAOptions) -> Result<String, GalleryBatchError> {
@@ -63,7 +63,7 @@ import LintelUI
         do {
             if let folder = options.galleryExport {
                 let count = try await export(scenes, language: language, to: folder)
-                report("exported \(count) pictures (\(language)) to \(folder.path)")
+                report("exported \(count) pictures (\(language))")
                 return EX_OK
             }
             if let folder = options.galleryRecord {
@@ -98,10 +98,14 @@ import LintelUI
         var count = 0
         for scene in scenes {
             for state in scene.states {
+                let directory = folder.appending(path: "\(scene.id)/\(state.id)", directoryHint: .isDirectory)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                // What the owner approves, next to the pictures: the contact sheet shows it (spec: `summary`).
+                try Data(state.summary.utf8).write(to: directory.appending(path: "summary.txt"))
+                let caveat = state.presentation.caveat ?? ""
+                try Data(caveat.utf8).write(to: directory.appending(path: "caveat.txt"))
                 for variant in GalleryVariant.fullMatrix where variant.language == language {
                     let bitmap = try await GalleryRenderer.render(state, variant)
-                    let directory = folder.appending(path: "\(scene.id)/\(state.id)", directoryHint: .isDirectory)
-                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                     try GalleryRenderer.pngData(bitmap).write(to: directory.appending(path: "\(variant.name).png"))
                     count += 1
                 }
