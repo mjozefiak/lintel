@@ -6,11 +6,13 @@
 >
 > Work in flight that this spec builds on and does not repeat: branch `feat/dictation-cleanup-fidelity` (D1 offline measurement tool `scripts/dictation-eval/`, D2 `CleanupPrompt` v2 and the number check in `FormatterGuard`). **This spec assumes CleanupPrompt v2 is the Standard level.**
 >
+> **Scope addition (owner, 2026-11-25):** dictation tidying can also run on an **external AI provider** (today only meeting notes use Claude Code, `Sources/LintelProviders/`). This spec treats **where it runs** (built-in / my server / AI provider) and **how much it tidies** (level) as two independent dimensions of one setting. It does not repeat the providers spec (`.ai/specs/2026-11-10-external-ai-providers.md`, version of 2026-11-19 on `main`); section "Source: external AI provider" lists only what dictation adds or changes.
+>
 > All example sentences in this file are invented. None comes from a real dictation.
 
 ## 📝 TLDR
 
-Today dictation has one switch, "Clean up text" (`plugins.dictation.mode` = `raw` / `cleanup`): either the raw transcript, or one fixed cleanup by a language model. The owner asked (2026-11-25) for selectable strength, as in Wispr Flow. **Proposed:** the switch becomes one choice, **"Tidy up my text: Off · Light · Standard · Full"**. Light runs **without a language model** (filler words out, spacing and capitals fixed, nothing else) at raw speed (≈ 0.13 s); Standard is today's cleanup with prompt v2 (self-corrections and spoken lists); Full adds email layout (greeting, paragraphs, sign-off on their own lines) and light style edits. At every level numbers, names and details stay as dictated, and a guard returns the raw chunk when they do not. A new additive key `plugins.dictation.cleanupLevel` carries the level; `plugins.dictation.mode` keeps its meaning (on/off), so nothing migrates and an older build keeps working. Three code PRs, after the D1+D2 PR.
+Today dictation has one switch, "Clean up text" (`plugins.dictation.mode` = `raw` / `cleanup`): either the raw transcript, or one fixed cleanup by a language model. The owner asked (2026-11-25) for selectable strength, as in Wispr Flow. **Proposed:** the switch becomes one choice, **"Tidy up my text: Off · Light · Standard · Full"**. Light runs **without a language model** (filler words out, spacing and capitals fixed, nothing else) at raw speed (≈ 0.13 s); Standard is today's cleanup with prompt v2 (self-corrections and spoken lists); Full adds email layout (greeting, paragraphs, sign-off on their own lines) and light style edits. At every level numbers, names and details stay as dictated, and a guard returns the raw chunk when they do not. A new additive key `plugins.dictation.cleanupLevel` carries the level; `plugins.dictation.mode` keeps its meaning (on/off), so nothing migrates and an older build keeps working. A second, independent choice says where Standard and Full run: **This Mac** (built-in model), **My server**, or the **AI provider** (Claude Code, as for meeting notes). The provider is held to a latency limit measured from key release (default 2 s at Standard); past it the raw text is pasted. It is offered only at the levels where offline measurement shows it fits, expected Full only. Five code PRs, after the D1+D2 PR.
 
 ## 📝 Problem Statement
 
@@ -47,6 +49,33 @@ Invariants at **every** level (from the owner's proposal):
 - **Light as a model pass with a "change nothing else" prompt.** Rejected as the default: it costs ≈ 0.5–0.75 s for an edit a word list does, needs a downloaded model, and the benchmark shows the model is what changes words. A later owner decision (A3) may add a model pass to Light only for transcripts the rules cannot fix, and only if Phase 1 data says so.
 - **A free-text "custom instructions" field.** Not doing: it removes the guarantees above and breaks the foolproof rules (R4, R6 of #247).
 
+## 📝 Source × level: two dimensions of one setting
+
+| | Off | Light | Standard | Full |
+|---|---|---|---|---|
+| **This Mac** (built-in, `llmSource = builtIn`) | raw | rules | built-in model | built-in model |
+| **My server** (`llmSource = server`) | raw | rules | user's server | user's server |
+| **AI provider** (`llmSource = provider`, new value) | raw | rules | provider **if the Standard gate is open**, else the local fallback below | provider |
+
+- **Two keys, one each:** `plugins.dictation.cleanupLevel` (level) and `plugins.dictation.llmSource` (source). Changing one never changes the other. Off and Light never use a source, so choosing a source has no effect on them and the Light help line says "Runs on this Mac." / „Działa na tym Macu.”.
+- **The provider gate per level** (`ProviderLevels.offered`, a compile-time constant set from the measurement in Phase 4, expected `[.full]`). When the source is the provider and the level is not offered, the level runs on the **local fallback**: the built-in model when it is installed, otherwise the user's server when one is set, otherwise raw. The row says so in words (UI below), so nothing is silent.
+- **Latency limit from key release** (provider only): Standard 2 s, Full 6 s (Resolved assumptions A10, A11). At key release the session waits for the chunks still out at the provider until the limit. Every chunk not back by then is pasted **raw**, and the HUD shows "Pasted without tidying, Claude was too slow" / „Wklejono bez porządkowania, Claude odpowiadał za wolno” (new `FallbackReason.tooSlow`). Chunks that finished during the recording keep their tidied text, which is today's per-chunk `partial` rule. The existing per-chunk timeout (5 s + 0.2 s/word) still applies during the recording. The built-in model and the user's server keep today's timeouts and get no new limit.
+
+## 📝 Source: external AI provider (differences from the providers spec)
+
+The providers spec on `main` (2026-11-19, meeting notes only) stays the authority for the descriptor, the isolation, `ProviderRunner`, `ProviderGate`, status probes and "choosing the provider is the consent" (owner decisions D1–D15 of 2026-11-20). Dictation adds only the following:
+
+1. **Owner decision of 2026-11-25 overrides Q2 of that spec** ("dictation outside v1, separate phase after a separate owner decision"). That decision is now taken. Its point 9 leaves to each future feature whether it inherits the meetings choice. Dictation **does not inherit it**: it has its own provider and model choice, `plugins.dictation.provider` and `plugins.dictation.providerModel`. Choosing them is the consent for dictation only, by the same rule as meetings. A user who sends meetings to Claude does not start sending dictations, and the reverse holds too.
+2. **Names and code state on `main`:** the targets are `LintelProviders`, `LintelSpeech` and `LintelKit` (not `Pounce*`). There is **no `TextGenerator` protocol**, because the 2026-11-10 version was replaced. Meetings call `ProviderRunner.run(_:authorization:)` through `ProviderNotesGenerator`. Dictation does the same through a new `ProviderFormatter: TextFormatter`. It builds a `ProviderRequest` (`feature: .dictationCleanup`, a new `ProviderFeatureID` value `dictation.cleanup`, the `CleanupPrompt.messages(…level:)`, the timeout) and checks the answer with the same `FormatterGuard`. The authorization closure answers "`llmSource == provider` and `plugins.dictation.provider` is set, right now", so the `ProviderRunner` check before every process works unchanged. No `LintelKit` change.
+3. **What leaves the Mac for dictation:** the recognised text of the chunk and up to 300 characters of the previous chunk of the **same** dictation (`<context>`, as today). Never audio. Never the DICT focus context (app, field, window title), by the DICT epic non-goal. Never vocabulary terms: they are applied after formatting, on this Mac. The fixed sentence beside the choice says this:
+   - en: "Text you dictate is sent to **Anthropic** through your Claude Code. Audio stays on this Mac."
+   - pl: „Dyktowany tekst jest wysyłany do **Anthropic** przez Twoje Claude Code. Dźwięk zostaje na tym Macu.”
+   The company name comes from the descriptor's `recipient`.
+4. **`ProviderGate` gets an interactive lane.** Today the gate is FIFO with one slot per provider. Its own comment says "priorities come with the second consumer". A whole-transcript meeting-notes run can hold that slot for minutes, so dictation gets a **separate lane**: the slot key becomes (provider, lane), with lanes `background` (notes) and `interactive` (dictation). Two processes can then run at once, one per lane. Dictation chunks are FIFO among themselves. Notes are never cancelled by dictation. This is simpler than the `LLMLease` cancel-and-retry and costs one extra CLI process at most.
+5. **History and HUD:** `formatter_model` = `cli:claude-code/<model>`, the same format as `meeting.notes_model`, read as "Claude · sonnet" in the dictation note's details. While a chunk is at the provider, the HUD shows the small cloud mark with the VoiceOver label "Processed by an external provider" / „Przetwarzane przez zewnętrznego dostawcę” (from the 2026-11-10 version, still not built).
+6. **No fallback chain beyond the local fallback above.** On a provider error (not signed in, limit, no network), the chunk comes back raw with the provider's reason in the HUD, as the providers spec says for dictation. The "fall back to built-in" switch (`app.ai.fallbackToBuiltIn` in the 2026-11-10 version) does not exist on `main` and is not added here.
+7. **#253 (settings IA v2) Q5** says "Claude writes meeting notes only. Dictation stays on This Mac". The owner decision of 2026-11-25 replaces this. In #253's layout, the source row is "Tidy up with: This Mac · My server · Claude" under Dictation → More options, and the AI assistant page's sentence "Dictation stays on this Mac" changes to name the actual dictation source. Whichever PR lands second updates the other.
+
 ## 📝 Architecture
 
 ```mermaid
@@ -56,6 +85,8 @@ flowchart LR
   F -- Off --> R[RawFormatter existing]
   F -- Light --> L[LightCleaner NEW, pure]
   F -- Standard/Full --> B[BuiltInFormatter or LocalLLMFormatter existing]
+  F -- Standard/Full, provider --> PF[ProviderFormatter NEW] --> PR[ProviderRunner LintelProviders existing, gate lane NEW]
+  PF --> G
   B --> P[CleanupPrompt.messages level: CHANGED]
   B --> G[FormatterGuard.check level: CHANGED]
   L --> V[vocabulary TermReplacer existing]
@@ -72,7 +103,9 @@ Components (all in `DictationPlugin`; nothing in `LintelKit`, `LintelSpeech` or 
 - **`LightCleaner: TextFormatter`** (new, pure, no I/O): a fixed filler list per language (PL: `yyy`, `yy`, `eee`, `ee`, `eem`, `yhm` when standalone; EN: `um`, `uh`, `erm`, `uhm`), matched only as whole tokens with optional trailing comma; nothing else is removed (repetitions and false starts are Standard's job); then spacing, the comma left before a removed filler and the capital letter of a sentence whose first word was removed. Always returns `.formatted`; it cannot fail. "no więc" at a sentence start is **not** on the list at Light (it can be content: "no więc tak zrobimy" is ambiguous); Standard removes it as today.
 - **`CleanupPrompt`** (changed): `messages(transcript:context:level:)`, `system(for:)`, `examples(for:)`, and `version(for:) -> Int` per level: `standard` = the v2 text from D2 unchanged (2), `full` = v2 + the Full rules and three Full examples (1). The release notes name both ("Standard v2, Full v1"). The Standard text is not edited by this spec. Snapshot fixtures `prompt-standard-v2.txt` (renamed from D2's `prompt-v2.txt` only if D2 has merged; otherwise kept) and `prompt-full-v1.txt`.
 - **`FormatterGuard`** (changed): `check(input:output:level:)`. Shared checks at every model level: empty, answered, language changed, and D2's number check. New in Phase 3: **term check** — every token of the input that is a vocabulary term or alias target, or a capitalised word that is not the first word of a sentence, must occur in the output (diacritics-insensitive). Length limits per level: Standard keeps D2's range; Full keeps today's `0.6…1.15` until the eval shows a tighter bound holds (a line break is not a word).
-- **`DictationPlugin.formatter(settings:…)`** (changed): `nil` for Off (today's raw path), `LightCleaner()` for Light, else today's server or built-in formatter with the level passed in.
+- **`DictationPlugin.formatter(settings:…)`** (changed): `nil` for Off (today's raw path), `LightCleaner()` for Light, else the formatter of the **effective source** (the chosen source, or the local fallback when the provider is not offered at this level) with the level passed in.
+- **`ProviderFormatter`** (new, Phase 5): `TextFormatter` over `ProviderRunner`; shares the chunk/guard logic with `BuiltInFormatter`; `prepare()` does nothing. `DictationSession` gets the key-release deadline (`releaseDeadline: Duration?`, `nil` for local sources). `DictationPlugin` gains a dependency on `LintelProviders` (allowed: plugins may import it).
+- **`LintelProviders`** (changed, Phase 5): `ProviderFeatureID.dictationCleanup`; `ProviderGate` lanes (`ProviderLane.background` default, `.interactive`), additive with the default keeping today's behaviour for meetings.
 - **`DictationController.recordHistory`** (changed): `formatMode` stays `raw`/`clean` (Light is recorded as `clean`, because the pasted text differs from the raw one); `formatterModel` is `nil` for Light (no model ran; `DictationNoteSource` shows that column as "Cleanup model", so a fake name would leak into the UI).
 
 ## 📝 Data Model
@@ -83,6 +116,9 @@ No database change. One new settings key (BC §3, additive):
 |---|---|---|---|---|
 | `plugins.dictation.cleanupLevel` (new) | String | `light`, `standard`, `full` | missing = `standard` | `DictationSettings.cleanupLevel` |
 | `plugins.dictation.mode` (unchanged) | String | `raw`, `cleanup` | `raw` | unchanged; `raw` = Off |
+| `plugins.dictation.llmSource` (new value) | String | + `provider` | `server` (unchanged) | an older build reads an unknown value as `.server` (`DictationSettings.swift:101`): no break, the user's server or raw |
+| `plugins.dictation.provider` (new) | String `ProviderID` | `claude-code` | missing = no provider chosen (the provider source is then not selectable) | `DictationSettings`, the authorization closure |
+| `plugins.dictation.providerModel` (new) | String | descriptor's model aliases | missing = descriptor default | `ProviderFormatter` |
 
 **Migration: none is written.** An existing `mode = cleanup` user has no `cleanupLevel` and reads `standard`, which is today's cleanup with prompt v2 (the change from v1 to v2 is D2's, with its own release note). An existing `mode = raw` user stays Off. The picker writes both keys: Off → `mode = raw` (the stored level is kept, so turning back on returns to it); Light/Standard/Full → `mode = cleanup` and `cleanupLevel`. Rollback to a build without levels: it reads `mode`; a Light or Full user gets Standard-era cleanup (v1/v2), an Off user stays raw, so the on/off choice survives. Known cost: a Light user with no model downloaded and no server set gets raw pastes and the "model missing" status on the older build (documented in the release note; no data is touched). The key goes into BC §3 with the release that ships it, and BC §3's sentence on `CleanupPrompt.version` becomes: "`CleanupPrompt.version(for:)` (an Int per level) is a user-visible behaviour: a change to one level's text bumps that level's version and goes into the release notes."
 
@@ -118,6 +154,17 @@ Rows that follow the popup:
 - **Off** and **Light**: no other cleanup rows (today's "Run on", "Model", server address are hidden; Light needs no model). Light works with no model downloaded.
 - **Standard** and **Full**: today's cleanup rows unchanged (source, model, server) until #253 moves them to AI assistant → More options.
 
+### Source row ("Tidy up with")
+
+Shown only for Standard and Full. Until #253 lands it is today's "Run on" popup, renamed; after #253 it is the More options row. Values:
+- **This Mac** / **Na tym Macu**
+- **My server** / **Mój serwer**
+- **Claude** / **Claude**: the provider's display name. It is listed only when the provider is ready, per the providers spec D14. Otherwise the list shows "Add a provider…" / „Dodaj dostawcę…”.
+
+With Claude chosen:
+- The fixed sentence from point 3 above sits under the row.
+- At a level the provider is not offered for, one more line explains what runs instead: "Claude is used for Full. Standard runs on this Mac." / „Claude porządkuje na poziomie Pełnym. Standardowe działa na tym Macu.” When there is no local fallback: "… Standard pastes your text untidied." / „… Standardowe wkleja tekst bez porządkowania.”
+
 ### States
 
 | State | Trigger | What the user sees | What they can do |
@@ -126,6 +173,8 @@ Rows that follow the popup:
 | User's server unreachable | Standard/Full, "My server" | as today: the chunk is pasted raw; HUD "Pasted without tidying" | fix the server, or pick Light |
 | A chunk was rejected by the guard | any model level | as today: that chunk raw, HUD shows the partial state | "Paste my last dictation unedited" |
 | Full chosen on a small built-in model | Full with the smallest catalog model (A6) | help line adds "Works best with the Recommended assistant." / „Działa najlepiej z zalecanym asystentem.” | change the model, or keep it |
+| Provider too slow | provider source, a chunk not back within the limit after key release | HUD "Pasted without tidying, Claude was too slow" / „Wklejono bez porządkowania, Claude odpowiadał za wolno”; finished chunks stay tidied | choose Full or This Mac; "Paste my last dictation unedited" |
+| Provider not signed in / limit / no network | provider source | HUD with the provider's reason (providers spec), raw text pasted | fix in Settings, or choose This Mac |
 | Dictation turned off | plugin disabled | the popup dimmed, as every row | turn Dictation on |
 
 The HUD, the history list and the shortcuts do not change. VoiceOver: the popup is "Tidy up my text, Standard, pop-up button"; the example line is one element ("Example: … becomes …").
@@ -142,6 +191,9 @@ The HUD, the history list and the shortcuts do not change. VoiceOver: the popup 
 - **Length guard and paragraphs.** Line breaks do not count as words. The length bound alone does not stop a model that adds a short greeting, so the Full prompt forbids it and the eval counts invented greetings (target 0).
 - **Server user ("My server").** Levels apply the same way: the request carries the level's prompt. A server model that does Full badly is rejected chunk by chunk by the same guard; Lintel cannot measure the user's model, and the help line does not promise quality for it.
 - **Self-correction cut (spec 2026-11-20) ships later.** When it does, marker cuts run before `Segmenter` at Standard and Full only. Light never cuts (it never removes a word that is not a filler).
+- **Meeting notes running on Claude while the user dictates:** dictation uses the interactive lane and never waits for the notes job. Two CLI processes run at once, which costs the user's subscription limit; the notes job is not cancelled.
+- **Provider chosen, then signed out:** the authorization still passes (the choice is the consent), the process fails to authenticate, and the chunk comes back raw with "Claude is signed out" in the HUD. Settings shows the provider's status as for meetings.
+- **Cold start longer than the limit on every dictation** (expected for short Standard dictations): the measurement gate keeps Standard off the provider, so users do not get raw text every time by default.
 - **Level changed during a recording:** the formatter is chosen when the session starts, so the change applies to the next dictation (as `mode` today).
 
 ## 📝 Risks & Impact Review
@@ -152,6 +204,8 @@ The HUD, the history list and the shortcuts do not change. VoiceOver: the popup 
 | BC §5 user-visible behaviour | `CleanupPrompt` gets a version per level; Full is new behaviour | users who pick Full | release note "Dictation: choose how much Lintel tidies your text"; Standard is unchanged from D2 |
 | Light changes raw-mode users? | no: Off stays raw; Light is opt-in | — | — |
 | Settings IA v2 (#253) | its basic row "Tidy up my text" toggle on `mode` becomes this popup on `mode` + `cleanupLevel` | #253 implementer | whichever PR lands second updates the row; the label "Tidy up my text" is the same in both |
+| Privacy promise | the dictated text leaves the Mac when the provider source is chosen | users who choose it | own choice per feature (not inherited from meetings), fixed sentence, cloud mark in HUD, `cli:` marker in history; Off and Light never send anything |
+| `LintelProviders` | `ProviderGate` lanes, new `ProviderFeatureID` | meetings (unchanged behaviour by default lane) | additive; TSan tests for two lanes |
 | Prompt quality | Full may still rewrite meaning on small models | Full users | guard (numbers, terms, length, language) + raw fallback per chunk; acceptance metrics below before Full is offered |
 
 Product direction calls (not defects): whether Light should ever use a model (A3), and the default level for new installs (A2).
@@ -166,6 +220,16 @@ Every level is measured with `scripts/dictation-eval/` (from `feat/dictation-cle
 | Standard | D2's targets (FLEURS WER ≤ raw + 0.3 pt; self-corrections OK ≥ 60 %; forbidden left ≤ 15 %; lists in `pl-list-01/02`, `en-list-01`; none of the meaning changes from the benchmark) | unchanged from D2 |
 | Full | invented greetings or sign-offs: 0; numbers and terms: 100 % kept (guard counters 0 misses after fallback); terms % ≥ Standard; self-corrections ≥ Standard; `chat`/`code`/`keep-not-correction` WER ≤ Standard + 1 pt; on `mail` items with a spoken greeting, the greeting is alone on the first line (new check in the eval script) | mail items: ≥ 2 paragraphs when ≥ 2 pauses were spoken |
 
+**Provider (Phase 4 gate, before any product code):**
+- The eval tool gets `--source provider` and runs each chunk through `ProviderRunner` with the real Claude Code CLI. It is off by default and turned on by `LINTEL_DICTATION_EVAL_PROVIDER=claude-code` and `LINTEL_DICTATION_EVAL_PROVIDER_MODEL`.
+- It replays the chunking of a real session: chunks complete at the times the speech segments would, and it records **latency from key release** = the time from the last segment to the last chunk back, cold start included.
+- It reports p50 and p90 per level, plus the quality metrics of that level.
+- A level is **offered** for the provider when its p90 is at or under the limit (Standard 2 s, Full 6 s) **and** it meets that level's quality targets.
+- The result is set in `ProviderLevels.offered` and recorded in `docs/perf.md`.
+- Input:
+  - FLEURS PL/EN (public text) by default.
+  - The owner's corpus only with the owner's explicit OK for sending it to Anthropic (A14).
+
 FLEURS WER is not a Full metric (layout and style edits are intended); fidelity is carried by the number and term checks. Results go into each PR body (table level × metric), never the transcripts' text.
 
 ## 📋 Phasing
@@ -175,6 +239,9 @@ Prerequisite (not part of this spec): the D1+D2 PR from `feat/dictation-cleanup-
 - **Phase 1 — the setting and Light** (one PR): key, `CleanupLevel`, `LightCleaner`, the popup with Off / Light / Standard, eval `--level`. Full is not offered yet. Standard is exactly today's `mode = cleanup`. **Blocked on the D1+D2 PR** (eval tool, prompt v2, number check): Phase 1 is not started before it merges, so Standard = v2 from the first release that shows levels.
 - **Phase 2 — Full** (one PR): `CleanupPrompt` Full text and examples, per-level guard limits, Full in the popup, the "Works best with…" line, measured against the Full targets. Not offered if the targets fail (the PR then reports why and stays open).
 - **Phase 3 — term check** (one PR): `FormatterGuard` term check at Standard and Full. First the baseline (today's fallback rate per chunk on corpus and FLEURS), then the check; it ships only if it adds ≤ 2 points of fallback over that baseline and keeps 100 % of terms on the corpus `terms` items.
+
+- **Phase 4: provider measurement** (one PR, scripts and tests only, no product change): `--source provider` in `scripts/dictation-eval/` and the latency-from-release replay. The tables (Standard and Full × p50/p90 × quality) go in `docs/perf.md`, with the proposed `ProviderLevels.offered`.
+- **Phase 5: provider source** (one PR, `risk-medium`): `ProviderFeatureID.dictationCleanup`, `ProviderGate` lanes, `ProviderFormatter`, `llmSource = provider`, `plugins.dictation.provider`/`providerModel`, the source row with the fixed sentence, the local-fallback line, the release deadline and the HUD states (too slow, cloud mark). QA with the real Claude Code CLI.
 
 Outside the phases: the owner's decision on A3 (model assist for Light), taken from Phase 1 data and recorded in ADR 0004.
 
@@ -202,6 +269,34 @@ Outside the phases: the owner's decision on A3 (model assist for Light), taken f
 1. `FormatterGuard` term check (vocabulary terms and mid-sentence capitalised words must survive, diacritics-insensitive) for Standard and Full. Tests incl. a Polish inflected name ("Anna" → "Anny" counts as kept by stem of ≥ 4 letters).
 2. Baseline first (fallback rate per chunk without the check), then with it; ships when the added fallback is ≤ 2 points and every corpus `terms` item keeps its terms. Table in the PR body.
 
+### Phase 4 — provider measurement
+
+1. `scripts/dictation-eval/`: `--source provider`, the replay of chunk completion times, and the latency-from-release metric. Real CLI behind environment variables, off by default.
+2. Measure Standard and Full on FLEURS PL/EN (and on the corpus if A14 is approved): p50 and p90 from release, the level's quality targets, the provider's failures. Table in `docs/perf.md` and the PR body.
+3. Propose `ProviderLevels.offered`. The owner confirms it on the PR.
+
+### Phase 5 — provider source
+
+1. `LintelProviders`: `ProviderFeatureID.dictationCleanup`; `ProviderGate` lanes (`background` by default, `interactive`). Tests:
+   - meetings unchanged;
+   - two lanes run at once and one lane stays FIFO;
+   - a cancelled waiter leaves its lane (TSan).
+2. `DictationSettings`: `LLMSource.provider`, `provider`, `providerModel`, `effectiveSource(for:)` with the local fallback. Tests: every row of the source × level table; an unknown source reads `.server`.
+3. `ProviderFormatter` (shared chunk/guard logic with `BuiltInFormatter`), the authorization closure, and `FallbackReason.tooSlow` plus the provider reasons. Tests with a fake `ProviderSystem`:
+   - success;
+   - not authorized → 0 processes;
+   - timeout;
+   - guard rejection;
+   - `formatter_model = cli:claude-code/<model>`.
+4. `DictationSession.releaseDeadline`. Test with a fake clock: chunks that finished stay tidied; the chunk that is late at the limit is raw; the summary is `partial`.
+5. Settings: the source row, the fixed sentence (en+pl), the local-fallback line. HUD: too slow, cloud mark, VoiceOver labels. Gallery states and QA screenshots (light/dark, en/pl), plus one real dictation through Claude Code (invented text).
+6. Docs:
+   - BC §3: the new keys and the `provider` value;
+   - BC §1: the `LintelProviders` additions;
+   - AGENTS.md: the dictation row and the providers row;
+   - the providers spec: a line at Q2 pointing to this spec;
+   - the release note.
+
 ## Resolved assumptions (autonomous defaults)
 
 | # | Question | Default | Why | Marker |
@@ -214,4 +309,10 @@ Outside the phases: the owner's decision on A3 (model assist for Light), taken f
 | A6 | Offer Full on every built-in model? | Yes, with the "Works best with the Recommended assistant." line on the smallest model | the guard falls back per chunk; hiding a level by model is confusing | — |
 | A7 | Per-app levels or a quick switch in the HUD/menu bar? | Not now (Later) | needs app-category context (`FocusContextReader`) and new UI | — |
 | A8 | Polish labels | "Wyłączone / Lekkie / Standardowe / Pełne", row "Porządkuj mój tekst" (#253's label) | neuter agrees with "porządkowanie"; same row label as #253 | — |
-| A9 | One spec or split per level? | One spec, three PRs: the levels share one key and one control and only make sense together | each phase ships a working subset | — |
+| A9 | One spec or split per level? | One spec, five PRs. The levels and the source share one setting and one control | each phase ships a working subset | — |
+| A10 | Provider latency limit from key release at Standard | **2 s** (the owner's proposed default); past it the late chunks are pasted raw | Standard is for everyday short messages; built-in p90 today is ≈ 1 s | ⚠ NEEDS HUMAN CONFIRMATION |
+| A11 | The same limit at Full | **6 s** | Full is for emails, where a wait is acceptable. It stays under the providers spec's 8 s p95 gate for chunks | ⚠ NEEDS HUMAN CONFIRMATION |
+| A12 | Which levels the provider serves | Only the levels that pass the Phase 4 gate (`ProviderLevels.offered`); **expected Full only**. Other levels use the local fallback, and the UI says so | follows the owner's "consider the provider by default only for Full" with data instead of a guess | — |
+| A13 | Does dictation inherit the meetings provider choice? | No: its own `plugins.dictation.provider` and its own consent-by-choice | the providers spec, point 9, leaves this to the feature; separate consent is the safer reading of "the choice is the consent" | — |
+| A14 | May the owner's voice corpus go to Anthropic during the Phase 4 measurement? | Not by default; FLEURS only, until the owner says yes on the PR | the corpus is the owner's private speech, and the benchmark data never enters the repo | ⚠ NEEDS HUMAN CONFIRMATION |
+| A15 | Dictation's place in `ProviderGate` | A separate `interactive` lane (two processes at most); notes are never cancelled | simplest; avoids minutes of waiting behind a whole-transcript notes run | — |
