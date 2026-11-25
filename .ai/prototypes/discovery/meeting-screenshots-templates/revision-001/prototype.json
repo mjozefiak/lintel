@@ -1,0 +1,146 @@
+{
+  "format": "discovery-prototype-v1",
+  "skill": "om-mockup-prototype",
+  "slug": "meeting-screenshots-templates",
+  "revision": 1,
+  "revisionPath": ".ai/prototypes/discovery/meeting-screenshots-templates/revision-001",
+  "previousRevision": null,
+  "brief": "~/.lintel-agents/2026-11-25/briefs/proto-granola.md (outside the repository)",
+  "flow": "Meeting screenshot from the pill, note templates (choose, change, edit)",
+  "panelReport": null,
+  "verification": "passed",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "6a6294056cbde6d22151a25456aef37627895aae6e5f6132f663f192e75a2959"
+    },
+    {
+      "path": "evidence/01-pill-idle-pl-light.png",
+      "sha256": "109a7499893f1d708da276d3aaab6b14a61bff849cc94a1d4d0e1b221541ef43"
+    },
+    {
+      "path": "evidence/01b-pill-hover-pl-light.png",
+      "sha256": "df668252a285cc1adb6db6bac4ef912bfe3c1b9a01a8bf4eb1a5481886a8d625"
+    },
+    {
+      "path": "evidence/02-pill-need-permission.png",
+      "sha256": "88a2dd8fde09f3292344151a90da43fd8e24631dd0f24f1b670fc044e415156d"
+    },
+    {
+      "path": "evidence/03-pill-captured-undo.png",
+      "sha256": "863240c837b1957fbb12f7fec3c191bf7935b02efc43abe5fcf2f885b2b60337"
+    },
+    {
+      "path": "evidence/04-recording-panel-mynotes-shots.png",
+      "sha256": "f4d2ada7bcc4c093268d28e6a8b5fa6908cac6f3c672faec75fc14a0d6a7a172"
+    },
+    {
+      "path": "evidence/05-note-client-template-mine-variant.png",
+      "sha256": "75163b62c8115c28705d6e636659f847307e86c981abc26b90ebbdb11fc549d0"
+    },
+    {
+      "path": "evidence/06-note-my-notes-with-shots.png",
+      "sha256": "8bdb85832aec345384b77a3f0a657c74349044c330d30ba24d6e0a9cad237eb6"
+    },
+    {
+      "path": "evidence/07-note-variant-strip.png",
+      "sha256": "b729038c7963d45f696e3603fc8984aa55d8d4757cadd16507831bd5ec582560"
+    },
+    {
+      "path": "evidence/08-note-variant-inline-empty-shown.png",
+      "sha256": "cdafba6af4cab7826a604166540b39e994d6ff1579001e1e946b48a8c523c4d5"
+    },
+    {
+      "path": "evidence/09-screenshot-viewer.png",
+      "sha256": "45b8d21de71775f1f5de1cc4e055155458ae4387248715d73f2d6956ba300ffa"
+    },
+    {
+      "path": "evidence/10-transcript-shot-markers.png",
+      "sha256": "210e379981de8b47e4d3bd32f99d17d67ab170e9726052c490e4ecf415c7e731"
+    },
+    {
+      "path": "evidence/11-regenerate-confirm.png",
+      "sha256": "c4b90d60efdc9fe2334bbfaf066a029b9cc9faaa76e786e8fca0228312b01a51"
+    },
+    {
+      "path": "evidence/12-note-after-regenerate-1on1.png",
+      "sha256": "f71a2d3befe18e2477361cf6554633e17594bf0d9e5af392c7a18c940c7ded21"
+    },
+    {
+      "path": "evidence/13-templates-list.png",
+      "sha256": "099d536f6e6407a7a9cad269d9dca11da46c311f03569efcac3dbfd960719a20"
+    },
+    {
+      "path": "evidence/14-editor-error-name.png",
+      "sha256": "65bd711829ff217a42133c9c99f93566c823d21b337b2937afadea8b3a55f3e3"
+    },
+    {
+      "path": "evidence/15-editor-filled-preview.png",
+      "sha256": "0615a4e58e4c3c2b97246d6eefa8aa2c00521ff7225d7258711315109db88a1b"
+    },
+    {
+      "path": "evidence/15b-editor-error-cleared.png",
+      "sha256": "645f94a098b87f4922afcae7cb7cd04cee5be49a30647eb18886b6f0aed26e7f"
+    },
+    {
+      "path": "evidence/16-templates-after-save.png",
+      "sha256": "a1211759b5d5509ef01a3e2636168eb2ae2b06127c2b74991d24e47b4e6fbfd2"
+    },
+    {
+      "path": "evidence/17-unknown-fragment.png",
+      "sha256": "80e6b74909263293cd922132bc5a6ab52194570e79c31eef60b426eebaf744aa"
+    },
+    {
+      "path": "evidence/18-pill-denied.png",
+      "sha256": "7947ce75e194412024bd5d3cbd23386ec45cef29e8a254d512a035334aef72cc"
+    },
+    {
+      "path": "evidence/19-pill-no-meeting-window.png",
+      "sha256": "1bd7724c8fe211cf0df90a9921fc31ba93135a549878ec83ed546feb8a905750"
+    },
+    {
+      "path": "evidence/20-pill-failed.png",
+      "sha256": "cee08317d815e7217ae7bd95f557fb2291772ee25fdf925bd62cd391bac37ec8"
+    },
+    {
+      "path": "evidence/21-settings-provider-none.png",
+      "sha256": "93d45defc01e9e6c474fb521158f0b0d435cedc4ca5c71f7a27a4a2d3b76e871"
+    },
+    {
+      "path": "evidence/22-settings-provider-ocr.png",
+      "sha256": "3e6d3f6057d90e5fa894b03815ba543e0ba604d421fb9800db1949c467b7dde2"
+    },
+    {
+      "path": "evidence/23-settings-provider-image.png",
+      "sha256": "38f981577956af1e6a1c516bc0da6ad8fb1179bb3fc4353d6694e19ec333cca9"
+    },
+    {
+      "path": "evidence/24-en-dark-pill-hover.png",
+      "sha256": "adfa37306865d2f4ce6ed849a78531192632c1d7b53d72c3afe81401914c757e"
+    },
+    {
+      "path": "evidence/25-en-dark-note.png",
+      "sha256": "fd0adcd7b1b535bc5bd69348bbc33e1037832df9e04b9d1eb42303b0c0cbb927"
+    },
+    {
+      "path": "evidence/26-en-dark-editor.png",
+      "sha256": "df1de272917177ee8191515444099258630782737919aca1cda87d576ad32d7e"
+    },
+    {
+      "path": "evidence/26b-en-dark-templates.png",
+      "sha256": "a270ab543033516bebe5aea89e9ecbb3466523eb2ac8fb56be502093fb529410"
+    },
+    {
+      "path": "evidence/27-narrow-recording.png",
+      "sha256": "7276edda0c8dce9ea4b57639bf88aad0a44bb361e75374129a821b2a23544371"
+    },
+    {
+      "path": "evidence/28-keyboard-focus-camera.png",
+      "sha256": "c058e08df6637fa5a9497a7f4c43d328ba70260eb3dabceb07fbdf840769a7de"
+    },
+    {
+      "path": "index.html",
+      "sha256": "5d10719feb03923897cece80fd2e6f38507029ac8b03eecb1ee7fd49625f1398"
+    }
+  ]
+}
