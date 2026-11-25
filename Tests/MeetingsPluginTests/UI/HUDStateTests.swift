@@ -177,10 +177,10 @@ import Testing
 
     @Test func anUnavailableStoredMicrophoneHasFourTextsAndNeverShowsAUID() {
         let texts: [(String?, String?, String)] = [
-            ("USB MICROPHONE", "Built-in", "Microphone “USB MICROPHONE” is unavailable – recording from “Built-in”"),
-            ("USB MICROPHONE", nil, "Microphone “USB MICROPHONE” is unavailable – recording from the system input"),
-            (nil, "Built-in", "The chosen microphone is unavailable – recording from “Built-in”"),
-            (nil, nil, "The chosen microphone is unavailable – recording from the system input"),
+            ("USB MICROPHONE", "Built-in", "“USB MICROPHONE” unavailable – using “Built-in”"),
+            ("USB MICROPHONE", nil, "“USB MICROPHONE” unavailable – using the system input"),
+            (nil, "Built-in", "Chosen microphone unavailable – using “Built-in”"),
+            (nil, nil, "Chosen microphone unavailable – using the system input"),
         ]
         for (requested, using, expected) in texts {
             let state = recording {
@@ -189,9 +189,8 @@ import Testing
             #expect(state.detail == expected)
             #expect(state.actions == [.stop])
             #expect(state.accessibilityLabel.contains(expected))
-            // The sentence wraps to a second line, so the pill is taller than one with a one-line detail.
-            #expect(state.detailLines == 2)
-            #expect(state.pillHeight == 82)
+            // One line, like every other notice: the pill keeps its two-line height.
+            #expect(state.pillHeight == 68)
         }
     }
 

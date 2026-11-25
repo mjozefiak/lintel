@@ -75,7 +75,7 @@ enum MeetingHUDState: Equatable, Sendable {
         }
     }
 
-    /// The names for "Microphone … is unavailable – recording from …"; either can be unknown. Never a UID.
+    /// The names for "“…” unavailable – using “…”"; either can be unknown. Never a UID.
     struct MicrophoneFallback: Equatable, Sendable {
         var requested: String?
         var using: String?
@@ -358,21 +358,8 @@ extension MeetingHUDState {
     /// A pill with a detail line is taller.
     var hasDetailLine: Bool { detail != nil }
 
-    /// The fallback sentence names two devices and wraps to a second line; every other detail is one line.
-    var detailLines: Int {
-        guard hasDetailLine else { return 0 }
-        if case .recording(let recording) = self, case .microphoneFallback? = recording.notice { return 2 }
-        return 1
-    }
-
-    /// The pill's height: the title row plus the detail lines.
-    var pillHeight: CGFloat {
-        switch detailLines {
-        case 0: 44
-        case 1: 68
-        default: 82
-        }
-    }
+    /// The pill's height: the title row, plus the one-line detail when there is one.
+    var pillHeight: CGFloat { hasDetailLine ? 68 : 44 }
 
     /// How long a final state stays before the HUD disappears; `nil` while the state is live. A message with
     /// a decision in it stays longer.

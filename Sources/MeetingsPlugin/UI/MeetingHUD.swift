@@ -186,9 +186,9 @@ struct MeetingHUDView: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(state.detailLines)
+                    .lineLimit(1)
                     .minimumScaleFactor(0.85)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .truncationMode(.middle)
                     .padding(.leading, 30)
             }
         }

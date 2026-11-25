@@ -215,7 +215,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
             return
         }
         let state = HUDState.recording(recording)
-        #expect(state.notice == "Microphone “USB MICROPHONE” is unavailable – recording from “MacBook Pro Microphone”")
+        #expect(state.notice == "“USB MICROPHONE” unavailable – using “MacBook Pro Microphone”")
         #expect(state.announcement == state.notice)
         #expect(state.accessibilityLabel.contains("USB MICROPHONE"))
         #expect(!(state.notice ?? "").contains("AppleUSBAudioEngine"))

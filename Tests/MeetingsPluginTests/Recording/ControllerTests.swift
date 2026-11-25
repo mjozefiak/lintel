@@ -566,7 +566,7 @@ import Testing
                 == .microphoneFallback(
                     .init(requested: "USB MICROPHONE", using: "MacBook Pro Microphone")))
         let text = rig.hud.last?.detail
-        #expect(text == "Microphone “USB MICROPHONE” is unavailable – recording from “MacBook Pro Microphone”")
+        #expect(text == "“USB MICROPHONE” unavailable – using “MacBook Pro Microphone”")
         #expect(rig.hud.last?.actions == [.stop])
         // Recording goes on: the preference is only ever read, never rewritten.
         #expect(rig.controller.phase == .recording)

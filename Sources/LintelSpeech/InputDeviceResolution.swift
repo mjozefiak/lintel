@@ -17,26 +17,28 @@ public struct InputFallback: Equatable, Sendable {
 }
 
 extension InputFallback {
-    /// The sentence both HUDs show (meetings and dictation); device names only, never a UID.
+    /// The one-line notice both HUDs show (meetings and dictation); device names only, never a UID. Short on
+    /// purpose: the HUDs show one line per problem.
     public var message: String {
         switch (requestedName, usingName) {
         case (let requested?, let using?):
             String(
-                localized: "Microphone “\(requested)” is unavailable – recording from “\(using)”",
-                comment: "HUD notice: the chosen microphone is unplugged, the placeholders are device names")
+                localized: "“\(requested)” unavailable – using “\(using)”",
+                comment: "HUD notice, one line: the chosen microphone is unplugged, the placeholders are device names")
         case (let requested?, nil):
             String(
-                localized: "Microphone “\(requested)” is unavailable – recording from the system input",
-                comment: "HUD notice: the chosen microphone is unplugged, the placeholder is its name")
+                localized: "“\(requested)” unavailable – using the system input",
+                comment: "HUD notice, one line: the chosen microphone is unplugged, the placeholder is its name")
         case (nil, let using?):
             String(
-                localized: "The chosen microphone is unavailable – recording from “\(using)”",
-                comment: "HUD notice: the chosen microphone is unplugged, the placeholder is the name of the input used"
+                localized: "Chosen microphone unavailable – using “\(using)”",
+                comment:
+                    "HUD notice, one line: the chosen microphone is unplugged, the placeholder is the name of the input used"
             )
         case (nil, nil):
             String(
-                localized: "The chosen microphone is unavailable – recording from the system input",
-                comment: "HUD notice: the chosen microphone is unplugged")
+                localized: "Chosen microphone unavailable – using the system input",
+                comment: "HUD notice, one line: the chosen microphone is unplugged")
         }
     }
 }

@@ -58,13 +58,13 @@ import Testing
 
     @Test func theMessageNamesDevicesAndNeverAUID() {
         let all = InputFallback(requestedName: "USB MICROPHONE", usingName: "MacBook Pro Microphone").message
-        #expect(all == "Microphone “USB MICROPHONE” is unavailable – recording from “MacBook Pro Microphone”")
+        #expect(all == "“USB MICROPHONE” unavailable – using “MacBook Pro Microphone”")
         let noUsing = InputFallback(requestedName: "USB MICROPHONE", usingName: nil).message
-        #expect(noUsing == "Microphone “USB MICROPHONE” is unavailable – recording from the system input")
+        #expect(noUsing == "“USB MICROPHONE” unavailable – using the system input")
         let noRequested = InputFallback(requestedName: nil, usingName: "Built-in").message
-        #expect(noRequested == "The chosen microphone is unavailable – recording from “Built-in”")
+        #expect(noRequested == "Chosen microphone unavailable – using “Built-in”")
         let none = InputFallback(requestedName: nil, usingName: nil).message
-        #expect(none == "The chosen microphone is unavailable – recording from the system input")
+        #expect(none == "Chosen microphone unavailable – using the system input")
         for text in [all, noUsing, noRequested, none] { #expect(!text.contains("AppleUSBAudioEngine")) }
     }
 }

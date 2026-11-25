@@ -136,7 +136,7 @@ struct DictationHUDView: View {
     /// The size of the capsule, shared with the QA snapshot's backdrop (`DictationHUDQA`).
     static let size = CGSize(width: 248, height: 40)
     /// The panel is taller than the capsule: the capsule sits at its bottom (where it always was) and the
-    /// sentence about an unavailable microphone goes above it.
+    /// one-line notice about an unavailable microphone (shown only then) goes above it.
     static let panelSize = CGSize(width: 360, height: 104)
     /// The distance of the capsule from the panel's bottom edge.
     static let bottomInset: CGFloat = 8
@@ -152,8 +152,9 @@ struct DictationHUDView: View {
             if let notice = state.notice {
                 Text(notice)
                     .font(.footnote.weight(.medium))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .truncationMode(.middle)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .frame(maxWidth: 344)
