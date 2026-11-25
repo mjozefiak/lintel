@@ -30,6 +30,16 @@ public actor ParakeetEngine: SpeechEngine {
     }
 
     public func transcribe(_ samples: [Float]) async throws -> TranscriptSegment {
+        try await transcribe(samples, options: .none)
+    }
+
+    /// The hint of this request: the request's own when it has one, else the engine's default (the language
+    /// closure it was built with). Per request, never remembered: the engine is shared between leases.
+    static func hint(for options: SpeechRequestOptions, default fallback: Language?) -> Language? {
+        options.scriptHint?.fluidAudioLanguage ?? fallback
+    }
+
+    public func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
         guard let manager else { throw EngineError.notLoaded }
         // The model needs a minimum of audio; very short utterances are padded with silence.
         let minimum = ASRConstants.minimumRequiredSamples(forSampleRate: AudioFormat.sampleRate)
@@ -37,7 +47,7 @@ public actor ParakeetEngine: SpeechEngine {
             samples.count >= minimum ? samples : samples + [Float](repeating: 0, count: minimum - samples.count)
         var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
         let result = try await manager.transcribe(
-            padded, decoderState: &state, language: languageHint)
+            padded, decoderState: &state, language: Self.hint(for: options, default: languageHint))
         return TranscriptSegment(text: result.text)
     }
 
