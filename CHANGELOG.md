@@ -6,6 +6,10 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ## [Unreleased]
 
+### Changed
+
+- Meeting notes written by a provider (Claude) now follow a topic layout: a short intro, topics, decisions made and next steps.
+
 ## [0.1.0-beta.1] - 2026-11-22
 
 The first public beta.
