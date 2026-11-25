@@ -80,21 +80,55 @@ public enum ParakeetLanguage {
     }
 }
 
+/// The knobs of Silero's streaming segmentation. `standard` is FluidAudio's default and what dictation uses.
+///
+/// A chunk (256 ms) with a probability of at least `entryThreshold` opens speech; speech ends after
+/// `minSilence` of chunks below `entryThreshold - exitOffset`. `padding` widens both boundaries. Chunks in
+/// between neither continue nor end the speech, so a soft tail can be cut: the meeting recorder sends a short
+/// pre-roll and post-roll to the engine with every segment (`MeetingSessionLimits`).
+public struct VADTuning: Equatable, Sendable {
+    public var entryThreshold: Float
+    public var exitOffset: Float
+    public var minSilence: TimeInterval
+    public var padding: TimeInterval
+
+    public static let standard = VADTuning(entryThreshold: 0.85, exitOffset: 0.15, minSilence: 0.75, padding: 0.1)
+
+    public init(entryThreshold: Float, exitOffset: Float, minSilence: TimeInterval, padding: TimeInterval) {
+        self.entryThreshold = entryThreshold
+        self.exitOffset = exitOffset
+        self.minSilence = minSilence
+        self.padding = padding
+    }
+}
+
 /// Silero voice activity detection through FluidAudio, fed in the 4096-sample (256 ms) chunks its model takes.
 public actor SileroVAD: VoiceActivityDetector {
     private let manager: VadManager
     private var state: VadStreamState
     private var pending: [Float] = []
-    private let segmentation = VadSegmentationConfig.default
+    private let segmentation: VadSegmentationConfig
+    private let recordsProbabilities: Bool
+    private var probabilities: [Float] = []
 
-    /// - Parameter modelFolder: the `.mlmodelc` folder of the Silero model inside the model package.
-    public init(modelFolder: URL) throws {
+    /// - Parameters:
+    ///   - modelFolder: the `.mlmodelc` folder of the Silero model inside the model package.
+    ///   - tuning: the thresholds and times of the segmentation (the default is FluidAudio's own).
+    ///   - recordsProbabilities: keep the probability of every chunk until `drainProbabilities()` (the meeting
+    ///     recorder counts near misses with it; leave it off when nobody drains).
+    public init(modelFolder: URL, tuning: VADTuning = .standard, recordsProbabilities: Bool = false) throws {
         let configuration = MLModelConfiguration()
         configuration.computeUnits = .cpuOnly
         let model = try MLModel(contentsOf: modelFolder, configuration: configuration)
-        let manager = VadManager(config: .default, vadModel: model)
+        let manager = VadManager(config: VadConfig(defaultThreshold: tuning.entryThreshold), vadModel: model)
         self.manager = manager
         self.state = VadStreamState.initial()
+        self.segmentation = VadSegmentationConfig(
+            // Unused when streaming; FluidAudio asserts that the padding does not exceed it.
+            minSpeechDuration: max(0.15, tuning.padding),
+            minSilenceDuration: tuning.minSilence, speechPadding: tuning.padding,
+            negativeThresholdOffset: tuning.exitOffset)
+        self.recordsProbabilities = recordsProbabilities
     }
 
     public func process(_ samples: [Float]) async throws -> [VADEvent] {
@@ -105,11 +139,17 @@ public actor SileroVAD: VoiceActivityDetector {
             pending.removeFirst(VadManager.chunkSize)
             let result = try await manager.processStreamingChunk(chunk, state: state, config: segmentation)
             state = result.state
+            if recordsProbabilities { probabilities.append(result.probability) }
             if let event = result.event {
                 events.append(VADEvent(kind: event.isStart ? .speechStart : .speechEnd, sampleIndex: event.sampleIndex))
             }
         }
         return events
+    }
+
+    public func drainProbabilities() async -> [Float] {
+        defer { probabilities.removeAll(keepingCapacity: true) }
+        return probabilities
     }
 }
 
@@ -117,16 +157,25 @@ public actor SileroVAD: VoiceActivityDetector {
 /// the plugin.
 public actor LazyVAD: VoiceActivityDetector {
     private let modelFolder: URL
+    private let tuning: VADTuning
+    private let recordsProbabilities: Bool
     private var detector: SileroVAD?
 
-    public init(modelFolder: URL) {
+    public init(modelFolder: URL, tuning: VADTuning = .standard, recordsProbabilities: Bool = false) {
         self.modelFolder = modelFolder
+        self.tuning = tuning
+        self.recordsProbabilities = recordsProbabilities
     }
 
     public func process(_ samples: [Float]) async throws -> [VADEvent] {
         if detector == nil {
-            detector = try SileroVAD(modelFolder: modelFolder)
+            detector = try SileroVAD(
+                modelFolder: modelFolder, tuning: tuning, recordsProbabilities: recordsProbabilities)
         }
         return try await detector?.process(samples) ?? []
+    }
+
+    public func drainProbabilities() async -> [Float] {
+        await detector?.drainProbabilities() ?? []
     }
 }
