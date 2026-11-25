@@ -181,8 +181,8 @@ import Testing
         service.beginWatching()
         await eventually { service.ticks >= 3 }
         service.endWatching()
-        #expect(
-            reader.reads.isEmpty || reader.reads.count <= Permission.allCases.count, "only beginWatching's own read")
+        let readable = Permission.allCases.filter(\.isReadable).count
+        #expect(reader.reads.count == readable, "only beginWatching's own read")
     }
 
     @Test func theQAEnvironmentGetsTheRequesterThatNeverPromptsForAccessibility() {
