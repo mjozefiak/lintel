@@ -332,7 +332,10 @@ private func session(
         #expect(seen.contains(.limitReached))
     }
 
-    @Test func aMicrophoneThatDisappearsIsReportedAndWhatWasSaidCanBeFinished() async throws {
+    /// `MicrophoneCapture` ends its stream only when no input can be started again (a change of the audio
+    /// configuration restarts the engine and the stream goes on: `MicrophoneCaptureReconfigurationTests`). Then the
+    /// session reports it and what was said so far can still be finished.
+    @Test func anInputThatIsReallyGoneIsReportedAndWhatWasSaidCanBeFinished() async throws {
         let events = EventLog()
         let session = session(
             ScriptedAudioInput(seconds: 4, endsEarly: true), vad: RangeVAD([second..<(2 * second)]),
@@ -342,6 +345,21 @@ private func session(
         #expect(events.all.contains(.audioLost))
         let output = try await session.finish()
         #expect(output.text == "segment 1")
+    }
+
+    /// What the capture hands over after a new default output or a unplugged monitor: the stream does not end, a gap
+    /// of silence is in it, the words on both sides are transcribed and nothing says the audio was lost.
+    @Test func aRestartedCaptureWithASilentGapKeepsOneRecording() async throws {
+        let events = EventLog()
+        let session = session(
+            ScriptedAudioInput(seconds: 8), vad: RangeVAD([second..<(2 * second), (5 * second)..<(6 * second)]),
+            engine: FakeEngine(), events: events)
+        try await session.start()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(!events.all.contains(.audioLost))
+        let output = try await session.finish()
+        #expect(output.text == "segment 1 segment 5")
+        #expect(!events.all.contains(.audioLost))
     }
 
     @Test func aMicrophoneThatCannotStartThrows() async throws {

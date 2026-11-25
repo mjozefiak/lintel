@@ -155,7 +155,11 @@ final class DictationController {
             Task { await session?.cancel() }
             return
         case .limitReached, .audioLost:
-            // What was said so far is still finished and pasted.
+            // What was said so far is still finished and pasted. The capture restarts itself after an audio
+            // configuration change, so `audioLost` means no input could be started again.
+            logger.notice(
+                "Recording ended by \(event == .audioLost ? "the audio input being lost" : "the time limit", privacy: .public)"
+            )
             menu()
             return
         }

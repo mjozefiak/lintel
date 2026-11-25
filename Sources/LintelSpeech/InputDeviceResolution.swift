@@ -45,6 +45,13 @@ extension InputFallback {
 public protocol InputFallbackReporting: AudioInput {
     /// Set while the last `start` used the default input because the chosen device was not available.
     var fallback: InputFallback? { get }
+    /// Called when the fallback changes after `start` (the capture moved to the default input because the chosen
+    /// device went away, or back to it). `nil` is "no longer a fallback". The default does nothing.
+    func setFallbackHandler(_ handler: (@Sendable (InputFallback?) -> Void)?)
+}
+
+extension InputFallbackReporting {
+    public func setFallbackHandler(_ handler: (@Sendable (InputFallback?) -> Void)?) {}
 }
 
 /// Decides which input a capture uses. Pure: the devices that exist are an argument, so it is tested without

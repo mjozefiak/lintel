@@ -283,6 +283,7 @@ actor MeetingSession {
             let onLevel = { @Sendable (level: Float) in
                 if levelGate.isOpen { _ = continuation.yield(.level(channel, level)) }
             }
+            observeFallback(of: input.audio, channel: channel)
             do {
                 let stream = try await input.audio.start(onLevel: onLevel)
                 let track = TrackState(channel: channel, audio: input.audio, vad: makeVAD())
@@ -367,6 +368,21 @@ actor MeetingSession {
         continuation.yield(.microphoneFallback(requested: fallback.requestedName, using: fallback.usingName))
     }
 
+    /// The capture can move to the default input (or back) by itself while it records, when the chosen device is
+    /// unplugged (or plugged in again) during an audio configuration change: the HUD hears about it.
+    private func observeFallback(of audio: any AudioInput, channel: AudioChannel) {
+        guard channel == .mic else { return }
+        let continuation = continuation
+        (audio as? any InputFallbackReporting)?.setFallbackHandler { fallback in
+            if let fallback {
+                continuation.yield(
+                    .microphoneFallback(requested: fallback.requestedName, using: fallback.usingName))
+            } else {
+                continuation.yield(.microphoneFallbackEnded)
+            }
+        }
+    }
+
     private func logStartFailure(_ channel: AudioChannel, _ error: any Error, attempt: Int?) {
         let kind = String(describing: error)
         let input = inputDiagnostics()
@@ -438,6 +454,7 @@ actor MeetingSession {
             guard state == .recording, finishTask == nil, microphoneToRevive()?.identity == target.identity else {
                 return false
             }
+            observeFallback(of: target.audio, channel: .mic)
             do {
                 let stream = try await target.audio.start(onLevel: target.onLevel ?? { _ in })
                 guard state == .recording, finishTask == nil else {
@@ -641,6 +658,7 @@ actor MeetingSession {
                 track.resuming = false
                 return
             }
+            observeFallback(of: track.audio, channel: channel)
             do {
                 let stream = try await track.audio.start(onLevel: track.onLevel ?? { _ in })
                 guard tracks[channel] === track, finishTask == nil, state == .recording else {

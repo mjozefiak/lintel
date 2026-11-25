@@ -57,18 +57,81 @@ public struct InputDeviceInfo: Equatable, Sendable {
     }
 }
 
+/// The audio engine `MicrophoneCapture` drives, as a seam: the real one wraps `AVAudioEngine`, tests give a fake
+/// that can post the configuration-change notification and change the format.
+protocol CaptureEngine: AnyObject, Sendable {
+    /// The object `.AVAudioEngineConfigurationChange` is posted for.
+    var notificationSource: AnyObject { get }
+    func select(deviceUID: String) throws
+    var inputFormat: AVAudioFormat { get }
+    func installTap(format: AVAudioFormat, _ block: @escaping @Sendable (AVAudioPCMBuffer) -> Void)
+    func removeTap()
+    func start() throws
+    func stop()
+}
+
+final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
+    private let engine = AVAudioEngine()
+
+    var notificationSource: AnyObject { engine }
+    var inputFormat: AVAudioFormat { engine.inputNode.outputFormat(forBus: 0) }
+
+    func select(deviceUID: String) throws {
+        guard let device = MicrophoneCapture.deviceID(forUID: deviceUID), let unit = engine.inputNode.audioUnit else {
+            throw CaptureError.noInputDevice
+        }
+        var id = device
+        let status = AudioUnitSetProperty(
+            unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &id,
+            UInt32(MemoryLayout<AudioDeviceID>.size))
+        guard status == noErr else { throw CaptureError.noInputDevice }
+    }
+
+    func installTap(format: AVAudioFormat, _ block: @escaping @Sendable (AVAudioPCMBuffer) -> Void) {
+        engine.inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in block(buffer) }
+    }
+
+    func removeTap() { engine.inputNode.removeTap(onBus: 0) }
+
+    func start() throws {
+        engine.prepare()
+        do {
+            try engine.start()
+        } catch {
+            throw CaptureError.engineFailed(error.localizedDescription)
+        }
+    }
+
+    func stop() { engine.stop() }
+}
+
 /// `AVAudioEngine` on the chosen input (or the system's), converted to 16 kHz mono `Float32` and handed out
-/// in memory; nothing is written to disk. The stream ends when the device goes away or the Mac sleeps.
+/// in memory; nothing is written to disk.
+///
+/// A change of the audio configuration (a new default *output*, a monitor that is plugged or unplugged, a
+/// sample-rate change, sleep) stops the engine and posts `.AVAudioEngineConfigurationChange`, even though the
+/// input did not go anywhere. The capture then builds a new engine on the same device (or, when the chosen
+/// device is gone, on the default input, reported as a `fallback`) and the stream goes on, with the short gap
+/// filled with silence so a timeline stays right. The stream ends only when no input can be started again.
 public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendable {
     private let deviceUID: String?
     private let deviceName: String?
     private let devices: @Sendable () -> [InputDevice]
     private let defaultInputName: @Sendable () -> String?
+    private let makeEngine: @Sendable () -> any CaptureEngine
+    private let notifications: NotificationCenter
+    private let restartDelays: [Duration]
+    private let sleep: @Sendable (Duration) async -> Void
+    private let logger = Logger(subsystem: "com.lintelapp", category: "capture")
     private let lock = NSLock()
     private var activeFallback: InputFallback?
-    private var engine: AVAudioEngine?
+    private var fallbackHandler: (@Sendable (InputFallback?) -> Void)?
+    private var engine: (any CaptureEngine)?
     private var observer: (any NSObjectProtocol)?
     private var continuation: AsyncStream<[Float]>.Continuation?
+    private var onLevel: (@Sendable (Float) -> Void)?
+    /// Counts engines: a notification or a restart that belongs to an older one is ignored.
+    private var generation = 0
 
     /// - Parameters:
     ///   - deviceUID: the input device's UID from Settings, or `nil` for the system's input. A device that is
@@ -76,21 +139,89 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
     ///     system's input and `fallback` says so.
     ///   - deviceName: the name stored with that choice, for the message; read from a USB UID when `nil`.
     ///   - devices, defaultInputName: where the devices come from (Core Audio; tests give lists).
-    public init(
+    public convenience init(
         deviceUID: String? = nil, deviceName: String? = nil,
         devices: @escaping @Sendable () -> [InputDevice] = { MicrophoneCapture.inputDevices() },
         defaultInputName: @escaping @Sendable () -> String? = { MicrophoneCapture.defaultInputInfo()?.name }
+    ) {
+        self.init(
+            deviceUID: deviceUID, deviceName: deviceName, devices: devices, defaultInputName: defaultInputName,
+            makeEngine: { SystemCaptureEngine() }, notifications: .default,
+            restartDelays: [.milliseconds(100), .milliseconds(250), .milliseconds(500)],
+            sleep: { try? await Task.sleep(for: $0) })
+    }
+
+    init(
+        deviceUID: String?, deviceName: String?, devices: @escaping @Sendable () -> [InputDevice],
+        defaultInputName: @escaping @Sendable () -> String?, makeEngine: @escaping @Sendable () -> any CaptureEngine,
+        notifications: NotificationCenter, restartDelays: [Duration],
+        sleep: @escaping @Sendable (Duration) async -> Void
     ) {
         self.deviceUID = deviceUID
         self.deviceName = deviceName
         self.devices = devices
         self.defaultInputName = defaultInputName
+        self.makeEngine = makeEngine
+        self.notifications = notifications
+        self.restartDelays = restartDelays
+        self.sleep = sleep
     }
 
     public var fallback: InputFallback? { lock.withLock { activeFallback } }
 
+    public func setFallbackHandler(_ handler: (@Sendable (InputFallback?) -> Void)?) {
+        lock.withLock { fallbackHandler = handler }
+    }
+
     public func start(onLevel: @escaping @Sendable (Float) -> Void) async throws -> AsyncStream<[Float]> {
-        let engine = AVAudioEngine()
+        let (stream, continuation) = AsyncStream<[Float]>.makeStream(bufferingPolicy: .unbounded)
+        let engine = makeEngine()
+        let used = try attach(engine, continuation: continuation, onLevel: onLevel)
+        let token = installObserver(for: engine)
+        do {
+            try engine.start()
+        } catch {
+            engine.removeTap()
+            notifications.removeObserver(token)
+            throw error
+        }
+        lock.withLock {
+            generation += 1
+            activeFallback = used
+            self.engine = engine
+            self.observer = token
+            self.continuation = continuation
+            self.onLevel = onLevel
+        }
+        return stream
+    }
+
+    public func stop() async {
+        let (engine, observer, continuation) = lock.withLock {
+            () -> ((any CaptureEngine)?, (any NSObjectProtocol)?, AsyncStream<[Float]>.Continuation?) in
+            defer {
+                self.engine = nil
+                self.observer = nil
+                self.continuation = nil
+                self.onLevel = nil
+                // A restart that is under way notices and gives its new engine back.
+                self.generation += 1
+            }
+            return (self.engine, self.observer, self.continuation)
+        }
+        if let observer { notifications.removeObserver(observer) }
+        engine?.removeTap()
+        engine?.stop()
+        continuation?.finish()
+    }
+
+    // MARK: Engine setup
+
+    /// Picks the device, reads its format and puts the tap on `engine`. Returns the fallback in use, if any.
+    private func attach(
+        _ engine: any CaptureEngine, continuation: AsyncStream<[Float]>.Continuation,
+        onLevel: @escaping @Sendable (Float) -> Void
+    ) throws -> InputFallback? {
         let resolution = InputDeviceResolution.resolve(
             requestedUID: deviceUID, requestedName: deviceName, available: devices(),
             defaultInputName: defaultInputName())
@@ -101,7 +232,7 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
         case .chosen(let uid):
             // The device was listed a moment ago; if selecting it still fails, the system's input is used.
             do {
-                try Self.select(deviceUID: uid, on: engine)
+                try engine.select(deviceUID: uid)
             } catch {
                 used = InputFallback(
                     requestedName: deviceName ?? InputDeviceResolution.displayName(ofUID: uid),
@@ -110,9 +241,7 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
         case .fallback(let fallback):
             used = fallback
         }
-        lock.withLock { activeFallback = used }
-        let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
+        let format = engine.inputFormat
         guard format.sampleRate > 0, format.channelCount > 0 else { throw CaptureError.noInputDevice }
         guard
             let target = AVAudioFormat(
@@ -121,8 +250,7 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
             let converter = AVAudioConverter(from: format, to: target)
         else { throw CaptureError.converterUnavailable }
 
-        let (stream, continuation) = AsyncStream<[Float]>.makeStream(bufferingPolicy: .unbounded)
-        input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
+        engine.installTap(format: format) { buffer in
             let ratio = target.sampleRate / format.sampleRate
             let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 16
             guard let converted = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return }
@@ -142,47 +270,109 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
             onLevel(Self.level(of: samples))
             continuation.yield(samples)
         }
-        // A device change or sleep reconfigures the engine and stops it: end the stream.
-        let observer = NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
+        return used
+    }
+
+    private func installObserver(for engine: any CaptureEngine) -> any NSObjectProtocol {
+        notifications.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine.notificationSource, queue: nil
         ) { [weak self] _ in
-            self?.finishStream()
+            self?.configurationChanged(of: engine)
         }
-        engine.prepare()
-        do {
-            try engine.start()
-        } catch {
-            input.removeTap(onBus: 0)
-            NotificationCenter.default.removeObserver(observer)
-            throw CaptureError.engineFailed(error.localizedDescription)
-        }
-        lock.withLock {
-            self.engine = engine
-            self.observer = observer
-            self.continuation = continuation
-        }
-        return stream
     }
 
-    public func stop() async {
-        let (engine, observer, continuation) = lock.withLock {
-            () -> (AVAudioEngine?, (any NSObjectProtocol)?, AsyncStream<[Float]>.Continuation?) in
+    // MARK: Configuration change
+
+    /// The engine stopped because the configuration changed. Not a lost microphone by itself: start a new engine.
+    private func configurationChanged(of changed: any CaptureEngine) {
+        let work = lock.withLock { () -> (Int, AsyncStream<[Float]>.Continuation, @Sendable (Float) -> Void)? in
+            guard let current = engine, current === changed, let continuation, let onLevel else { return nil }
+            generation += 1
+            return (generation, continuation, onLevel)
+        }
+        guard let (token, continuation, onLevel) = work else { return }
+        logger.notice("Audio configuration changed while recording; restarting the capture")
+        Task.detached { [self] in await restart(token, continuation: continuation, onLevel: onLevel) }
+    }
+
+    private func restart(
+        _ token: Int, continuation: AsyncStream<[Float]>.Continuation, onLevel: @escaping @Sendable (Float) -> Void
+    ) async {
+        let began = ContinuousClock.now
+        let old = lock.withLock { () -> ((any CaptureEngine)?, (any NSObjectProtocol)?) in
             defer {
-                self.engine = nil
-                self.observer = nil
-                self.continuation = nil
+                engine = nil
+                observer = nil
             }
-            return (self.engine, self.observer, self.continuation)
+            return (engine, observer)
         }
-        if let observer { NotificationCenter.default.removeObserver(observer) }
-        engine?.inputNode.removeTap(onBus: 0)
-        engine?.stop()
-        continuation?.finish()
-    }
-
-    private func finishStream() {
-        let continuation = lock.withLock { self.continuation }
-        continuation?.finish()
+        if let observer = old.1 { notifications.removeObserver(observer) }
+        old.0?.removeTap()
+        old.0?.stop()
+        for (index, delay) in restartDelays.enumerated() {
+            // The device list is inconsistent for a moment while hardware comes and goes.
+            await sleep(delay)
+            guard lock.withLock({ generation == token && self.continuation != nil }) else { return }
+            let fresh = makeEngine()
+            do {
+                let used = try attach(fresh, continuation: continuation, onLevel: onLevel)
+                let observerToken = installObserver(for: fresh)
+                // The engine is current before it starts, so a notification during the start is not lost.
+                let adopted = lock.withLock { () -> Bool in
+                    guard generation == token, self.continuation != nil else { return false }
+                    engine = fresh
+                    observer = observerToken
+                    return true
+                }
+                guard adopted else {
+                    notifications.removeObserver(observerToken)
+                    fresh.removeTap()
+                    fresh.stop()
+                    return
+                }
+                do {
+                    try fresh.start()
+                } catch {
+                    lock.withLock {
+                        if engine === fresh {
+                            engine = nil
+                            observer = nil
+                        }
+                    }
+                    notifications.removeObserver(observerToken)
+                    throw error
+                }
+                let (handler, changed) = lock.withLock { () -> ((@Sendable (InputFallback?) -> Void)?, Bool) in
+                    let changed = activeFallback != used
+                    activeFallback = used
+                    return (fallbackHandler, changed)
+                }
+                // The gap is silence, so a timeline that counts samples stays in step with the clock.
+                let gap = began.duration(to: .now)
+                let seconds = min(max(0, Double(gap.components.seconds) + Double(gap.components.attoseconds) / 1e18), 2)
+                let silent = Int(seconds * Double(AudioFormat.sampleRate))
+                if silent > 0 { continuation.yield([Float](repeating: 0, count: silent)) }
+                logger.notice(
+                    "Audio capture restarted after attempt \(index + 1, privacy: .public), fallback \(used != nil, privacy: .public)"
+                )
+                if changed { handler?(used) }
+                return
+            } catch {
+                logger.error(
+                    "Audio capture restart failed, attempt \(index + 1, privacy: .public): \(String(describing: error), privacy: .public)"
+                )
+                fresh.removeTap()
+                fresh.stop()
+            }
+        }
+        let ended = lock.withLock { () -> Bool in
+            guard generation == token else { return false }
+            self.continuation = nil
+            return true
+        }
+        guard ended else { return }
+        logger.error("Audio capture lost: no input could be started after the configuration change")
+        continuation.finish()
     }
 
     /// The lowest level of a chunk that holds any sound at all: a working microphone's quietest room noise
@@ -286,7 +476,7 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
         return value.takeRetainedValue() as String
     }
 
-    private static func deviceID(forUID uid: String) -> AudioDeviceID? {
+    static func deviceID(forUID uid: String) -> AudioDeviceID? {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyTranslateUIDToDevice, mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain)
@@ -299,16 +489,5 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
                 &device)
         }
         return status == noErr && device != 0 ? device : nil
-    }
-
-    private static func select(deviceUID: String, on engine: AVAudioEngine) throws {
-        guard let device = deviceID(forUID: deviceUID), let unit = engine.inputNode.audioUnit else {
-            throw CaptureError.noInputDevice
-        }
-        var id = device
-        let status = AudioUnitSetProperty(
-            unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &id,
-            UInt32(MemoryLayout<AudioDeviceID>.size))
-        guard status == noErr else { throw CaptureError.noInputDevice }
     }
 }

@@ -130,6 +130,21 @@ import Testing
         #expect(!log.contains { if case .microphoneFallback = $0 { true } else { false } })
     }
 
+    @Test func aMicrophoneThatMovesToTheDefaultInputWhileRecordingSaysSoAndSaysWhenItIsBack() async throws {
+        let rig = try SessionRig(texts: [:])
+        let device = ControlledInput()
+        let session = rig.session(mic: TrackScript(), system: systemScript(), limits: limits(rig), micAudio: device)
+        let log = SessionEventLog(session)
+        _ = try await session.start()
+        // The chosen microphone is unplugged during an audio configuration change; the capture carries on.
+        device.moveToFallback(InputFallback(requestedName: "USB MICROPHONE", usingName: nil))
+        #expect(await log.wait { $0 == .microphoneFallback(requested: "USB MICROPHONE", using: nil) })
+        device.moveToFallback(nil)
+        #expect(await log.wait { $0 == .microphoneFallbackEnded })
+        #expect(!log.contains { $0 == .trackLost(.mic) || $0 == .trackUnavailable(.mic) })
+        _ = await session.finish()
+    }
+
     @Test func aMicrophoneThatStartsLateOnTheDefaultInputSaysSoWhenItResumes() async throws {
         let rig = try SessionRig(texts: [:])
         let device = ControlledInput(failFirstStarts: 1)

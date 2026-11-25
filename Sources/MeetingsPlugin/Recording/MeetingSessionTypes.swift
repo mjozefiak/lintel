@@ -43,6 +43,8 @@ enum MeetingSessionEvent: Equatable, Sendable {
     /// (`InputFallback`): at the start, or after the device went away during the recording. The names are for the
     /// HUD only; either can be unknown.
     case microphoneFallback(requested: String?, using: String?)
+    /// The chosen microphone is recording again (it was plugged in during an audio configuration change).
+    case microphoneFallbackEnded
     /// A track could not be started at the beginning (the session continues with the other one).
     case trackUnavailable(AudioChannel)
     /// A track ended while recording (device unplugged, permission revoked); the other one carries on.

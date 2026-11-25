@@ -28,6 +28,14 @@ final class ControlledInput: InputFallbackReporting {
     var fallback: InputFallback? { reportedFallback.withLock { $0 } }
     func setFallback(_ fallback: InputFallback?) { reportedFallback.withLock { $0 = fallback } }
 
+    private let handler = Mutex<(@Sendable (InputFallback?) -> Void)?>(nil)
+    func setFallbackHandler(_ handler: (@Sendable (InputFallback?) -> Void)?) { self.handler.withLock { $0 = handler } }
+    /// The capture moved to another input (or back) by itself while recording.
+    func moveToFallback(_ fallback: InputFallback?) {
+        setFallback(fallback)
+        handler.withLock { $0 }?(fallback)
+    }
+
     var starts: Int { state.withLock { $0.starts } }
     var stops: Int { state.withLock { $0.stops } }
     /// Every call of `start`, failed or not.

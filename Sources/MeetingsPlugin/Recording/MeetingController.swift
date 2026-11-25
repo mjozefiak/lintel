@@ -484,6 +484,9 @@ final class MeetingController {
         case .microphoneFallback(let requested, let using):
             recording.microphoneFallback = MeetingHUDState.MicrophoneFallback(requested: requested, using: using)
             refresh()
+        case .microphoneFallbackEnded:
+            recording.microphoneFallback = nil
+            refresh()
         case .trackLost(let channel):
             recording.lost.insert(channel)
             darken(channel)
