@@ -9,6 +9,12 @@ name: Gallery goldens
 # section and `needs-qa`; nobody records new goldens just to make a test pass.
 
 on:
+  # TEMPORARY (bootstrap of the PR that adds this workflow, removed before merge): GitHub offers workflow_dispatch only
+  # for a workflow that already exists on the default branch, so the first goldens of this branch are recorded by a push
+  # that touches this file.
+  push:
+    branches: [feat/swiftui-gallery-f1]
+    paths: [.github/workflows/gallery-goldens.yml]
   workflow_dispatch:
     inputs:
       scene:
