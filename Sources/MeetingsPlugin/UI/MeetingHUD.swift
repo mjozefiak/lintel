@@ -41,7 +41,6 @@ final class MeetingHUDModel {
 final class MeetingHUDPanel: HUDPresenter {
     private static let width: CGFloat = 400
     private static let singleLineHeight: CGFloat = 44
-    private static let twoLineHeight: CGFloat = 68
     private static let margin: CGFloat = 8
 
     private let model = MeetingHUDModel()
@@ -126,7 +125,7 @@ final class MeetingHUDPanel: HUDPresenter {
     /// Positions the panel when it appears; afterwards only the height may change, with the top edge fixed, so
     /// the pill does not jump to another screen when the mouse moves.
     private func layout(_ panel: NSPanel, for state: MeetingHUDState) {
-        let height = state.hasDetailLine ? Self.twoLineHeight : Self.singleLineHeight
+        let height = state.pillHeight
         guard panel.isVisible else { return place(panel, height: height) }
         let current = panel.frame
         guard abs(current.height - height) > 0.5 else { return }
@@ -187,13 +186,14 @@ struct MeetingHUDView: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(state.detailLines)
                     .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 30)
             }
         }
         .padding(.horizontal, 14)
-        .frame(width: 400, height: state.hasDetailLine ? 68 : 44, alignment: .leading)
+        .frame(width: 400, height: state.pillHeight, alignment: .leading)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
         .overlay {
             if contrast == .increased {
@@ -201,7 +201,7 @@ struct MeetingHUDView: View {
                     .strokeBorder(.primary.opacity(0.6), lineWidth: 1)
             }
         }
-        .animation(still ? nil : .smooth(duration: 0.2), value: state.hasDetailLine)
+        .animation(still ? nil : .smooth(duration: 0.2), value: state.pillHeight)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(state.accessibilityLabel)
     }

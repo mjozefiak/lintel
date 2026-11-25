@@ -189,6 +189,9 @@ import Testing
             #expect(state.detail == expected)
             #expect(state.actions == [.stop])
             #expect(state.accessibilityLabel.contains(expected))
+            // The sentence wraps to a second line, so the pill is taller than one with a one-line detail.
+            #expect(state.detailLines == 2)
+            #expect(state.pillHeight == 82)
         }
     }
 

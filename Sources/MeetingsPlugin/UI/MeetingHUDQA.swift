@@ -91,7 +91,7 @@ final class MeetingHUDQA {
         guard let state = Self.state(named: name) else { return false }
         model.reducesMotion = true
         model.state = state
-        let height: CGFloat = state.hasDetailLine ? 68 : 44
+        let height = state.pillHeight
         let panel = panel ?? makePanel()
         self.panel = panel
         panel.setContentSize(NSSize(width: 400, height: height))
