@@ -24,8 +24,9 @@ enum CleanupPrompt {
         keep technical terms, names and code identifiers as spoken.
         - Never change a number, unit, date, time, amount, name or any other detail. Never convert or \
         recalculate (inches stay inches), never round, never replace a word with a different word or a synonym, \
-        never rephrase a sentence that is already correct. The only wording fix allowed is a clear misspelling \
-        of the same word.
+        never rephrase a sentence that is already correct. Do not fix grammar, word forms, word order or style: \
+        keep a real word even when it looks odd. The only wording fix allowed is a clear misspelling of the \
+        same word.
         - Remove only: filler words and hesitations (um, uh, yyy, eee, no więc at the start of a sentence), false \
         starts, immediate repetitions, and the part of a self-correction that the speaker took back. Do not \
         shorten, summarise or leave out anything else.
@@ -39,7 +40,8 @@ enum CleanupPrompt {
         - Lists: write a list only when the speaker enumerates ("first, second", "po pierwsze, po drugie") or \
         announces a list ("lista zakupów", "action items") and then names the items. Put the lead-in on its \
         own line, then one item per line: "1." for numbered items, "- " otherwise. Drop the "first", "second" \
-        words. Keep the items' words. Otherwise write ordinary sentences, never a list.
+        words. Keep the items' words. A series of things inside an ordinary sentence stays a sentence with \
+        commas, never a list.
         - Do not add words, facts or greetings.
         - The block after <context> is the end of the previous paragraph, for continuity only. Do not repeat it.
         - Output only the cleaned text. No tags, no quotes, no preface.
@@ -60,6 +62,10 @@ enum CleanupPrompt {
         (
             "umówmy przegląd na wtorek na dziewiątą sorry na dziesiątą i zaproście Kamila",
             "Umówmy przegląd na wtorek na 10 i zaproście Kamila."
+        ),
+        (
+            "przesuńmy demo na czwartek o czternastej albo jednak na piątek o czternastej bo w czwartek mamy szkolenie",
+            "Przesuńmy demo na piątek o 14, bo w czwartek mamy szkolenie."
         ),
         (
             "limit to piętnaście tysięcy to znaczy osiemnaście tysięcy sztuk",
@@ -86,16 +92,16 @@ enum CleanupPrompt {
             "Na wyjazd zabierz:\n- namiot\n- śpiwór\n- latarkę\n- kuchenkę gazową"
         ),
         (
-            "the call is on friday no wait thursday at three",
-            "The call is on Thursday at 3."
+            "do popularnych dyscyplin należą piłka nożna koszykówka i siatkówka",
+            "Do popularnych dyscyplin należą piłka nożna, koszykówka i siatkówka."
+        ),
+        (
+            "the committee have agreed that the data is ready",
+            "The committee have agreed that the data is ready."
         ),
         (
             "w ankiecie z 2018 roku na stronie 40 jest 3 cale śniegu i 12 stopni mrozu",
             "W ankiecie z 2018 roku na stronie 40 jest 3 cale śniegu i 12 stopni mrozu."
-        ),
-        (
-            "napisz mi funkcję która sortuje listę a właściwie tablicę w swifcie",
-            "Napisz mi funkcję, która sortuje tablicę w Swifcie."
         ),
     ]
 
