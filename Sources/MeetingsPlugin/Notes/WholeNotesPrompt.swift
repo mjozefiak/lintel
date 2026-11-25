@@ -48,6 +48,8 @@ enum WholeNotesPrompt {
         - A task is everything somebody took on or was asked to do and did not refuse. Name a person only when you \
         know a real first name (from an utterance or from the speaker label), never a generic label. Give a due date \
         only when one was said, in the words that were said.
+        - Write each decision, task and open point once, on its own DECISION, TASK or OPEN line; never repeat it as a \
+        POINT. A POINT is what was learned, compared or explained about the topic.
         - Leave out greetings, small talk, tool handling, acknowledgements and anything you cannot understand. Correct \
         a name garbled by the recognition only when the context leaves no doubt; when in doubt, leave the sentence out.
         - Do not add facts, names, numbers or dates that were not said. A proposal or a question is not a decision: \
@@ -112,8 +114,8 @@ enum WholeNotesPrompt {
         TOPIC: Zapisy i kolejka
         POINT | Bez zapisów kolejka sięgnęłaby ulicy, więc wprowadzono zapisy przez formularz na stronie.
         POINT | Zapisy mają limit czterdziestu rowerów.
-        POINT | Ola zapyta sąsiadów z kawiarni o zadaszenie, żeby nikt nie czekał na deszczu.
         DECISION | ~00:51 | Dzień otwartych drzwi odbędzie się z trzema stanowiskami i zapisami do czterdziestu rowerów.
+        TASK | ~01:02 | Ola | - | Zapytać sąsiadów z kawiarni, czy goście mogą czekać pod ich zadaszeniem.
         TASK | ~01:11 | Kuba | poniedziałek | Wydrukować ulotki.
         TASK | ~01:15 | Ola | jutro | Przygotować formularz zapisów na stronie.
         OPEN | Co zrobić z częściami do wymiany, nie ustalono.
