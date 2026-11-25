@@ -236,9 +236,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
-        if let appearance = options.appearance { NSApp.appearance = NSAppearance(named: appearance.name) }
         let controller = GalleryWindowController()
-        controller.show()
+        controller.show(appearance: options.appearance == .dark ? .dark : .light)
         galleryWindow = controller
         if let quitAfter = options.quitAfter {
             schedule(after: quitAfter) { [weak controller] in

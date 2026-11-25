@@ -10,14 +10,16 @@ import SwiftUI
 @MainActor final class GalleryWindowController {
     private(set) var window: NSWindow?
 
-    func show(snapshotAfter: Duration? = nil) {
-        let host = NSHostingView(rootView: GalleryBrowserView(groups: GalleryCatalog.groups))
+    func show(appearance: GalleryVariant.Appearance = .light) {
+        let host = NSHostingView(
+            rootView: GalleryBrowserView(groups: GalleryCatalog.groups, initialAppearance: appearance))
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_180, height: 820),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Lintel Design Gallery"
         window.isReleasedWhenClosed = false
         window.contentView = host
+        window.appearance = NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
         window.center()
         // Like the other QA windows: in front, but without taking the focus from the tester.
         window.orderFrontRegardless()
@@ -37,6 +39,13 @@ import SwiftUI
 
 private struct GalleryBrowserView: View {
     let groups: [GalleryCatalog.Group]
+    let initialAppearance: GalleryVariant.Appearance
+
+    init(groups: [GalleryCatalog.Group], initialAppearance: GalleryVariant.Appearance) {
+        self.groups = groups
+        self.initialAppearance = initialAppearance
+        _appearance = State(initialValue: initialAppearance)
+    }
 
     enum Mode: String, CaseIterable, Identifiable {
         case live = "Live"
@@ -46,7 +55,7 @@ private struct GalleryBrowserView: View {
 
     @State private var selection: String?
     @State private var mode = Mode.live
-    @State private var appearance = GalleryVariant.Appearance.light
+    @State private var appearance: GalleryVariant.Appearance
     @State private var textSize = TextSize.medium
     @State private var fullMatrix = false
 

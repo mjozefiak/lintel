@@ -13,7 +13,7 @@ the shell's own scenes (follow-up). HUDs and sheets are phase 4, the other scree
 
 | What | How |
 |---|---|
-| Look at the scenes, live or as pictures | `CONFIGURATION=debug scripts/make-app.sh`, then `dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-gallery`. Add `--qa-snapshot <png> --qa-quit-after 8` for a picture of the window. No plugin starts. |
+| Look at the scenes, live or as pictures | `CONFIGURATION=debug scripts/make-app.sh`, then `dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa --qa-gallery`. Add `--qa-snapshot <png> --qa-quit-after 8` for a picture of the window. No plugin starts. `--qa-snapshot` uses `cacheDisplay`, which does not draw the sidebar selection (a black box) or the toolbar of an inactive window: for a picture of the window itself use `screencapture -l <window id>` while it is open. |
 | The full matrix for the owner | `scripts/gallery-export.sh <dir> [--scene <id>]`: PNGs in `<dir>/<scene>/<state>/<variant>.png` and a contact sheet `<dir>/index.html`. It runs the app bundle twice (`-AppleLanguages "(en)"` and `"(pl)"`). A local export is a preview: another macOS build draws text differently from the CI runner. |
 | One language by hand | `Lintel-QA --qa --qa-gallery-export <dir> --qa-gallery-language pl -AppleLanguages "(pl)"` |
 | Compare / record goldens (the CI mechanism) | `--qa-gallery-compare <dir>` / `--qa-gallery-record <dir>` with `--qa-gallery-language <en\|pl>`; exit code 1 on a difference. The goldens are in `Tests/<Plugin>Tests/Gallery/Goldens/`. |
