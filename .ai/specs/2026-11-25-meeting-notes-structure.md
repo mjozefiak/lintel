@@ -279,7 +279,7 @@ Dwie niezależne ścieżki: układ (F1 → F4; F4 zależy tylko od F1, czyli od 
 
 1. **`NotesLayout` + `NotesLayoutComposer`** (czyste): `maxTopics`, krótkie spotkanie, łączenie tematów z jednym punktem w „Inne”, kolejność sekcji, usuwanie czasów i znaczników checklisty, etykiety PL/EN. Testy: tabela długości → `maxTopics`; krótkie spotkanie bez nagłówków; pusta sekcja znika; brak „Do przypisania”; żaden czas `[mm:ss]`, `~mm:ss`, `(mm:ss)` nie przechodzi; Markdown przez `NotesMarkdown.render` bez linków i obrazów.
 2. **`NotesDraftComposer` → `NotesLayout`.** Testy: istniejące testy dostawcy zaktualizowane do nowej kolejności; oczekiwania co do usuwanych treści (linki, HTML, czasy, osoby bez pokrycia) bez osłabienia.
-3. **`WholeNotesPrompt` `whole2`** (format z `INTRO:`, liczba tematów i punktów od kodu, nowy syntetyczny przykład) i limity `NotesFactGuard`. Testy: nowy golden `whole-notes-prompt-v2.txt`, `provider-prompt-cli1.txt` dla nowej treści; parser przyjmuje `INTRO:` i stary `SUMMARY:`; nazwa tematu z obcym imieniem odrzucona.
+3. **`WholeNotesPrompt` `whole2`** (format z `INTRO:`, liczba tematów i punktów od kodu, nowy syntetyczny przykład) i limity `NotesFactGuard`. Testy: nowe golden `whole-notes-prompt-v2.txt` i `provider-prompt-cli1-whole2.txt` (stare `whole-notes-prompt-v1.txt` i `provider-prompt-cli1.txt` zostają bez zmian); parser przyjmuje `INTRO:` i stary `SUMMARY:`; nazwa tematu z obcym imieniem odrzucona.
 4. **Pomiar `P1`** + bramka G (ADR 0011) + ręczne QA: zrzuty notatki długiej, krótkiej, PL i EN w jasnym i ciemnym motywie (`--qa` i nagranie z korpusu syntetycznego). Release note tylko dla notatek dostawcy (tor wbudowany zmienia układ w F4).
 
 ### F2 — strażnik: kotwiczenie i początek zdania
