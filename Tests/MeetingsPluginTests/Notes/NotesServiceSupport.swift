@@ -69,6 +69,8 @@ final class NotesServiceRig {
     let llm: ScriptedLLM
     let lease = LLMLease(sleep: { _ in try await Task.sleep(for: .seconds(3600)) })
     let file = Shared<URL?>(URL(filePath: "/models/llm/notes-test.gguf"))
+    /// How many times the service looked for the model file (`Dependencies.modelFile`).
+    let modelLookups = Shared(0)
     /// The packages `openModels` was called with.
     let modelsOpened = Shared<[String?]>([])
     let changes = Shared(0)
@@ -86,7 +88,8 @@ final class NotesServiceRig {
         runtime custom: (any LLMRuntime)? = nil, shutdownLimit: Duration = .milliseconds(200),
         configure: @escaping @Sendable (inout NotesPipeline.Configuration) -> Void = { _ in },
         providerRunner: ProviderRunner? = nil,
-        configureWhole: @escaping @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in }
+        configureWhole: @escaping @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in },
+        modelWatchInterval: Duration = .seconds(15)
     ) throws {
         harness = try MeetingsHarness(settings: initial)
         library = harness.library()
@@ -95,19 +98,24 @@ final class NotesServiceRig {
         library.open()
         let llm = llm
         let file = file
+        let lookups = modelLookups
         let opened = modelsOpened
         let changes = changes
         let bell = bell
         let now = fixedNow
         service = NotesService(
             NotesService.Dependencies(
-                library: library, settings: settings, lease: lease, modelFile: { _ in file.get() },
+                library: library, settings: settings, lease: lease,
+                modelFile: { _ in
+                    lookups.update { $0 += 1 }
+                    return file.get()
+                },
                 makeRuntime: { custom ?? llm },
                 configure: { configuration in
                     configuration.busyPoll = .milliseconds(10)
                     configure(&configuration)
                 }, providerRunner: providerRunner, configureWhole: configureWhole, now: { now },
-                shutdownLimit: shutdownLimit,
+                shutdownLimit: shutdownLimit, modelWatchInterval: modelWatchInterval,
                 openModels: { id in opened.update { $0.append(id) } },
                 changed: {
                     changes.update { $0 += 1 }

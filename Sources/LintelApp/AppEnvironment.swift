@@ -305,17 +305,21 @@ struct AppEnvironment {
     }
     #endif
 
-    /// Runs `PluginDefaultsMigration` before `openRanking` creates `ranking.sqlite` (the sign of an earlier launch)
-    /// and before the host reads any `plugins.<id>.enabled`. `settingsPersist` is false only for a QA run with
-    /// in-memory settings, which is always a new install.
+    /// Runs `PluginDefaultsMigration` and `NotesDefaultMigration` before `openRanking` creates `ranking.sqlite` (the
+    /// sign of an earlier launch) and before the host reads any `plugins.<id>.enabled` or a plugin reads its settings.
+    /// Whether the install ran before is decided once, before either step writes its marker, so a new install's
+    /// first launch is never taken for an old one because #251's step has just marked it. `settingsPersist` is false
+    /// only for a QA run with in-memory settings, which is always a new install.
     static func pinPreviousPluginDefaults(
         dataRoot: URL, settings: any SettingsStore, fileManager: FileManager, settingsPersist: Bool = true
     ) {
         let existing =
             settingsPersist
-            && PluginDefaultsMigration.isExistingInstall(
+            && (PluginDefaultsMigration.isExistingInstall(
                 dataRoot: dataRoot, settings: settings, fileManager: fileManager)
+                || settings.value(forKey: PluginDefaultsMigration.migratedKey) != nil)
         PluginDefaultsMigration.run(settings: settings, isExistingInstall: existing)
+        NotesDefaultMigration.run(settings: settings, isExistingInstall: existing)
     }
 
     /// `ranking.sqlite` at the data root. If it cannot be opened, ranking falls back to memory for this

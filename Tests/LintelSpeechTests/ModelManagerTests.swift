@@ -207,6 +207,30 @@ struct Fixture {
         #expect(StubProtocol.requests(forPathPrefix: fixture.prefix).isEmpty)
     }
 
+    /// The read-only check a screen shows before Download (#252) asks for exactly what `install` asks for.
+    @Test func theSpaceCheckMatchesWhatTheInstallNeeds() async throws {
+        let fixture = try Fixture()
+        let total = fixture.package.totalBytes
+        let tight = fixture.manager(space: 10)
+        let expected = ModelSpaceCheck(needed: total + total / 10, available: 10)
+        #expect(await tight.spaceCheck(for: fixture.package) == expected)
+        #expect(await !tight.spaceCheck(for: fixture.package).fits)
+
+        // A stopped download needs only what is still missing.
+        let weights = fixture.directory.url.appending(
+            path: "Models/fixture.partial/Model.mlmodelc/weights", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: weights, withIntermediateDirectories: true)
+        try fixture.a.prefix(30).write(to: weights.appending(path: "weight.bin.part"))
+        let remaining = total - 30
+        #expect(await tight.spaceCheck(for: fixture.package).needed == remaining + remaining / 10)
+
+        fixture.serve()
+        let roomy = fixture.manager()
+        #expect(await roomy.spaceCheck(for: fixture.package).fits)
+        try await roomy.install(fixture.package)
+        #expect(await tight.spaceCheck(for: fixture.package) == ModelSpaceCheck(needed: 0, available: 10))
+    }
+
     @Test func aRedirectToAnAllowedHostIsFollowed() async throws {
         let fixture = try Fixture()
         let b = fixture.b

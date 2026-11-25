@@ -234,7 +234,7 @@ private func mode(_ url: URL) throws -> Int {
         #expect(settings.voiceProcessing == false)
         #expect(settings.diarization == true)
         #expect(settings.consentReminder == true)
-        #expect(settings.notesEnabled == false)
+        #expect(settings.notesEnabled == true)
         #expect(settings.builtInLLMModel.id == LLMModelCatalog.defaultModel.id)
         #expect(settings.notesChunkTokens == 3_000)
         #expect(settings.notesReduceInputTokens == 4_500)
