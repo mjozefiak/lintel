@@ -569,6 +569,19 @@ done
 $QA --qa --qa-onboarding-step meetings.setup --qa-setting plugins.meetings.notesEnabled=false
 ```
 
+`--qa-snapshot` renders the main window (or a `--qa-hud` panel) only, never the welcome screen: capture the welcome
+window while it is open with a window screenshot (`screencapture -o -l <window id> <file>.png`, or ⌘⇧4 then Space),
+and look at it for the account name and home-folder paths before publishing it.
+
+The default flip also changes two Settings screens on a fresh profile (capture them with `--qa-snapshot`):
+
+```bash
+# Settings → Meetings: the switch on, the notes model row and "Notes are written by" (Local) shown:
+$QA --qa --qa-window settings --qa-settings meetings --qa-snapshot /tmp/meetings.png --qa-quit-after 6
+# Settings → Models: the notes model "used by Meetings", no "needed" banner for it:
+$QA --qa --qa-window settings --qa-settings models --qa-snapshot /tmp/models.png --qa-quit-after 6
+```
+
 Check: Continue is never disabled; the line "You can record now. Notes are written once the model is on this Mac."
 shows under every state except Downloaded and off; `noSpace` shows the needed and the free size and no Download
 button; Download, Try Again and Continue Download in a forced state do nothing. A real download (2.5 GB for the
