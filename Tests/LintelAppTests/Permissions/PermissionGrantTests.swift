@@ -160,6 +160,34 @@ import Testing
         #expect(reader.reads.count == reads)
     }
 
+    @Test func aPluginThatKeepsItsBannerWaitingIsRedrawnOncePerGrantNotOnEveryTick() async {
+        defer { env.tearDown() }
+        let reader = FakePermissionsReader()
+        reader.answers[.accessibility] = .denied
+        let host = env.makeHost([WaitingForAccessibilityPlugin.self])
+        await host.start()
+        let settings = SettingsHostModel(host: host, reader: reader)
+        settings.show("waiting")
+        #expect(settings.livePermissions == [.accessibility])
+        /// Whether `body` made the host redraw (the observed `banner` was written).
+        func redraws(_ body: () -> Void) -> Bool {
+            let fired = Locked(false)
+            withObservationTracking {
+                _ = settings.banner
+            } onChange: {
+                fired.value = true
+            }
+            body()
+            return fired.value
+        }
+
+        #expect(!redraws { settings.liveTick() }, "still waiting for the grant: nothing is redrawn")
+        reader.answers[.accessibility] = .granted
+        #expect(redraws { settings.liveTick() }, "the grant redraws once")
+        // The plugin's banner stays (its own state), but the same grant is not redrawn again.
+        for _ in 0..<3 { #expect(!redraws { settings.liveTick() }) }
+    }
+
     @Test func aGateThatSaysClosedStopsTheLiveReads() async {
         defer { env.tearDown() }
         let reader = FakePermissionsReader()
@@ -322,6 +350,21 @@ import Testing
         #expect(plan(.fullDiskAccess) == .init(asksSystem: false, opensSettings: true, help: .dragTile))
         #expect(plan(.systemAudioRecording).help == .turnOnSwitch)
         #expect(plan(.pasteboard).help == .none)
+    }
+}
+
+/// Keeps its own "parked" banner waiting for Accessibility after the grant, like Window Management until its windows
+/// are restored: the banner comes from the plugin's state, not from the reader.
+final class WaitingForAccessibilityPlugin: LintelPlugin {
+    static let manifest = PluginManifest(id: "waiting", displayName: "Waiting", symbolName: "w.circle", order: 8)
+
+    init(context: PluginContext) {}
+
+    var requiredPermissions: Set<Permission> { [.accessibility] }
+    var settingsStatus: SettingsStatus? {
+        SettingsStatus(
+            level: .error, title: "Windows are parked",
+            fix: [SettingsStatusAction(title: "Open System Settings", destination: .systemSettings(.accessibility))])
     }
 }
 
