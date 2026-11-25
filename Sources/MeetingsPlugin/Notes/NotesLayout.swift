@@ -50,7 +50,7 @@ struct NotesLayout: Equatable, Sendable {
     }
 
     /// The topics as they are shown. A short meeting is one list without a heading. Otherwise a named topic with
-    /// one point joins the closing topic "Other" (when there are two such topics, or an "Other" already exists), and
+    /// one point joins the closing topic "Other", and
     /// that topic holds at most six points. Points without a name come first, so they never read as part of a
     /// heading above them.
     func shownTopics(durationMs: Int?) -> [Topic] {
@@ -61,7 +61,7 @@ struct NotesLayout: Equatable, Sendable {
         let named = filled.filter { $0.name != nil && !$0.isOther }
         var other = filled.filter(\.isOther).flatMap(\.points)
         let singles = named.filter { $0.points.count == 1 }
-        let merge = singles.count >= 2 || (!singles.isEmpty && !other.isEmpty)
+        let merge = !singles.isEmpty
         var kept = merge ? named.filter { $0.points.count > 1 } : named
         if merge { other = singles.flatMap(\.points) + other }
         if !other.isEmpty {

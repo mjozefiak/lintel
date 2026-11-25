@@ -65,10 +65,12 @@ import Testing
                 "Other\n"))
     }
 
-    @Test func aSingleOnePointTopicStaysItself() {
+    @Test func aSingleOnePointTopicJoinsOther() {
         var layout = NotesLayout()
         layout.topics = [topic("Pierwszy", 3), topic("Drugi", 1), topic("Trzeci", 3)]
-        #expect(layout.shownTopics(durationMs: 40 * 60_000).map(\.name) == ["Pierwszy", "Drugi", "Trzeci"])
+        let shown = layout.shownTopics(durationMs: 40 * 60_000)
+        #expect(shown.map(\.name) == ["Pierwszy", "Trzeci", nil])
+        #expect(shown.last?.isOther == true && shown.last?.points.count == 1)
     }
 
     @Test func theOtherTopicHoldsAtMostSixPoints() {

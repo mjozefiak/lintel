@@ -68,8 +68,9 @@ import Testing
             .summary
         #expect((wordy ?? "").split(separator: " ").count <= NotesFactGuard.maxSummaryWords)
         let huge = (1...100).map { _ in "budżet" }.joined(separator: " ")
+        // A sentence over the limit is left out whole, never cut in the middle.
         let cut = check("INTRO: \(huge).\nPOINT | A.").draft.summary
-        #expect((cut ?? "").split(separator: " ").count == NotesFactGuard.maxSummaryWords)
+        #expect(cut == nil)
     }
 
     // MARK: Topic names

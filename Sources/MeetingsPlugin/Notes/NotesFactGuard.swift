@@ -179,7 +179,7 @@ struct NotesFactGuard: Sendable {
             }
         }
         if flat.changed, !kept.isEmpty { report.shapeStripped += 1 }
-        // At most three sentences and 70 words: whole sentences, the first one cut to the word limit if it is longer.
+        // At most three sentences and 70 words: whole sentences only; a sentence longer than the limit is left out.
         var shown: [String] = []
         var words = 0
         for sentence in kept {
@@ -188,11 +188,9 @@ struct NotesFactGuard: Sendable {
                 report.cutToLimit += 1
                 continue
             }
-            if shown.isEmpty, count > Self.maxSummaryWords {
+            if count > Self.maxSummaryWords {
+                // Never cut a sentence in the middle: the rest could hold a negation or a condition.
                 report.cutToLimit += 1
-                shown.append(
-                    sentence.split(whereSeparator: \.isWhitespace).prefix(Self.maxSummaryWords).joined(separator: " "))
-                words = Self.maxSummaryWords
                 continue
             }
             shown.append(sentence)
