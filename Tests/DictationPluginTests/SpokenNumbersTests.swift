@@ -37,3 +37,62 @@ import Testing
         #expect(SpokenNumbers.newNumbers(in: "wersja 2", comparedTo: "wersja dwa").isEmpty)
     }
 }
+
+@Suite struct SpokenNumbersReviewTests {
+    @Test func aRunThatOverflowsIsNoNumberAndDoesNotTrap() {
+        let numbers = SpokenNumbers.spokenNumbers(
+            in: "ninety hundred hundred hundred hundred hundred hundred billion billion")
+        #expect(numbers.contains(90))
+        #expect(numbers.allSatisfy { $0 >= 0 })
+    }
+
+    @Test(
+        arguments: [
+            ("he was born in nineteen eighty nine", 1989), ("the plan for twenty twenty six", 2026),
+            ("one hundred and twenty chairs", 120), ("two thousand and five hundred dollars", 2500),
+            ("przyjdzie troje dzieci", 3), ("czworga dorosłych", 4), ("wpół do dziesiątej", 9),
+            ("wpół do dziesiątej", 30),
+        ])
+    func readingsOfAWholeRun(text: String, value: Int) {
+        #expect(SpokenNumbers.spokenNumbers(in: text).contains(value), Comment(rawValue: text))
+    }
+
+    @Test func wpółOnlyMovesTheHourRightAfterIt() {
+        #expect(!SpokenNumbers.spokenNumbers(in: "wpół godziny i dziesiątej").contains(9))
+    }
+
+    @Test(
+        "Correct digits are accepted",
+        arguments: [
+            (
+                "he was born in nineteen eighty nine in a small town near the coast",
+                "He was born in 1989 in a small town near the coast."
+            ),
+            (
+                "we need one hundred and twenty chairs for the event next week",
+                "We need 120 chairs for the event next week."
+            ),
+            (
+                "przyjdzie troje dzieci i czworo dorosłych na urodziny jutro",
+                "Przyjdzie 3 dzieci i 4 dorosłych na urodziny jutro."
+            ),
+            (
+                "spotkajmy się wpół do dziesiątej przed biurem na parkingu",
+                "Spotkajmy się o 9:30 przed biurem na parkingu."
+            ),
+            (
+                "do zrobienia po pierwsze mleko po drugie chleb i jeszcze masło",
+                "Do zrobienia:\n1. Mleko.\n2. Chleb.\n3. I jeszcze masło."
+            ),
+        ])
+    func theGuardAcceptsCorrectDigits(input: String, output: String) {
+        #expect(FormatterGuard.check(input: input, output: output) == .accepted(output))
+    }
+
+    @Test func aListMarkerDoesNotHideAChangedNumber() {
+        let input = "do zrobienia po pierwsze kupić 2 kable po drugie oddać laptopa"
+        #expect(
+            FormatterGuard.check(input: input, output: "Do zrobienia:\n1. Kupić 3 kable.\n2. Oddać laptopa.")
+                == .rejected(.newNumber))
+    }
+}

@@ -48,25 +48,58 @@ enum SpokenNumbers {
     // MARK: Words
 
     /// Every number the text says in words, with the parts of every run of number words (see the type's note).
+    /// Also the readings a run has only as a whole: a year said in pairs ("nineteen eighty nine" is 1989) and
+    /// the hour before "wpół do" ("wpół do dziesiątej" is 9:30).
     static func spokenNumbers(in text: String) -> Set<Int> {
         var numbers: Set<Int> = []
         var run: [Word] = []
+        var halfBefore = false
         func flush() {
+            defer {
+                run = []
+                halfBefore = false
+            }
             guard !run.isEmpty else { return }
-            let limit = min(run.count, 8)
-            for start in 0..<limit {
+            // values[start][end] is the value of run[start...end], for runs of up to 8 words.
+            var values: [[Int?]] = Array(repeating: Array(repeating: nil, count: run.count), count: run.count)
+            for start in run.indices {
                 for end in start..<min(run.count, start + 8) {
-                    if let value = evaluate(run[start...end]) { numbers.insert(value) }
+                    guard let value = evaluate(run[start...end]) else { continue }
+                    values[start][end] = value
+                    numbers.insert(value)
+                    if halfBefore, start == 0, value > 0 { numbers.insert(value - 1) }
                 }
             }
-            run = []
+            // A year or a long number said in pairs: two parts next to each other, the first 10 to 99 and the
+            // second 0 to 99, read together ("twenty twenty six" is 2026, "nineteen oh five" is not covered).
+            for start in run.indices {
+                for middle in start..<min(run.count - 1, start + 7) {
+                    guard let left = values[start][middle], (10...99).contains(left) else { continue }
+                    for end in (middle + 1)..<min(run.count, start + 8) {
+                        guard let right = values[middle + 1][end], (0...99).contains(right) else { continue }
+                        numbers.insert(left * 100 + right)
+                    }
+                }
+            }
         }
-        for token in tokens(in: text) {
+        let words = tokens(in: text)
+        for (index, token) in words.enumerated() {
             if let word = word(for: token) {
                 run.append(word)
+            } else if joiners.contains(token), !run.isEmpty, index + 1 < words.count,
+                self.word(for: words[index + 1]) != nil
+            {
+                // "one hundred and twenty": "and" between two number words keeps the run going.
+                continue
             } else if let value = special[token] {
                 flush()
                 numbers.formUnion(value)
+            } else if token == "wpół" {
+                flush()
+                numbers.insert(30)
+                halfBefore = true
+            } else if token == "do", halfBefore, run.isEmpty {
+                continue
             } else {
                 flush()
             }
@@ -74,6 +107,9 @@ enum SpokenNumbers {
         flush()
         return numbers
     }
+
+    /// Words that join the parts of one spoken number: "a hundred and five".
+    private static let joiners: Set<String> = ["and"]
 
     /// Whether a word is part of a spoken number, for counting a spoken number as one word.
     static func isNumberWord(_ token: String) -> Bool { word(for: token) != nil }
@@ -127,27 +163,42 @@ enum SpokenNumbers {
         text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
     }
 
+    /// The value of a run of number words, or nil when there is none or it does not fit in an `Int` (a
+    /// transcript can repeat "hundred" any number of times; overflow must not trap, risk R7).
     private static func evaluate(_ words: ArraySlice<Word>) -> Int? {
         var total = 0
         var current = 0
         var sawAny = false
+        func scaled(_ value: Int, by factor: Int) -> Int? {
+            let (product, overflow) = max(value, 1).multipliedReportingOverflow(by: factor)
+            return overflow ? nil : product
+        }
+        func adding(_ left: Int, _ right: Int) -> Int? {
+            let (sum, overflow) = left.addingReportingOverflow(right)
+            return overflow ? nil : sum
+        }
         for word in words {
             sawAny = true
             switch word {
-            case .add(let value): current += value
-            case .hundred: current = max(current, 1) * 100
-            case .thousand:
-                total += max(current, 1) * 1000
-                current = 0
-            case .million:
-                total += max(current, 1) * 1_000_000
-                current = 0
-            case .billion:
-                total += max(current, 1) * 1_000_000_000
+            case .add(let value):
+                guard let sum = adding(current, value) else { return nil }
+                current = sum
+            case .hundred:
+                guard let product = scaled(current, by: 100) else { return nil }
+                current = product
+            case .thousand, .million, .billion:
+                let factor =
+                    switch word {
+                    case .thousand: 1000
+                    case .million: 1_000_000
+                    default: 1_000_000_000
+                    }
+                guard let product = scaled(current, by: factor), let sum = adding(total, product) else { return nil }
+                total = sum
                 current = 0
             }
         }
-        return sawAny ? total + current : nil
+        return sawAny ? adding(total, current) : nil
     }
 
     private static func word(for token: String) -> Word? {
@@ -190,6 +241,16 @@ enum SpokenNumbers {
             10,
             "dziesięć dziesięciu dziesięcioma dziesiąty dziesiąta dziesiąte dziesiątego dziesiątej dziesiątym dziesiątą dziesiątych"
         )
+        // Collective numerals: "troje dzieci", "czworga dorosłych".
+        add(2, "dwojga dwojgu dwojgiem")
+        add(3, "troje trojga trojgu trojgiem")
+        add(4, "czworo czworga czworgu czworgiem")
+        add(5, "pięcioro pięciorga pięciorgu")
+        add(6, "sześcioro sześciorga")
+        add(7, "siedmioro siedmiorga")
+        add(8, "ośmioro ośmiorga")
+        add(9, "dziewięcioro dziewięciorga")
+        add(10, "dziesięcioro dziesięciorga")
         add(100, "sto stu setny setna setne")
         add(200, "dwieście dwustu")
         add(300, "trzysta trzystu")

@@ -40,7 +40,10 @@ enum FormatterGuard {
 
         if introducesForeignScript(input: input, output: output) { return .rejected(.foreignScript) }
 
-        if !SpokenNumbers.newNumbers(in: output, comparedTo: input).isEmpty { return .rejected(.newNumber) }
+        // The "1." and "2." of a list the model wrote are not details of the transcript.
+        if !SpokenNumbers.newNumbers(in: withoutListMarkers(output), comparedTo: input).isEmpty {
+            return .rejected(.newNumber)
+        }
 
         // A spoken number counts as one word and a list marker as none: "dwadzieścia pięć tysięcy" becomes
         // "25 000" and "po pierwsze" becomes "1.".
