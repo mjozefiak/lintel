@@ -716,6 +716,21 @@ start with `#` and empty lines are ignored; a line is run when its newline arriv
 panel (they write their sizes and the Go To sheet's frame into the real defaults domain): files and the "Add App…"
 picker are scripted by the verbs above (`plugins.windows.qaScriptedFiles`, on in every `--qa` run).
 
+**Dictation from a WAV file.** `qa dictation play <output prefix> <wav path>` (DEBUG, route above) dictates the file
+through the whole session instead of the microphone: voice activity detection, the speech model, the cleanup model and
+the paste into the QA pasteboard (the keystroke is only logged). It needs no microphone permission, no hotkey and no
+Accessibility grant of the tester (`--qa-accessibility granted` makes the paste report "Pasted"). The file may have any
+sample rate; a second of silence follows it. The speech and cleanup models must be installed under the QA data root:
+link the real folder (`ln -s ~/Library/Application\ Support/Lintel/Models <qa data root>/Models`) and switch the plugin on
+with `--qa-setting plugins.dictation.enabled=true`, `plugins.dictation.mode=cleanup`, `plugins.dictation.llmSource=builtIn`
+and `plugins.dictation.builtInLLMModel=<model id>`. The verb waits for the paste (up to 4 minutes, the first run loads
+the models), then writes `<prefix>.json` (what the speech model heard, the pasted text, the last HUD state) and the
+result card as `<prefix>-light.png` and `<prefix>-dark.png` (the real HUD view in the state the flow ended in, then the
+two texts; written by the app itself, so it works without screen recording). The command log answers
+`ok: <HUD state>; 2 screenshots`. The transcripts are the tester's own test sentences: check a card before publishing it.
+Start the app with `run_in_background` or a plain `&` from a shell that stays alive; a process started from a finished
+tool call may be killed with it.
+
 | # | Scenario | Expect |
 |---|---|---|
 | 1 | Switch workspaces with 20 windows of 5 apps | Windows of the old workspace disappear into the bottom right corner, the new ones return to their frames, no flicker; the budget in `docs/perf.md` holds. |
