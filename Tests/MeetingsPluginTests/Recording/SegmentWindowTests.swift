@@ -216,6 +216,37 @@ private final class ProbabilityVAD: VoiceActivityDetector {
         for (a, b) in zip(rows, rows.dropFirst()) { #expect(a.endMs <= b.startMs) }
     }
 
+    @Test func aSpeechEndReportedInTheSameBatchAsTheWindowOverrunIsCutFirst() async throws {
+        // One batch holds the start (1 s) and the end (16.05 s): the range is longer than the window by the time
+        // the end is applied, so it has to be cut there and not only after the events.
+        let rig = try SessionRig()
+        let engine = LengthEngine()
+        var script = TrackScript()
+        script.silence(1)
+        script.say(11, seconds: 15.05)
+        script.silence(5)
+        let spans = script.spans
+        let session = MeetingSession(
+            store: rig.store, keys: rig.keys, spool: rig.spool, mic: UnavailableAudioInput(), system: rig.system,
+            makeVAD: { ScriptedVAD(spans) }, engine: engine, modelID: "test-model",
+            modelFolder: rig.directory.url.appending(path: "model"), lease: rig.lease,
+            sleepAssertion: rig.sleepAssertion, gate: rig.gate, limits: limits(rig, pre: 300, post: 200),
+            retriesMicrophone: false)
+        _ = try await session.start()
+        rig.system.push(script.samples)
+        rig.system.end()
+        let outcome = await session.finish()
+        #expect(outcome.result == .ready)
+        #expect(engine.heard.count == 2)
+        #expect(engine.heard.allSatisfy { $0 <= MeetingSession.longestSegment })
+        // The first piece keeps its pre-roll inside the window; the rest follows right behind it.
+        #expect(engine.heard.first == MeetingSession.longestSegment)
+        // Nothing before 0.7 s or twice: the 15 s piece, the 0.35 s that remained, and up to the 0.2 s post-roll that
+        // had arrived (the batch size decides how much).
+        let total = engine.heard.reduce(0, +)
+        #expect(total >= Int(15.35 * Double(rate)) && total <= Int(15.55 * Double(rate)))
+    }
+
     @Test func probabilitiesAreCountedAsNearMissesOnlyWhileNoSpeechIsOpen() async throws {
         let rig = try SessionRig()
         let sink = Mutex<CaptureCounters?>(nil)
