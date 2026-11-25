@@ -154,6 +154,15 @@ final class ScriptedTransport: HTTPTransport, @unchecked Sendable {
         #expect(FormatterGuard.check(input: input, output: output) == .accepted(output))
     }
 
+    @Test func lettersOfAnotherScriptAreRejected() {
+        let input = "po drugie naprawić logowanie po trzecie napisać test dla płatności i dodać opis"
+        let output = "Po drugie naprawić logowanie, po trzecie napишesz test dla płatności i dodać opis."
+        #expect(FormatterGuard.check(input: input, output: output) == .rejected(.foreignScript))
+        // The input's own script is fine, and so are Polish and Vietnamese letters.
+        #expect(!FormatterGuard.introducesForeignScript(input: "Это тест", output: "Это тест."))
+        #expect(!FormatterGuard.introducesForeignScript(input: "zażółć gęślą jaźń", output: "Zażółć gęślą jaźń."))
+    }
+
     @Test func aDroppedDetailIsRejectedWhenNothingWasToBeRemoved() {
         let input = "teams need clear goals as shown by Larson and LaFasto 1989 page 109 and trust"
         #expect(

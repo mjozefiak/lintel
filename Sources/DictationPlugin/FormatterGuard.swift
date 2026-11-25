@@ -17,6 +17,8 @@ enum FormatterGuard {
         case answered
         /// The output has a number the transcript does not (a converted unit, a changed hour, a made-up detail).
         case newNumber
+        /// The output has letters of a script the transcript does not (a Cyrillic word in a Polish sentence).
+        case foreignScript
     }
 
     /// The output may hold 0.6 to 1.15 times the input's words when the speaker said something that may go
@@ -35,6 +37,8 @@ enum FormatterGuard {
         guard !output.isEmpty else { return .rejected(.empty) }
 
         if answersInsteadOfCleaning(input: input, output: output) { return .rejected(.answered) }
+
+        if introducesForeignScript(input: input, output: output) { return .rejected(.foreignScript) }
 
         if !SpokenNumbers.newNumbers(in: output, comparedTo: input).isEmpty { return .rejected(.newNumber) }
 
@@ -88,6 +92,17 @@ enum FormatterGuard {
 
     static func words(in text: String) -> Int {
         text.split(whereSeparator: \.isWhitespace).count
+    }
+
+    /// Whether the output has letters outside the Latin alphabet (Cyrillic, Greek, CJK, Arabic, ...) and the input has
+    /// none. A model with a mixed-up vocabulary writes such letters in the middle of a word.
+    static func introducesForeignScript(input: String, output: String) -> Bool {
+        func hasNonLatinLetters(_ text: String) -> Bool {
+            text.unicodeScalars.contains {
+                $0.properties.isAlphabetic && $0.value > 0x24F && !(0x1E00...0x1EFF).contains($0.value)
+            }
+        }
+        return hasNonLatinLetters(output) && !hasNonLatinLetters(input)
     }
 
     /// The text without the "-", "•", "1." and "2)" that start the lines of a list the model wrote.
