@@ -97,18 +97,25 @@ final class SettingsHostModel {
         refreshAttention()
     }
 
-    /// True while the shown banner sends the user to System Settings: a grant given there must clear it without
-    /// a restart (#71), so the host re-reads it every second (`liveTick`).
-    var needsLiveRefresh: Bool {
-        banner?.actions.contains { action in
-            if case .systemSettings = action.destination { return true }
-            return false
-        } ?? false
+    /// The permissions behind the shown banner's System Settings buttons that the system itself reports live and
+    /// that a plugin does not cache: Accessibility and the microphone. A grant of one of these must clear the banner
+    /// without a restart (#71). Full Disk Access and clipboard access are shown from the plugin's own cached state,
+    /// which only changes on its own events, so polling them would redraw for nothing.
+    var livePermissions: [Permission] {
+        let permissions = (banner?.actions ?? []).compactMap { action -> Permission? in
+            if case .systemSettings(let permission) = action.destination { return permission }
+            return nil
+        }
+        return permissions.filter { $0 == .accessibility || $0 == .microphone }
     }
 
-    /// One live re-read: the banner and the dots, only while a permission banner is shown.
+    /// True while the shown banner waits for one of `livePermissions`.
+    var needsLiveRefresh: Bool { !livePermissions.isEmpty }
+
+    /// One live check. It reads only the waited-for permission, and reads the banner again only when that
+    /// permission was granted, so a waiting banner does not redraw the pane every second.
     func liveTick() {
-        if needsLiveRefresh { refresh() }
+        if livePermissions.contains(where: { reader.status(of: $0) == .granted }) { refresh() }
     }
 
     /// `PluginContext.resultsChanged` from the plugin `pluginID`: its dot, and the banner when it is shown.

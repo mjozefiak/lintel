@@ -249,11 +249,17 @@ struct PermissionsPane: View {
 
     var body: some View {
         mainForm
-            .onAppear {
-                model.refresh()
-                model.service.beginWatching()
+            .task {
+                // Watching lasts exactly as long as the pane's task: it ends when the pane goes away or its
+                // window closes, whatever `onDisappear` delivers.
+                let service = model.service
+                service.beginWatching()
+                await withTaskCancellationHandler {
+                    while !Task.isCancelled { try? await Task.sleep(for: .seconds(3600)) }
+                } onCancel: {
+                    Task { @MainActor in service.endWatching() }
+                }
             }
-            .onDisappear { model.service.endWatching() }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 model.refresh()
             }

@@ -82,12 +82,31 @@ import Testing
         #expect(pane.status(of: .accessibility) == .granted)
     }
 
-    @Test func theLiveTickDoesNothingWhileNoPermissionBannerIsShown() async {
+    @Test func theLiveTickLeavesABannerAloneWhileTheGrantIsStillMissing() async {
         defer { env.tearDown() }
         let reader = FakePermissionsReader()
+        reader.answers[.accessibility] = .denied
+        reader.answers[.pasteboard] = .granted
         let host = env.makeHost([PastingPlugin.self])
         await host.start()
         let settings = SettingsHostModel(host: host, reader: reader)
+        settings.show("pasting")
+        #expect(settings.livePermissions == [.accessibility])
+        let reads = reader.reads.count
+        settings.liveTick()
+        #expect(reader.reads.count == reads + 1, "only the waited-for permission is read, no banner rebuild")
+    }
+
+    @Test func aBannerForACachedPermissionIsNeverPolled() async {
+        defer { env.tearDown() }
+        let reader = FakePermissionsReader()
+        reader.answers[.accessibility] = .granted
+        reader.answers[.pasteboard] = .denied
+        let host = env.makeHost([PastingPlugin.self])
+        await host.start()
+        let settings = SettingsHostModel(host: host, reader: reader)
+        settings.show("pasting")
+        #expect(settings.banner?.actions.isEmpty == false, "the pasteboard banner sends the user to System Settings")
         #expect(!settings.needsLiveRefresh)
         let reads = reader.reads.count
         settings.liveTick()

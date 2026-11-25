@@ -10,6 +10,14 @@ protocol PermissionRequester {
     func request(_ permission: Permission) async
 }
 
+/// QA mode: the microphone request is the real one (as before); the Accessibility prompt is never raised.
+struct QAPermissionRequester: PermissionRequester {
+    func request(_ permission: Permission) async {
+        guard permission == .microphone else { return }
+        await SystemPermissionRequester().request(.microphone)
+    }
+}
+
 /// The real requester: `AVCaptureDevice.requestAccess` for the microphone, and the Accessibility prompt, which
 /// adds Lintel to the list with its switch off (spec 2026-11-24, section 3).
 struct SystemPermissionRequester: PermissionRequester {

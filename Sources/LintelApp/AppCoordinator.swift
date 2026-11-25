@@ -26,7 +26,11 @@ final class AppCoordinator {
     private var settingsHost: SettingsHostModel?
     /// The one permission service (live states and asking), shared by Settings → Permissions and, later, the
     /// onboarding Access step.
-    private(set) lazy var permissionGrant = PermissionGrantService(reader: environment.permissionsReader) {
+    private(set) lazy var permissionGrant = PermissionGrantService(
+        reader: environment.permissionsReader,
+        // A QA run never raises the Accessibility prompt (it would target the tester's real settings).
+        requester: environment.postsKeystrokes ? SystemPermissionRequester() : QAPermissionRequester()
+    ) {
         NSWorkspace.shared.open($0)
     }
     /// Settings → Models (spec step 3.2).

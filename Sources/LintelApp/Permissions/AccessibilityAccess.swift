@@ -13,8 +13,10 @@ nonisolated enum AccessibilityAccess {
         axTrusted ? .granted : .denied
     }
 
-    /// Whether Command-V may be posted into the previous app. Either answer is enough: the Accessibility grant
-    /// covers it, and an install that only holds the older Post Event grant keeps pasting.
+    /// Whether Command-V may be posted into the previous app. Either answer is enough here. Note that the paste
+    /// callers (Clipboard, Dictation) first check `PermissionsReader.status(of: .accessibility)`, which is
+    /// Accessibility only, so a Mac that holds only a Post Event grant (a managed profile or an old grant) is
+    /// offered copy-only until Accessibility is granted.
     static func canPostEvents(axTrusted: Bool, postEvent: Bool) -> Bool {
         axTrusted || postEvent
     }

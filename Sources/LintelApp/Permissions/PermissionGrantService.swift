@@ -31,6 +31,7 @@ final class PermissionGrantService {
     @ObservationIgnored private var watchers = 0
     @ObservationIgnored private var poll: Task<Void, Never>?
     @ObservationIgnored private var activationObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private let notificationCenter: NotificationCenter?
     /// Called with a permission whose state just changed (for example to refresh a banner).
     @ObservationIgnored var onChange: (Permission, PermissionStatus) -> Void = { _, _ in }
 
@@ -47,6 +48,7 @@ final class PermissionGrantService {
         self.openURL = openURL
         self.clock = clock
         self.pollInterval = pollInterval
+        self.notificationCenter = notificationCenter
         if let notificationCenter {
             activationObserver = notificationCenter.addObserver(
                 forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
@@ -60,7 +62,7 @@ final class PermissionGrantService {
 
     isolated deinit {
         poll?.cancel()
-        if let activationObserver { NotificationCenter.default.removeObserver(activationObserver) }
+        if let activationObserver { notificationCenter?.removeObserver(activationObserver) }
     }
 
     /// The state of `permission`: the last read, or a fresh read of a readable one that was never read.
