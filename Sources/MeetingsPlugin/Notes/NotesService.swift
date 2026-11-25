@@ -39,8 +39,9 @@ final class NotesBoard: Sendable {
         var phases: [Int64: NotesJobPhase] = [:]
         /// Meetings that became `ready` in this session while notes were on and the model was missing. Only they
         /// show "Notes model needed": older meetings and meetings recorded while notes were off show nothing. When
-        /// the built-in model arrives (and no provider is chosen) they are queued and get their notes. In memory:
-        /// a restart forgets them, and "Regenerate" is then the way to their notes.
+        /// the built-in model arrives (and no provider is chosen) they are queued and get their notes; notes switched
+        /// off or a chosen provider end the wait. In memory: a restart forgets them, and "Regenerate" is then the way
+        /// to their notes.
         var awaitingModel: Set<Int64> = []
         /// How the last job of the chosen provider ended when it did not write notes (Settings → Meetings shows it
         /// with "Try Again" and "Write on This Mac"). In memory: a restart forgets it. Cleared by the next job of that
@@ -218,18 +219,24 @@ final class NotesService {
 
     /// Re-reads the notes switch and whether the chosen model is downloaded (Settings calls it after a
     /// download, a removal or a change of the switch or the model).
-    /// A built-in model that arrived queues the meetings that waited for it (notes on, no provider chosen).
+    /// A built-in model that arrived queues the meetings that waited for it (notes on, no provider chosen). Notes
+    /// switched off or a chosen provider end the wait: those meetings are no longer written by themselves (as when a
+    /// provider job runs), so the model watch stops at its next look.
     func refreshAvailability() async {
         let enabled = deps.settings.notesEnabled
         // A chosen provider writes the notes, so the built-in model is not missing.
         let provider = deps.settings.notesProviderSelection != nil
         var installed = provider
         if !installed { installed = await deps.modelFile(deps.settings.builtInLLMModel) != nil }
+        // Read again after the wait: the switch or the provider may have changed meanwhile.
+        let waits = deps.settings.notesEnabled && deps.settings.notesProviderSelection == nil
         var arrived: [Int64] = []
         let changed = board.update {
             $0.enabled = enabled
             $0.modelMissing = !installed
-            if installed, enabled, !provider {
+            if !waits {
+                $0.awaitingModel = []
+            } else if installed, enabled, !provider {
                 arrived = $0.awaitingModel.sorted()
                 $0.awaitingModel = []
             }

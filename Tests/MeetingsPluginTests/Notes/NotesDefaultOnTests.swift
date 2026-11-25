@@ -77,6 +77,40 @@ import Testing
         #expect(!rig.service.board.snapshot.needsModel)
     }
 
+    /// The watch looks for the model only while notes are on and no provider is chosen: switching notes off ends the
+    /// wait, the looking stops, and a model that arrives after notes are back on writes nothing by itself.
+    @Test func switchingNotesOffEndsTheWaitAndTheWatch() async throws {
+        let rig = try NotesServiceRig(settings: [:], modelWatchInterval: .milliseconds(20))
+        rig.file.update { $0 = nil }
+        await rig.start()
+        let id = try await rig.addMeeting()
+        rig.library.meetingReady(id)
+        #expect(await rig.settle())
+        #expect(rig.service.board.snapshot.awaitingModel == [id])
+        // The watch is running: it keeps looking for the file.
+        let seen = rig.modelLookups.get()
+        #expect(await waitFor("the watch to look for the model") { rig.modelLookups.get() >= seen + 2 })
+
+        // What the switch in Settings or the setup step does.
+        rig.settings.setNotesEnabled(false)
+        await rig.service.refreshAvailability()
+        #expect(rig.service.board.snapshot.awaitingModel.isEmpty)
+        #expect(!rig.service.board.snapshot.needsModel(for: id))
+        // At most the look already under way, then none.
+        try await Task.sleep(for: .milliseconds(60))
+        let stopped = rig.modelLookups.get()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(rig.modelLookups.get() == stopped)
+
+        rig.settings.setNotesEnabled(true)
+        rig.file.update { $0 = URL(filePath: "/models/llm/notes-test.gguf") }
+        await rig.service.refreshAvailability()
+        #expect(await rig.settle())
+        #expect(rig.llm.calls.isEmpty)
+        #expect(try rig.record(id).status == .none)
+        await rig.service.shutDown()
+    }
+
     @Test func switchingThePluginOffStopsTheWatch() async throws {
         let rig = try NotesServiceRig(settings: [:], modelWatchInterval: .milliseconds(20))
         rig.file.update { $0 = nil }

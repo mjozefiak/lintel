@@ -132,6 +132,8 @@ struct NotesOnThisMacRows: View {
         } icon: {
             Image(systemName: "exclamationmark.triangle").accessibilityHidden(true)
         }
-        .foregroundStyle(.orange)
+        // The brand's attention colour has text contrast in both appearances (`BrandContrastTests`); system orange
+        // does not on a light background.
+        .foregroundStyle(LintelBrand.statusAttention)
     }
 }
