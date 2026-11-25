@@ -33,12 +33,12 @@ enum CleanupPrompt {
         - Self-correction: when the speaker takes something back ("sorry", "actually no", "I mean", "wait", \
         "nie, czekaj", "to znaczy", "albo jednak", "a właściwie"), delete the withdrawn part and the signal \
         words and keep only the corrected version, in its place in the sentence. This holds for numbers, \
-        hours, days and names too. A contrast that takes nothing back ("not X, but Y", "nie chodzi o to, że X, \
-        tylko o to, że Y") is a normal sentence: keep all of it.
+        hours, days and names too. A contrast that takes nothing back ("not X, but Y", "nie X, tylko Y") is a \
+        normal sentence: keep all of it.
         - Write numbers, dates, times, amounts and percentages as digits, as they are spoken. Add punctuation \
         and capital letters.
         - Lists: write a list only when the speaker enumerates ("first, second", "po pierwsze, po drugie") or \
-        announces a list ("lista zakupów", "action items") and then names the items. Put the lead-in on its \
+        announces a list with a heading ("plan na tydzień", "to do") and then names the items. Put the lead-in on its \
         own line, then one item per line: "1." for numbered items, "- " otherwise. Drop the "first", "second" \
         words. Keep the items' words. A series of things inside an ordinary sentence stays a sentence with \
         commas, never a list.
@@ -49,7 +49,9 @@ enum CleanupPrompt {
 
     /// Pairs in both languages. The questions and commands come back as cleaned questions and commands, a
     /// self-correction keeps only its correction, a list is written as a list, and a correct sentence with
-    /// numbers and units returns as it came.
+    /// numbers and units returns as it came. The examples must not copy or paraphrase the items the cleanup is
+    /// measured on (the benchmark corpus and FLEURS, `scripts/dictation-eval/`): other topics, other signal words
+    /// and other sentence shapes, so a better score means a better prompt and not a memorised answer.
     static let examples: [(input: String, output: String)] = [
         (
             "yyy no więc jak zrobić backup bazy w postgresie bo nie pamiętam",
@@ -60,48 +62,36 @@ enum CleanupPrompt {
             "What is the capital of Poland?"
         ),
         (
-            "umówmy przegląd na wtorek na dziewiątą sorry na dziesiątą i zaproście Kamila",
-            "Umówmy przegląd na wtorek na 10 i zaproście Kamila."
-        ),
-        (
-            "przesuńmy demo na czwartek o czternastej albo jednak na piątek o czternastej bo w czwartek mamy szkolenie",
-            "Przesuńmy demo na piątek o 14, bo w czwartek mamy szkolenie."
-        ),
-        (
-            "limit to piętnaście tysięcy to znaczy osiemnaście tysięcy sztuk",
-            "Limit to 18 000 sztuk."
-        ),
-        (
             "so uh I think we should we should move the meeting to thursday at ten",
             "I think we should move the meeting to Thursday at 10."
         ),
         (
-            "to nie jest błąd w kodzie tylko w konfiguracji serwera",
-            "To nie jest błąd w kodzie, tylko w konfiguracji serwera."
+            "zadzwoń do serwisu jutro rano a właściwie w poniedziałek po południu",
+            "Zadzwoń do serwisu w poniedziałek po południu."
         ),
         (
-            "do zrobienia po pierwsze zaktualizować zależności po drugie dodać testy importu po trzecie wypuścić wersję",
-            "Do zrobienia:\n1. Zaktualizować zależności.\n2. Dodać testy importu.\n3. Wypuścić wersję."
+            "pokój ma numer czterysta dwanaście przepraszam czterysta czternaście i jest obok windy",
+            "Pokój ma numer 414 i jest obok windy."
         ),
         (
-            "next steps first dana drafts the proposal second leo reviews the numbers",
-            "Next steps:\n1. Dana drafts the proposal.\n2. Leo reviews the numbers."
+            "the upload is about three hundred I mean four hundred megabytes",
+            "The upload is about 400 megabytes."
         ),
         (
-            "na wyjazd zabierz namiot śpiwór latarkę i kuchenkę gazową",
-            "Na wyjazd zabierz:\n- namiot\n- śpiwór\n- latarkę\n- kuchenkę gazową"
+            "to reset the router first unplug it then wait thirty seconds and finally plug it back in",
+            "To reset the router:\n1. Unplug it.\n2. Wait 30 seconds.\n3. Plug it back in."
         ),
         (
-            "do popularnych dyscyplin należą piłka nożna koszykówka i siatkówka",
-            "Do popularnych dyscyplin należą piłka nożna, koszykówka i siatkówka."
+            "w projekcie używamy swifta pythona i trochę basha",
+            "W projekcie używamy Swifta, Pythona i trochę Basha."
+        ),
+        (
+            "do hotelu jest pięć mil a bagaż waży czterdzieści funtów",
+            "Do hotelu jest 5 mil, a bagaż waży 40 funtów."
         ),
         (
             "the committee have agreed that the data is ready",
             "The committee have agreed that the data is ready."
-        ),
-        (
-            "w ankiecie z 2018 roku na stronie 40 jest 3 cale śniegu i 12 stopni mrozu",
-            "W ankiecie z 2018 roku na stronie 40 jest 3 cale śniegu i 12 stopni mrozu."
         ),
     ]
 
