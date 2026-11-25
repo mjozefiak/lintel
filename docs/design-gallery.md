@@ -17,10 +17,10 @@ the shell's own scenes (follow-up). HUDs and sheets are phase 4, the other scree
 | The full matrix for the owner | `scripts/gallery-export.sh <dir> [--scene <id>]`: PNGs in `<dir>/<scene>/<state>/<variant>.png` and a contact sheet `<dir>/index.html`. It runs the app bundle twice (`-AppleLanguages "(en)"` and `"(pl)"`). A local export is a preview: another macOS build draws text differently from the CI runner. |
 | One language by hand | `Lintel-QA --qa --qa-gallery-export <dir> --qa-gallery-language pl -AppleLanguages "(pl)"` |
 | Compare / record goldens (the CI mechanism) | `--qa-gallery-compare <dir>` / `--qa-gallery-record <dir>` with `--qa-gallery-language <en\|pl>`; exit code 1 on a difference. The goldens are in `Tests/<Plugin>Tests/Gallery/Goldens/`. |
-| `en` goldens in `swift test` | `LINTEL_SNAPSHOTS=compare\|compare-anyway\|record swift test --filter GallerySnapshotTests`. Unset: the suite does not run. `compare` needs `LINTEL_GALLERY_XCODE` (CI sets it) and is skipped locally. |
+| Which build compares | Both languages, in CI and when recording, come from the app bundle (`-AppleLanguages` and `-AppleLocale`): the same build the contact sheet shows the owner, with the accent colour and the compiled string catalog. `swift test` has neither, so it does not compare pictures; it only checks that every scene draws, is independent and fits the size budget. |
 
 Language is an axis of the PROCESS, not of the view: almost every text is `String(localized:)` without a bundle or locale
-and reads the process's languages. `swift test` runs in the test runner's bundle (English, no compiled catalog), so
+and reads the process's languages. `swift test` runs in the test runner's bundle (English, no compiled catalog, another accent colour), so
 `GalleryRenderer` refuses a variant in another language with `GalleryError.languageMismatch`; the Polish pictures come from
 the app bundle with `-AppleLanguages "(pl)"` (ADR-style note: spec Q11).
 
@@ -37,8 +37,8 @@ the app bundle with `-AppleLanguages "(pl)"` (ADR-style note: spec Q11).
 4. Dates and relative times come from an injected fixed `now`. Tell the model of the view only the state, never "today".
 5. Tests: ids unique and `[a-z0-9.-]+`, summaries not empty, a test that renders every state with
    `MeetingsSystem.installQuiet()`-style guards for the real system (see `GalleryScenesTests`).
-6. Run the workflow **Gallery goldens** on the PR branch (Actions → Gallery goldens → Run workflow). It draws the full
-   matrix on the CI runner and the CI subset from the same render. Link the artifact `gallery-record-<run id>` in the PR, get
+6. Run the workflow **Gallery goldens** on the PR branch (Actions → Gallery goldens → Run workflow; GitHub offers it only once the workflow file is on `main`, so the PR that adds it records its first goldens from a throwaway branch with a push trigger). It draws the full
+   matrix on the CI runner, records the CI subset's goldens, and fails if a golden differs from the sheet's picture of the same variant. Link the artifact `gallery-record-<run id>` in the PR, get
    the owner's approval of the sheet, then commit the PNGs and `goldens.json` from `goldens/` of that artifact onto the
    branch (a commit that touches only `Tests/`).
 
@@ -56,8 +56,11 @@ the app bundle with `-AppleLanguages "(pl)"` (ADR-style note: spec Q11).
 A picture differs when any RGBA channel differs by more than 3/255; a test fails when more than 0.1% of the pixels differ or
 the size differs (`GalleryDiff`, spec Q6). Goldens carry a **renderer fingerprint** (macOS build, Xcode build, scale 2,
 renderer version) in `goldens.json`. When the CI image changes, the step fails once with "renderer fingerprint changed" on
-every open PR until the goldens are recorded again. A run that cannot know the Xcode build (no `LINTEL_GALLERY_XCODE`, a
-local Mac) skips the comparison instead of reporting false failures.
+every open PR until the goldens are recorded again. A run that does not set `LINTEL_GALLERY_XCODE` (a local Mac) has no
+Xcode build to match against the manifest's, so it reports "renderer fingerprint changed" and compares nothing; to look
+at differences locally anyway, record into a temporary folder first and compare against that. With no `goldens.json` at all
+there is one line, "no goldens.json … run gallery-goldens.yml". A picture that never settles (two renders in a row never
+the same within `GalleryRenderer.maxAttempts`) is an error, never a golden.
 
 On a failure CI uploads `gallery-diffs` (`actual.png`, `diff.png` with the changed pixels in red, `fingerprint.json`).
 An agent never records goldens again to make a test pass: a PR that changes golden PNGs has `needs-qa`, a "Golden changes"

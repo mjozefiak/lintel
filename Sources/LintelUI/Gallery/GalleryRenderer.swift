@@ -14,8 +14,30 @@ import SwiftUI
     public static let version = 1
     /// Every bitmap is made at this scale, whatever the display of the machine says.
     public static let scale: CGFloat = 2
-    /// A render that has not settled by then is taken as it is (and an empty one is an error).
-    static let settleLimit: Duration = .seconds(2)
+    /// Most renders of one state before it is called unsettled (`GalleryError.didNotSettle`) or empty. Counted in
+    /// renders, not in seconds: under a busy main actor (parallel tests, a window full of cards) a second is not many
+    /// turns of the run loop, but the number of renders a state needs does not change.
+    public static let maxAttempts = 120
+
+    // One render at a time: renders spin the main run loop and a second one would run inside the first one's waits.
+    private static var gateBusy = false
+    private static var gateWaiters: [CheckedContinuation<Void, Never>] = []
+
+    private static func acquireGate() async {
+        if gateBusy {
+            await withCheckedContinuation { gateWaiters.append($0) }
+        } else {
+            gateBusy = true
+        }
+    }
+
+    private static func releaseGate() {
+        if gateWaiters.isEmpty {
+            gateBusy = false
+        } else {
+            gateWaiters.removeFirst().resume()
+        }
+    }
 
     /// `en` or `pl`: the language the bundle of this process is localized to.
     public static var processLanguage: String {
@@ -23,7 +45,17 @@ import SwiftUI
         return String(preferred.lowercased().prefix(2))
     }
 
-    public static func render(_ state: GalleryState, _ variant: GalleryVariant) async throws -> NSBitmapImageRep {
+    public static func render(
+        _ state: GalleryState, _ variant: GalleryVariant, maxAttempts: Int = GalleryRenderer.maxAttempts
+    ) async throws -> NSBitmapImageRep {
+        await acquireGate()
+        defer { releaseGate() }
+        return try await draw(state, variant, maxAttempts: maxAttempts)
+    }
+
+    private static func draw(
+        _ state: GalleryState, _ variant: GalleryVariant, maxAttempts: Int
+    ) async throws -> NSBitmapImageRep {
         let process = processLanguage
         guard variant.language == process else {
             throw GalleryError.languageMismatch(state: state.id, variant: variant.name, process: process)
@@ -50,44 +82,52 @@ import SwiftUI
             window.contentView = nil
             window.close()
         }
-        NSAnimationContext.beginGrouping()
-        NSAnimationContext.current.duration = 0
-        NSAnimationContext.current.allowsImplicitAnimation = false
-        defer { NSAnimationContext.endGrouping() }
-
         var previous: Data?
         var stableRenders = 0
-        let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: settleLimit)
         var latest: NSBitmapImageRep?
         // Layout and the tasks a state starts (a probe that answers, a text that loads) need a few turns of the
         // loop; the picture counts as settled when two renders in a row are the same.
-        repeat {
+        var attempts = 0
+        while stableRenders < 2 && attempts < maxAttempts {
+            attempts += 1
             try await Task.sleep(for: .milliseconds(15))
             Self.spinRunLoop()
-            let size = Self.size(of: host, presentation: state.presentation)
-            guard size.width > 0, size.height > 0 else {
+            guard let bitmap = try Self.drawOnce(host, window, state.presentation, appearance) else {
                 stableRenders = 0
                 continue
-            }
-            window.setContentSize(size)
-            host.frame = NSRect(origin: .zero, size: size)
-            host.layoutSubtreeIfNeeded()
-            let bitmap = try makeBitmap(size: size)
-            appearance?.performAsCurrentDrawingAppearance {
-                host.cacheDisplay(in: host.bounds, to: bitmap)
             }
             let bytes = Self.bytes(of: bitmap)
             stableRenders = (bytes == previous) ? stableRenders + 1 : 0
             previous = bytes
             latest = bitmap
-        } while stableRenders < 2 && clock.now < deadline
+        }
         guard let latest, latest.pixelsWide > 0, latest.pixelsHigh > 0 else {
             throw GalleryError.emptyRender(state.id)
         }
         // An unsettled picture is never returned as if it were a golden.
         guard stableRenders >= 2 else { throw GalleryError.didNotSettle(state.id) }
         return latest
+    }
+
+    /// One synchronous layout and `cacheDisplay`; `nil` while the view has no size yet. The animation group is opened
+    /// and closed inside this step, never across a suspension point (another task's group would be closed by it).
+    private static func drawOnce(
+        _ host: NSView, _ window: NSWindow, _ presentation: GalleryPresentation, _ appearance: NSAppearance?
+    ) throws -> NSBitmapImageRep? {
+        NSAnimationContext.beginGrouping()
+        NSAnimationContext.current.duration = 0
+        NSAnimationContext.current.allowsImplicitAnimation = false
+        defer { NSAnimationContext.endGrouping() }
+        let size = Self.size(of: host, presentation: presentation)
+        guard size.width > 0, size.height > 0 else { return nil }
+        window.setContentSize(size)
+        host.frame = NSRect(origin: .zero, size: size)
+        host.layoutSubtreeIfNeeded()
+        let bitmap = try makeBitmap(size: size)
+        appearance?.performAsCurrentDrawingAppearance {
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+        }
+        return bitmap
     }
 
     /// The state as a live view (the gallery window's preview): the real view in the variant's text size and

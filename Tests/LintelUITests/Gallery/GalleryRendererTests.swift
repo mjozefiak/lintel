@@ -44,6 +44,28 @@ private func digest(_ bitmap: NSBitmapImageRep) -> String {
     return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
 }
 
+/// A view whose model changes every few milliseconds for as long as `running`: it never settles.
+@MainActor @Observable private final class Flicker {
+    var tick = 0
+    var running = true
+
+    init() {
+        Task { @MainActor [weak self] in
+            while let self, self.running {
+                self.tick += 1
+                try? await Task.sleep(for: .milliseconds(3))
+            }
+        }
+    }
+}
+
+private struct FlickerView: View {
+    let model: Flicker
+    var body: some View {
+        Text(verbatim: "tick \(model.tick)").frame(width: 200, height: 40)
+    }
+}
+
 @MainActor
 struct GalleryRendererTests {
     @Test("a pane with a Form, Toggle and TextField draws pixels for the controls")
@@ -125,6 +147,26 @@ struct GalleryRendererTests {
         await #expect(throws: GalleryError.emptyRender("zero")) {
             _ = try await GalleryRenderer.render(zero, lightM)
         }
+    }
+
+    @Test("a view that never stops changing is an error, not a picture")
+    func anUnsettledViewIsAnError() async {
+        let model = Flicker()
+        defer { model.running = false }
+        let flicker = state("flicker", view: { AnyView(FlickerView(model: model)) })
+        await #expect(throws: GalleryError.didNotSettle("flicker")) {
+            _ = try await GalleryRenderer.render(flicker, lightM, maxAttempts: 25)
+        }
+    }
+
+    @Test("renders started together run one after the other and all come out the same")
+    func rendersStartedTogetherAreSerialized() async throws {
+        // Three main-actor tasks started together: the gate lets them in one at a time.
+        let tasks = (0..<3).map { _ in Task { @MainActor in digest(try await GalleryRenderer.render(state(), lightM)) }
+        }
+        var digests = Set<String>()
+        for task in tasks { digests.insert(try await task.value) }
+        #expect(digests.count == 1)
     }
 }
 #endif

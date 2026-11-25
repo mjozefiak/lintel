@@ -26,9 +26,9 @@ public struct GalleryGoldenManifest: Codable, Equatable, Sendable {
     public static let currentVersion = 1
 }
 
-/// DEBUG only: compares and records golden PNGs for gallery scenes. The tests of a plugin and the app's
-/// `--qa-gallery-compare` / `--qa-gallery-record` both use it, so an `en` picture made by `swift test` and a `pl`
-/// picture made by the app bundle go through the same renderer, diff and file layout.
+/// DEBUG only: compares and records golden PNGs for gallery scenes. The app's `--qa-gallery-compare` and
+/// `--qa-gallery-record` use it, in both languages, from the app bundle (the build the owner approves: it has the
+/// accent colour and the compiled string catalog that `swift test` lacks).
 @MainActor public enum GalleryGoldens {
     public static let manifestName = "goldens.json"
 

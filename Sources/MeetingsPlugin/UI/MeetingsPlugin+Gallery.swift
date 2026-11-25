@@ -150,7 +150,8 @@ private struct NotesProviderGalleryPane: View {
         _ id: String, _ reason: ProviderJobFailure.Reason, _ what: String
     ) -> GalleryState {
         pane(
-            "failed-\(id)", "Claude Code is chosen and the last job failed: \(what).",
+            "failed-\(id)",
+            "Claude Code is chosen and the last job failed: \(what). \(Self.bannerOnly)",
             NotesProviderGalleryCase(provider: chosen(), failure: reason))
     }
 
@@ -159,11 +160,16 @@ private struct NotesProviderGalleryPane: View {
         content: @escaping @MainActor @Sendable (NotesProviderGalleryRig) -> AnyView
     ) -> GalleryState {
         GalleryState(
-            id: id, summary: summary + " (content only; system chrome approximated)", presentation: .popover(width: 270)
+            id: id, summary: summary, presentation: .popover(width: 270)
         ) {
             content(NotesProviderGalleryRig(scenario))
         }
     }
+
+    /// States whose difference is shown only by the host's banner (`StatusBanner`, issue #280): until its scenes exist
+    /// the pane looks as in `ready-sonnet`, and `GalleryScenesTests` lists them as declared aliases.
+    private static let bannerOnly =
+        "The pane looks as in ready-sonnet; the host's banner (issue #280) shows the difference."
 
     static var states: [GalleryState] {
         [
@@ -194,7 +200,8 @@ private struct NotesProviderGalleryPane: View {
                 NotesProviderGalleryCase(
                     provider: chosen(), probe: ProviderStatusReport(status: .incompatibleVersion, version: nil))),
             pane(
-                "newer-version", "Claude Code is newer than this Lintel supports.",
+                "newer-version",
+                "Claude Code is newer than this Lintel supports. The status row reads as in incompatible-version; the banner (#280) tells them apart.",
                 NotesProviderGalleryCase(
                     provider: chosen(), probe: ProviderStatusReport(status: .newerVersion, version: nil))),
             pane(
@@ -202,7 +209,7 @@ private struct NotesProviderGalleryPane: View {
                 NotesProviderGalleryCase(provider: chosen(), probe: nil)),
             pane(
                 "job-running",
-                "A provider job is running: Use Local is the banner's action (the banner is the host's).",
+                "A provider job is running: Use Local is the banner's action. \(Self.bannerOnly)",
                 NotesProviderGalleryCase(provider: chosen(), jobRunning: true)),
             pane(
                 "confirm-use-local", "Use Local was pressed while a job runs: the question, asked once.",

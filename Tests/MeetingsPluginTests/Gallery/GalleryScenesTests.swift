@@ -8,6 +8,7 @@ import Testing
 /// The scenes of `MeetingsPlugin` for the design gallery: ids, summaries, that every state draws, and that none of
 /// them touches the real system (spec `2026-11-23-swiftui-design-gallery`, "Edge Cases").
 @MainActor
+@Suite(.serialized)
 struct GalleryScenesTests {
     private static let lightM = GalleryVariant(appearance: .light, textSize: .medium, language: "en")
 
@@ -61,7 +62,16 @@ struct GalleryScenesTests {
         #expect(MeetingsSystem.liveUses.isEmpty, "a gallery scene built the real \(MeetingsSystem.liveUses.sorted())")
     }
 
-    @Test("a state is made fresh each time: in another order every picture is exactly the same")
+    /// States whose pictures are the same on purpose: what tells them apart is the host's banner (issue #280).
+    private static let aliasGroups: [Set<String>] = [
+        [
+            "ready-sonnet", "job-running", "failed-timed-out", "failed-network", "failed-rate-limited", "failed-other",
+            "failed-too-long", "failed-model-not-available",
+        ],
+        ["incompatible-version", "newer-version"],
+    ]
+
+    @Test("a state is made fresh each time (every picture is exactly the same in another order) and states differ")
     func statesAreIndependent() async throws {
         let states = try #require(GalleryTestSupport.scenes.first).states
         var first: [String: NSBitmapImageRep] = [:]
@@ -70,6 +80,18 @@ struct GalleryScenesTests {
             let again = try await GalleryRenderer.render(state, Self.lightM)
             let (result, _) = GalleryDiff.compare(try #require(first[state.id]), again)
             #expect(result.passes(shareLimit: 0), "\(state.id) differs after the other states were drawn")
+        }
+        // Two states with the same picture must be declared aliases: otherwise a scene whose set-up never reaches the
+        // view (or a golden that guards nothing new) goes unnoticed.
+        var byPicture: [String: [String]] = [:]
+        for state in states {
+            let key = GalleryGoldens.sha256(try GalleryRenderer.pngData(try #require(first[state.id])))
+            byPicture[key, default: []].append(state.id)
+        }
+        for ids in byPicture.values where ids.count > 1 {
+            #expect(
+                Self.aliasGroups.contains { Set(ids).isSubset(of: $0) },
+                "\(ids.sorted()) draw the same picture; make the states differ or declare them aliases")
         }
     }
 

@@ -31,9 +31,10 @@ import Testing
             contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/Notes/ProviderChoiceViews.swift"),
             encoding: .utf8)
         let sections = try #require(views.range(of: "struct NotesWrittenBySections"), "NotesWrittenBySections is gone")
-        #expect(
-            views[sections.upperBound...].contains("surfacesProvider("),
-            "NotesWrittenBySections must decide through surfacesProvider")
+        // The struct's own body: up to the next line that starts a declaration at the left margin.
+        let rest = views[sections.upperBound...]
+        let body = rest.range(of: "\n}\n").map { rest[..<$0.lowerBound] } ?? rest
+        #expect(body.contains("surfacesProvider("), "NotesWrittenBySections must decide through surfacesProvider")
         let status = try String(
             contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/MeetingsPlugin+Status.swift"),
             encoding: .utf8)

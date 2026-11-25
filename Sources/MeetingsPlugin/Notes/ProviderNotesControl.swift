@@ -14,5 +14,3 @@ import Foundation
     func regenerate(_ meetingID: Int64)
     func writeOnThisMac(_ meetingID: Int64)
 }
-
-extension NotesService: ProviderNotesControl {}

@@ -70,6 +70,22 @@ jobs:
           else
             scripts/gallery-export.sh "$RUNNER_TEMP/gallery-sheet" --no-build
           fi
+          # The goldens and the sheet are two renders of the same code: they must be the same pictures, or the owner
+          # would approve something the goldens do not guard.
+          sheet="$RUNNER_TEMP/gallery-sheet"
+          mismatches=0
+          for golden in "$goldens"/*/*@*.png; do
+            scene="$(basename "$(dirname "$golden")")"
+            name="$(basename "$golden" .png)"
+            state="${name%@*}"
+            variant="${name#*@}"
+            [ -d "$sheet/$scene" ] || continue
+            if ! cmp -s "$golden" "$sheet/$scene/$state/$variant.png"; then
+              echo "::error::golden $scene/$state@$variant differs from the contact sheet's picture"
+              mismatches=$((mismatches + 1))
+            fi
+          done
+          [ "$mismatches" -eq 0 ]
 
       - name: Collect
         run: |
