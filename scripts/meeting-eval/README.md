@@ -78,6 +78,33 @@ Matching is lexical (Dice over the Polish-normalized tokens of `score.py`, thres
 
 `require_local_judge(entry, judge_is_local)` raises `ConsentError` for a non-local judge unless the entry has `participants_agreed` and `cloud_judges` both true.
 
+## Measuring the notes (spec 2026-11-25-meeting-notes-structure, F0)
+
+`run.sh` runs `MeetingEvalTests` (a release build, one test). Two switches avoid the slow and the costly parts:
+
+```sh
+# Replay a saved transcript: no audio, no ASR, no diarization. Variants then differ only in the notes code.
+scripts/meeting-eval/run.sh --transcript <results/.../name.json> --out <dir> --name <name> --notes-model <gguf>
+# The provider track (WholeNotesPipeline) with the Claude Code CLI, twice, with the removed lines dumped (out dir only):
+env -u CLAUDE_CONFIG_DIR scripts/meeting-eval/run.sh --transcript <name.json> --out <dir> --name <name> \
+  --notes-pipeline whole --provider-model sonnet --generations 2 --dump-rejections
+# Variant W: a llama-server started by hand on a local GGUF (loopback only):
+scripts/meeting-eval/run.sh --transcript <name.json> --out <dir> --name <name> --notes-pipeline whole --llama-url http://127.0.0.1:8080
+```
+
+The result JSON gets `config.transcriptSource` (the replayed file) and the `codeVersion` of the run. Notes are also written as `<name>.notes.md` (`<name>.gN.notes.md` for generation N > 1). `<name>.notes-trace.json` (schema 6, numbers only) lists, per verification, `details`: the rule behind `unsupportedDetail` and the kind of miss behind `quoteNotInTranscript`. With `--dump-rejections` (`LINTEL_MEETING_EVAL_DUMP_REJECTIONS=1`) the harness also writes `<name>.notes-rejections.json` (quote track: every point with outcome, detail, text and quote) or `<name>.notes-whole.json` (provider track: the raw answers and the lines the fact guard removed). Those files hold notes text: keep the out folder outside the repository; the printed output is always numbers.
+
+The provider track passes only `HOME`, `USER`, `LANG` and `CLAUDE_CONFIG_DIR` to the CLI, so the account is the one `CLAUDE_CONFIG_DIR` names (unset: the default `~/.claude`).
+
+Two tools read a note in Markdown (Lintel's old layout, the topic layout, and other apps' notes); both print numbers only:
+
+```sh
+python3 -I scripts/meeting-eval/notes_md_to_points.py --notes notes.md --meeting <gold id> --out notes.json   # for score_notes.py
+python3 -I scripts/meeting-eval/notes_structure.py --notes notes.md --duration-min 38 --lang en [--expect-decisions] [--expect-next-steps]
+```
+
+`notes_structure.py` checks the layout rules of the spec (topics within `min(10, max(2, minutes / 6))`, 2 to 6 points per topic, a short meeting without topic headings, no times, no author marks, labels in the meeting's language, no "Unassigned", an intro of at most 3 sentences and 70 words) and exits 1 when one fails. A single heading at the top of a note that is no known section is read as its title.
+
 ## Judge panel (MEET-1.4, part 2)
 
 `judge_panel.py` decides semantic matches with 2-3 local judges from different model families and plugs into the `similarity` seam of `score_notes.py`. A candidate pair (lexical Dice >= 0.15; below it nobody is asked) gets one vote per judge; unanimous = decided; otherwise the pair is disputed and every judge votes until it has at least 5 votes (`repeats`), and the pair matches when more than half of all votes say yes. The report gives the number of pairs asked and disputed, judge calls and the spread between repeats (standard deviation of the per-repeat share of yes votes, mean and max). Protocol and prompt: `notes-rubric.md` section 6.
