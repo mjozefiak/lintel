@@ -20,12 +20,12 @@ let package = Package(
         // GRDB built against SQLCipher (spike 0.4, docs/decisions/0001-sqlite.md).
         .package(path: "Packages/GRDBCipher"),
         // Global shortcuts and the shortcut recorder (MIT), used by LintelApp only.
-        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts.git", exact: "1.10.0"),
+        .package(url: "https://github.com/sindresorhus/KeyboardShortcuts.git", exact: "1.17.0"),
         // Local speech to text (Parakeet), voice activity detection and offline speaker diarization through
         // Core ML (Apache-2.0), used by LintelSpeech and, for diarization, by MeetingsPlugin. 0.x: its API stays
         // behind the SpeechEngine and Diarizer ports (ADR 0003, ADR 0007). `traits: ["Diarizer"]` leaves out text
         // to speech and the bundled Rust text engine (the trait is opt-out upstream, which is why Lintel names it).
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.2", traits: ["Diarizer"]),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.18.4", traits: ["Diarizer"]),
         // Whisper large-v3-turbo through Core ML (MIT), the second speech engine with a pinned language
         // (ADR 0003), used by LintelSpeech only.
         .package(url: "https://github.com/argmaxinc/argmax-oss-swift.git", exact: "1.1.1"),

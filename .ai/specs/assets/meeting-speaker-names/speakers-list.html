@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><title>Mówcy — makieta</title>
+<style>
+body{margin:0;font:13px -apple-system,system-ui,sans-serif;display:flex;gap:24px;padding:24px;background:#d9d9de}
+.w{width:420px;border-radius:12px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.18)}
+.l{background:#fff;color:#1d1d1f}.d{background:#1e1e20;color:#f2f2f4}
+h3{margin:0 0 10px;font-size:13px;opacity:.6;font-weight:600}
+.r{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid rgba(128,128,128,.18)}
+.av{width:22px;height:22px;border-radius:50%;background:#8a8f98;color:#fff;font-size:11px;display:grid;place-items:center}
+.n{flex:1}.m{opacity:.55;font-size:12px}
+.s{margin:-2px 0 6px 32px;font-size:12px;display:flex;gap:8px;align-items:center}
+.s a{color:#2f6fde;text-decoration:none}.d .s a{color:#6ea2ff}
+button{font:12px -apple-system,system-ui;border:1px solid rgba(128,128,128,.35);background:transparent;color:inherit;border-radius:6px;padding:2px 9px}
+.p{background:#2f6fde;color:#fff;border-color:#2f6fde}
+.t{margin-top:14px;font-size:12px;line-height:1.55}.t b{font-weight:600}
+</style></head><body>
+<script>
+const html=`<h3>Mówcy</h3>
+<div class="r"><span class="av">AK</span><span class="n">Anna Kowalska</span><span class="m">Ja</span></div>
+<div class="r"><span class="av">BN</span><span class="n">Bartek Nowak</span></div>
+<div class="r"><span class="av">2</span><span class="n">Rozmówca 2</span></div>
+<div class="s">Marek? <a href="#">usłyszane w 03:12</a><button class="p">Tak</button><button>Nie</button></div>
+<div class="r"><span class="av">3</span><span class="n">Rozmówca 3</span></div>
+<div class="t"><b>[02:58] Bartek Nowak:</b> To przejdźmy do wdrożenia.<br><b>[03:12] Rozmówca 2:</b> Tu Marek, mam aktualizację z testów.</div>`;
+for(const c of ['l','d']){const e=document.createElement('div');e.className='w '+c;e.innerHTML=html;document.body.appendChild(e)}
+</script></body></html>
