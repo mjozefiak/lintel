@@ -64,12 +64,23 @@ final class MeetingHUDQA {
 
     static func state(named name: String) -> MeetingHUDState? { states.first { $0.name == name }?.state }
 
+    /// The suggestion pill ("Looks like a meeting in …", "End the recording?") with a fixture app name, so QA can
+    /// look at it without a call app that uses the microphone. `--qa-hud meeting:suggestion-meeting`.
+    static let suggestions: [(name: String, prompt: SuggestionPrompt)] = [
+        ("suggestion-meeting", .meeting(bundleID: "com.google.Chrome", appName: "Google Chrome")),
+        ("suggestion-end-recording", .endRecording(appName: "Google Chrome")),
+    ]
+
+    static func suggestion(named name: String) -> SuggestionPrompt? { suggestions.first { $0.name == name }?.prompt }
+
     private let model = MeetingHUDModel()
+    private let suggestionModel = SuggestionHUDModel()
     private var panel: NSPanel?
 
     /// Shows the state; `false` for a name this HUD does not have.
     @discardableResult
     func show(named name: String) -> Bool {
+        if let prompt = Self.suggestion(named: name) { return showSuggestion(prompt) }
         guard let state = Self.state(named: name) else { return false }
         model.reducesMotion = true
         model.state = state
@@ -82,6 +93,38 @@ final class MeetingHUDQA {
         }
         panel.orderFrontRegardless()
         return true
+    }
+
+    private func showSuggestion(_ prompt: SuggestionPrompt) -> Bool {
+        suggestionModel.reducesMotion = true
+        suggestionModel.prompt = prompt
+        let size = NSSize(width: 440, height: 78)
+        let panel = panel ?? makeSuggestionPanel(size)
+        self.panel = panel
+        panel.setContentSize(size)
+        if let frame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame {
+            panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height - 8))
+        }
+        panel.orderFrontRegardless()
+        return true
+    }
+
+    private func makeSuggestionPanel(_ size: NSSize) -> NSPanel {
+        let panel = NSPanel(
+            contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered, defer: true)
+        panel.identifier = NSUserInterfaceItemIdentifier(Self.panelIdentifier)
+        panel.level = .statusBar
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.becomesKeyOnlyIfNeeded = true
+        panel.isFloatingPanel = true
+        let host = SnapshotBackdropHostingView(rootView: SuggestionHUDView(model: suggestionModel))
+        host.backdropShape = { SnapshotBackdropHostingView<SuggestionHUDView>.roundedPath($0, radius: 22) }
+        panel.contentView = host
+        return panel
     }
 
     func hide() { panel?.orderOut(nil) }

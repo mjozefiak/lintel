@@ -132,10 +132,12 @@ struct MeetingSessionLimits: Sendable {
     /// The wait before each of those attempts, so a device change has time to settle.
     var resumeDelay: Duration = .seconds(2)
     /// How many times a microphone that did not start is started again (the first seconds of the recording,
-    /// a change of the default input, "Spróbuj ponownie"): three attempts about two seconds apart.
+    /// a change of the default input, "Spróbuj ponownie"): three attempts 1.5 s apart, the first of them 1.5 s
+    /// after the start (about 5 s in all).
     var startRetryAttempts = 3
-    /// The wait between those attempts and before the first one after the default input changed.
-    var startRetryDelay: Duration = .seconds(2)
+    /// The wait before each attempt of the automatic retry, between the attempts of "Try again", and before the
+    /// first one after the default input changed.
+    var startRetryDelay: Duration = .milliseconds(1_500)
     /// A gap longer than this is filled with only this much silence; the rest shifts the track on the timeline.
     var longestGapFill: Duration = .seconds(120)
 

@@ -27,6 +27,16 @@ import Testing
         for state in states { #expect(!state.title.isEmpty) }
     }
 
+    @Test func theSuggestionPillCanBeDrawnWithAFixtureAppName() {
+        #expect(
+            MeetingHUDQA.suggestion(named: "suggestion-meeting")
+                == .meeting(bundleID: "com.google.Chrome", appName: "Google Chrome"))
+        #expect(MeetingHUDQA.suggestion(named: "suggestion-end-recording") == .endRecording(appName: "Google Chrome"))
+        #expect(MeetingHUDQA.suggestion(named: "recording") == nil)
+        // A name belongs to one list only.
+        for name in MeetingHUDQA.suggestions.map(\.name) { #expect(MeetingHUDQA.state(named: name) == nil) }
+    }
+
     @Test func thePanelHasTheIdentifierTheShellLooksFor() {
         #expect(MeetingHUDQA.panelIdentifier == "lintel.qa.hud")
         #expect(MeetingHUDQA.settingName == "qaHUD")

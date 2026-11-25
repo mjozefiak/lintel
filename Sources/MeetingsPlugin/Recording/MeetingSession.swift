@@ -379,7 +379,8 @@ actor MeetingSession {
         guard retriesMicrophone else { return }
         if pendingMic != nil {
             micRetryTask = Task { [weak self] in
-                _ = await self?.reviveMicrophone(attempts: self?.limits.startRetryAttempts ?? 0)
+                // The first retry also waits: a Bluetooth headset that is switching profile needs a moment.
+                _ = await self?.reviveMicrophone(attempts: self?.limits.startRetryAttempts ?? 0, waitFirst: true)
             }
         }
         if let makeChanges = defaultInputChanges {
@@ -413,14 +414,14 @@ actor MeetingSession {
     /// them. A late microphone lands at its real place on the timeline: the time it was missing is filled
     /// with silence in full (not capped like an interruption's gap), so it stays aligned with the system
     /// track for the echo check and the order of the transcript. Returns whether it records now.
-    private func reviveMicrophone(attempts: Int) async -> Bool {
+    private func reviveMicrophone(attempts: Int, waitFirst: Bool = false) async -> Bool {
         guard retriesMicrophone, !reviving, state == .recording, finishTask == nil,
             let target = microphoneToRevive()
         else { return false }
         reviving = true
         defer { reviving = false }
         for attempt in 1...max(1, attempts) {
-            if attempt > 1 {
+            if attempt > 1 || waitFirst {
                 do { try await sleep(limits.startRetryDelay) } catch { return false }
             }
             guard state == .recording, finishTask == nil, microphoneToRevive()?.identity == target.identity else {
