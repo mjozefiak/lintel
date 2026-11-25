@@ -52,10 +52,27 @@ struct ChoiceMenuButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(Text(verbatim: title))
-        .popover(isPresented: $isOpen, arrowEdge: .bottom) { menu }
+        .popover(isPresented: $isOpen, arrowEdge: .bottom) {
+            ChoiceMenuList(groups: groups, selection: selection, footer: footer) { id in
+                isOpen = false
+                onSelect(id)
+            }
+        }
     }
+}
 
-    private var menu: some View {
+/// The content of a `ChoiceMenuButton`'s popover (mockup v2: a symbol, a title, a grey line under it, a check on the
+/// chosen one). Its own view so the design gallery draws it as a popover (spec `2026-11-23-swiftui-design-gallery`).
+struct ChoiceMenuList: View {
+    let groups: [ChoiceMenuGroup]
+    let selection: String
+    /// "Add provider…" style row under the groups; `nil` for none.
+    var footer: ChoiceMenuItem?
+    let onSelect: (String) -> Void
+
+    @Environment(\.lintelTextSize) private var textSize
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(groups) { group in
                 if let header = group.header {
@@ -79,7 +96,6 @@ struct ChoiceMenuButton: View {
     private func row(_ item: ChoiceMenuItem, plain: Bool = false) -> some View {
         let chosen = item.id == selection && !plain
         return Button {
-            isOpen = false
             onSelect(item.id)
         } label: {
             HStack(alignment: .top, spacing: 8) {
@@ -112,6 +128,130 @@ struct ChoiceMenuButton: View {
     }
 }
 
+/// The groups of the two popover menus of "Notes are written by", built from the models. One place for the rows and
+/// for the design gallery, which draws the menus' content as popovers.
+@MainActor enum NotesWrittenByMenus {
+    static var localName: String {
+        String(localized: "Local", comment: "Provider menu: the built-in models on this Mac")
+    }
+
+    static var providerFooter: ChoiceMenuItem {
+        ChoiceMenuItem(
+            id: "add",
+            title: String(localized: "Add provider…", comment: "Provider menu: row that adds a provider"),
+            subtitle: nil, symbol: "plus", enabled: false)
+    }
+
+    static func providerGroups(_ provider: ProviderChoiceModel) -> [ChoiceMenuGroup] {
+        [
+            ChoiceMenuGroup(
+                id: "mac",
+                header: String(localized: "On this Mac", comment: "Provider menu group: nothing leaves the Mac"),
+                items: [
+                    ChoiceMenuItem(
+                        id: "local", title: localName,
+                        subtitle: String(
+                            localized: "Built-in models. Nothing leaves this Mac.", comment: "Provider menu: Local"),
+                        symbol: "desktopcomputer")
+                ]),
+            ChoiceMenuGroup(
+                id: "tools",
+                header: String(
+                    localized: "Tools on your subscription", comment: "Provider menu group: CLIs on the user's plan"),
+                items: provider.descriptors.map { descriptor in
+                    ChoiceMenuItem(
+                        id: descriptor.id.rawValue, title: descriptor.displayName,
+                        subtitle: String(
+                            localized: "\(descriptor.recipient) · through the \(descriptor.displayName) on this Mac",
+                            comment: "Provider menu: the company and how the text gets there"),
+                        symbol: "terminal")
+                }),
+        ]
+    }
+
+    /// The model menu: the chosen provider's models, or the built-in ones while Local is chosen.
+    static func modelGroups(provider: ProviderChoiceModel, notes: NotesSettingsModel) -> [ChoiceMenuGroup] {
+        if let chosen = provider.chosen {
+            return [
+                ChoiceMenuGroup(
+                    id: "models",
+                    header: String(
+                        localized: "Models offered by \(chosen.displayName)",
+                        comment: "Model menu heading of an external provider"),
+                    items: provider.models.map { entry in
+                        ChoiceMenuItem(
+                            id: entry.id, title: entry.displayName,
+                            subtitle: String(
+                                localized: "Newest \(entry.displayName) your \(chosen.displayName) knows",
+                                comment: "Model menu: an alias means the newest model of that family"),
+                            symbol: "shippingbox")
+                    })
+            ]
+        }
+        return [
+            ChoiceMenuGroup(
+                id: "builtin",
+                header: String(localized: "Built-in models", comment: "Model menu heading of the local models"),
+                items: notes.models.map { entry in
+                    ChoiceMenuItem(
+                        id: entry.id, title: entry.package.title, subtitle: localSubtitle(entry, notes: notes),
+                        symbol: "shippingbox")
+                })
+        ]
+    }
+
+    private static func localSubtitle(_ entry: LLMModel, notes: NotesSettingsModel) -> String {
+        let size = ByteCountFormatter.string(fromByteCount: Int64(entry.package.totalBytes), countStyle: .file)
+        let memory = ByteCountFormatter.string(fromByteCount: Int64(entry.minimumMemoryBytes), countStyle: .memory)
+        let state =
+            entry.id == notes.model.id
+            ? (notes.isInstalled
+                ? String(localized: "installed", comment: "Local model state")
+                : String(localized: "not installed", comment: "Local model state")) : nil
+        let fit = String(localized: "for \(memory) Macs and up", comment: "Local model: the least memory")
+        return [size, state, fit].compactMap { $0 }.joined(separator: " · ")
+    }
+}
+
+/// The sections of Settings → Meetings that belong to "Notes are written by": the rows with the menus, status and test,
+/// and the notice with its caption. Shown while notes are written automatically or a provider is chosen
+/// (`ProviderChoiceModel.surfacesProvider`). One view for the pane and for the design gallery, so a scene never keeps
+/// its own copy of the section (spec `2026-11-23-swiftui-design-gallery`).
+struct NotesWrittenBySections: View {
+    @Bindable var provider: ProviderChoiceModel
+    let notes: NotesSettingsModel
+
+    var body: some View {
+        if ProviderChoiceModel.surfacesProvider(notesEnabled: notes.enabled, isLocal: provider.isLocal) {
+            Section {
+                NotesWrittenByRows(provider: provider, notes: notes)
+            } header: {
+                Text("Notes are written by", comment: "Settings → Meetings: provider menu label")
+                    .settingsSectionHeader()
+            } footer: {
+                if provider.isLocal {
+                    SettingsFooter(
+                        LocalizedStringResource(
+                            "Nothing leaves this Mac.",
+                            comment: "Settings → Meetings: caption under the local choice"))
+                }
+            }
+            if !provider.isLocal || provider.earlierMark != nil {
+                Section {
+                    NotesWrittenByNotices(provider: provider)
+                } footer: {
+                    if !provider.isLocal {
+                        SettingsFooter(
+                            LocalizedStringResource(
+                                "Switch back to Local here at any time: no question asked. It stops further sending; it can’t recall what was sent.",
+                                comment: "Settings → Meetings: caption under the notice about an external provider"))
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// "Notes are written by": the provider menu, the model menu, status and test, the notice. Mockup v2 screens
 /// A-local, A2, B, and the status rows of C. The banner (the host's) carries the state; the rows repeat the facts.
 struct NotesWrittenByRows: View {
@@ -140,12 +280,9 @@ struct NotesWrittenByRows: View {
             ChoiceMenuButton(
                 title: provider.chosen?.displayName ?? Self.localName,
                 symbol: provider.chosen == nil ? "desktopcomputer" : "terminal",
-                groups: providerGroups,
+                groups: NotesWrittenByMenus.providerGroups(provider),
                 selection: provider.chosen == nil ? "local" : provider.selection?.provider.rawValue ?? "local",
-                footer: ChoiceMenuItem(
-                    id: "add",
-                    title: String(localized: "Add provider…", comment: "Provider menu: row that adds a provider"),
-                    subtitle: nil, symbol: "plus", enabled: false),
+                footer: NotesWrittenByMenus.providerFooter,
                 isOpen: $providerMenuOpen,
                 accessibilityLabel: Text("Notes are written by", comment: "Settings → Meetings: provider menu label")
             ) { id in
@@ -161,36 +298,7 @@ struct NotesWrittenByRows: View {
         }
     }
 
-    static var localName: String {
-        String(localized: "Local", comment: "Provider menu: the built-in models on this Mac")
-    }
-
-    private var providerGroups: [ChoiceMenuGroup] {
-        [
-            ChoiceMenuGroup(
-                id: "mac",
-                header: String(localized: "On this Mac", comment: "Provider menu group: nothing leaves the Mac"),
-                items: [
-                    ChoiceMenuItem(
-                        id: "local", title: Self.localName,
-                        subtitle: String(
-                            localized: "Built-in models. Nothing leaves this Mac.", comment: "Provider menu: Local"),
-                        symbol: "desktopcomputer")
-                ]),
-            ChoiceMenuGroup(
-                id: "tools",
-                header: String(
-                    localized: "Tools on your subscription", comment: "Provider menu group: CLIs on the user's plan"),
-                items: provider.descriptors.map { descriptor in
-                    ChoiceMenuItem(
-                        id: descriptor.id.rawValue, title: descriptor.displayName,
-                        subtitle: String(
-                            localized: "\(descriptor.recipient) · through the \(descriptor.displayName) on this Mac",
-                            comment: "Provider menu: the company and how the text gets there"),
-                        symbol: "terminal")
-                }),
-        ]
-    }
+    static var localName: String { NotesWrittenByMenus.localName }
 
     /// DEBUG QA only (`plugins.meetings.qaProviderScenario=menu|modelMenu`): opens a menu so a screenshot can show it.
     private func openForQA(_ name: String, _ open: @escaping () -> Void) {
@@ -200,51 +308,28 @@ struct NotesWrittenByRows: View {
 
     private var modelRow: some View {
         LabeledContent {
-            if let chosen = provider.chosen {
-                ChoiceMenuButton(
-                    title: provider.model?.displayName ?? "", symbol: "shippingbox",
-                    groups: [
-                        ChoiceMenuGroup(
-                            id: "models",
-                            header: String(
-                                localized: "Models offered by \(chosen.displayName)",
-                                comment: "Model menu heading of an external provider"),
-                            items: provider.models.map { entry in
-                                ChoiceMenuItem(
-                                    id: entry.id, title: entry.displayName,
-                                    subtitle: String(
-                                        localized: "Newest \(entry.displayName) your \(chosen.displayName) knows",
-                                        comment: "Model menu: an alias means the newest model of that family"),
-                                    symbol: "shippingbox")
-                            })
-                    ],
-                    selection: provider.selection?.model ?? "", isOpen: $modelMenuOpen,
-                    accessibilityLabel: Text("Model", comment: "Settings → Meetings: model menu label")
-                ) { provider.chooseModel($0) }
-                .onAppear { openForQA("modelMenu") { modelMenuOpen = true } }
-                .onChange(of: provider.modelMenuRequested) { _, requested in
-                    if requested {
-                        modelMenuOpen = true
-                        provider.modelMenuRequested = false
-                    }
+            ChoiceMenuButton(
+                title: provider.chosen == nil ? notes.model.package.title : provider.model?.displayName ?? "",
+                symbol: "shippingbox",
+                groups: NotesWrittenByMenus.modelGroups(provider: provider, notes: notes),
+                selection: provider.chosen == nil ? notes.model.id : provider.selection?.model ?? "",
+                isOpen: $modelMenuOpen,
+                accessibilityLabel: Text("Model", comment: "Settings → Meetings: model menu label")
+            ) { id in
+                if provider.chosen == nil {
+                    Task { await notes.choose(id) }
+                } else {
+                    provider.chooseModel(id)
                 }
-            } else {
-                ChoiceMenuButton(
-                    title: notes.model.package.title, symbol: "shippingbox",
-                    groups: [
-                        ChoiceMenuGroup(
-                            id: "builtin",
-                            header: String(
-                                localized: "Built-in models", comment: "Model menu heading of the local models"),
-                            items: notes.models.map { entry in
-                                ChoiceMenuItem(
-                                    id: entry.id, title: entry.package.title, subtitle: localSubtitle(entry),
-                                    symbol: "shippingbox")
-                            })
-                    ],
-                    selection: notes.model.id, isOpen: $modelMenuOpen,
-                    accessibilityLabel: Text("Model", comment: "Settings → Meetings: model menu label")
-                ) { id in Task { await notes.choose(id) } }
+            }
+            .onAppear {
+                if provider.chosen != nil { openForQA("modelMenu") { modelMenuOpen = true } }
+            }
+            .onChange(of: provider.modelMenuRequested) { _, requested in
+                if requested, provider.chosen != nil {
+                    modelMenuOpen = true
+                    provider.modelMenuRequested = false
+                }
             }
         } label: {
             VStack(alignment: .leading, spacing: 2) {
@@ -255,18 +340,6 @@ struct NotesWrittenByRows: View {
                 }
             }
         }
-    }
-
-    private func localSubtitle(_ entry: LLMModel) -> String {
-        let size = ByteCountFormatter.string(fromByteCount: Int64(entry.package.totalBytes), countStyle: .file)
-        let memory = ByteCountFormatter.string(fromByteCount: Int64(entry.minimumMemoryBytes), countStyle: .memory)
-        let state =
-            entry.id == notes.model.id
-            ? (notes.isInstalled
-                ? String(localized: "installed", comment: "Local model state")
-                : String(localized: "not installed", comment: "Local model state")) : nil
-        let fit = String(localized: "for \(memory) Macs and up", comment: "Local model: the least memory")
-        return [size, state, fit].compactMap { $0 }.joined(separator: " · ")
     }
 
     private var heavierNote: some View {

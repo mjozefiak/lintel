@@ -5,7 +5,7 @@ import Testing
 /// never on a plugin or `LintelApp`. The SwiftPM graph is the enforcement; this reads `Package.swift` and the
 /// sources so a dependency added by mistake fails a test.
 @Suite struct PackageGraphTests {
-    private static let allowedImports: Set<String> = ["LintelKit", "LintelCore", "SwiftUI", "AppKit"]
+    private static let allowedImports: Set<String> = ["LintelKit", "LintelCore", "SwiftUI", "AppKit", "CryptoKit"]
     private static let forbiddenTargets = [
         "LintelPersistence", "LintelSpeech", "LintelApp", "AppsPlugin", "FilesPlugin", "ClipboardPlugin",
         "DictationPlugin", "MeetingsPlugin", "WindowsPlugin",

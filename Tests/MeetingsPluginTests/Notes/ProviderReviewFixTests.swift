@@ -25,13 +25,20 @@ import Testing
         #expect(ProviderChoiceModel.surfacesProvider(notesEnabled: true, isLocal: false))
         #expect(ProviderChoiceModel.surfacesProvider(notesEnabled: true, isLocal: true))
         #expect(!ProviderChoiceModel.surfacesProvider(notesEnabled: false, isLocal: true))
+        // The pane shows the sections through `NotesWrittenBySections`, which decides through `surfacesProvider` (the
+        // same view the design gallery draws); the banner decides in `MeetingsPlugin+Status`.
         for file in [
-            "Sources/MeetingsPlugin/UI/MeetingsSettingsPane.swift",
+            "Sources/MeetingsPlugin/Notes/ProviderChoiceViews.swift",
             "Sources/MeetingsPlugin/MeetingsPlugin+Status.swift",
         ] {
             let source = try String(contentsOf: Self.root.appending(path: file), encoding: .utf8)
             #expect(source.contains("surfacesProvider("), "\(file) must decide through surfacesProvider")
         }
+        let pane = try String(
+            contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/UI/MeetingsSettingsPane.swift"),
+            encoding: .utf8)
+        #expect(
+            pane.contains("NotesWrittenBySections("), "the pane must show the section through NotesWrittenBySections")
     }
 
     // MARK: B2 and B3 a running job follows the choice

@@ -1,0 +1,94 @@
+name: Gallery goldens
+
+# Records the design gallery on the CI runner (spec .ai/specs/2026-11-23-swiftui-design-gallery.md, Q3): the FULL matrix
+# as a contact sheet for the owner's approval, and the golden PNGs of the CI subset from the SAME render. Text drawing
+# depends on the macOS build and the Xcode SDK, so goldens recorded anywhere else would give red CI.
+#
+# Manual only, no secrets, never pushes: it uploads the artifact `gallery-record-<run id>`; the author (or an agent)
+# commits the golden PNGs from it onto the PR branch. A change of the golden images needs the PR's "Golden changes"
+# section and `needs-qa`; nobody records new goldens just to make a test pass.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scene:
+        description: "Limit the full-matrix sheet to one scene id (the goldens always cover every scene)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gallery-goldens-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    name: Record gallery goldens
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 5
+        with:
+          submodules: true
+
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        timeout-minutes: 5
+        with:
+          xcode-version: latest-stable
+
+      # The renderer fingerprint: macOS build (read by the app) and this line (the Xcode build; a new SDK can change
+      # SwiftUI's layout through "linked on or after" behaviour). It goes into goldens.json.
+      - name: Toolchain
+        timeout-minutes: 2
+        run: |
+          echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
+          echo "LINTEL_GALLERY_XCODE=$(xcodebuild -version | tr '\n' ' ')" >> "$GITHUB_ENV"
+          xcodebuild -version
+          sw_vers
+
+      - name: Build
+        timeout-minutes: 12
+        run: swift build
+
+      # English: through `swift test`, the same mechanism that compares (GallerySnapshotTests).
+      - name: Record English goldens
+        timeout-minutes: 8
+        env:
+          LINTEL_SNAPSHOTS: record
+          LINTEL_GALLERY_RUN: ${{ github.run_id }}
+        run: swift test --filter GallerySnapshotTests
+
+      # Polish: from the app bundle with -AppleLanguages "(pl)" (Q11), then the full matrix of both languages.
+      - name: Record Polish goldens and export the full matrix
+        timeout-minutes: 12
+        env:
+          LINTEL_GALLERY_RUN: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          CONFIGURATION=debug scripts/make-app.sh
+          app="dist/Lintel-QA.app/Contents/MacOS/Lintel-QA"
+          goldens="Tests/MeetingsPluginTests/Gallery/Goldens"
+          "$app" --qa --qa-gallery-record "$goldens" --qa-gallery-language pl -AppleLanguages "(pl)" -AppleLocale pl
+          scene_args=()
+          if [ -n "${{ inputs.scene }}" ]; then scene_args=(--scene "${{ inputs.scene }}"); fi
+          scripts/gallery-export.sh "$RUNNER_TEMP/gallery-sheet" --no-build "${scene_args[@]}"
+
+      - name: Collect
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/gallery-record"
+          mkdir -p "$out"
+          cp -R Tests/MeetingsPluginTests/Gallery/Goldens "$out/goldens"
+          cp -R "$RUNNER_TEMP/gallery-sheet" "$out/sheet"
+          cat "$out/goldens/goldens.json" | head -20
+
+      - name: Upload the sheet and the goldens
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gallery-record-${{ github.run_id }}
+          path: ${{ runner.temp }}/gallery-record
+          if-no-files-found: error
+          retention-days: 30

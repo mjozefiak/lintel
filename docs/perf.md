@@ -471,3 +471,20 @@ The budget is the time from a key press to the updated line on screen at 50 000 
   included), measuring key-down to the next display with a signpost around `keyDown`. Only this number is entered
   in the table above. ADR 0008 addendum 0.1 measured the TextKit 2 layout and display side at p99 1.5 ms in a
   headless window; that run did not include the event path, the compositor or other hardware.
+
+## Design gallery (spec `2026-11-23-swiftui-design-gallery`, phase 1)
+
+DEBUG only; none of it is in a release build. The budgets protect the CI minutes, not the product.
+
+| Budget | Value | Measured | How |
+|---|---|---|---|
+| One state in one variant (window, `NSHostingView`, `cacheDisplay`, settle) | ≈ 50–150 ms (spec estimate) | ≈ 110 ms on an M4 Max (Form with Toggle, TextField and Picker, 960×520 px: 20 renders in 2.2 s) | `swift test --filter GalleryRendererTests`, line `GALLERY-PERF` |
+| Determinism: the same state 20 times in one process, and in 3 separate processes | 0% differing pixels | **0%**: one SHA-256 for all 20 renders and the same one in 3 processes (also for the 50 pilot pictures, compared with themselves through `GalleryDiff` at limit 0 in `GalleryScenesTests.statesAreIndependent`) | `GalleryRendererTests.renderIsDeterministic`, `LINTEL_GALLERY_DIGEST_FILE=<file>` three times |
+| Pilot compare step `Gallery snapshots` (`en`, 50 pictures) | ≤ 90 s, of which ≤ 60 s comparisons; limit 4 min | local: 7 s for the 50 renders after the build (M4 Max); CI: see the PR | `scripts/test-with-watchdog.sh … swift test --filter GallerySnapshotTests` |
+| Pilot compare step `Gallery snapshots (pl)` (25 pictures through the app bundle) | ≤ 3 min including `make-app.sh`; limit 6 min | CI: see the PR | `CONFIGURATION=debug scripts/make-app.sh`, then `--qa-gallery-compare … --qa-gallery-language pl` |
+| Golden images | ≤ 25 MB per folder (Q5) | enforced by `GoldenBudgetTests` | the size of `Tests/<Plugin>Tests/Gallery/Goldens/` |
+
+The renderer draws every bitmap itself at exactly 2 pixels per point (`GalleryRenderer.scale`) and records the scale in the
+fingerprint, so the picture does not depend on the display of the machine (a CI VM can report a backing scale of 1).
+Renderer fingerprint changes (macOS build, Xcode build) are expected a few times a year; if more often than once a month,
+pin the runner image.

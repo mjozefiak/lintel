@@ -227,9 +227,14 @@ let package = Package(
             dependencies: [
                 "MeetingsPlugin", "LintelSpeech", "LintelKit", "LintelPersistence", "LintelTestSupport",
                 "LintelProviders",
+                // The design gallery (spec 2026-11-23-swiftui-design-gallery): `GalleryRenderer` and the golden
+                // comparison draw the plugin's scenes. DEBUG only; the tests do not run without it.
+                "LintelUI",
                 .product(name: "GRDB", package: "GRDBCipher"),
             ],
-            resources: [.copy("Fixtures")]
+            // `Gallery/Goldens` holds the golden PNGs of the gallery pilot; declared so SwiftPM does not report them
+            // as unhandled files. The tests read them from the source tree.
+            resources: [.copy("Fixtures"), .copy("Gallery/Goldens")]
         ),
         .testTarget(
             name: "WindowsPluginTests",
