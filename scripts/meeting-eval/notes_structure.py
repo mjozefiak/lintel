@@ -11,7 +11,8 @@ Prints rule names, pass/fail and numbers only, never note text. Exit code: 0 eve
 trace or the draft, which this tool does not see): the section must then be present.
 
 Rules (spec "Plan pomiaru", metric 3):
-  no_headingless_points  a meeting that is not short has no list of points outside every heading
+  no_headingless_points  a meeting that is not short has no list of points outside every heading (this also fails the
+                         built-in track's fallback list without a heading; decide before F4 whether to exempt it)
   topics_within_max      number of named topic headings ("Other" is extra) <= min(10, max(2, minutes // 6)); a short meeting has none
   points_per_topic       2..6 points under each topic heading ("Other" 1..6), unless the meeting is short
   decisions_section      a decisions section exists when --expect-decisions

@@ -67,8 +67,7 @@ enum WholeNotesEval {
     static func makeGenerator() -> (generator: any HarnessGenerator, label: String)? {
         if let url = value("LLAMA_URL") {
             guard let base = URL(string: url), base.host == "127.0.0.1" else { return nil }
-            // 5 500 fits the 8 192-token context of the built-in model; a larger server context needs `_LLAMA_BUDGET`.
-            let budget = Int(value("LLAMA_BUDGET") ?? "") ?? 5_500
+            let budget = Int(value("LLAMA_BUDGET") ?? "") ?? 24_000
             return (LlamaServerGenerator(base: base, inputBudgetTokens: budget), "llama-server")
         }
         let model = value("PROVIDER_MODEL") ?? "sonnet"

@@ -64,7 +64,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="notes_md_to_points.py")
     ap.add_argument("--notes", required=True, help="the notes as Markdown")
     ap.add_argument("--meeting", required=True, help="the meeting id (the gold entry's id)")
-    ap.add_argument("--out", help="notes.json to write (default: <notes>.json beside the input)")
+    ap.add_argument("--out", help="notes.json to write (default: <notes without extension>.points.json beside the input)")
     args = ap.parse_args(argv)
     try:
         with open(args.notes, encoding="utf-8") as handle:
