@@ -38,9 +38,15 @@ protocol MeetingRecordingObserver: AnyObject {
 ///
 /// It listens only while it is `start`ed, which `MeetingsPlugin` does only while the plugin is active and
 /// `plugins.meetings.suggestMeetings` is on. It sees process + bundle ID + "uses an input" and nothing else,
-/// keeps that in memory, logs none of it, and **never starts or stops a recording by itself**: the HUD's
+/// keeps that in memory, and **never starts or stops a recording by itself**: the HUD's
 /// buttons call `Dependencies.startRecording` / `stopRecording`, which are the user's clicks. It registers no
 /// global keys.
+///
+/// It logs its decisions at `notice` level, which unified logging keeps on disk (`log show --predicate
+/// 'subsystem == "com.lintelapp"'`, "Meeting detection"): that an app started or stopped using an input (with
+/// the bundle IDs Core Audio reported and the listed app they were matched to), that a suggestion was shown, or
+/// skipped and why, what the user answered, and the detector's status. Bundle IDs are public; no window title,
+/// URL, audio or text is ever involved.
 @MainActor
 final class MeetingDetector: MeetingRecordingObserver {
     enum Status: Equatable, Sendable {
@@ -80,7 +86,11 @@ final class MeetingDetector: MeetingRecordingObserver {
     private let deps: Dependencies
     private var policy = SuggestionPolicy()
     private(set) var status = Status.off {
-        didSet { if status != oldValue { deps.statusChanged(status) } }
+        didSet {
+            guard status != oldValue else { return }
+            deps.logger.notice("Meeting detection: status \(String(describing: self.status), privacy: .public)")
+            deps.statusChanged(status)
+        }
     }
     private var subscription: ProcessAudioSubscription?
     private var eventsTask: Task<Void, Never>?
@@ -197,6 +207,7 @@ final class MeetingDetector: MeetingRecordingObserver {
     private func evaluate() {
         let now = deps.clock.now()
         let effects = policy.evaluate(now: now, config: config(), isBusy: deps.isBusy(), canSuggest: shown == nil)
+        logNotes()
         for effect in effects {
             switch effect {
             case .suggest(let bundleID):
@@ -206,6 +217,32 @@ final class MeetingDetector: MeetingRecordingObserver {
             }
         }
         reschedule(after: now)
+    }
+
+    /// Writes what the policy saw and decided since the last call (see the type's comment).
+    private func logNotes() {
+        let logger = deps.logger
+        for note in policy.drainNotes() {
+            switch note {
+            case .inputStarted(let reported, let responsible, let listed):
+                logger.notice(
+                    "Meeting detection: input in use by \(reported ?? "unknown", privacy: .public) (app: \(responsible ?? "none", privacy: .public)), listed as \(listed ?? "none", privacy: .public)"
+                )
+            case .inputEnded(let app):
+                logger.notice("Meeting detection: input no longer in use by \(app, privacy: .public)")
+            case .suggested(let app):
+                logger.notice("Meeting detection: suggested a recording for \(app, privacy: .public)")
+            case .skipped(let app, let reason):
+                logger.notice(
+                    "Meeting detection: no suggestion for \(app, privacy: .public), skipped: \(reason.rawValue, privacy: .public)"
+                )
+            case .waiting(let app):
+                logger.notice(
+                    "Meeting detection: \(app, privacy: .public) waits for the suggestion on screen")
+            case .askedToEnd(let app):
+                logger.notice("Meeting detection: asked whether to end the recording of \(app, privacy: .public)")
+            }
+        }
     }
 
     private func name(of bundleID: String) -> String {
@@ -268,6 +305,7 @@ final class MeetingDetector: MeetingRecordingObserver {
         hideTask = Task { [weak self] in
             try? await sleep(SuggestionPrompt.lifetime)
             guard !Task.isCancelled, let self, self.shown == prompt else { return }
+            deps.logger.notice("Meeting detection: the suggestion expired unanswered")
             self.dismiss()
             // An app that reached its 10 s while this pill was up is offered now.
             if self.isListening { self.evaluate() }
@@ -288,6 +326,7 @@ final class MeetingDetector: MeetingRecordingObserver {
     /// `stopRecording`.
     func perform(_ action: SuggestionAction) {
         guard let prompt = shown else { return }
+        deps.logger.notice("Meeting detection: the user answered \(String(describing: action), privacy: .public)")
         dismiss()
         switch (prompt, action) {
         case (.meeting(let bundleID, _), .record):

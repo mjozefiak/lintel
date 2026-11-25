@@ -24,6 +24,15 @@ final class AppCoordinator {
     private var mainMenu: MainMenuController?
     /// The one banner of the main window's Settings mode (spec step 2.2); built with the Settings mode.
     private var settingsHost: SettingsHostModel?
+    /// The one permission service (live states and asking), shared by Settings → Permissions and, later, the
+    /// onboarding Access step.
+    private(set) lazy var permissionGrant = PermissionGrantService(
+        reader: environment.permissionsReader,
+        // A QA run never raises the Accessibility prompt (it would target the tester's real settings).
+        requester: Self.permissionRequester(postsKeystrokes: environment.postsKeystrokes)
+    ) {
+        NSWorkspace.shared.open($0)
+    }
     /// Settings → Models (spec step 3.2).
     private var modelsPane: ModelsPaneModel?
     /// Shows the welcome screen's pending steps. Set in `start()` outside QA mode; tests replace it.
@@ -201,7 +210,10 @@ final class AppCoordinator {
             actions: ShellMenuActions(
                 openPanel: { [weak self] in self?.panelModel.show() },
                 openSettings: { [weak self] in self?.openSettingsFromMenu() },
-                mainShortcut: { [weak self] in self?.hotkeys.mainShortcut },
+                mainShortcut: { [weak self] in
+                    guard let hotkeys = self?.hotkeys, hotkeys.isMainShortcutActive else { return nil }
+                    return hotkeys.mainShortcut
+                },
                 runCommand: { [weak self] command in self?.perform(command) },
                 commandShortcut: { [weak self] id in self?.hotkeys.commandShortcut(id) },
                 showAbout: { [weak self] in self?.showAbout() },
@@ -228,7 +240,7 @@ final class AppCoordinator {
         startQACommandRoute()
         #endif
         observeActivationForRecovery()
-        hotkeys.start { [weak self] in self?.panelModel.toggle() }
+        hotkeys.start(onMainShortcut: { [weak self] in self?.panelModel.toggle() }, active: !host.activeSources.isEmpty)
         syncCommands()
         statusItem?.rebuildMenu()
         logger.info("Started with \(host.entries.count, privacy: .public) plugins")
@@ -378,6 +390,8 @@ final class AppCoordinator {
     }
 
     private func syncCommands() {
+        // The launcher shortcut follows the plugins that search (Apps, Files, Windows): registered while one is active.
+        hotkeys.setMainShortcutActive(!host.activeSources.isEmpty)
         hotkeys.syncCommands(
             host.activeCommands,
             perform: { [weak self] command in self?.perform(command) },
@@ -418,7 +432,9 @@ final class AppCoordinator {
             case .features:
                 return AnyView(FeaturesPane(host: host, settings: settings) { self?.pluginsChanged() })
             case .permissions:
-                let model = PermissionsModel(host: host, reader: environment.permissionsReader) { url in
+                let model = PermissionsModel(
+                    host: host, reader: environment.permissionsReader, service: self?.permissionGrant
+                ) { url in
                     NSWorkspace.shared.open(url)
                 }
                 return AnyView(PermissionsPane(model: model))
@@ -438,6 +454,7 @@ final class AppCoordinator {
             host.entries.filter(\.state.isActive).flatMap(\.plugin.onboardingSteps)
         }
         onboarding.activatesApp = environment.registersGlobalHotkeys
+        onboarding.launcherIsActive = { !host.activeSources.isEmpty }
         onboarding.openMainWindow = { [weak self] in self?.router.openMainWindow() }
         self.onboarding = onboarding
 
@@ -494,6 +511,12 @@ final class AppCoordinator {
                 onBack: hasSection ? { [weak self] in self?.mainWindow?.showWorkspace() } : nil))
     }
 
+    /// The requester of the shared permission service: the real one, or in QA mode (no keystrokes) one that never
+    /// raises the Accessibility prompt.
+    static func permissionRequester(postsKeystrokes: Bool) -> any PermissionRequester {
+        postsKeystrokes ? SystemPermissionRequester() : QAPermissionRequester()
+    }
+
     private func makeSettingsHost() -> SettingsHostModel {
         var navigation = SettingsHostModel.Navigation()
         navigation.openModels = { [weak self] id, packageID in self?.openModels(from: id, packageID: packageID) }
@@ -505,6 +528,10 @@ final class AppCoordinator {
             panes: { [weak self] in self?.mainWindowPluginPanes() ?? [] },
             shellBanners: shellPaneBanners(models: models))
         settingsHost = model
+        // Live checks only while the main window is visible; a change the service sees redraws the banner and dots.
+        model.liveGate = { [weak self] in self?.mainWindow?.isVisible ?? false }
+        permissionGrant.pollGate = { [weak self] in self?.mainWindow?.isVisible ?? false }
+        model.follow(permissionGrant)
         return model
     }
 
@@ -515,7 +542,8 @@ final class AppCoordinator {
         let reader = environment.permissionsReader
         return [
             SettingsShellPane.general.rawValue: {
-                ShellPaneBanners.general(shortcut: hotkeys.mainShortcut?.displayString)
+                ShellPaneBanners.general(
+                    shortcut: hotkeys.mainShortcut?.displayString, launcherIsActive: hotkeys.isMainShortcutActive)
             },
             SettingsShellPane.features.rawValue: { ShellPaneBanners.features(host: host) },
             SettingsShellPane.permissions.rawValue: {

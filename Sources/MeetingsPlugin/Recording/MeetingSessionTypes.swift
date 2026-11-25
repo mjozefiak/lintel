@@ -1,4 +1,5 @@
 import Foundation
+import LintelSpeech
 
 /// The session's state in memory (spec: Phasing, "Stany"). `idle` has no row in the database; the others map
 /// to `meeting.status` through `meetingStatus`.
@@ -39,6 +40,12 @@ enum MeetingSessionEvent: Equatable, Sendable {
     case modelLoaded
     /// The speech model could not be taken; `busy` when another model is in use. Segments wait in the spool.
     case modelUnavailable(busy: Bool)
+    /// The microphone the user chose is not available (unplugged), so the recording uses the system's input
+    /// (`InputFallback`): at the start, or after the device went away during the recording. The names are for the
+    /// HUD only; either can be unknown.
+    case microphoneFallback(requested: String?, using: String?)
+    /// The chosen microphone is recording again (it was plugged in during an audio configuration change).
+    case microphoneFallbackEnded
     /// A track could not be started at the beginning (the session continues with the other one).
     case trackUnavailable(AudioChannel)
     /// A track ended while recording (device unplugged, permission revoked); the other one carries on.
@@ -131,8 +138,25 @@ struct MeetingSessionLimits: Sendable {
     var resumeAttempts = 5
     /// The wait before each of those attempts, so a device change has time to settle.
     var resumeDelay: Duration = .seconds(2)
+    /// How many times a microphone that did not start is started again (the first seconds of the recording,
+    /// a change of the default input, "Spróbuj ponownie"): three attempts 1.5 s apart, the first of them 1.5 s
+    /// after the start (about 5 s in all).
+    var startRetryAttempts = 3
+    /// The wait before each attempt of the automatic retry, between the attempts of "Try again", and before the
+    /// first one after the default input changed.
+    var startRetryDelay: Duration = .milliseconds(1_500)
     /// A gap longer than this is filled with only this much silence; the rest shifts the track on the timeline.
     var longestGapFill: Duration = .seconds(120)
+    /// Audio sent to the engine before the start of the speech range the voice activity detector reports. The
+    /// detector opens a range at the 256 ms chunk that first reaches its threshold, so the first syllables of a
+    /// quiet word can lie before it (issue #135). Never reaches into the previous segment.
+    var segmentPreRoll: Duration = SegmentWindow.preRoll
+    /// Audio sent after the end of the range: the detector closes it at the start of the first quiet chunk,
+    /// so a soft ending can lie after it. Not added where a segment is cut at the model window.
+    var segmentPostRoll: Duration = SegmentWindow.postRoll
+    /// The detector's entry threshold: chunks from `SegmentingStats.nearMissFloor` up to it, while no speech is
+    /// open, are counted as near misses.
+    var vadEntryThreshold: Float = MeetingVAD.tuning.entryThreshold
 
     static func seconds(_ duration: Duration) -> Double {
         let parts = duration.components

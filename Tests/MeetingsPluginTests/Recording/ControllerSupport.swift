@@ -187,7 +187,7 @@ final class ScriptedSession: RecordingSession {
 
     let events: AsyncStream<MeetingSessionEvent>
     private let continuation: AsyncStream<MeetingSessionEvent>.Continuation
-    private let counts = Mutex((starts: 0, finishes: 0))
+    private let counts = Mutex((starts: 0, finishes: 0, retries: 0))
     private let behaviour: Behaviour
     private let startReturned = Latch()
 
@@ -200,6 +200,17 @@ final class ScriptedSession: RecordingSession {
     var finishCount: Int { counts.withLock { $0.finishes } }
 
     func send(_ event: MeetingSessionEvent) { continuation.yield(event) }
+
+    /// How many times "Try again" reached the session, and what it answers.
+    var retryCount: Int { counts.withLock { $0.retries } }
+    func answerRetries(with value: Bool) { retryAnswer.withLock { $0 = value } }
+    private let retryAnswer = Mutex(false)
+
+    func retryMicrophone() async -> Bool {
+        counts.withLock { $0.retries += 1 }
+        ChangeSignal.fireFromAnywhere()
+        return retryAnswer.withLock { $0 }
+    }
 
     func waitForStartToReturn() async { await startReturned.wait() }
 

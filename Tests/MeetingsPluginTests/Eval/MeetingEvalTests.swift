@@ -16,7 +16,10 @@ import Testing
 /// pins it, Parakeet gets it as a script hint, like the app), `_PARAKEET_HINT` (`0`: Parakeet without the hint, the
 /// behaviour before issue #132), `_CODE_VERSION`, `_NOTES_MODEL` (a .gguf), `_DUMP_REJECTIONS` (`1`: also write
 /// `<name>.notes-rejections.json` with the text of every refused point; the only file that holds notes text
-/// besides the result), `_DIARIZATION_FOLDER`, `_SPEAKER_NAMES` (a JSON of oracle names that replace "Mówca N" after diarization), `_ALLOW_DEBUG`. The WAV must be
+/// besides the result), `_TRACK` (`system`: feed the WAV as the system audio, like a remote speaker, with no
+/// microphone; default `mic`), the segmentation knobs of issue #135 (`_PRE_ROLL_MS`, `_POST_ROLL_MS`, `_VAD_ENTRY`,
+/// `_VAD_EXIT_OFFSET`, `_VAD_MIN_SILENCE`, `_VAD_PADDING`; unset = the app's values; the run writes its counters
+/// under `capture` in the result), `_DIARIZATION_FOLDER`, `_SPEAKER_NAMES` (a JSON of oracle names that replace "Mówca N" after diarization), `_ALLOW_DEBUG`. The WAV must be
 /// 16 kHz mono. The transcript goes only into the JSON; the test prints numbers, never text.
 @Suite(
     .serialized,
@@ -65,6 +68,18 @@ struct MeetingEvalTests {
         let samples = try WAVFile.samples(from: Data(contentsOf: audioURL))
         let audioSeconds = Double(samples.count) / Double(AudioFormat.sampleRate)
         let source = try WAVFileAudioSource(url: audioURL)
+        let asSystem = Self.value("TRACK") == "system"
+        var limits = MeetingSessionLimits()
+        if let value = Self.value("PRE_ROLL_MS").flatMap(Int.init) { limits.segmentPreRoll = .milliseconds(value) }
+        if let value = Self.value("POST_ROLL_MS").flatMap(Int.init) { limits.segmentPostRoll = .milliseconds(value) }
+        var chosen = MeetingVAD.tuning
+        if let value = Self.value("VAD_ENTRY").flatMap(Float.init) { chosen.entryThreshold = value }
+        if let value = Self.value("VAD_EXIT_OFFSET").flatMap(Float.init) { chosen.exitOffset = value }
+        if let value = Self.value("VAD_MIN_SILENCE").flatMap(Double.init) { chosen.minSilence = value }
+        if let value = Self.value("VAD_PADDING").flatMap(Double.init) { chosen.padding = value }
+        let tuning = chosen
+        limits.vadEntryThreshold = tuning.entryThreshold
+        let counters = Mutex<CaptureCounters?>(nil)
 
         // Store and spool live in a temporary folder that is removed at the end; the audio never exists
         // outside the encrypted spool in it.
@@ -76,10 +91,12 @@ struct MeetingEvalTests {
         let vadFolder = speechFolder.appending(path: ModelCatalog.sileroVADPath)
 
         let session = MeetingSession(
-            store: store, keys: keys, spool: SpoolStorage(pluginDirectory: plugin), mic: source, system: nil,
-            makeVAD: { LazyVAD(modelFolder: vadFolder) }, engine: engine, modelID: engineID,
-            modelFolder: speechFolder, lease: SpeechEngineLease(), sleepAssertion: RecordingSleepAssertion(),
-            gate: MeetingSessionGate())
+            store: store, keys: keys, spool: SpoolStorage(pluginDirectory: plugin),
+            mic: asSystem ? UnavailableAudioInput() : source, system: asSystem ? source : nil,
+            makeVAD: { LazyVAD(modelFolder: vadFolder, tuning: tuning, recordsProbabilities: true) },
+            engine: engine, modelID: engineID, modelFolder: speechFolder, lease: SpeechEngineLease(),
+            sleepAssertion: RecordingSleepAssertion(), gate: MeetingSessionGate(), limits: limits,
+            recordCounters: { value in counters.withLock { $0 = value } }, retriesMicrophone: !asSystem)
 
         let sampler = FootprintSampler()
         sampler.start()
@@ -119,6 +136,15 @@ struct MeetingEvalTests {
         var result = EvalResult(
             recording: name, audioSeconds: audioSeconds,
             config: .init(engine: engineID, language: language, codeVersion: codeVersion), asr: asr)
+        result.capture = counters.withLock { $0 }
+        if let capture = result.capture {
+            let c = capture[asSystem ? .system : .mic]
+            print(
+                "MEETING-EVAL capture track=\(asSystem ? "system" : "mic") sent=\(c.segmentsSent) text=\(c.textResults)"
+                    + " empty=\(c.emptyResults) hardCuts=\(c.hardCuts) short=\(c.shortSegments)"
+                    + " nearMissChunks=\(c.segmentingStats.nearMissChunks) padMs=\(c.segmentingStats.paddedSamples / 16)"
+            )
+        }
         print(
             "MEETING-EVAL asr name=\(name) audioSeconds=\(Self.ms(audioSeconds)) seconds=\(Self.ms(processingSeconds))"
                 + " rtf=\(String(format: "%.3f", asr.rtf)) peakMB=\(Self.ms(asrPeak)) segments=\(rows.count)"

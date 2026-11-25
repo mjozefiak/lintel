@@ -1,4 +1,5 @@
 .build/
+.build-tsan/
 dist/
 .DS_Store
 .swiftpm/

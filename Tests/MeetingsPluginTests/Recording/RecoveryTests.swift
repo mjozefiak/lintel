@@ -135,6 +135,27 @@ private let texts: [Int: String] = [11: "Pierwsza wypowiedź", 12: "Druga wypowi
         #expect(try store.segmentCount(meetingID: meeting.id) == 1)
     }
 
+    // MARK: Padding
+
+    @Test func resumedRangesGetThePreRollAreCutWithItAndNeverOverlapOrExceedTheWindow() async throws {
+        // Silence in front of a range is what the pre-roll adds; the engine names that level too.
+        let rig = try RecoveryRig(texts: texts.merging([0: "cisza"]) { $1 })
+        // Utterance 11 for 3 s at 1 s; utterance 12 for 20 s at 6 s (more than the window); 3 s of silence.
+        let mic = TrackScript.build([(1, 11, 3), (2, 12, 20)], tail: 3)
+        let meeting = try await rig.seed(.processing, mic: mic, stored: [])
+        let library = rig.library(
+            resumer: rig.resumerFactory(mic: mic, preRoll: .milliseconds(300), postRoll: .milliseconds(200)))
+        library.open()
+        let store = try #require(library.store)
+        #expect(await pollUntil { (try? store.audioState(of: meeting.id)) == .deleted })
+        let rows = try rig.rows(library, meeting.id)
+        // 1 s..4 s gets both margins; the long utterance is cut so that its pre-roll fits in the window (the
+        // piece is exactly 15 s), the continuation starts at the cut and gets nothing in front of it.
+        #expect(rows.map(\.startMs) == [700, 5_700, 20_700])
+        #expect(rows.map(\.endMs) == [4_200, 20_700, 26_200])
+        #expect(rows.allSatisfy { $0.endMs - $0.startMs <= 15_000 })
+    }
+
     // MARK: Failed and unreadable
 
     enum Scenario: CaseIterable, CustomStringConvertible {

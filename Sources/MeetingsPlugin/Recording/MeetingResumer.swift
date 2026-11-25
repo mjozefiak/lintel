@@ -92,6 +92,9 @@ struct MeetingResumer: MeetingResuming {
     let now: @Sendable () -> Date
     /// `plugins.meetings.keepAudio` when the meeting becomes `ready`.
     let keepAudio: @Sendable () -> Bool
+    /// What a detected range is widened by (`SegmentWindow`); the live session's values by default.
+    let preRoll: Duration
+    let postRoll: Duration
     let logger: Logger
 
     init(
@@ -101,8 +104,11 @@ struct MeetingResumer: MeetingResuming {
         keepWarm: @escaping @Sendable () -> Duration = { .seconds(600) },
         finalize: @escaping @Sendable (Int64, UUID) async -> Void, echo: EchoSuppressor = EchoSuppressor(),
         now: @escaping @Sendable () -> Date = { Date() }, keepAudio: @escaping @Sendable () -> Bool = { false },
+        preRoll: Duration = SegmentWindow.preRoll, postRoll: Duration = SegmentWindow.postRoll,
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "meetings")
     ) {
+        self.preRoll = preRoll
+        self.postRoll = postRoll
         self.keepAudio = keepAudio
         self.store = store
         self.keys = keys
@@ -222,7 +228,26 @@ struct MeetingResumer: MeetingResuming {
         let longest = MeetingSession.longestSegment
         var scan = TrackScan()
         var start: Int?
-        func close(_ range: Range<Int>) { if !range.isEmpty { scan.ranges.append(range) } }
+        // The ranges are widened like the live session's (`SegmentWindow`), so audio that is transcribed after a
+        // crash or by "Dokończ" gets the same words as audio transcribed while recording.
+        let preRoll = MeetingSessionLimits.samples(in: self.preRoll)
+        let postRoll = MeetingSessionLimits.samples(in: self.postRoll)
+        func close(_ range: Range<Int>, endsInCut: Bool = false) {
+            guard !range.isEmpty else { return }
+            scan.ranges.append(
+                SegmentWindow.widened(
+                    range, notBefore: scan.ranges.last?.upperBound ?? 0, received: scan.samples, preRoll: preRoll,
+                    postRoll: endsInCut ? 0 : postRoll))
+        }
+        // The range outgrew the window: it is cut so that its pre-roll fits too (`SegmentWindow.cutEnd`).
+        func cutWhileTooLong(upTo end: Int) {
+            while let begin = start, end - begin > longest {
+                let cut = SegmentWindow.cutEnd(
+                    start: begin, notBefore: scan.ranges.last?.upperBound ?? 0, preRoll: preRoll, longest: longest)
+                close(begin..<cut, endsInCut: true)
+                start = cut
+            }
+        }
         do {
             while let chunk = try reader.nextChunk() {
                 try Task.checkCancellation()
@@ -232,16 +257,14 @@ struct MeetingResumer: MeetingResuming {
                     case .speechStart:
                         if start == nil { start = event.sampleIndex }
                     case .speechEnd:
-                        if let begin = start {
-                            close(begin..<max(begin, event.sampleIndex))
+                        if start != nil {
+                            cutWhileTooLong(upTo: event.sampleIndex)
+                            if let begin = start { close(begin..<max(begin, event.sampleIndex)) }
                             start = nil
                         }
                     }
                 }
-                while let begin = start, scan.samples - begin > longest {
-                    close(begin..<begin + longest)
-                    start = begin + longest
-                }
+                cutWhileTooLong(upTo: scan.samples)
             }
         } catch is CancellationError {
             throw CancellationError()

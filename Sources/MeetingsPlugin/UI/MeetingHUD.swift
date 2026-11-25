@@ -41,7 +41,6 @@ final class MeetingHUDModel {
 final class MeetingHUDPanel: HUDPresenter {
     private static let width: CGFloat = 400
     private static let singleLineHeight: CGFloat = 44
-    private static let twoLineHeight: CGFloat = 68
     private static let margin: CGFloat = 8
 
     private let model = MeetingHUDModel()
@@ -126,7 +125,7 @@ final class MeetingHUDPanel: HUDPresenter {
     /// Positions the panel when it appears; afterwards only the height may change, with the top edge fixed, so
     /// the pill does not jump to another screen when the mouse moves.
     private func layout(_ panel: NSPanel, for state: MeetingHUDState) {
-        let height = state.hasDetailLine ? Self.twoLineHeight : Self.singleLineHeight
+        let height = state.pillHeight
         guard panel.isVisible else { return place(panel, height: height) }
         let current = panel.frame
         guard abs(current.height - height) > 0.5 else { return }
@@ -171,7 +170,7 @@ struct MeetingHUDView: View {
                 icon(for: state)
                     .frame(width: 20, height: 20)
                 if case .recording(let recording) = state {
-                    recordingRow(recording)
+                    recordingRow(recording, compact: state.actions.count > 1)
                 } else {
                     Text(state.title)
                         .font(.callout.weight(.medium))
@@ -189,11 +188,12 @@ struct MeetingHUDView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
+                    .truncationMode(.middle)
                     .padding(.leading, 30)
             }
         }
         .padding(.horizontal, 14)
-        .frame(width: 400, height: state.hasDetailLine ? 68 : 44, alignment: .leading)
+        .frame(width: 400, height: state.pillHeight, alignment: .leading)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous))
         .overlay {
             if contrast == .increased {
@@ -201,26 +201,30 @@ struct MeetingHUDView: View {
                     .strokeBorder(.primary.opacity(0.6), lineWidth: 1)
             }
         }
-        .animation(still ? nil : .smooth(duration: 0.2), value: state.hasDetailLine)
+        .animation(still ? nil : .smooth(duration: 0.2), value: state.pillHeight)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(state.accessibilityLabel)
     }
 
-    private func recordingRow(_ recording: MeetingHUDState.Recording) -> some View {
+    /// `compact`: a link sits next to "End recording" (a notice with a place to go), so the meters lose their names
+    /// to leave room; the clock and the buttons never wrap.
+    private func recordingRow(_ recording: MeetingHUDState.Recording, compact: Bool) -> some View {
         HStack(spacing: 10) {
             Text(MeetingHUDState.clock(recording.elapsedSeconds))
                 .font(.callout.monospacedDigit().weight(.medium))
+                .lineLimit(1)
+                .fixedSize()
                 .accessibilityHidden(true)
             Spacer(minLength: 4)
             if recording.recordsMicrophone {
                 LevelMeter(
                     label: String(localized: "Me", comment: "Meeting HUD level meter of the microphone"),
-                    level: recording.micLevel, animated: !still)
+                    level: recording.micLevel, animated: !still, showsLabel: !compact)
             }
             if recording.recordsSystem {
                 LevelMeter(
                     label: String(localized: "System", comment: "Meeting HUD level meter of the system audio"),
-                    level: recording.systemLevel, animated: !still)
+                    level: recording.systemLevel, animated: !still, showsLabel: !compact)
             }
         }
     }
@@ -234,10 +238,14 @@ struct MeetingHUDView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.red)
                 .controlSize(.small)
+                .lineLimit(1)
+                .fixedSize()
         default:
             Button(title) { model.onAction(action) }
                 .buttonStyle(.link)
                 .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .fixedSize()
         }
     }
 
@@ -271,12 +279,15 @@ private struct LevelMeter: View {
     let label: String
     let level: Float
     let animated: Bool
+    var showsLabel = true
 
     var body: some View {
         HStack(spacing: 5) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if showsLabel {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.15))
                 Capsule()

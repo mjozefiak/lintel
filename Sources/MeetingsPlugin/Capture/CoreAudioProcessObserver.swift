@@ -79,6 +79,8 @@ private final class ProcessObservation: @unchecked Sendable {
     private struct Watched {
         var listener: ObjectListener
         var bundleID: String?
+        var responsible: String? = nil
+        var pid: Int32? = nil
         var isRunningInput: Bool
     }
 
@@ -162,7 +164,8 @@ private final class ProcessObservation: @unchecked Sendable {
             watched[object] = nil
             if entry.isRunningInput {
                 continuation.yield(
-                    ProcessAudioEvent(processObjectID: object, bundleID: entry.bundleID, isRunningInput: false))
+                    ProcessAudioEvent(
+                        processObjectID: object, bundleID: entry.bundleID, isRunningInput: false, pid: entry.pid))
             }
         }
         for object in objects where watched[object] == nil {
@@ -170,12 +173,10 @@ private final class ProcessObservation: @unchecked Sendable {
             answered.withLock { $0 = true }
             let listener = ObjectListener(object: object, selector: kAudioProcessPropertyIsRunningInput, queue: queue)
             guard listener.install({ [weak self] in self?.inputChanged(object) }) == noErr else { continue }
-            let bundleID = Self.bundleID(object)
-            watched[object] = Watched(listener: listener, bundleID: bundleID, isRunningInput: running)
-            if running {
-                continuation.yield(
-                    ProcessAudioEvent(processObjectID: object, bundleID: bundleID, isRunningInput: true))
-            }
+            var entry = Watched(listener: listener, bundleID: Self.bundleID(object), isRunningInput: running)
+            if running { Self.resolve(&entry, object) }
+            watched[object] = entry
+            if running { continuation.yield(Self.event(object, entry)) }
         }
     }
 
@@ -183,11 +184,26 @@ private final class ProcessObservation: @unchecked Sendable {
         guard !stopped, var entry = watched[object], let running = Self.isRunningInput(object),
             running != entry.isRunningInput
         else { return }
-        if running { entry.bundleID = Self.bundleID(object) }
+        if running {
+            entry.bundleID = Self.bundleID(object)
+            Self.resolve(&entry, object)
+        }
         entry.isRunningInput = running
         watched[object] = entry
-        continuation.yield(
-            ProcessAudioEvent(processObjectID: object, bundleID: entry.bundleID, isRunningInput: running))
+        continuation.yield(Self.event(object, entry))
+    }
+
+    /// Reads the pid and the responsible app of a process that starts using an input. The path lookup is
+    /// skipped for a process that never answers (nothing to look up).
+    private static func resolve(_ entry: inout Watched, _ object: AudioObjectID) {
+        entry.pid = uint32(object, kAudioProcessPropertyPID).map { Int32(bitPattern: $0) }
+        entry.responsible = entry.pid.flatMap { ResponsibleApp.bundleID(pid: $0) }
+    }
+
+    private static func event(_ object: AudioObjectID, _ entry: Watched) -> ProcessAudioEvent {
+        ProcessAudioEvent(
+            processObjectID: object, bundleID: entry.bundleID, isRunningInput: entry.isRunningInput,
+            responsibleBundleID: entry.responsible, pid: entry.pid)
     }
 
     // MARK: Reads

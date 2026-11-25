@@ -206,6 +206,11 @@ final class OnboardingController: NSObject, NSWindowDelegate {
     /// Called after the welcome window closed (finished, skipped or closed): the updater starts then.
     var onClosed: (() -> Void)?
 
+    /// Whether the main shortcut opens anything worth a page: an active plugin searches (apps, files, windows). On a
+    /// new install since 2026-11-24 the launcher add-ons are off and the panel finds nothing, so the welcome screen
+    /// neither asks for the shortcut nor names it on the final page; the shortcut stays in Settings → General.
+    var launcherIsActive: () -> Bool = { true }
+
     init(
         hotkeys: HotkeyService, settings: AppSettings,
         pluginSteps: @escaping () -> [OnboardingStep] = { [] }
@@ -246,7 +251,7 @@ final class OnboardingController: NSObject, NSWindowDelegate {
         var pages: [WelcomePage] = []
         if !settings.shortcutOnboardingCompleted {
             pages.append(WelcomePage(kind: .intro))
-            pages.append(WelcomePage(kind: .shortcut))
+            if launcherIsActive() { pages.append(WelcomePage(kind: .shortcut)) }
         }
         pages += pendingPluginSteps.map { WelcomePage(kind: .plugin($0)) }
         return withFinalPage(pages)
@@ -268,9 +273,9 @@ final class OnboardingController: NSObject, NSWindowDelegate {
     /// Shows every page (the introduction, the Shortcut step and every active plugin step), starting at
     /// `id` when given. QA uses it to capture any page regardless of what was completed.
     func showAllSteps(startingAt id: String? = nil) {
+        let shortcut = launcherIsActive() ? [WelcomePage(kind: .shortcut)] : []
         let pages = withFinalPage(
-            [WelcomePage(kind: .intro), WelcomePage(kind: .shortcut)]
-                + pluginSteps().map { WelcomePage(kind: .plugin($0)) })
+            [WelcomePage(kind: .intro)] + shortcut + pluginSteps().map { WelcomePage(kind: .plugin($0)) })
         show(pages, startingAt: id)
     }
 
@@ -298,7 +303,10 @@ final class OnboardingController: NSObject, NSWindowDelegate {
         flow.onComplete = { [weak self] in self?.complete() }
         self.flow = flow
         let openMainWindow = { [weak self] in self?.openMainWindow() ?? () }
-        present(AnyView(WelcomeColumnView(flow: flow, hotkeys: hotkeys, openMainWindow: openMainWindow)))
+        present(
+            AnyView(
+                WelcomeColumnView(
+                    flow: flow, hotkeys: hotkeys, namesShortcut: launcherIsActive(), openMainWindow: openMainWindow)))
     }
 
     private func finish(_ page: WelcomePage, skipped: Bool) {
@@ -408,13 +416,15 @@ struct WelcomeColumnView: View {
 
     let flow: WelcomeFlow
     let hotkeys: HotkeyService
+    /// False while no plugin searches: the final page then leaves the shortcut out.
+    var namesShortcut = true
     var openMainWindow: () -> Void = {}
 
     var body: some View {
         if let page = flow.current {
             WelcomeStepLayout(
                 heading: page.heading,
-                text: Self.text(for: page, shortcut: hotkeys.mainShortcut?.displayString),
+                text: Self.text(for: page, shortcut: namesShortcut ? hotkeys.mainShortcut?.displayString : nil),
                 accessibilityLabel: flow.positionDescription
             ) {
                 LintelMark(ring: LintelBrand.ink)
@@ -432,7 +442,7 @@ struct WelcomeColumnView: View {
         case .intro:
             String(
                 localized:
-                    "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac.",
+                    "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings.",
                 comment: "Welcome screen: text of the first page")
         case .shortcut:
             ShortcutStepContent.explanation

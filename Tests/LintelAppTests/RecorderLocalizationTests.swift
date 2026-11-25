@@ -11,7 +11,7 @@ import Testing
     @Test func theLibrarysRecorderStringsHaveARealPolishTranslation() throws {
         let url = Self.root.appending(path: "Resources/KeyboardShortcuts/pl.lproj/Localizable.strings")
         let strings = try #require(NSDictionary(contentsOf: url) as? [String: String])
-        // The two keys the recorder uses in KeyboardShortcuts 1.10.0 (pinned exactly in Package.swift).
+        // The two keys the recorder uses in KeyboardShortcuts 1.17.0 (pinned exactly in Package.swift).
         let english = [
             "record_shortcut": "Record Shortcut", "press_shortcut": "Press Shortcut",
             "keyboard_shortcut_used_by_menu_item": "", "keyboard_shortcut_used_by_system": "",

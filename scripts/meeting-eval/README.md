@@ -106,3 +106,24 @@ Exit codes: 0 valid (or the trap was caught), 1 invalid (or the trap was missed)
 The input is the export of the `meeting-export` tool (outside the repository) as it is: `segments.jsonl`, `speakers.json`, `notes.md` and `meta.json` (section 2 of `fable-judge.md` says which fields are used and how the prompt is built from them).
 
 `examples/fable-judge/` is an invented meeting with a clean note, a trap note with planted errors and hand-written example answers; the tests use it.
+
+## Where does speech go missing? (issue #135)
+
+`score_loss.py` answers one question about the system-audio track: of the speech in a reference, which words are missing from the transcript, and was that audio ever sent to the engine? It prints numbers only. The tests are `test_score_loss.py`.
+
+```sh
+# 1. Feed a WAV to the real MeetingSession as the SYSTEM track (no microphone), with the real Silero VAD and Parakeet.
+#    The segmentation knobs default to the app's values; set them to compare variants on the same audio.
+LINTEL_MEETING_EVAL_TRACK=system \
+LINTEL_MEETING_EVAL_VAD_ENTRY=0.85 LINTEL_MEETING_EVAL_PRE_ROLL_MS=0 LINTEL_MEETING_EVAL_POST_ROLL_MS=0 \
+  scripts/meeting-eval/run.sh --audio meeting.wav --out out/before --name rec --engine parakeet-ultra \
+  --language en --speech-folder <Models>/speech/parakeet-ultra
+# 2. Compare runs against a gold entry.json (or a whisper.cpp raw.json) of the same audio.
+python3 -I scripts/meeting-eval/score_loss.py --reference entry.json out/before/rec.json out/after/rec.json
+```
+
+Other knobs: `LINTEL_MEETING_EVAL_VAD_EXIT_OFFSET`, `_VAD_MIN_SILENCE`, `_VAD_PADDING`. The run writes the capture counters under `capture` in the result (segments sent, empty results, hard cuts, near misses, milliseconds of padding).
+
+Columns (all rates; the first group are shares of every reference word and add up to `lost`): `outside` is speech in no segment at all (never sent; `outside±.5s` leaves a margin of 0.5 s for the coarse word clock), `inside` is a word missing from a segment the engine decoded. The `rate:` columns are the loss among the words of one zone (middle of a segment, within 0.4 s of a boundary, within 0.6 s of a segment cut at the model window, deep in a gap). `extra` is transcript words with no partner in the reference, `uncovered` the share of reference speech time that no segment covers.
+
+A quiet remote speaker is simulated by lowering the same recording (`ffmpeg -i meeting.wav -af volume=-20dB -ar 16000 -ac 1 -c:a pcm_s16le quiet.wav`). Silence and stationary noise are the false-alarm control: no segment must open on them.
