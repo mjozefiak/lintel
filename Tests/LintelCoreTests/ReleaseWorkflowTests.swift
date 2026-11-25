@@ -221,7 +221,7 @@ import Testing
         #expect(pullRequestPaths.contains("Resources/*.entitlements"))
         let build = code(try #require(try jobs()["build"])).joined(separator: "\n")
         #expect(build.contains("if: github.actor != 'dependabot[bot]'"))
-        // One step: the condition, a step timeout above the watchdog limit (800 s + samples + kill < 16 min) and the
+        // The test step: the condition, a step timeout above the watchdog limit (800 s + samples + kill < 16 min) and the
         // watchdog around swift test.
         #expect(
             build.contains(
@@ -236,6 +236,9 @@ import Testing
                     + "        if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')\n"
                     + "        timeout-minutes: 15\n"
                     + "        run: swift build --build-tests\n"))
+        let buildTests = try #require(build.range(of: "      - name: Build tests\n"))
+        let runTests = try #require(build.range(of: "      - name: Test\n"))
+        #expect(buildTests.lowerBound < runTests.lowerBound)
         #expect(
             build.contains(
                 "        if: failure() || cancelled()\n"

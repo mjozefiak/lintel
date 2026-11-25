@@ -141,7 +141,7 @@ jobs:
 
       # A push to main is tested by ci.yml on the same commit; here it only checks that the app still packages.
       # The test targets are compiled in their own step (issue #263): the 800 s watchdog below used to include a cold
-      # compile (about 4 min) and sat at 765-801 s. Now it covers only running the tests, and a slow compile fails on
+      # compile (about 9 min measured on the first run of this change) and sat at 765-801 s. Now it covers only running the tests, and a slow compile fails on
       # this step's own timeout with its own name in the log. No test is dropped or filtered.
       - name: Build tests
         if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
