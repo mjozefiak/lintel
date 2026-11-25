@@ -22,7 +22,7 @@ final class DictationSettingsModel {
     @ObservationIgnored var onStatusChange: (@MainActor () -> Void)?
     private(set) var devices: [MicrophoneCapture.InputDevice] = []
     var inputDevice: String? {
-        didSet { settings.setInputDevice(inputDevice) }
+        didSet { settings.setInputDevice(inputDevice, name: devices.first { $0.uid == inputDevice }?.name) }
     }
     var restoresClipboard: Bool {
         didSet { settings.setRestoresClipboard(restoresClipboard) }
