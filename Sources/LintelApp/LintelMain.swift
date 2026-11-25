@@ -236,6 +236,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+        if let appearance = options.appearance { NSApp.appearance = NSAppearance(named: appearance.name) }
         let controller = GalleryWindowController()
         controller.show()
         galleryWindow = controller
