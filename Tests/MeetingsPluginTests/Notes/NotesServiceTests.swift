@@ -59,7 +59,7 @@ import Testing
     }
 
     @Test func notesThatAreOffRunNothing() async throws {
-        let rig = try NotesServiceRig(settings: [:])
+        let rig = try NotesServiceRig(settings: ["plugins.meetings.notesEnabled": .bool(false)])
         await rig.start()
         let id = try await rig.addMeeting()
         rig.library.meetingReady(id)
@@ -68,12 +68,12 @@ import Testing
         #expect(try rig.record(id).status == .none)
         #expect(try rig.document(id).notesMarkdown == nil)
         #expect(!rig.service.board.snapshot.enabled)
-        // Nothing wrote the switch either.
-        #expect(rig.harness.settings.value(forKey: "plugins.meetings.notesEnabled") == nil)
+        // Nothing rewrote the switch either.
+        #expect(rig.harness.settings.value(forKey: "plugins.meetings.notesEnabled") == .bool(false))
     }
 
     @Test func aRegenerateRequestWorksEvenWhenAutomaticNotesAreOff() async throws {
-        let rig = try NotesServiceRig(settings: [:])
+        let rig = try NotesServiceRig(settings: ["plugins.meetings.notesEnabled": .bool(false)])
         await rig.start()
         let id = try await rig.addMeeting()
         rig.service.regenerate(id)

@@ -187,13 +187,13 @@ final class StuckLoadLLM: LLMRuntime, @unchecked Sendable {
         #expect(badges[fresh] == "Notes model needed")
         #expect(badges[old] == .some(nil))
 
-        // The model arrives: no catch-up, no badge, and "Regenerate" still works for any meeting.
+        // The model arrives (#252): the meeting that waited for it gets its notes, the older one does not, no badge
+        // is left, and "Regenerate" still works for any meeting.
         rig.file.update { $0 = URL(filePath: "/models/llm/notes-test.gguf") }
         await rig.service.refreshAvailability()
         #expect(await rig.settle())
-        #expect(rig.llm.calls.isEmpty)
         #expect(!rig.service.board.snapshot.needsModel(for: fresh))
-        #expect(try rig.record(fresh).status == .none)
+        #expect(try rig.record(fresh).status == .ok)
         #expect(try rig.record(old).status == .none)
         rig.service.regenerate(old)
         #expect(await rig.settle())
@@ -201,7 +201,7 @@ final class StuckLoadLLM: LLMRuntime, @unchecked Sendable {
     }
 
     @Test func aMeetingThatFinishedWhileNotesWereOffNeverShowsTheBadge() async throws {
-        let rig = try NotesServiceRig(settings: [:])
+        let rig = try NotesServiceRig(settings: ["plugins.meetings.notesEnabled": .bool(false)])
         rig.file.update { $0 = nil }
         await rig.start()
         let id = try await rig.addMeeting()

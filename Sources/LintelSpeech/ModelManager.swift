@@ -22,6 +22,19 @@ public enum ModelLocation: Equatable, Sendable {
     }
 }
 
+/// The free space a download needs and what the volume has (`ModelManager.spaceCheck(for:)`).
+public struct ModelSpaceCheck: Equatable, Sendable {
+    public var needed: Int
+    public var available: Int
+
+    public init(needed: Int, available: Int) {
+        self.needed = needed
+        self.available = available
+    }
+
+    public var fits: Bool { available >= needed }
+}
+
 public struct ModelProgress: Equatable, Sendable {
     public var bytesDone: Int
     public var bytesTotal: Int
@@ -132,6 +145,16 @@ public actor ModelManager {
 
     // MARK: Download
 
+    /// The free space `install(_:)` asks for before it downloads anything (what is still missing, plus 10%) and what
+    /// the volume has, so a screen can say so before the user clicks. Reads only; an installed package needs nothing.
+    public func spaceCheck(for package: ModelPackage) -> ModelSpaceCheck {
+        if isComplete(package, in: installedFolder(package)) {
+            return ModelSpaceCheck(needed: 0, available: availableSpace(directory))
+        }
+        let remaining = max(0, package.totalBytes - partialBytes(package))
+        return ModelSpaceCheck(needed: remaining + remaining / 10, available: availableSpace(directory))
+    }
+
     /// Downloads and verifies `package`, then moves it into place. Cancelling the task keeps the partial
     /// folder so the next call resumes. Returns the installed folder.
     @discardableResult
@@ -184,12 +207,9 @@ public actor ModelManager {
         try createPrivateDirectory(directory)
         try createPrivateDirectory(partial)
 
-        // Space for what is still missing, plus 10%.
-        let remaining = package.totalBytes - partialBytes(package)
-        let needed = remaining + remaining / 10
-        let available = availableSpace(directory)
-        guard available >= needed else {
-            throw ModelError.insufficientSpace(needed: needed, available: available)
+        let space = spaceCheck(for: package)
+        guard space.fits else {
+            throw ModelError.insufficientSpace(needed: space.needed, available: space.available)
         }
 
         let total = package.totalBytes

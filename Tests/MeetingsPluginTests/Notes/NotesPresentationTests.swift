@@ -188,7 +188,7 @@ extension Database {
             "Writing the notes failed. The notes below are from an earlier run.",
             "The notes could not be written. The transcript is unchanged; try Regenerate Notes.",
             "The notes miss some parts of the recording that could not be read. Regenerate Notes to try again.",
-            "Notes are on, but their model is not downloaded.",
+            "Notes will be written once the notes model is on this Mac.",
             "The notes model is in use right now. Try again when the notes are written.",
             "Write notes after each meeting", "The model you chose does not fit this Mac, so %@ is used.",
         ]

@@ -86,7 +86,8 @@ final class NotesServiceRig {
         runtime custom: (any LLMRuntime)? = nil, shutdownLimit: Duration = .milliseconds(200),
         configure: @escaping @Sendable (inout NotesPipeline.Configuration) -> Void = { _ in },
         providerRunner: ProviderRunner? = nil,
-        configureWhole: @escaping @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in }
+        configureWhole: @escaping @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in },
+        modelWatchInterval: Duration = .seconds(15)
     ) throws {
         harness = try MeetingsHarness(settings: initial)
         library = harness.library()
@@ -107,7 +108,7 @@ final class NotesServiceRig {
                     configuration.busyPoll = .milliseconds(10)
                     configure(&configuration)
                 }, providerRunner: providerRunner, configureWhole: configureWhole, now: { now },
-                shutdownLimit: shutdownLimit,
+                shutdownLimit: shutdownLimit, modelWatchInterval: modelWatchInterval,
                 openModels: { id in opened.update { $0.append(id) } },
                 changed: {
                     changes.update { $0 += 1 }
