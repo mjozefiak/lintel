@@ -92,7 +92,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
             try FileManager.default.removeItem(at: directory.url.appending(path: "Models/fixture"))
         }
 
-        func controller(keepWarm: Duration = .seconds(600)) -> DictationController {
+        func controller(keepWarm: Duration = .seconds(600), paster: TextPaster? = nil) -> DictationController {
             let hud = hud
             let engine = engine
             let lease = lease
@@ -110,7 +110,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
                             modelFolder: folder, lease: lease,
                             keepWarm: { keepWarm }, onEvent: onEvent)
                     },
-                    lease: lease, paster: paste.paster(), hud: hud,
+                    lease: lease, paster: paster ?? paste.paster(), hud: hud,
                     claimEscape: { handler in
                         rig.escapeHandler = handler
                         guard rig.escapeAvailable else { return .inactive }
@@ -162,6 +162,26 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(rig.escapeReleases == 1)
         #expect(controller.lastRawText == "segment 1")
         #expect(!controller.isBusy)
+    }
+
+    @Test func theControllerStaysProcessingUntilTheClipboardIsRestored() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.paste.pasteboard.setString("what I copied before")
+        let paster = rig.paste.paster()
+        let controller = rig.controller(paster: paster)
+        var duringDelay: [BusyReason?] = []
+        rig.paste.clock.onSleep { duration in
+            if duration == TextPaster.restoreDelay { duringDelay.append(controller.busyReason) }
+        }
+        // The dictation itself is over (the gesture is idle); only the restore of the clipboard is left.
+        #expect(controller.busyReason == nil)
+        await paster.paste("dictated")
+        #expect(controller.busyReason == .processing)
+        await paster.pendingRestore?.value
+        #expect(duringDelay == [.processing])
+        #expect(rig.paste.pasteboard.string() == "what I copied before")
+        #expect(controller.busyReason == nil)
     }
 
     @Test func holdToTalkPastesAtKeyUp() async throws {
