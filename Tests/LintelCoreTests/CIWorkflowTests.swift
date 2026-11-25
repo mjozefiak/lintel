@@ -95,6 +95,9 @@ import Testing
         #expect(
             conditional == [
                 "      - name: Restore the Thread Sanitizer build cache", "      - name: Test under Thread Sanitizer",
+                // The design gallery: its step does not fail the job itself (so it never hides the steps after it);
+                // these two report a difference at the end.
+                "      - name: Upload gallery diffs", "      - name: Fail on gallery differences",
                 "      - name: Upload watchdog diagnostics",
             ])
         let classify = try step(named: "Classify changes")
