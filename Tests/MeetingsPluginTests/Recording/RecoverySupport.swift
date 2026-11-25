@@ -170,7 +170,9 @@ final class RecoveryRig {
                             meetingID: id, statusDuringCall: status,
                             spoolExisted: FileManager.default.fileExists(atPath: spool.directory(for: uuid).path)))
                 },
-                now: { RecoveryRig.now }, keepAudio: { keepAudio })
+                now: { RecoveryRig.now }, keepAudio: { keepAudio },
+                // The tests tell segments apart by the level of their first sample: no padding.
+                preRoll: .zero, postRoll: .zero)
         }
     }
 

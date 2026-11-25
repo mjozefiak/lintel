@@ -77,9 +77,12 @@ struct EvalResult: Codable, Equatable, Sendable {
     var asr: ASR
     var diarization: Diarization?
     var notes: Notes?
+    /// Additive and optional: the capture counters of the run (numbers only), including the voice activity
+    /// detector statistics. Written only when the run had them.
+    var capture: CaptureCounters?
 
     private enum CodingKeys: String, CodingKey {
-        case schema, recording, audioSeconds, config, asr, diarization, notes
+        case schema, recording, audioSeconds, config, asr, diarization, notes, capture
     }
 
     init(
@@ -103,6 +106,7 @@ struct EvalResult: Codable, Equatable, Sendable {
         asr = try container.decode(ASR.self, forKey: .asr)
         diarization = try container.decodeIfPresent(Diarization.self, forKey: .diarization)
         notes = try container.decodeIfPresent(Notes.self, forKey: .notes)
+        capture = try container.decodeIfPresent(CaptureCounters.self, forKey: .capture)
     }
 
     /// The optional sections are always written, as `null` when absent (the scorer reads the keys directly).
@@ -123,6 +127,7 @@ struct EvalResult: Codable, Equatable, Sendable {
         } else {
             try container.encodeNil(forKey: .notes)
         }
+        try container.encodeIfPresent(capture, forKey: .capture)
     }
 }
 
