@@ -629,7 +629,7 @@ actor MeetingSession {
     private func recordProbabilities(_ probabilities: [Float], of track: TrackState, open: Bool) {
         guard !probabilities.isEmpty else { return }
         var stats = counters[track.channel].segmentingStats
-        for probability in probabilities {
+        for probability in probabilities where probability.isFinite {
             stats.add(probability)
             let nearMiss =
                 !open && probability >= SegmentingStats.nearMissFloor && probability < limits.vadEntryThreshold

@@ -46,8 +46,9 @@ FILLERS = {"um", "uh", "mm", "hmm", "mhm", "erm", "eh", "ehm", "yy", "yyy", "eee
 WINDOW_MS = 2_000
 EDGE_MS = 400
 CUT_MS = 600
-# A segment cut at the model window is this long (15 s, `MeetingSession.longestSegment`), give or take chunking.
-CUT_SEGMENT_MS = 14_900
+# A segment cut at the model window is exactly this long (15 s, `MeetingSession.longestSegment`); since the widening
+# never exceeds the window, a segment of exactly 15 s from before that change may also be a plain long one.
+CUT_SEGMENT_MS = 14_990
 
 
 def words_of(text):

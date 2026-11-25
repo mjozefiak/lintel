@@ -44,7 +44,10 @@ struct SegmentingStats: Equatable, Codable, Sendable {
     /// Samples the pre-roll and post-roll added to the ranges the detector reported.
     var paddedSamples = 0
 
+    /// A probability that is not a number (a damaged buffer through the model) is not counted: converting it
+    /// would trap.
     mutating func add(_ probability: Float) {
+        guard probability.isFinite else { return }
         chunks += 1
         let bin = min(probabilityHistogram.count - 1, max(0, Int(probability * 10)))
         probabilityHistogram[bin] += 1

@@ -143,7 +143,8 @@ final class RecoveryRig {
     /// The factory `MeetingsLibrary` asks for a resumer. `scripts` are the tracks' speech, in the order the
     /// resumer scans them: system first, then the microphone (each scan gets a fresh detector).
     func resumerFactory(
-        mic: TrackScript, system: TrackScript? = nil, haveModel: Bool = true, keepAudio: Bool = false
+        mic: TrackScript, system: TrackScript? = nil, haveModel: Bool = true, keepAudio: Bool = false,
+        preRoll: Duration = .zero, postRoll: Duration = .zero
     ) -> @MainActor (MeetingsStore, MeetingKeys, SpoolStorage) -> (any MeetingResuming)? {
         let spans = (system.map { [$0.spans] } ?? []) + [mic.spans]
         let counter = Mutex(0)
@@ -171,8 +172,8 @@ final class RecoveryRig {
                             spoolExisted: FileManager.default.fileExists(atPath: spool.directory(for: uuid).path)))
                 },
                 now: { RecoveryRig.now }, keepAudio: { keepAudio },
-                // The tests tell segments apart by the level of their first sample: no padding.
-                preRoll: .zero, postRoll: .zero)
+                // Most tests tell segments apart by the level of their first sample: no padding unless asked.
+                preRoll: preRoll, postRoll: postRoll)
         }
     }
 

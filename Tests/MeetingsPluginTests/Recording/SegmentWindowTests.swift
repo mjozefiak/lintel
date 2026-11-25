@@ -31,6 +31,26 @@ import Testing
         #expect(range == 0..<1_000)
     }
 
+    @Test func theWidenedRangeNeverExceedsTheEnginesWindow() {
+        let longest = 15 * rate
+        // A range that is exactly the window (a cut) gets nothing.
+        #expect(
+            SegmentWindow.widened(
+                20_000..<(20_000 + longest), notBefore: 0, received: 1_000_000, preRoll: 4_800, postRoll: 3_200)
+                == 20_000..<(20_000 + longest))
+        // A range a little short of it gets what fits, the margin before the speech giving way first.
+        let detected = 20_000..<(20_000 + longest - 5_000)
+        let range = SegmentWindow.widened(
+            detected, notBefore: 0, received: 1_000_000, preRoll: 4_800, postRoll: 3_200)
+        #expect(range.count == longest)
+        #expect(range.upperBound == detected.upperBound + 3_200)
+        #expect(range.lowerBound == detected.lowerBound - 1_800)
+        // Margins too big for the window leave the detected range whole and drop the rest.
+        let long = SegmentWindow.widened(
+            detected, notBefore: 0, received: 1_000_000, preRoll: 90_000, postRoll: 90_000)
+        #expect(long == (detected.lowerBound..<detected.upperBound + 5_000))
+    }
+
     @Test func zeroRollsAndEmptyRangesAreLeftAlone() {
         #expect(
             SegmentWindow.widened(500..<900, notBefore: 0, received: 2_000, preRoll: 0, postRoll: 0) == 500..<900)
@@ -170,10 +190,11 @@ private final class ProbabilityVAD: VoiceActivityDetector {
         script.silence(12)
         let (outcome, rows) = try await run(script, pre: 500, post: 500, rig: rig, engine: engine)
         #expect(outcome.result == .ready)
-        // Every sample from 0.5 s (the pre-roll before the first piece) to 24.2 s (the post-roll after the last)
-        // was sent exactly once, in three pieces: the cut at 16 s adds nothing and repeats nothing.
+        // Every sample from 1 s to 24.2 s (the post-roll after the last piece) was sent exactly once, in three
+        // pieces: the first is the full 15 s window, so it gets no pre-roll; the cut repeats nothing.
         #expect(engine.heard.count == 3)
-        #expect(engine.heard.reduce(0, +) == Int(23.7 * Double(rate)))
+        #expect(engine.heard.allSatisfy { $0 <= MeetingSession.longestSegment })
+        #expect(engine.heard.reduce(0, +) == Int(23.2 * Double(rate)))
         #expect(rows.count == 3)
         // The ranges in the transcript do not overlap.
         for (a, b) in zip(rows, rows.dropFirst()) { #expect(a.endMs <= b.startMs) }
@@ -206,6 +227,51 @@ private final class ProbabilityVAD: VoiceActivityDetector {
         #expect(stats.nearMissRuns == 3)
         #expect(stats.longestNearMissRun == 2)
         #expect(stats.probabilityHistogram == [0, 0, 2, 0, 0, 1, 2, 1, 0, 2])
+    }
+
+    @Test func aProbabilityThatIsNotANumberIsIgnoredAndDoesNotTrap() {
+        var stats = SegmentingStats()
+        stats.add(.nan)
+        stats.add(.infinity)
+        stats.add(-.infinity)
+        stats.add(0.95)
+        stats.add(1.5)
+        stats.add(-0.2)
+        #expect(stats.chunks == 3)
+        #expect(stats.probabilityHistogram == [1, 0, 0, 0, 0, 0, 0, 0, 0, 2])
+    }
+
+    @Test func chunksWhileSpeechIsOpenAreNeverNearMisses() async throws {
+        let rig = try SessionRig()
+        let sink = Mutex<CaptureCounters?>(nil)
+        var limits = rig.shortLimits
+        limits.vadEntryThreshold = 0.85
+        var script = TrackScript()
+        script.say(11, seconds: 3)
+        script.silence(13)
+        // One batch per 0.1 s chunk: speech opens in call 0 and closes in call 30.
+        var batches = [[Float]](repeating: [], count: 60)
+        batches[0] = [0.9]
+        batches[1] = [0.6]  // inside speech: not a near miss
+        batches[31] = [0.6]  // after it: a near miss
+        batches[33] = [0.9]  // ends the run
+        batches[35] = [0.3]  // a second run
+        let vad = ProbabilityVAD(spans: script.spans, batches: batches)
+        let session = MeetingSession(
+            store: rig.store, keys: rig.keys, spool: rig.spool, mic: UnavailableAudioInput(), system: rig.system,
+            makeVAD: { vad }, engine: rig.engine, modelID: "test-model",
+            modelFolder: rig.directory.url.appending(path: "model"), lease: rig.lease,
+            sleepAssertion: rig.sleepAssertion, gate: rig.gate, limits: limits,
+            recordCounters: { value in sink.withLock { $0 = value } }, retriesMicrophone: false)
+        _ = try await session.start()
+        rig.system.push(script.samples)
+        rig.system.end()
+        _ = await session.finish()
+        let stats = try #require(sink.withLock { $0 }).system.segmentingStats
+        #expect(stats.chunks == 5)
+        #expect(stats.nearMissChunks == 2)
+        #expect(stats.nearMissRuns == 2)
+        #expect(stats.longestNearMissRun == 1)
     }
 
     @Test func countersWrittenBeforeTheDetectorStatisticsExistedStillDecode() throws {

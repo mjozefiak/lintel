@@ -14,12 +14,21 @@ enum SegmentWindow {
     ///   - notBefore: the end of the audio already sent; the widening never reaches back into it, so a word is
     ///     not transcribed twice (the range itself is never narrowed to keep that promise).
     ///   - received: samples that exist; the widening never runs past them.
-    static func widened(_ detected: Range<Int>, notBefore: Int, received: Int, preRoll: Int, postRoll: Int)
-        -> Range<Int>
-    {
+    ///   - longest: the engine's window; the widened range is never longer (past it FluidAudio splits the audio
+    ///     into two windows with a seam). The margins give way first, the one before the speech before the one
+    ///     after it; the detected range itself is never cut.
+    static func widened(
+        _ detected: Range<Int>, notBefore: Int, received: Int, preRoll: Int, postRoll: Int,
+        longest: Int = MeetingSession.longestSegment
+    ) -> Range<Int> {
         guard !detected.isEmpty else { return detected }
-        let lower = min(detected.lowerBound, max(notBefore, detected.lowerBound - max(0, preRoll)))
-        let upper = max(detected.upperBound, min(received, detected.upperBound + max(0, postRoll)))
+        var lower = min(detected.lowerBound, max(notBefore, detected.lowerBound - max(0, preRoll)))
+        var upper = max(detected.upperBound, min(received, detected.upperBound + max(0, postRoll)))
+        var excess = max(0, (upper - lower) - max(longest, detected.count))
+        let trimmedBefore = min(excess, detected.lowerBound - lower)
+        lower += trimmedBefore
+        excess -= trimmedBefore
+        upper -= min(excess, upper - detected.upperBound)
         return max(0, lower)..<upper
     }
 }
