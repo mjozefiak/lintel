@@ -3,6 +3,7 @@
 > Status: **design, waiting for the owner's decisions OD-1 to OD-13.** Nothing here is implemented. The recommendations below are proposals; none of them is an accepted default.
 > Owner direction (2026-11-25): "te pastylki u konkurencji zawsze są mega minimalistyczne i też chcę, aby tak było w Lintel; obecnie jest tam za dużo zbędnych informacji, ograniczamy się do totalnego minimum."
 > Sketch (before and after for every state, light and dark, en and pl, S/M/XL, Reduce Motion, Increase Contrast, hover): `.ai/specs/assets/minimal-hud/index.html`. It is a sketch for the decision only: after acceptance the SwiftUI gallery (#248) is the source of truth.
+> Related: #233 (the meeting clock wraps when a notice adds a second button; this design removes that layout), #236 (its fix), #258 (new microphone states, mapped below), #266 (a dictation state for a lost microphone, not designed here).
 > Inputs: the current HUD code (`Sources/DictationPlugin/HUDState.swift`, `DictationHUD.swift`, `Sources/MeetingsPlugin/UI/MeetingHUDState.swift`, `MeetingHUD.swift`, `Sources/MeetingsPlugin/Suggestions/SuggestionHUD.swift`, `SuggestionPrompt.swift`), the `--qa-hud` states in `docs/qa.md`, the new states of PR #258, the UX direction of PR #247 (the working ring, Verdigris only for live state) and the gallery spec of PR #248.
 
 ## 📝 TLDR
@@ -271,5 +272,5 @@ Each phase is its own `feat/` PR with `needs-qa` and the QA comment (screenshots
 
 - Moving or resizing pills by drag (Wispr's first change after feedback; later, if asked for).
 - A menu-bar-only mode without a pill.
-- New detection or new problems: the pill only shows what the controllers already report.
+- New detection or new problems: the pill only shows what the controllers already report. When #266 (dictation: microphone lost during a recording) is decided, its state uses the `message` variant with the microphone glyph and "Microphone disconnected" ("Mikrofon odłączony"), the same line as the meeting pill.
 - Window management HUDs (`WindowsPlugin`), which are an add-on and off by default.
