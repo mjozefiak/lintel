@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 400" width="660" height="400">
+  <title>Lintel installer window background</title>
+  <!-- 660 x 400 pt Finder window. Icons sit at (165, 205) and (495, 205), 128 pt. No words: nothing to translate. -->
+  <rect width="660" height="400" fill="#F8F6F2"/>
+  <!-- The cut ring from the logo, in Verdigris, above the arrow. -->
+  <g transform="translate(330 104) scale(0.28) translate(-128 -128)">
+    <path fill="#267C6C" d="M99.01 19.82A112 112 0 1 1 19.82 99.01L64.25 110.92A66 66 0 1 0 110.92 64.25Z"/>
+    <circle fill="#267C6C" cx="128" cy="128" r="34"/>
+  </g>
+  <!-- A hand-drawn arrow from the app to Applications. -->
+  <g fill="none" stroke="#267C6C" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M254 214 C282 196 318 222 358 204 C372 198 384 200 396 205"/>
+    <path d="M375 181 C385 191 392 198 398 206 C390 214 382 224 372 233"/>
+  </g>
+  <!-- Bands behind the icon names. Finder draws the names itself in white (dark mode) or black (light mode), so the band must give
+       at least 4.5:1 with both. #7B746E: 4.60:1 with white, 4.57:1 with black (scripts/tests/test_dmg_art.zsh checks it). -->
+  <rect id="band-app" x="95" y="275" width="140" height="26" rx="13" fill="#7B746E"/>
+  <rect id="band-applications" x="425" y="275" width="140" height="26" rx="13" fill="#7B746E"/>
+</svg>
