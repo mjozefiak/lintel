@@ -96,12 +96,22 @@ import Testing
 
     // MARK: PermissionGrantService
 
-    @Test func theServiceReadsTheStatesAtOnceAndAGrantIsOneChange() {
+    @Test func buildingAServiceReadsNothingAndStatusReadsOnDemand() {
+        let reader = FakePermissionsReader()
+        reader.answers[.accessibility] = .denied
+        let service = service(reader: reader)
+        #expect(reader.reads.isEmpty, "banner redraws build models, and a model must not probe every permission")
+        #expect(service.status(of: .accessibility) == .denied)
+        #expect(reader.reads == [.accessibility])
+    }
+
+    @Test func aGrantIsOneChangeAndTheFirstReadIsNone() {
         let reader = FakePermissionsReader()
         reader.answers[.accessibility] = .denied
         let service = service(reader: reader)
         var changes: [Permission] = []
         service.onChange = { permission, _ in changes.append(permission) }
+        service.refresh()
         #expect(service.status(of: .accessibility) == .denied)
         #expect(changes.isEmpty, "the first read is not a change")
 

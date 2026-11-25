@@ -54,7 +54,8 @@ final class PermissionGrantService {
                 MainActor.assumeIsolated { _ = self?.refresh() }
             }
         }
-        refresh()
+        // No read here: models built for one banner redraw create a service each, and `status(of:)` reads on demand.
+        // The first `refresh()` (the pane appearing, an activation, `beginWatching()`) fills `statuses`.
     }
 
     isolated deinit {
