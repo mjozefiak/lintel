@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import Foundation
 import LintelKit
+import Observation
 import Testing
 
 @testable import LintelApp
@@ -32,7 +33,7 @@ import Testing
         #expect(AccessibilityAccess.status(axTrusted: false) == .denied)
     }
 
-    @Test func pasteKeepsTheOlderPostEventGrantAndAcceptsTheAccessibilityOne() {
+    @Test func thePosterAcceptsEitherGrantEvenThoughTheReaderIsAccessibilityOnly() {
         #expect(AccessibilityAccess.canPostEvents(axTrusted: true, postEvent: false))
         #expect(AccessibilityAccess.canPostEvents(axTrusted: false, postEvent: true))
         #expect(AccessibilityAccess.canPostEvents(axTrusted: true, postEvent: true))
@@ -111,6 +112,82 @@ import Testing
         let reads = reader.reads.count
         settings.liveTick()
         #expect(reader.reads.count == reads)
+    }
+
+    @Test func theShellBannerAndTheDotsFollowTheServiceWhenAGrantShowsOnThePermissionsPane() async {
+        defer { env.tearDown() }
+        let reader = FakePermissionsReader()
+        reader.answers[.accessibility] = .denied
+        reader.answers[.pasteboard] = .granted
+        let host = env.makeHost([PastingPlugin.self])
+        await host.start()
+        let settings = SettingsHostModel(
+            host: host, reader: reader,
+            shellBanners: ["permissions": { ShellPaneBanners.permissions(host: host, reader: reader) }])
+        let service = service(reader: reader)
+        settings.follow(service)
+        service.refresh()
+        settings.show("permissions")
+        #expect(settings.shownBanner?.level != .ok)
+        let redraws = Locked(0)
+        withObservationTracking {
+            _ = settings.banner
+        } onChange: {
+            redraws.value += 1
+        }
+
+        reader.answers[.accessibility] = .granted
+        service.refresh()
+        #expect(redraws.value == 1, "the host is told to redraw, which re-derives the shell banner")
+        #expect(settings.shownBanner?.level == .ok)
+    }
+
+    @Test func oneGrantRedrawsTheHostOnceNotOnEveryTick() async {
+        defer { env.tearDown() }
+        let reader = FakePermissionsReader()
+        reader.answers[.accessibility] = .denied
+        reader.answers[.pasteboard] = .granted
+        let host = env.makeHost([PastingPlugin.self])
+        await host.start()
+        let settings = SettingsHostModel(host: host, reader: reader)
+        settings.show("pasting")
+        reader.answers[.accessibility] = .granted
+        settings.liveTick()
+        let reads = reader.reads.count
+        // The banner is now ok, so it no longer waits: later ticks do nothing at all.
+        settings.liveTick()
+        settings.liveTick()
+        #expect(reader.reads.count == reads)
+    }
+
+    @Test func aGateThatSaysClosedStopsTheLiveReads() async {
+        defer { env.tearDown() }
+        let reader = FakePermissionsReader()
+        reader.answers[.accessibility] = .denied
+        let host = env.makeHost([PastingPlugin.self])
+        await host.start()
+        let settings = SettingsHostModel(host: host, reader: reader)
+        settings.show("pasting")
+        settings.liveGate = { false }
+        let reads = reader.reads.count
+        settings.liveTick()
+        #expect(reader.reads.count == reads)
+    }
+
+    @Test func theServicePollSkipsReadsWhileItsGateIsClosed() async {
+        let reader = FakePermissionsReader()
+        let service = service(reader: reader)
+        service.pollGate = { false }
+        service.beginWatching()
+        await eventually { service.ticks >= 3 }
+        service.endWatching()
+        #expect(
+            reader.reads.isEmpty || reader.reads.count <= Permission.allCases.count, "only beginWatching's own read")
+    }
+
+    @Test func theQAEnvironmentGetsTheRequesterThatNeverPromptsForAccessibility() {
+        #expect(AppCoordinator.permissionRequester(postsKeystrokes: false) is QAPermissionRequester)
+        #expect(AppCoordinator.permissionRequester(postsKeystrokes: true) is SystemPermissionRequester)
     }
 
     // MARK: PermissionGrantService

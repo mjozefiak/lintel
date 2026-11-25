@@ -29,7 +29,7 @@ final class AppCoordinator {
     private(set) lazy var permissionGrant = PermissionGrantService(
         reader: environment.permissionsReader,
         // A QA run never raises the Accessibility prompt (it would target the tester's real settings).
-        requester: environment.postsKeystrokes ? SystemPermissionRequester() : QAPermissionRequester()
+        requester: Self.permissionRequester(postsKeystrokes: environment.postsKeystrokes)
     ) {
         NSWorkspace.shared.open($0)
     }
@@ -505,6 +505,12 @@ final class AppCoordinator {
                 onBack: hasSection ? { [weak self] in self?.mainWindow?.showWorkspace() } : nil))
     }
 
+    /// The requester of the shared permission service: the real one, or in QA mode (no keystrokes) one that never
+    /// raises the Accessibility prompt.
+    static func permissionRequester(postsKeystrokes: Bool) -> any PermissionRequester {
+        postsKeystrokes ? SystemPermissionRequester() : QAPermissionRequester()
+    }
+
     private func makeSettingsHost() -> SettingsHostModel {
         var navigation = SettingsHostModel.Navigation()
         navigation.openModels = { [weak self] id, packageID in self?.openModels(from: id, packageID: packageID) }
@@ -516,6 +522,10 @@ final class AppCoordinator {
             panes: { [weak self] in self?.mainWindowPluginPanes() ?? [] },
             shellBanners: shellPaneBanners(models: models))
         settingsHost = model
+        // Live checks only while the main window is visible; a change the service sees redraws the banner and dots.
+        model.liveGate = { [weak self] in self?.mainWindow?.isVisible ?? false }
+        permissionGrant.pollGate = { [weak self] in self?.mainWindow?.isVisible ?? false }
+        model.follow(permissionGrant)
         return model
     }
 

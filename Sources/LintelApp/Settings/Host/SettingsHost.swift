@@ -112,10 +112,30 @@ final class SettingsHostModel {
     /// True while the shown banner waits for one of `livePermissions`.
     var needsLiveRefresh: Bool { !livePermissions.isEmpty }
 
+    /// Whether the one-second live check should run (the app answers "the main window is visible").
+    @ObservationIgnored var liveGate: @MainActor () -> Bool = { true }
+    /// Live permissions last seen granted, so one grant redraws once, not on every tick until a plugin catches up.
+    @ObservationIgnored private var seenGranted: Set<Permission> = []
+
     /// One live check. It reads only the waited-for permission, and reads the banner again only when that
-    /// permission was granted, so a waiting banner does not redraw the pane every second.
+    /// permission turns granted, so a waiting banner does not redraw the pane every second.
     func liveTick() {
-        if livePermissions.contains(where: { reader.status(of: $0) == .granted }) { refresh() }
+        guard liveGate() else { return }
+        var turned = false
+        for permission in livePermissions {
+            if reader.status(of: permission) == .granted {
+                if seenGranted.insert(permission).inserted { turned = true }
+            } else {
+                seenGranted.remove(permission)
+            }
+        }
+        if turned { refresh() }
+    }
+
+    /// Reads the shown banner and the dots again whenever the shared permission service sees a state change, so the
+    /// Permissions pane's banner and the sidebar dots follow its live rows (#71).
+    func follow(_ service: PermissionGrantService) {
+        service.onChange = { [weak self] _, _ in self?.refresh() }
     }
 
     /// `PluginContext.resultsChanged` from the plugin `pluginID`: its dot, and the banner when it is shown.

@@ -34,6 +34,10 @@ final class PermissionGrantService {
     @ObservationIgnored private let notificationCenter: NotificationCenter?
     /// Called with a permission whose state just changed (for example to refresh a banner).
     @ObservationIgnored var onChange: (Permission, PermissionStatus) -> Void = { _, _ in }
+    /// Whether a one-second poll should read at all. The app answers "the main window is visible", so a closed or
+    /// minimised window (its SwiftUI tree and the pane's task stay alive) costs a boolean check, not a probe of
+    /// every permission. Default: always.
+    @ObservationIgnored var pollGate: @MainActor () -> Bool = { true }
 
     init(
         reader: any PermissionsReader,
@@ -102,7 +106,7 @@ final class PermissionGrantService {
             while !Task.isCancelled {
                 do { try await clock.sleep(for: interval) } catch { return }
                 guard let self else { return }
-                self.refresh()
+                if self.pollGate() { self.refresh() }
                 self.ticks += 1
             }
         }
