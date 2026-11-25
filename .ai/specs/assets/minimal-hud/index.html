@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minimal HUD sketch</title>
+<style>
+  :root {
+    --page: #F8F6F2; --ink: #1d1b18; --muted: #6b665e; --line: #e2ddd4;
+    --verdigris: #267C6C; --verdigris-dark: #6BBDAB;
+    --amber: #B25E00; --amber-dark: #FFB454; --red: #C42B1C; --red-dark: #FFA8A0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; background: var(--page); color: var(--ink); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--line); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 6px; align-items: center; }
+  legend { float: left; margin-right: 6px; color: var(--muted); font-size: 12px; }
+  .seg button { font: inherit; font-size: 12px; padding: 3px 10px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--verdigris); outline-offset: 2px; }
+  main { padding: 16px; max-width: 1360px; margin: 0 auto; }
+  .note { color: var(--muted); font-size: 13px; max-width: 900px; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 20px; font-size: 13px; }
+  nav.toc a { color: var(--ink); }
+  section, article { scroll-margin-top: 110px; }
+  h2 { font-size: 18px; margin: 32px 0 4px; }
+  h2 + p { margin-top: 0; }
+  .state { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; border-top: 1px solid var(--line); padding: 14px 0; }
+  .state h3 { font-size: 14px; margin: 0 0 4px; }
+  .state .meta { font-size: 12px; color: var(--muted); }
+  .state .meta b { color: var(--ink); font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 4px; background: #ece7de; margin: 2px 4px 0 0; }
+  .tag.od { background: #fde9cc; }
+  .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .cols > .before { grid-column: 1 / -1; max-width: 640px; }
+  .col, .state, .cols, .stage { min-width: 0; }
+  #family .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .state .head { display: flex; flex-wrap: wrap; gap: 4px 24px; align-items: baseline; }
+  .state .head h3 { min-width: 260px; }
+  .col h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  .before img { max-width: 100%; height: auto; border-radius: 8px; display: block; background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0/12px 12px; }
+  .before .missing { font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 12px; }
+  .stage { border-radius: 10px; min-height: 96px; display: flex; align-items: center; justify-content: center; padding: 18px 10px; position: relative; overflow: hidden; }
+  .stage.light { background: linear-gradient(135deg, #dfe7ee, #f1ece3 60%, #e6ebe3); }
+  .stage.dark { background: linear-gradient(135deg, #1f2730, #2a2520 60%, #1d2622); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .copy { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .copy q { color: var(--ink); quotes: "“" "”"; }
+
+  /* ---------- The pill family ---------- */
+  .pill { --h: 32px; --fs: 13px; --g: 16px; --max: 380px;
+    display: inline-flex; align-items: center; gap: 8px; height: var(--h); padding: 0 12px 0 10px;
+    border-radius: 999px; font-size: var(--fs); font-weight: 500; white-space: nowrap; max-width: var(--max);
+    backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    box-shadow: 0 6px 22px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.12); position: relative; }
+  .size-s .pill { --h: 28px; --fs: 12px; --g: 14px; --max: 380px; }
+  .size-xl .pill { --h: 38px; --fs: 15px; --g: 19px; --max: 450px; }
+  .light .pill { background: rgba(255,255,255,.72); color: #1d1b18; --live: var(--verdigris); --amb: var(--amber); --err: var(--red); --sec: #5d5850; --btn: rgba(0,0,0,.07); }
+  .dark .pill { background: rgba(40,38,35,.66); color: #f3f0ea; --live: var(--verdigris-dark); --amb: var(--amber-dark); --err: var(--red-dark); --sec: #b8b2a8; --btn: rgba(255,255,255,.12); box-shadow: 0 6px 22px rgba(0,0,0,.45), 0 0 0 .5px rgba(255,255,255,.14); }
+  .contrast .pill { box-shadow: 0 0 0 1px currentColor; }
+  .pill.only-glyph { padding: 0; width: var(--h); justify-content: center; }
+  .pill .txt { overflow: hidden; text-overflow: ellipsis; }
+  .pill .sec { color: var(--sec); font-variant-numeric: tabular-nums; }
+  .pill .clock { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .pill .amb { color: var(--amb); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .pill .act { font: inherit; font-weight: 600; font-size: calc(var(--fs) - 1px); border: 0; border-radius: 999px; padding: 0 10px; height: calc(var(--h) - 8px); background: var(--btn); color: inherit; cursor: pointer; }
+  .pill .act.primary { background: var(--live); color: #fff; }
+  .dark .pill .act.primary { color: #0f2a25; }
+  .pill .act.link { background: transparent; padding: 0 4px; font-weight: 500; color: var(--sec); text-decoration: underline; text-underline-offset: 2px; }
+  .pill .x, .pill .stop { border: 0; background: transparent; color: var(--sec); width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; cursor: pointer; padding: 0; }
+  .pill .stop { background: var(--btn); color: inherit; }
+  .pill .stop i { width: 8px; height: 8px; border-radius: 2px; background: currentColor; display: block; }
+  .pill .x svg { width: 12px; height: 12px; }
+  .pill .sep { width: 1px; height: 14px; background: var(--sec); opacity: .35; }
+  .pill .more { display: none; align-items: center; gap: 8px; }
+  .pill:hover .more, .pill.hovered .more, .pill:focus-within .more { display: inline-flex; }
+  .pill:hover .less, .pill.hovered .less, .pill:focus-within .less { display: none; }
+  .glyph { width: var(--g); height: var(--g); flex: none; display: block; }
+  .ring { color: var(--live); }
+  .ring .arc, .ring .dot { transform-box: fill-box; transform-origin: center; }
+  .anim .ring.live .arc { animation: spin 6s linear infinite; }
+  .anim .ring .dot { animation: breathe 2.2s ease-in-out infinite; }
+  .anim .ring.work .arc { animation: close 1.6s ease-in-out infinite; }
+  @keyframes spin { from { transform: rotate(-60deg); } to { transform: rotate(300deg); } }
+  @keyframes breathe { 50% { transform: scale(.7); opacity: .7; } }
+  @keyframes close { 0% { stroke-dasharray: 10 40; } 100% { stroke-dasharray: 38 40; } }
+  .badge { position: absolute; left: 21px; top: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--amb); box-shadow: 0 0 0 1.5px rgba(255,255,255,.8); }
+  .size-xl .badge { left: 25px; top: 6px; }
+  .wave { display: inline-flex; align-items: center; gap: 2.5px; height: var(--g); }
+  .wave i { width: 3px; border-radius: 2px; background: var(--live); display: block; height: 30%; }
+  .anim .wave i { animation: lvl 1s ease-in-out infinite; }
+  .wave i:nth-child(2) { animation-delay: -.2s; } .wave i:nth-child(3) { animation-delay: -.45s; } .wave i:nth-child(4) { animation-delay: -.1s; } .wave i:nth-child(5) { animation-delay: -.6s; }
+  @keyframes lvl { 0%,100% { height: 25%; } 50% { height: 95%; } }
+  .meter { display: inline-flex; align-items: center; gap: 4px; font-size: calc(var(--fs) - 2px); color: var(--sec); }
+  .meter b { display: inline-block; width: 34px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--sec) 25%, transparent); position: relative; overflow: hidden; }
+  .meter b::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--v); background: var(--live); border-radius: 3px; }
+  .spinner { width: var(--g); height: var(--g); border-radius: 50%; border: 2px solid color-mix(in srgb, var(--sec) 30%, transparent); border-top-color: var(--sec); }
+  .anim .spinner { animation: spin 1s linear infinite; }
+  @media (max-width: 1180px) { .cols { grid-template-columns: minmax(0, 1fr); } .stage { justify-content: flex-start; overflow-x: auto; } .state .head h3 { min-width: 0; } }
+  .pill:hover, .pill.hovered, .pill:focus-within { max-width: calc(var(--max) + 120px); }
+</style>
+</head>
+<body class="anim size-m">
+<header>
+  <h1>Minimal HUD (pills): before and after</h1>
+  <fieldset class="seg" id="lang"><legend>Language</legend><button aria-pressed="true" data-v="en">EN</button><button aria-pressed="false" data-v="pl">PL</button></fieldset>
+  <fieldset class="seg" id="size"><legend>Text size</legend><button aria-pressed="false" data-v="s">S</button><button aria-pressed="true" data-v="m">M</button><button aria-pressed="false" data-v="xl">XL</button></fieldset>
+  <fieldset class="seg" id="motion"><legend>Reduce Motion</legend><button aria-pressed="true" data-v="off">Off</button><button aria-pressed="false" data-v="on">On</button></fieldset>
+  <fieldset class="seg" id="contrast"><legend>Increase Contrast</legend><button aria-pressed="true" data-v="off">Off</button><button aria-pressed="false" data-v="on">On</button></fieldset>
+  <fieldset class="seg" id="hover"><legend>Show hover details</legend><button aria-pressed="true" data-v="off">On hover</button><button aria-pressed="false" data-v="on">Always</button></fieldset>
+</header>
+<main>
+  <p class="note">Design sketch for the owner's decision (2026-11-25), not the source of truth: the shipped look is set in the SwiftUI gallery (spec #248). "Before" is the real HUD from the debug build (<code>--qa-hud … --qa-snapshot</code>, light only, because a snapshot cannot draw the dark glass; the #258 states come from that PR's screenshots). "After" is drawn in HTML on a sample desktop in light and dark. Hover a pill (or tab into it) to see what appears only on hover. Items marked <span class="tag od">OD-n</span> are open owner decisions, listed in the spec and the report. Simulated data only.</p>
+  <nav class="toc" aria-label="Sections"><a href="#family">Pill family</a><a href="#dictation">Dictation</a><a href="#meeting">Meeting recording</a><a href="#meeting-start">Meeting: start and end messages</a><a href="#suggestion">Meeting suggestions</a></nav>
+  <section id="family"><h2>The pill family</h2><p class="note">One capsule, one height (32 pt at M, 28 at S, 38 at XL), glass, at most one text button plus ✕, one line of text. Glyphs: <b>live</b> = the Lintel ring turning (meeting: with the breathing centre dot; dictation: without), <b>working</b> = the ring closing, <b>problem</b> = amber ⚠, <b>failed</b> = red ⚠, <b>done</b> = ✓ in the live colour.</p><div id="family-row"></div></section>
+  <div id="sections"></div>
+</main>
+<script>
+"use strict";
+const T = (en, pl) => ({ en, pl });
+const ring = (kind, dot) => `<svg class="glyph ring ${kind}" viewBox="0 0 20 20" aria-hidden="true"><circle class="arc" cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="${kind === "work" ? "20 44" : "36 44"}" transform="rotate(-60 10 10)"/>${dot ? '<circle class="dot" cx="10" cy="10" r="2.6" fill="currentColor"/>' : ""}</svg>`;
+const warn = (cls) => `<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true" style="color:var(${cls})"><path d="M10 2.5 18.5 17h-17z" fill="currentColor"/><rect x="9.1" y="7.5" width="1.8" height="5" rx=".9" fill="#fff"/><circle cx="10" cy="14.6" r="1" fill="#fff"/></svg>`;
+const check = `<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true" style="color:var(--live)"><circle cx="10" cy="10" r="8" fill="currentColor"/><path d="m6.2 10.2 2.6 2.6 5-5.4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const person = `<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true" style="color:var(--sec)"><circle cx="7.5" cy="7" r="3" fill="currentColor"/><path d="M2 16c.5-3 2.6-4.6 5.5-4.6S12.5 13 13 16z" fill="currentColor"/><path d="M14.5 5.5a4.5 4.5 0 0 1 0 6M16.8 3.5a7.5 7.5 0 0 1 0 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>`;
+const mic = `<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true" style="color:var(--amb)"><rect x="7" y="2" width="6" height="10" rx="3" fill="currentColor"/><path d="M4.5 9.5a5.5 5.5 0 0 0 11 0M10 15v3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M3 3l14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+const wave = `<span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>`;
+const xBtn = (label) => `<button class="x" type="button" aria-label="${label}"><svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>`;
+const act = (label, kind = "") => `<button class="act ${kind}" type="button">${label}</button>`;
+const meters = (l) => `<span class="meter">${l === "pl" ? "Ty" : "You"} <b style="--v:60%"></b></span><span class="meter">${l === "pl" ? "Rozmówcy" : "Others"} <b style="--v:35%"></b></span>`;
+const L = {
+  cancel: T("Cancel dictation", "Anuluj dyktowanie"), close: T("Close", "Zamknij"), stop: T("End recording", "Zakończ nagrywanie"),
+  esc: T("Esc cancels", "Esc anuluje"), end: T("End", "Zakończ"),
+};
+const t = (x, l) => (typeof x === "string" ? x : x[l]);
+
+// Each state: id, title, before (snapshot file stem or null), what stays / goes / only on problem, and render(lang)
+const DICT = [
+  { id: "dictation-recording", name: "Recording", before: "dictation-recording", keep: "Live ring + level wave", gone: "“Recording”, the red dot, the running time and the ✕ (time and ✕ on hover; Esc still cancels)", od: [2],
+    pill: (l) => `${ring("live", false)}${wave}<span class="more"><span class="sec">0:12</span>${xBtn(t(L.cancel, l))}</span>`,
+    copy: T("VoiceOver: “Recording started”. Label: “Dictation, recording, 0:12. Esc cancels.”", "VoiceOver: „Rozpoczęto nagrywanie”. Etykieta: „Dyktowanie, nagrywanie, 0:12. Esc anuluje.”") },
+  { id: "dictation-recording-no-esc", name: "Recording, Esc not available", before: null, keep: "Live ring + wave + ✕ always (the ✕ is the only way to cancel)", gone: "“✕ cancels” hint", od: [],
+    pill: (l) => `${ring("live", false)}${wave}${xBtn(t(L.cancel, l))}`, copy: T("Tooltip on ✕: “Cancel dictation”", "Podpowiedź na ✕: „Anuluj dyktowanie”") },
+  { id: "dictation-loading-model", name: "Recording while the model loads", before: "dictation-loading-model", keep: "Same pill as Recording (recording already runs)", gone: "“Loading model…” and the blinking caret", od: [7],
+    pill: (l) => `${ring("live", false)}${wave}<span class="more"><span class="sec">0:02</span>${xBtn(t(L.cancel, l))}</span>` },
+  { id: "dictation-countdown", name: "Last 10 s before the limit", before: "dictation-countdown", keep: "Ring + wave + the seconds left in amber", gone: "“Stops in 9 s” sentence", od: [],
+    pill: (l) => `${ring("live", false)}${wave}<span class="amb">9</span>`, copy: T("Label: “Stops in 9 s”. No announcement per tick.", "Etykieta: „Koniec za 9 s”. Bez komunikatu co sekundę.") },
+  { id: "dictation-mic-fallback", name: "Chosen microphone missing (#258)", before: "s1:dictation-recording-microphone-fallback-light-pl", keep: "Ring with an amber dot + wave; the microphone name for 3 s, then on hover only", gone: "The two-line bubble above the pill", od: [11],
+    pill: (l) => `${ring("live", false)}<span class="badge"></span>${wave}<span class="sec">${l === "pl" ? "Mikrofon: MacBook Pro" : "Using MacBook Pro mic"}</span>`,
+    copy: T("“Using MacBook Pro mic” (3 s) · Label: “Using MacBook Pro Microphone, USB Microphone is unavailable”", "„Mikrofon: MacBook Pro” (3 s) · Etykieta: „Nagrywam z: MacBook Pro Microphone, USB Microphone jest niedostępny”") },
+  { id: "dictation-allow-microphone", name: "System microphone prompt", before: "dictation-allow-microphone", keep: "One line", gone: "—", od: [],
+    pill: (l) => `${mic}<span class="txt">${l === "pl" ? "Zezwól na mikrofon w oknie systemu" : "Allow the microphone in the dialog"}</span>` },
+  { id: "dictation-finishing", name: "Finishing (making the text)", before: "dictation-finishing", keep: "The ring closing, nothing else", gone: "“Finishing…”", od: [],
+    pill: () => `${ring("work", false)}`, glyphOnly: true, copy: T("VoiceOver: “Recording stopped”", "VoiceOver: „Zatrzymano nagrywanie”") },
+  { id: "dictation-pasted", name: "Pasted", before: "dictation-pasted", keep: "A ✓ for 0.6 s, then gone (option: no pill at all)", gone: "“Pasted”", od: [3],
+    pill: () => check, glyphOnly: true, copy: T("VoiceOver: “Pasted”", "VoiceOver: „Wklejono”") },
+  { id: "dictation-pasted-unformatted", name: "Pasted without cleanup", before: "dictation-pasted-unformatted", keep: "One line, 3 s", gone: "“Raw version: Dictation → Paste raw version” hint; the “partly cleaned up” variant shows nothing", od: [4],
+    pill: (l) => `${warn("--amb")}<span class="txt">${l === "pl" ? "Wklejono bez poprawek" : "Pasted without cleanup"}</span>` },
+  { id: "dictation-copied-no-accessibility", name: "Copied, Accessibility missing", before: "dictation-copied-no-accessibility", keep: "One line + one button", gone: "—", od: [],
+    pill: (l) => `${warn("--amb")}<span class="txt">${l === "pl" ? "Skopiowano, wklej ⌘V" : "Copied, paste with ⌘V"}</span>${act(l === "pl" ? "Zezwól" : "Allow")}` },
+  { id: "dictation-copied", name: "Copied (could not paste)", before: null, keep: "One line", gone: "—", od: [],
+    pill: (l) => `${warn("--amb")}<span class="txt">${l === "pl" ? "Skopiowano, wklej ⌘V" : "Copied, paste with ⌘V"}</span>` },
+  { id: "dictation-model-missing", name: "No speech model", before: "dictation-model-missing", keep: "One line + Download", gone: "“in Settings”", od: [],
+    pill: (l) => `${warn("--err")}<span class="txt">${l === "pl" ? "Brak modelu mowy" : "No speech model"}</span>${act(l === "pl" ? "Pobierz" : "Download")}` },
+  { id: "dictation-model-unavailable", name: "Model unavailable / failed to load", before: null, keep: "One line + Fix (opens the model card)", gone: "Two different texts merge into one", od: [],
+    pill: (l) => `${warn("--err")}<span class="txt">${l === "pl" ? "Model mowy nie działa" : "Speech model isn't working"}</span>${act(l === "pl" ? "Napraw" : "Fix")}` },
+  { id: "dictation-speech-model-busy", name: "A meeting holds the speech model", before: "dictation-speech-model-busy", keep: "One line in user words", gone: "“Another speech model is in use” (jargon)", od: [],
+    pill: (l) => `${warn("--amb")}<span class="txt">${l === "pl" ? "Dyktowanie wróci po spotkaniu" : "Dictation is back after the meeting"}</span>` },
+  { id: "dictation-microphone-denied", name: "Microphone denied", before: "dictation-microphone-denied", keep: "One line + Allow", gone: "“Open Settings” link", od: [],
+    pill: (l) => `${mic}<span class="txt">${l === "pl" ? "Brak dostępu do mikrofonu" : "No microphone access"}</span>${act(l === "pl" ? "Zezwól" : "Allow")}` },
+  { id: "dictation-no-microphone", name: "No microphone", before: null, keep: "One line", gone: "—", od: [],
+    pill: (l) => `${mic}<span class="txt">${l === "pl" ? "Nie znaleziono mikrofonu" : "No microphone found"}</span>` },
+  { id: "dictation-nothing-heard", name: "Nothing heard", before: "dictation-nothing-heard", keep: "One line", gone: "—", od: [],
+    pill: (l) => `${warn("--amb")}<span class="txt">${l === "pl" ? "Nic nie usłyszano" : "Nothing heard"}</span>` },
+  { id: "dictation-nothing-to-paste", name: "Paste raw version, nothing dictated", before: null, keep: "One line", gone: "—", od: [],
+    pill: (l) => `${warn("--amb")}<span class="txt">${l === "pl" ? "Nie ma jeszcze nic do wklejenia" : "Nothing to paste yet"}</span>` },
+];
+const clockPill = (l, extra = "", badge = false, glyph = ring("live", true)) => `${glyph}${badge ? '<span class="badge"></span>' : ""}<span class="clock">12:34</span>${extra}`;
+const stopBtn = (l) => `<button class="stop" type="button" aria-label="${t(L.stop, l)}"><i></i></button>`;
+const recMore = (l) => `<span class="more"><span class="sep"></span>${meters(l)}${act(t(L.end, l))}</span><span class="less">${stopBtn(l)}</span>`;
+const notice = (l, glyph, en, pl, action) => `${ring("live", true)}<span class="sep"></span>${glyph}<span class="txt">${l === "pl" ? pl : en}</span>${action ? act(action[l === "pl" ? 1 : 0]) : ""}${stopBtn(l)}`;
+const MEET = [
+  { id: "meeting-recording", name: "Recording", before: "meeting-recording", keep: "Live ring with dot, the time, a stop button", gone: "“Recording a meeting”, the two named meters and the red “End recording” button (meters and “End” on hover)", od: [1, 5, 12],
+    pill: (l) => clockPill(l, recMore(l)), copy: T("Label: “Recording a meeting, 12:34”. Hover: You ▂ Others ▂ · End", "Etykieta: „Nagrywanie spotkania, 12:34”. Po najechaniu: Ty ▂ Rozmówcy ▂ · Zakończ") },
+  { id: "meeting-recording-consent", name: "First 8 s: consent reminder", before: "meeting-recording-consent", keep: "One line + Copy, only while the reminder setting is on", gone: "The second line under the pill", od: [6],
+    pill: (l) => notice(l, "", "Tell people you're recording", "Powiedz, że nagrywasz", ["Copy text", "Kopiuj tekst"]) },
+  { id: "meeting-recording-loading-model", name: "Model loading / unavailable (text after the meeting)", before: "meeting-recording-loading-model", keep: "Nothing extra: the plain recording pill; the reason on hover", gone: "“Loading the speech model – recording continues” and “… the text comes after the meeting”", od: [7],
+    pill: (l) => clockPill(l, recMore(l)), copy: T("Hover adds: “Text after the meeting”", "Po najechaniu: „Tekst po spotkaniu”") },
+  { id: "meeting-recording-countdown", name: "Last minutes before the 3 h limit", before: "meeting-recording-countdown", keep: "The clock becomes an amber countdown", gone: "“Recording ends in 4:59” line", od: [],
+    pill: (l) => `${ring("live", true)}<span class="amb">${l === "pl" ? "Koniec za 4:59" : "Ends in 4:59"}</span>${stopBtn(l)}` },
+  { id: "meeting-recording-no-system-audio", name: "Others not heard (20 s)", before: "meeting-recording-no-system-audio", keep: "One line + Fix", gone: "“Check the system audio recording permission” (jargon), the meters", od: [8],
+    pill: (l) => notice(l, warn("--amb"), "Can't hear the others", "Nie słychać rozmówców", ["Fix", "Napraw"]) },
+  { id: "meeting-recording-no-microphone-audio", name: "Your microphone silent (10 s)", before: "meeting-recording-no-microphone-audio", keep: "One line + Fix", gone: "“… check the microphone permission and input”", od: [8],
+    pill: (l) => notice(l, mic, "Can't hear your microphone", "Nie słychać Twojego mikrofonu", ["Fix", "Napraw"]) },
+  { id: "meeting-recording-device-disconnected", name: "Microphone disconnected", before: "meeting-recording-device-disconnected", keep: "One line + Try again (#258)", gone: "—", od: [8],
+    pill: (l) => notice(l, mic, "Microphone disconnected", "Mikrofon odłączony", ["Try again", "Spróbuj ponownie"]) },
+  { id: "meeting-recording-microphone-not-recorded", name: "Microphone did not start (#258)", before: "s1:recording-microphone-not-recorded-light-pl", keep: "One line + Try again", gone: "Meters squeezed next to two buttons", od: [8],
+    pill: (l) => notice(l, mic, "Your mic isn't recording", "Mikrofon nie nagrywa", ["Try again", "Spróbuj ponownie"]) },
+  { id: "meeting-recording-microphone-retrying", name: "Retrying the microphone (#258)", before: "s1:recording-microphone-retrying-light-pl", keep: "Spinner + one line", gone: "Meters", od: [],
+    pill: (l) => notice(l, '<span class="spinner" aria-hidden="true"></span>', "Reconnecting the mic…", "Łączenie z mikrofonem…") },
+  { id: "meeting-recording-microphone-fallback", name: "Chosen microphone missing (#258)", before: "s1:meeting-recording-microphone-fallback-light-pl", keep: "Microphone name for 4 s, then the amber dot on the ring (hover shows it)", gone: "Long sentence with both device names", od: [11],
+    pill: (l) => notice(l, "", "Using MacBook Pro mic", "Mikrofon: MacBook Pro") },
+  { id: "meeting-recording-system-audio-lost", name: "Others' audio stopped", before: "meeting-recording-system-audio-lost", keep: "One line + Fix", gone: "—", od: [8],
+    pill: (l) => notice(l, warn("--amb"), "Others' audio stopped", "Dźwięk rozmówców przerwany", ["Fix", "Napraw"]) },
+  { id: "meeting-recording-low-disk", name: "Low disk while recording", before: "meeting-recording-low-disk", keep: "One line", gone: "—", od: [],
+    pill: (l) => notice(l, warn("--amb"), "Low disk, ends soon", "Mało miejsca, zaraz koniec") },
+  { id: "meeting-recording-write-problem", name: "Some text not saved", before: "meeting-recording-write-problem", keep: "One line", gone: "“Some text could not be saved – you can finish it later”", od: [],
+    pill: (l) => notice(l, warn("--amb"), "Saving problem, fix it later", "Błąd zapisu, dokończysz później") },
+  { id: "meeting-recording-collapsed-problem", name: "A problem that lasts (after 10 s)", before: null, keep: "Plain pill with an amber dot on the ring; hover and VoiceOver give the sentence", gone: "The sentence after 10 s", od: [8],
+    pill: (l) => clockPill(l, recMore(l), true) },
+  { id: "meeting-finishing", name: "Finishing / processing", before: "meeting-processing-transcribing", keep: "The ring closing; on hover “Transcribing, 3 left”", gone: "“Processing: transcribing (3 left)”", od: [9],
+    pill: (l) => `${ring("work", true)}<span class="more"><span class="sec">${l === "pl" ? "Transkrypcja, zostały 3" : "Transcribing, 3 left"}</span></span>` },
+  { id: "meeting-saved", name: "Saved", before: "meeting-saved", keep: "✓ + one word + Open, 3 s", gone: "—", od: [],
+    pill: (l) => `${check}<span class="txt">${l === "pl" ? "Zapisano" : "Saved"}</span>${act(l === "pl" ? "Otwórz" : "Open")}` },
+  { id: "meeting-saved-incomplete", name: "Saved, not complete", before: "meeting-saved-incomplete", keep: "One line + Open, 6 s", gone: "—", od: [],
+    pill: (l) => `${warn("--amb")}<span class="txt">${l === "pl" ? "Zapisano, niepełne" : "Saved, incomplete"}</span>${act(l === "pl" ? "Otwórz" : "Open")}` },
+];
+const msg = (glyph, en, pl, action, x) => (l) => `${glyph}<span class="txt">${l === "pl" ? pl : en}</span>${action ? act(action[l === "pl" ? 1 : 0], action[2] || "") : ""}${x ? xBtn(t(L.close, l)) : ""}`;
+const START = [
+  { id: "meeting-microphone-denied-system-only", name: "Microphone denied, others can be recorded", before: "meeting-microphone-denied-system-only", keep: "One line, one button, ✕; “Allow microphone” on hover", gone: "Three buttons", od: [],
+    pill: (l) => `${mic}<span class="txt">${l === "pl" ? "Brak mikrofonu" : "No microphone access"}</span>${act(l === "pl" ? "Nagraj tylko rozmówców" : "Record others only")}<span class="more">${act(l === "pl" ? "Zezwól" : "Allow", "link")}</span>${xBtn(t(L.close, l))}` },
+  { id: "meeting-microphone-denied", name: "Microphone denied", before: null, keep: "One line + Allow", gone: "“Open Privacy settings”", od: [], pill: msg(mic, "No microphone access", "Brak dostępu do mikrofonu", ["Allow", "Zezwól"]) },
+  { id: "meeting-model-missing", name: "No speech model", before: "meeting-model-missing", keep: "One line + Download", gone: "“in Settings”", od: [], pill: msg(warn("--err"), "No speech model", "Brak modelu mowy", ["Download", "Pobierz"]) },
+  { id: "meeting-library-unavailable", name: "Library unavailable", before: null, keep: "One line + Fix", gone: "—", od: [], pill: msg(warn("--err"), "Meetings can't be saved now", "Spotkań nie da się teraz zapisać", ["Fix", "Napraw"]) },
+  { id: "meeting-low-disk-at-start", name: "Not enough disk space", before: null, keep: "One line", gone: "—", od: [], pill: msg(warn("--err"), "Not enough disk space", "Za mało miejsca na dysku") },
+  { id: "meeting-still-processing", name: "Previous meeting still processing", before: "meeting-still-processing", keep: "One line", gone: "—", od: [], pill: msg(warn("--amb"), "Previous meeting still saving", "Poprzednie spotkanie wciąż się zapisuje") },
+  { id: "meeting-model-being-removed", name: "Model being removed", before: null, keep: "One line", gone: "—", od: [], pill: msg(warn("--amb"), "Model is being removed, try soon", "Usuwanie modelu, spróbuj za chwilę") },
+  { id: "meeting-no-audio-input", name: "No audio source", before: null, keep: "One line", gone: "—", od: [], pill: msg(mic, "No audio could be recorded", "Nie da się nagrać dźwięku") },
+  { id: "meeting-nothing-heard", name: "Nothing heard", before: null, keep: "One line", gone: "—", od: [], pill: msg(warn("--amb"), "Nothing heard", "Nic nie usłyszano") },
+  { id: "meeting-could-not-start", name: "Could not start", before: null, keep: "One line", gone: "—", od: [], pill: msg(warn("--err"), "Recording didn't start", "Nagrywanie się nie zaczęło") },
+  { id: "meeting-failed", name: "Could not be saved", before: "meeting-failed", keep: "One line", gone: "—", od: [], pill: msg(warn("--err"), "The meeting couldn't be saved", "Nie udało się zapisać spotkania") },
+];
+const SUGG = [
+  { id: "suggestion-meeting", name: "Looks like a meeting", before: "s1:suggestion-meeting-light-pl", keep: "One line, Record, ✕; “Don't ask again” on hover", gone: "Second row with three buttons", od: [10],
+    pill: (l) => `${person}<span class="txt">${l === "pl" ? "Spotkanie w Google Chrome" : "Meeting in Google Chrome"}</span>${act(l === "pl" ? "Nagrywaj" : "Record", "primary")}<span class="more">${act(l === "pl" ? "Nie pytaj więcej" : "Don't ask again", "link")}</span>${xBtn(l === "pl" ? "Nie teraz" : "Not now")}`,
+    copy: T("✕ = Not now. Hidden from screen sharing. 15 s.", "✕ = Nie teraz. Niewidoczna w udostępnianiu ekranu. 15 s.") },
+  { id: "suggestion-end-recording", name: "End the recording?", before: "s1:suggestion-end-recording-light-pl", keep: "One line, End, ✕ (= keep recording)", gone: "“Keep recording” button", od: [10],
+    pill: (l) => `${ring("live", true)}<span class="txt">${l === "pl" ? "Zakończyć nagrywanie?" : "End the recording?"}</span>${act(l === "pl" ? "Zakończ" : "End", "primary")}${xBtn(l === "pl" ? "Nagrywaj dalej" : "Keep recording")}` },
+];
+const SECTIONS = [
+  ["dictation", "Dictation (bottom centre)", "Today: 248 × 40 pt capsule with icon, word, bars, time and ✕. After: 88 pt while recording.", DICT],
+  ["meeting", "Meeting recording (top centre, visible in screen sharing)", "Today: 400 × 44–68 pt rounded rectangle with time, two named meters, a red End button and a second line. After: a 120 pt capsule; problems widen it to one line.", MEET],
+  ["meeting-start", "Meeting: start and end messages", "Shown only when something went wrong or finished; one line, at most one button.", START],
+  ["suggestion", "Meeting suggestions (top centre, hidden from screen sharing)", "Today: 440 × 78 pt card with two rows and three buttons. After: one line.", SUGG],
+];
+const state = { lang: "en", size: "m", motion: "off", contrast: "off", hover: "off" };
+function beforeHTML(s) {
+  if (!s.before) return `<div class="missing">No QA fixture for this state today (text only in code).</div>`;
+  const pl = state.lang === "pl";
+  const src = s.before.startsWith("s1:") ? `before/${s.before.slice(3)}.png` : `before/${s.before}-light-${pl ? "pl" : "en"}.png`;
+  return `<img src="${src}" alt="Current HUD: ${s.name}" loading="lazy">`;
+}
+function stateHTML(s) {
+  const l = state.lang;
+  const od = s.od.map((n) => `<span class="tag od">OD-${n}</span>`).join("");
+  const stage = (theme) => `<div class="stage ${theme}"><div class="pill${s.glyphOnly ? " only-glyph" : ""}${state.hover === "on" ? " hovered" : ""}" tabindex="0" role="group" aria-label="${s.name}">${s.pill(l)}</div></div>`;
+  return `<article class="state" id="${s.id}"><div class="head"><h3>${s.name}</h3><div class="meta"><b>Stays:</b> ${s.keep} · <b>Goes:</b> ${s.gone} ${od}</div></div>
+  <div class="cols"><div class="col before"><h4>Before (light, real app)</h4>${beforeHTML(s)}</div><div class="col"><h4>After · light</h4>${stage("light")}</div><div class="col"><h4>After · dark</h4>${stage("dark")}</div></div>
+  ${s.copy ? `<div class="copy">${t(s.copy, l)}</div>` : ""}</article>`;
+}
+function render() {
+  document.documentElement.lang = state.lang;
+  document.body.className = `${state.motion === "on" ? "" : "anim"} size-${state.size} ${state.contrast === "on" ? "contrast" : ""}`;
+  const l = state.lang;
+  document.getElementById("family-row").innerHTML = `<div class="cols">${["light", "dark"].map((th) => `<div class="stage ${th}" style="gap:12px;flex-wrap:wrap">
+    <div class="pill">${ring("live", false)}${wave}</div><div class="pill">${clockPill(l, `<span class="less">${stopBtn(l)}</span>`)}</div><div class="pill only-glyph">${ring("work", false)}</div>
+    <div class="pill">${warn("--amb")}<span class="txt">${l === "pl" ? "Jedna linia" : "One line"}</span>${act(l === "pl" ? "Akcja" : "Action")}</div></div>`).join("")}<div class="note" style="align-self:center">Live · working · message. Width follows content up to 380 pt at S and M, 450 pt at XL, plus 120 pt while hovered; while a problem line shows, the clock steps aside; text never wraps (copy budget: 40 characters).</div></div>`;
+  document.getElementById("sections").innerHTML = SECTIONS.map(([id, h, p, list]) => `<section id="${id}"><h2>${h}</h2><p class="note">${p}</p>${list.map(stateHTML).join("")}</section>`).join("");
+}
+for (const key of Object.keys(state)) {
+  document.getElementById(key).addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    state[key] = b.dataset.v;
+    for (const x of e.currentTarget.querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+    render();
+  });
+}
+// Optional start values from the query string (?lang=pl&size=xl&hover=on&motion=on&contrast=on), for screenshots.
+for (const [key, value] of new URLSearchParams(location.search)) {
+  const group = document.getElementById(key);
+  if (!(key in state) || !group) continue;
+  const button = [...group.querySelectorAll("button")].find((b) => b.dataset.v === value);
+  if (!button) continue;
+  state[key] = value;
+  for (const x of group.querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === button));
+}
+render();
+// ?only=<section id> draws that section alone (for screenshots).
+const only = new URLSearchParams(location.search).get("only");
+if (only) for (const el of document.querySelectorAll("main > section, #sections > section, main > nav, main > p")) el.hidden = el.id !== only;
+</script>
+</body>
+</html>
