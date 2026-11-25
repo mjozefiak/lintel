@@ -31,4 +31,15 @@ enum SegmentWindow {
         upper -= min(excess, upper - detected.upperBound)
         return max(0, lower)..<upper
     }
+
+    /// Where a range that has outgrown the engine's window is cut. The piece is cut so that, with its pre-roll,
+    /// it is exactly `longest` long: the first piece of a long utterance keeps its pre-roll too, and the
+    /// continuation starts at the cut. Never earlier than `start` (so the piece is never empty) and never later
+    /// than `start + longest`.
+    static func cutEnd(
+        start: Int, notBefore: Int, preRoll: Int, longest: Int = MeetingSession.longestSegment
+    ) -> Int {
+        let lower = min(start, max(notBefore, start - max(0, preRoll)))
+        return max(start + 1, lower + longest)
+    }
 }

@@ -49,7 +49,7 @@ struct SegmentingStats: Equatable, Codable, Sendable {
     mutating func add(_ probability: Float) {
         guard probability.isFinite else { return }
         chunks += 1
-        let bin = min(probabilityHistogram.count - 1, max(0, Int(probability * 10)))
+        let bin = Int(min(max(probability, 0), 0.999) * Float(probabilityHistogram.count))
         probabilityHistogram[bin] += 1
     }
 }

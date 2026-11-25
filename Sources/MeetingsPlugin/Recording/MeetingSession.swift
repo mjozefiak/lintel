@@ -599,9 +599,13 @@ actor MeetingSession {
                         counters[channel].vadSegmentsOpened += 1
                     }
                 case .speechEnd:
-                    if let start = track.speechStart {
+                    if track.speechStart != nil {
                         counters[channel].vadSegmentsClosed += 1
-                        closeSegment(track, start..<max(start, event.sampleIndex))
+                        // A range that outgrew the window (the end is reported late) is cut first.
+                        cutWhileTooLong(track, upTo: event.sampleIndex)
+                        if let start = track.speechStart {
+                            closeSegment(track, start..<max(start, event.sampleIndex))
+                        }
                         track.speechStart = nil
                     } else {
                         counters[channel].vadUnmatchedEnds += 1
@@ -612,16 +616,23 @@ actor MeetingSession {
             logger.error("Voice activity detection failed on \(channel.rawValue, privacy: .public)")
         }
         // Never a segment longer than the model's window.
-        while let start = track.speechStart, track.store.count - start > Self.longestSegment {
-            counters[channel].hardCuts += 1
-            closeSegment(track, start..<start + Self.longestSegment, endsInCut: true)
-            track.speechStart = start + Self.longestSegment
-        }
+        cutWhileTooLong(track, upTo: track.store.count)
         // Keep what a later range can still be widened into: the pre-roll before its start, and when no speech is
         // open the stretch the detector reports late.
         track.store.discard(before: (track.speechStart ?? track.store.count - Self.detectorLookback) - preRollSamples)
         progress()
         commitReady(force: false)
+    }
+
+    /// Cuts the open speech at the model's window while it reaches more than that far (up to `end`), so no segment
+    /// is longer than the window.
+    private func cutWhileTooLong(_ track: TrackState, upTo end: Int) {
+        while let start = track.speechStart, end - start > Self.longestSegment {
+            counters[track.channel].hardCuts += 1
+            let cut = SegmentWindow.cutEnd(start: start, notBefore: track.sentUntil, preRoll: preRollSamples)
+            closeSegment(track, start..<cut, endsInCut: true)
+            track.speechStart = cut
+        }
     }
 
     /// Counts the chunks the detector judged since the last batch. `open` is whether speech was open while the

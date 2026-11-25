@@ -51,6 +51,20 @@ import Testing
         #expect(long == (detected.lowerBound..<detected.upperBound + 5_000))
     }
 
+    @Test func aCutKeepsThePreRollInsideTheWindow() {
+        let longest = 15 * rate
+        // Room before the start: the cut moves back by the pre-roll, so with it the piece is exactly the window.
+        #expect(
+            SegmentWindow.cutEnd(start: 20_000, notBefore: 0, preRoll: 4_800, longest: longest)
+                == 20_000 - 4_800 + longest)
+        // The audio before was sent already: no pre-roll, the cut is a full window after the start.
+        #expect(
+            SegmentWindow.cutEnd(start: 20_000, notBefore: 20_000, preRoll: 4_800, longest: longest) == 20_000 + longest
+        )
+        // A cut is always after the start, whatever the rolls.
+        #expect(SegmentWindow.cutEnd(start: 100, notBefore: 0, preRoll: 90_000, longest: 50) == 101)
+    }
+
     @Test func zeroRollsAndEmptyRangesAreLeftAlone() {
         #expect(
             SegmentWindow.widened(500..<900, notBefore: 0, received: 2_000, preRoll: 0, postRoll: 0) == 500..<900)
@@ -190,11 +204,13 @@ private final class ProbabilityVAD: VoiceActivityDetector {
         script.silence(12)
         let (outcome, rows) = try await run(script, pre: 500, post: 500, rig: rig, engine: engine)
         #expect(outcome.result == .ready)
-        // Every sample from 1 s to 24.2 s (the post-roll after the last piece) was sent exactly once, in three
-        // pieces: the first is the full 15 s window, so it gets no pre-roll; the cut repeats nothing.
+        // Every sample from 0.5 s (the pre-roll before the speech) to 24.2 s (the post-roll after the last piece) was
+        // sent exactly once, in three pieces: the long utterance is cut so that its pre-roll fits in the window,
+        // and nothing is repeated at the cut.
         #expect(engine.heard.count == 3)
+        #expect(engine.heard.first == MeetingSession.longestSegment)
         #expect(engine.heard.allSatisfy { $0 <= MeetingSession.longestSegment })
-        #expect(engine.heard.reduce(0, +) == Int(23.2 * Double(rate)))
+        #expect(engine.heard.reduce(0, +) == Int(23.7 * Double(rate)))
         #expect(rows.count == 3)
         // The ranges in the transcript do not overlap.
         for (a, b) in zip(rows, rows.dropFirst()) { #expect(a.endMs <= b.startMs) }

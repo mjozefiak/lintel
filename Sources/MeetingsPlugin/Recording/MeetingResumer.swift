@@ -239,6 +239,15 @@ struct MeetingResumer: MeetingResuming {
                     range, notBefore: scan.ranges.last?.upperBound ?? 0, received: scan.samples, preRoll: preRoll,
                     postRoll: endsInCut ? 0 : postRoll))
         }
+        // The range outgrew the window: it is cut so that its pre-roll fits too (`SegmentWindow.cutEnd`).
+        func cutWhileTooLong(upTo end: Int) {
+            while let begin = start, end - begin > longest {
+                let cut = SegmentWindow.cutEnd(
+                    start: begin, notBefore: scan.ranges.last?.upperBound ?? 0, preRoll: preRoll, longest: longest)
+                close(begin..<cut, endsInCut: true)
+                start = cut
+            }
+        }
         do {
             while let chunk = try reader.nextChunk() {
                 try Task.checkCancellation()
@@ -248,16 +257,14 @@ struct MeetingResumer: MeetingResuming {
                     case .speechStart:
                         if start == nil { start = event.sampleIndex }
                     case .speechEnd:
-                        if let begin = start {
-                            close(begin..<max(begin, event.sampleIndex))
+                        if start != nil {
+                            cutWhileTooLong(upTo: event.sampleIndex)
+                            if let begin = start { close(begin..<max(begin, event.sampleIndex)) }
                             start = nil
                         }
                     }
                 }
-                while let begin = start, scan.samples - begin > longest {
-                    close(begin..<begin + longest, endsInCut: true)
-                    start = begin + longest
-                }
+                cutWhileTooLong(upTo: scan.samples)
             }
         } catch is CancellationError {
             throw CancellationError()
