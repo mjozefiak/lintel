@@ -178,13 +178,7 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
         let engine = makeEngine()
         let used = try attach(engine, continuation: continuation, onLevel: onLevel)
         let token = installObserver(for: engine)
-        do {
-            try engine.start()
-        } catch {
-            engine.removeTap()
-            notifications.removeObserver(token)
-            throw error
-        }
+        // The engine is current before it starts, so a configuration change during the start is not lost.
         lock.withLock {
             generation += 1
             activeFallback = used
@@ -192,6 +186,24 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
             self.observer = token
             self.continuation = continuation
             self.onLevel = onLevel
+        }
+        do {
+            try engine.start()
+        } catch {
+            lock.withLock {
+                // Also turns away a restart that a notification during the start began.
+                generation += 1
+                if self.engine === engine {
+                    self.engine = nil
+                    self.observer = nil
+                }
+                self.continuation = nil
+                self.onLevel = nil
+                activeFallback = nil
+            }
+            engine.removeTap()
+            notifications.removeObserver(token)
+            throw error
         }
         return stream
     }
@@ -309,6 +321,8 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
         if let observer = old.1 { notifications.removeObserver(observer) }
         old.0?.removeTap()
         old.0?.stop()
+        // Silence already put into the stream for the gap, so an attempt that fails does not count it twice.
+        var filled = 0
         for (index, delay) in restartDelays.enumerated() {
             // The device list is inconsistent for a moment while hardware comes and goes.
             await sleep(delay)
@@ -330,6 +344,15 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
                     fresh.stop()
                     return
                 }
+                // The gap is silence, so a timeline that counts samples stays in step with the clock. It goes in
+                // before the engine starts: the tap's first buffer may arrive before `start()` returns.
+                let gap = began.duration(to: .now)
+                let seconds = min(max(0, Double(gap.components.seconds) + Double(gap.components.attoseconds) / 1e18), 2)
+                let silent = Int(seconds * Double(AudioFormat.sampleRate)) - filled
+                if silent > 0 {
+                    continuation.yield([Float](repeating: 0, count: silent))
+                    filled += silent
+                }
                 do {
                     try fresh.start()
                 } catch {
@@ -342,16 +365,20 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
                     notifications.removeObserver(observerToken)
                     throw error
                 }
-                let (handler, changed) = lock.withLock { () -> ((@Sendable (InputFallback?) -> Void)?, Bool) in
+                // `stop()` (or another configuration change) may have come while the engine was starting: an
+                // engine that is no longer current must not keep the microphone open.
+                let current = lock.withLock { () -> (handler: (@Sendable (InputFallback?) -> Void)?, changed: Bool)? in
+                    guard generation == token, engine === fresh else { return nil }
                     let changed = activeFallback != used
                     activeFallback = used
                     return (fallbackHandler, changed)
                 }
-                // The gap is silence, so a timeline that counts samples stays in step with the clock.
-                let gap = began.duration(to: .now)
-                let seconds = min(max(0, Double(gap.components.seconds) + Double(gap.components.attoseconds) / 1e18), 2)
-                let silent = Int(seconds * Double(AudioFormat.sampleRate))
-                if silent > 0 { continuation.yield([Float](repeating: 0, count: silent)) }
+                guard let (handler, changed) = current else {
+                    notifications.removeObserver(observerToken)
+                    fresh.removeTap()
+                    fresh.stop()
+                    return
+                }
                 logger.notice(
                     "Audio capture restarted after attempt \(index + 1, privacy: .public), fallback \(used != nil, privacy: .public)"
                 )

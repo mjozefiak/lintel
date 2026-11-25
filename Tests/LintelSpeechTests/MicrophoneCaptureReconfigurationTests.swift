@@ -11,18 +11,25 @@ private final class FakeCaptureEngine: CaptureEngine, @unchecked Sendable {
     let source = NSObject()
     let format: AVAudioFormat
     let startFails: Bool
+    /// Runs inside `start()`, before the engine runs: a tap buffer or a `stop()` that comes while `start()` is busy.
+    let onStart: (@Sendable (FakeCaptureEngine) -> Void)?
     private let state = Mutex<State>(State())
     private struct State {
         var tap: (@Sendable (AVAudioPCMBuffer) -> Void)?
         var selected: String?
         var started = false
         var stopped = false
+        var running = false
     }
 
-    init(sampleRate: Double = 48_000, startFails: Bool = false) {
+    init(
+        sampleRate: Double = 48_000, startFails: Bool = false,
+        onStart: (@Sendable (FakeCaptureEngine) -> Void)? = nil
+    ) {
         format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false)!
         self.startFails = startFails
+        self.onStart = onStart
     }
 
     var notificationSource: AnyObject { source }
@@ -30,6 +37,8 @@ private final class FakeCaptureEngine: CaptureEngine, @unchecked Sendable {
     var selected: String? { state.withLock { $0.selected } }
     var started: Bool { state.withLock { $0.started } }
     var stopped: Bool { state.withLock { $0.stopped } }
+    var running: Bool { state.withLock { $0.running } }
+    var hasTap: Bool { state.withLock { $0.tap != nil } }
 
     func select(deviceUID: String) throws { state.withLock { $0.selected = deviceUID } }
     func installTap(format: AVAudioFormat, _ block: @escaping @Sendable (AVAudioPCMBuffer) -> Void) {
@@ -38,9 +47,18 @@ private final class FakeCaptureEngine: CaptureEngine, @unchecked Sendable {
     func removeTap() { state.withLock { $0.tap = nil } }
     func start() throws {
         if startFails { throw CaptureError.engineFailed("fake") }
-        state.withLock { $0.started = true }
+        onStart?(self)
+        state.withLock {
+            $0.started = true
+            $0.running = true
+        }
     }
-    func stop() { state.withLock { $0.stopped = true } }
+    func stop() {
+        state.withLock {
+            $0.stopped = true
+            $0.running = false
+        }
+    }
 
     /// What the microphone delivers: `seconds` of a constant 0.1.
     func deliver(seconds: Double = 0.1) {
@@ -78,6 +96,7 @@ private final class Received: @unchecked Sendable {
     var count: Int { state.withLock { $0.samples.count } }
     var finished: Bool { state.withLock { $0.finished } }
     var loud: Int { state.withLock { $0.samples.filter { $0 != 0 }.count } }
+    var samples: [Float] { state.withLock { $0.samples } }
     func consume(_ stream: AsyncStream<[Float]>) {
         Task {
             for await chunk in stream { state.withLock { $0.samples += chunk } }
@@ -92,12 +111,12 @@ private final class Received: @unchecked Sendable {
 
     private func capture(
         uid: String? = nil, devices: @escaping @Sendable () -> [MicrophoneCapture.InputDevice], engines: Engines,
-        center: NotificationCenter
+        center: NotificationCenter, sleep: @escaping @Sendable (Duration) async -> Void = { _ in }
     ) -> MicrophoneCapture {
         MicrophoneCapture(
             deviceUID: uid, deviceName: uid == nil ? nil : "USB MICROPHONE", devices: devices,
             defaultInputName: { "MacBook Pro Microphone" }, makeEngine: { engines.make() }, notifications: center,
-            restartDelays: [.milliseconds(1), .milliseconds(1), .milliseconds(1)], sleep: { _ in })
+            restartDelays: [.milliseconds(1), .milliseconds(1), .milliseconds(1)], sleep: sleep)
     }
 
     private func wait(_ condition: () -> Bool) async -> Bool {
@@ -230,6 +249,55 @@ private final class Received: @unchecked Sendable {
         center.post(name: .AVAudioEngineConfigurationChange, object: NSObject())
         try await Task.sleep(for: .milliseconds(100))
         #expect(engines.all.count == 1)
+        await capture.stop()
+    }
+
+    @Test func aStopWhileTheNewEngineStartsLeavesNoEngineRunning() async throws {
+        let captured = Mutex<MicrophoneCapture?>(nil)
+        let engines = Engines { index in
+            guard index == 1 else { return FakeCaptureEngine() }
+            // The user stops while the restarted engine is starting.
+            return FakeCaptureEngine(onStart: { _ in
+                let stopped = DispatchSemaphore(value: 0)
+                let capture = captured.withLock { $0 }
+                Task.detached {
+                    await capture?.stop()
+                    stopped.signal()
+                }
+                _ = stopped.wait(timeout: .now() + 5)
+            })
+        }
+        let center = NotificationCenter()
+        let capture = capture(devices: { [builtIn] }, engines: engines, center: center)
+        captured.withLock { $0 = capture }
+        let stream = try await capture.start(onLevel: { _ in })
+        let received = Received()
+        received.consume(stream)
+        center.post(name: .AVAudioEngineConfigurationChange, object: engines.all[0].source)
+        #expect(await wait { received.finished })
+        #expect(await wait { engines.all.count == 2 && engines.all[1].started && !engines.all[1].running })
+        #expect(!engines.all[1].hasTap)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(engines.all.count == 2)
+    }
+
+    @Test func theGapSilenceComesBeforeTheRestartedEnginesFirstBuffer() async throws {
+        // The restarted engine delivers its first buffer before `start()` returns.
+        let engines = Engines { $0 == 0 ? FakeCaptureEngine() : FakeCaptureEngine(onStart: { $0.deliver() }) }
+        let center = NotificationCenter()
+        let capture = capture(
+            devices: { [builtIn] }, engines: engines, center: center,
+            sleep: { _ in try? await Task.sleep(for: .milliseconds(50)) })
+        let stream = try await capture.start(onLevel: { _ in })
+        let received = Received()
+        received.consume(stream)
+        center.post(name: .AVAudioEngineConfigurationChange, object: engines.all[0].source)
+        #expect(await wait { received.loud > 0 })
+        let samples = received.samples
+        let firstLoud = try #require(samples.firstIndex { $0 != 0 })
+        // At least the 50 ms of waiting went in as silence, all of it before the new audio.
+        #expect(firstLoud >= 800)
+        #expect(!samples[firstLoud...].contains(0))
         await capture.stop()
     }
 }
