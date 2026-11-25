@@ -23,6 +23,8 @@ public final class ClipboardPlugin: LintelPlugin {
         displayName: LocalizedStringResource("Clipboard", comment: "Plugin name of the clipboard history in Settings"),
         symbolName: "doc.on.clipboard",
         order: 30,
+        // An add-on since the owner decision of 2026-11-24: off until the user turns it on.
+        defaultEnabled: false,
         settingsGroup: .search,
         summary: LocalizedStringResource("Paste from history.", comment: "Settings → Features: what Clipboard does"),
         // The launcher's list mode and an unavailable section keep "Clipboard History"; Settings says "Clipboard".

@@ -24,7 +24,8 @@ public final class DictationPlugin: LintelPlugin {
         displayName: LocalizedStringResource("Dictation", comment: "Plugin name of voice dictation"),
         symbolName: "mic",
         order: 40,
-        defaultEnabled: false,
+        // The core since the owner decision of 2026-11-24: on for a new install.
+        defaultEnabled: true,
         settingsGroup: .voice,
         summary: LocalizedStringResource(
             "Speak instead of typing.", comment: "Settings → Features: what Dictation does")
@@ -222,7 +223,7 @@ public final class DictationPlugin: LintelPlugin {
                 customFolder: { settings.speechModelFolder },
                 makeSession: { folder, onEvent in
                     DictationSession(
-                        audio: MicrophoneCapture(deviceUID: settings.inputDevice),
+                        audio: MicrophoneCapture(deviceUID: settings.inputDevice, deviceName: settings.inputDeviceName),
                         vad: LazyVAD(modelFolder: folder.appending(path: ModelCatalog.sileroVADPath)),
                         engine: engine,
                         formatter: Self.formatter(

@@ -354,7 +354,7 @@ import Testing
         #expect(source.contains("accessibilityReduceMotion"))
     }
 
-    @Test func detectionNeverTouchesAudioAndLogsNothingAboutAppsOrProcesses() throws {
+    @Test func detectionNeverTouchesAudioAndLogsOnlyBundleIDsAndDecisions() throws {
         let files = try sourceFiles()
         let observer = code(try #require(files.first { $0.name == "CoreAudioProcessObserver.swift" }).text)
         for word in [
@@ -363,11 +363,11 @@ import Testing
         ] {
             #expect(!observer.contains(word), "\(word)")
         }
-        // Every logger call in the detection files, however it is wrapped over lines, uses a literal without
-        // an interpolation.
+        // Only the detector logs (its decisions, at `notice`, with bundle IDs public); every other detection
+        // file's logger calls use a literal without an interpolation.
         for name in [
-            "MeetingDetector.swift", "SuggestionPolicy.swift", "CoreAudioProcessObserver.swift",
-            "ProcessAudioObserver.swift", "MeetingsPlugin+Suggestions.swift", "SuggestionHUD.swift",
+            "SuggestionPolicy.swift", "CoreAudioProcessObserver.swift", "ProcessAudioObserver.swift",
+            "ResponsibleApp.swift", "MeetingsPlugin+Suggestions.swift", "SuggestionHUD.swift",
             "SuggestionPrompt.swift", "MeetingsSettingsModel+Suggestions.swift",
         ] {
             let text = code(try #require(files.first { $0.name == name }).text)
@@ -376,7 +376,15 @@ import Testing
             }
         }
         let detector = code(try #require(files.first { $0.name == "MeetingDetector.swift" }).text)
-        #expect(loggerCalls(in: detector).count >= 2)
+        let calls = loggerCalls(in: detector)
+        #expect(calls.count >= 8)
+        for call in calls {
+            // Every value is a bundle ID, a reason or a status, written as public; never a title, URL or text.
+            #expect(call.components(separatedBy: "\\(").count == call.components(separatedBy: "privacy: .public").count)
+            for word in ["title", "Title", "url", "URL", "text", "audio"] {
+                #expect(!call.contains(word), "\(word) in \(call)")
+            }
+        }
     }
 
     /// The text of every `logger.<level>(...)` call, parentheses balanced across lines.

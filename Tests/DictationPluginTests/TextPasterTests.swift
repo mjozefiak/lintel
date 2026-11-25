@@ -38,6 +38,29 @@ final class HookClock: Clock, @unchecked Sendable {
     }
 }
 
+/// A clock whose sleeps wait until the test wakes them, oldest first.
+final class GateClock: Clock, @unchecked Sendable {
+    typealias Instant = HookClock.Instant
+
+    private let sleepers = Mutex([CheckedContinuation<Void, Never>]())
+
+    var now: Instant { Instant(offset: .zero) }
+    var minimumResolution: Duration { .zero }
+
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        await withCheckedContinuation { continuation in sleepers.withLock { $0.append(continuation) } }
+    }
+
+    func waitForSleepers(_ count: Int) async {
+        while sleepers.withLock({ $0.count }) < count { await Task.yield() }
+    }
+
+    /// Wakes the oldest sleeper; the next one moves to the front.
+    func wakeOldest() {
+        sleepers.withLock { $0.isEmpty ? nil : $0.removeFirst() }?.resume()
+    }
+}
+
 /// Reads like `NamedPasteboard` but hides one type, as `readContents` does for data it cannot read.
 @MainActor final class LossyPasteboard: PasteboardClient {
     let base: NamedPasteboard
@@ -106,6 +129,67 @@ final class HookClock: Clock, @unchecked Sendable {
         // The restore is marked transient as well and waited a second.
         #expect(rig.pasteboard.types().contains(PasteboardRepresentation.transientMarkerType))
         #expect(rig.clock.sleeps.contains(TextPaster.restoreDelay))
+    }
+
+    @Test func theRestoreIsPendingDuringItsDelayAndDoneAfterIt() async {
+        let rig = Rig()
+        defer { rig.pasteboard.release() }
+        rig.pasteboard.setString("before")
+        let paster = rig.paster()
+        #expect(!paster.isRestorePending)
+        var duringDelay: [Bool] = []
+        rig.clock.onSleep { duration in
+            if duration == TextPaster.restoreDelay { duringDelay.append(paster.isRestorePending) }
+        }
+
+        await paster.paste("dictated")
+        #expect(paster.isRestorePending)
+        await paster.pendingRestore?.value
+        #expect(duringDelay == [true])
+        #expect(!paster.isRestorePending)
+        #expect(rig.pasteboard.string() == "before")
+    }
+
+    @Test func aSkippedRestoreIsNotPendingEither() async {
+        let rig = Rig()
+        defer { rig.pasteboard.release() }
+        rig.pasteboard.setString("before")
+        let paster = rig.paster()
+        await paster.paste("dictated")
+        rig.pasteboard.setString("copied meanwhile")
+        await paster.pendingRestore?.value
+        #expect(!paster.isRestorePending)
+        // Nothing to restore: copy-only outcomes and a disabled restore never set it.
+        rig.restore = false
+        await paster.paste("again")
+        #expect(!paster.isRestorePending)
+    }
+
+    @Test func anEarlierRestoreDoesNotClearAPendingLaterOne() async {
+        let rig = Rig()
+        defer { rig.pasteboard.release() }
+        let gate = GateClock()
+        let paster = TextPaster(
+            pasteboard: rig.pasteboard, events: rig.events, workspace: rig.workspace,
+            permissions: rig.permissions, clock: gate, restoresClipboard: { true },
+            ownBundleID: "com.lintelapp.Lintel", modifiersHeld: { false },
+            logger: Logger(subsystem: "com.lintelapp.tests", category: "dictation"))
+        rig.pasteboard.setString("before")
+        await paster.paste("one")
+        let first = paster.pendingRestore
+        await gate.waitForSleepers(1)
+        // The user copies something before the first restore runs, and a second paste follows.
+        rig.pasteboard.setString("copied meanwhile")
+        await paster.paste("two")
+        await gate.waitForSleepers(2)
+
+        gate.wakeOldest()
+        await first?.value
+        #expect(paster.isRestorePending)
+        gate.wakeOldest()
+        await paster.pendingRestore?.value
+        #expect(!paster.isRestorePending)
+        #expect(rig.pasteboard.string() == "copied meanwhile")
     }
 
     @Test func withoutAccessibilityTheTextIsOnlyCopiedAndNothingIsRestored() async {
