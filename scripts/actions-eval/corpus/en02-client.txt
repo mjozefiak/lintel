@@ -1,0 +1,17 @@
+# id: en02-client
+# lang: en
+# date: 2026-11-23
+# self: Dana
+# title: Client call with Brightline
+[00:02] Dana: Hi Marcus, thanks for joining. Ivy from our onboarding team is here too.
+[00:07] Marcus: Hi both. I have about twenty minutes.
+[00:11] Dana: Then straight to it. We revised the quote after last week. It comes to seven thousand two hundred fifty dollars per quarter.
+[00:21] Marcus: That's closer to what we can do. Can you send it over in writing?
+[00:26] Dana: Yes, I'll send you the revised quote by end of day.
+[00:30] Marcus: Great. Our legal team still needs to review the data processing terms.
+[00:36] Dana: Understood. If legal signs off by Wednesday, I'll schedule the kickoff for December first at ten, with you and Ivy.
+[00:46] Marcus: That timing works if they sign off.
+[00:50] Ivy: And I'll create the onboarding ticket on our side so the team can prepare.
+[00:56] Marcus: If we needed the on-prem option, we'd ask for a separate quote. But we don't need it, cloud is fine.
+[01:05] Dana: Good, then cloud only.
+[01:08] Marcus: Alright, talk soon.

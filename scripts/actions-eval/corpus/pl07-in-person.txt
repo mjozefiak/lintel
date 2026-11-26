@@ -1,0 +1,19 @@
+# id: pl07-in-person
+# lang: pl
+# date: 2026-11-24
+# self: Ja
+# title: Spotkanie w biurze (jeden mikrofon)
+[00:02] Ja: Dobra, jesteśmy wszyscy przy stole, zaczynajmy.
+[00:06] Mówca 2: Słuchaj, potrzebuję tych makiet ekranu logowania, klient pyta.
+[00:13] Ja: Iwona, wyślę ci je jutro rano, muszę jeszcze poprawić dwa ekrany.
+[00:20] Mówca 2: Super, dzięki.
+[00:23] Mówca 3: A warsztat z klientem? Gdzie go robimy?
+[00:28] Ja: Zarezerwuję salę na warsztat w poniedziałek od dziewiątej do dwunastej.
+[00:36] Mówca 3: Duża sala czy mała?
+[00:39] Ja: Duża, będzie osiem osób.
+[00:43] Mówca 3: Dobra. A ja dam znać Krzyśkowi, żeby założył ticket na drukarkę, bo znowu nie działa.
+[00:51] Mówca 2: Wieczna historia z tą drukarką.
+[00:55] Mówca 3: Może kupimy nową?
+[00:58] Ja: Nie ma budżetu do końca roku, więc nie.
+[01:02] Mówca 2: To tyle?
+[01:04] Ja: Tak, dzięki.
