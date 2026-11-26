@@ -16,8 +16,10 @@ import Foundation
 /// - The owner's speaker is never written: `NotesUtterance.make(from:selfName:)` already shows `selfName` for its
 ///   "Ja", and the resolver only reserves that name so no other speaker can take it.
 /// - A pass that failed (an error, the time limit, a cancellation) writes nothing: the names the meeting had stay.
-///   A pass that answered, found no excerpt or was not allowed to ask resolves again from what it found, so names
-///   that no longer have evidence (a changed transcript, the switch turned off) go back to the default label.
+///   A pass that answered resolves again from what it found, so a name the conversation no longer supports goes
+///   back to the default label. A resolve without an answered pass (the switch off, no excerpt, no pass at all)
+///   knows nothing new about the conversation: the names it gave earlier (`transcript`, applied or suggested) and
+///   their evidence stay as they are (orchestrator decision 2026-11-26).
 ///
 /// Nothing here logs; `Report` holds counts only (for `NotesTrace`).
 enum MeetingSpeakerNames {
@@ -76,8 +78,13 @@ enum MeetingSpeakerNames {
         }
 
         let clusters = document.speakers.map { speaker in cluster(for: speaker, state: byID[speaker.id]) }
+        // Without an answer the conversation's own names are not this run's to change.
+        let conversationAnswered = report.pass.status == .answered
         let writable = Set(
-            document.speakers.filter { speaker in byID[speaker.id].map(isWritable) ?? false }.map(\.id))
+            document.speakers.filter { speaker in
+                guard let state = byID[speaker.id], isWritable(state) else { return false }
+                return conversationAnswered || state.source != .transcript
+            }.map(\.id))
         let resolutions = SpeakerNameResolver.resolve(
             SpeakerNameRequest(
                 mode: .diarized, clusters: clusters, selfName: selfName, evidence: report.pass.accepted,

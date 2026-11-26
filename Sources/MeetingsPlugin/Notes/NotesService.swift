@@ -593,8 +593,11 @@ final class NotesService: ProviderNotesControl {
         let id = document.id
         let epoch = epoch
         let settings = deps.settings
+        // `notesEnabled` is "a notes job runs", not the switch: this job loads the model anyway, also for a
+        // "Regenerate" with the switch off (orchestrator decision 2026-11-26). With the switch off no automatic job
+        // is queued, so no model is loaded for names alone.
         let conditions = SpeakerNamePass.Conditions(
-            notesEnabled: settings.notesEnabled, namesFromConversation: settings.namesFromConversation,
+            notesEnabled: true, namesFromConversation: settings.namesFromConversation,
             isChannelMeeting: document.speakerMode == .channels)
         var configuration = SpeakerNamePass.Configuration()
         deps.configureNames(&configuration)

@@ -16,7 +16,8 @@ import LintelSpeech
 /// the counters of `Outcome` hold no text (for `NotesTrace`, step 1.4b).
 struct SpeakerNamePass: Sendable {
     struct Conditions: Equatable, Sendable {
-        /// `plugins.meetings.notesEnabled`: without the notes Lintel does not load a model just for names.
+        /// Whether a notes job runs (`NotesService` passes `true`: the job loads the model anyway, also for a
+        /// "Regenerate" with the notes switch off). Without a notes job Lintel does not load a model just for names.
         var notesEnabled: Bool
         /// `plugins.meetings.namesFromConversation` (step 1.4b adds the key; the pass only reads the value).
         var namesFromConversation: Bool

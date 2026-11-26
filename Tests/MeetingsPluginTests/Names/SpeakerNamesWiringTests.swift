@@ -199,16 +199,54 @@ final class TraceLog: Sendable {
         rig.service.meetingBecameReady(id)
         #expect(await rig.settle())
         #expect(rig.llm.calls.isEmpty)
-
-        // "Regenerate" writes the notes the user asked for, but the names still wait for the notes switch.
-        rig.service.regenerate(id)
-        #expect(await rig.settle())
-        #expect(W.namesRequests(rig.llm) == 0)
-        #expect(!rig.llm.calls.isEmpty)
-        #expect(W.notesLabels(rig.llm).contains(W.owner))
         let owner = try W.state(rig, id, speaker: 0)
         #expect(owner.source == .me && owner.label == SpeakerLabels.me)
         #expect(try W.state(rig, id, speaker: 1).label == "Mówca 1")
+    }
+
+    @Test func aRegenerateWithTheNotesSwitchOffStillAsksForNames() async throws {
+        // "Regenerate" writes notes whatever the switch says, so its job loads the model anyway: the names come
+        // with it (orchestrator decision 2026-11-26).
+        let rig = try NotesServiceRig(
+            settings: W.settings(["plugins.meetings.notesEnabled": .bool(false)]), handler: W.answering())
+        await rig.start()
+        let id = try await W.addMeeting(rig)
+        rig.service.regenerate(id)
+        #expect(await rig.settle())
+        #expect(W.namesRequests(rig.llm) == 1)
+        #expect(try W.state(rig, id, speaker: 1).label == "Zofia")
+        #expect(W.notesLabels(rig.llm).contains("Zofia"))
+        #expect(W.notesLabels(rig.llm).contains(W.owner))
+        #expect(try W.state(rig, id, speaker: 0).source == .me)
+    }
+
+    @Test func aResolveWithoutThePassKeepsTheNamesFromTheConversation() async throws {
+        let rig = try NotesServiceRig(settings: W.settings(), handler: W.answering())
+        await rig.start()
+        let id = try await W.addMeeting(rig)
+        rig.service.meetingBecameReady(id)
+        #expect(await rig.settle())
+        let evidence = try rig.store.nameEvidence(meetingID: id)
+        #expect(evidence.count == 2)
+
+        // The user turns names from the conversation off, then asks for the notes again: nothing new is known
+        // about the conversation, so what it gave stays.
+        rig.settings.setNamesFromConversation(false)
+        let before = rig.llm.calls.count
+        rig.service.regenerate(id)
+        #expect(await rig.settle())
+        #expect(W.namesRequests(rig.llm) == 1)
+        let zofia = try W.state(rig, id, speaker: 1)
+        #expect(zofia.label == "Zofia")
+        #expect(zofia.source == .transcript && zofia.status == .applied)
+        let bogdan = try W.state(rig, id, speaker: 2)
+        #expect(bogdan.suggestedName == "Bogdan")
+        #expect(bogdan.label == "Mówca 2")
+        #expect(try rig.store.nameEvidence(meetingID: id).count == evidence.count)
+        // The new notes read the kept name.
+        let again = rig.llm.calls.dropFirst(before).filter { NotesFake.isMap($0.messages) }
+        #expect(!again.isEmpty)
+        #expect(again.contains { NotesFake.lastUser($0.messages).contains("Zofia: ") })
     }
 
     @Test func namesFromTheConversationOffMeansNoRequest() async throws {
