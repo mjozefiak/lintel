@@ -27,7 +27,8 @@ struct ExportComment: Sendable, Equatable {
 
 extension NotesStore {
     /// Every document Export All may write, oldest first: a `detached` row without user writing and without an
-    /// open comment is leftover (deleted as soon as it is not open) and is skipped.
+    /// open comment is leftover (deleted as soon as it is not open) and is skipped, and so is a document in Recently
+    /// deleted.
     func exportRows() throws -> [ExportRow] {
         try read { db in
             try Row.fetchAll(
@@ -36,7 +37,8 @@ extension NotesStore {
                     SELECT d.id, d.key, d.layer, d.kind, d.source_plugin_id, d.title_override, d.source_state,
                         d.created_at, d.updated_at
                     FROM note_doc d
-                    WHERE NOT (d.source_state = 'detached' AND NOT \(Self.keptSQL)) ORDER BY d.id
+                    WHERE d.deleted_at IS NULL AND NOT (d.source_state = 'detached' AND NOT \(Self.keptSQL))
+                    ORDER BY d.id
                     """
             ).compactMap { row -> ExportRow? in
                 let raw: String = row["key"]

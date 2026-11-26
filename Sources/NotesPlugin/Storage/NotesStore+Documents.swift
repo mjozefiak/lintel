@@ -189,10 +189,12 @@ extension NotesStore {
     }
 
     /// Moves every live row of the key to `detached` in ONE transaction together with `alongside` (the re-key
-    /// of an open document, the pending-write bookkeeping): when that throws, nothing is detached.
+    /// of an open document, the pending-write bookkeeping): when that throws, nothing is detached. Rows that carry a
+    /// Recently deleted mark are deleted instead (never a kept copy) and are not counted.
     @discardableResult
     func detach(_ key: NoteKey, alongside: (Database) throws -> Void = { _ in }) throws -> Int {
         try writeMaintenance { db in
+            _ = try Self.deleteMarkedOverlays(of: key, in: db)
             try db.execute(
                 sql: """
                     UPDATE note_doc SET source_state = 'detached'
@@ -261,7 +263,9 @@ extension NotesStore {
         }
     }
 
-    /// Live (not detached) overlays of recorded notes with these keys.
+    /// Live (not detached) overlays of recorded notes with these keys, also when the trash sweep marked them: the
+    /// owner listed the key, so it decides; a stale mark is cleared by the next sweep, and the user's text is shown
+    /// meanwhile instead of the source's.
     func liveOverlays(for keys: [NoteKey]) throws -> [OverlayRecord] {
         guard !keys.isEmpty else { return [] }
         return try read { db in
@@ -278,24 +282,33 @@ extension NotesStore {
         }
     }
 
+    /// Manual notes that are not in Recently deleted.
     func manualOverlays() throws -> [OverlayRecord] {
-        try read { db in try overlayRecords(db, where: "d.source_plugin_id = 'notes'", arguments: []) }
+        try read { db in
+            try overlayRecords(db, where: "d.source_plugin_id = 'notes' AND d.deleted_at IS NULL", arguments: [])
+        }
     }
 
     func detachedOverlays() throws -> [OverlayRecord] {
         try read { db in try overlayRecords(db, where: "d.source_state = 'detached'", arguments: []) }
     }
 
-    /// Live, kept overlays of recorded notes whose plugin is not in `excluding`.
+    /// Live, kept overlays of recorded notes whose plugin is not in `excluding`; an overlay whose owner put the
+    /// note in Recently deleted is not one of them.
     func keptOverlays(excludingPlugins excluding: Set<PluginID>) throws -> [OverlayRecord] {
         try read { db in
             try overlayRecords(
-                db, where: "d.source_plugin_id != 'notes' AND d.source_state IS NOT 'detached' AND \(Self.keptSQL)",
+                db,
+                where: """
+                    d.source_plugin_id != 'notes' AND d.source_state IS NOT 'detached' AND d.deleted_at IS NULL
+                    AND \(Self.keptSQL)
+                    """,
                 arguments: []
             ).filter { !excluding.contains($0.sourcePluginID) }
         }
     }
 
+    /// Every key with a live overlay of a recorded note, marked ones included (the sweep clears or deletes them).
     func liveOverlayKeys() throws -> [NoteKey] {
         try read { db in
             try String.fetchAll(

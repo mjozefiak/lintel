@@ -154,13 +154,24 @@ struct GoldenBudgetTests {
 
     @Test("no golden image of this plugin belongs to a state that no longer exists")
     func noOrphans() throws {
-        let expected = GalleryGoldens.expectedFiles(GalleryTestSupport.scenes)
+        try expectNoOrphans(prefix: Self.prefix, scenes: GalleryTestSupport.scenes)
+    }
+
+    /// The shared components' scenes (`LintelUIGallery`, ids `ui.*`) record into the same folder; no plugin test owns
+    /// them, so this one does, and a golden of a removed `ui.*` state cannot linger.
+    @Test("no golden image of a shared UI scene belongs to a state that no longer exists")
+    func noOrphansOfSharedUIScenes() throws {
+        try expectNoOrphans(prefix: "ui.", scenes: LintelUIGallery.scenes)
+    }
+
+    private func expectNoOrphans(prefix: String, scenes: [GalleryScene]) throws {
+        let expected = GalleryGoldens.expectedFiles(scenes)
         let root = GalleryTestSupport.goldens.standardizedFileURL.path + "/"
         let orphans = try files().map { String($0.standardizedFileURL.path.dropFirst(root.count)) }
-            .filter { $0.hasPrefix(Self.prefix) && !expected.contains($0) }
+            .filter { $0.hasPrefix(prefix) && !expected.contains($0) }
         #expect(orphans.isEmpty, "delete these goldens: \(orphans.sorted())")
         if let manifest = GalleryGoldens.loadManifest(in: GalleryTestSupport.goldens) {
-            let listed = Set(manifest.files.keys).filter { $0.hasPrefix(Self.prefix) }
+            let listed = Set(manifest.files.keys).filter { $0.hasPrefix(prefix) }
             #expect(listed.subtracting(expected).isEmpty, "goldens.json lists \(listed.subtracting(expected).sorted())")
         }
     }

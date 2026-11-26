@@ -28,7 +28,9 @@ enum MeetingNoteLayers {
         }
         return NoteLayer(
             id: notesLayerID, author: .agent, markdown: markdown, provenance: provenance,
-            version: version(markdown: markdown, provenance: provenance))
+            version: version(markdown: markdown, provenance: provenance),
+            writer: MeetingNoteMapping.writer(
+                notesStatus: document.notesStatus, hasNotes: true, provider: document.notesProvider))
     }
 
     /// The transcript, `nil` when no segment has visible text.

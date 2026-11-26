@@ -464,6 +464,126 @@
       "height" : 792,
       "sha256" : "ad9cfb99473f7c198c9a9087dff6eda0ef9370dd3d9c9e158fbd0affed13e634",
       "width" : 1360
+    },
+    "ui.ring\/error@dark-m-en.png" : {
+      "height" : 372,
+      "sha256" : "0091777e3541f4c9d2bbc18f4531d68f25ec62f08351765650a001ae615632f0",
+      "width" : 1120
+    },
+    "ui.ring\/error@light-m-en.png" : {
+      "height" : 372,
+      "sha256" : "82ae17c7af624e3cbb923265193eb07d21ac5b1105c1cf3a25830b827124c105",
+      "width" : 1120
+    },
+    "ui.ring\/error@light-xl-pl.png" : {
+      "height" : 456,
+      "sha256" : "11083e0a7b0ba85cdecf392b6d7c1137eb81bf4d757a966d05e4fe831df7f9f7",
+      "width" : 1120
+    },
+    "ui.ring\/idle@dark-m-en.png" : {
+      "height" : 372,
+      "sha256" : "dab6341744d01faa6aa8ec158bbb53d9e1e7fd5fff545b69a41fab5a02efaf2b",
+      "width" : 1120
+    },
+    "ui.ring\/idle@light-m-en.png" : {
+      "height" : 372,
+      "sha256" : "a85bc42b2457be2aef4c2635fc4855ef3748b927173597cbe8ea3959f3250d91",
+      "width" : 1120
+    },
+    "ui.ring\/idle@light-xl-pl.png" : {
+      "height" : 456,
+      "sha256" : "6a3b5b24bfa92ca669b3816e754e1f63806be7dd9b5be26775945573a179ae0f",
+      "width" : 1120
+    },
+    "ui.ring\/listening@dark-m-en.png" : {
+      "height" : 372,
+      "sha256" : "a1f496433a3f14fc7fad3702e3a0eff2f2e224dcd5f8cce18251834427ceed06",
+      "width" : 1120
+    },
+    "ui.ring\/listening@light-m-en.png" : {
+      "height" : 372,
+      "sha256" : "e11b3dff514cf3d0bdceba8b4bdf3f5a1da57cd7b5f0a1246e315b778269b7a9",
+      "width" : 1120
+    },
+    "ui.ring\/listening@light-xl-pl.png" : {
+      "height" : 456,
+      "sha256" : "91b651b9065c4aa1121250b04ffebba8a8f7bf9be7a62d6b83d7322cd8d2f21d",
+      "width" : 1120
+    },
+    "ui.ring\/on-verdigris@dark-m-en.png" : {
+      "height" : 1044,
+      "sha256" : "49c77a8c071b96876f7e8e19ffadd676df8b90d2e58cc00ae2600d87cca0cec3",
+      "width" : 1120
+    },
+    "ui.ring\/on-verdigris@light-m-en.png" : {
+      "height" : 1044,
+      "sha256" : "b99b6b62c7bc2abd084cc1e894fe45eb759db89f8e42fc3039fdbb3a1c469a0d",
+      "width" : 1120
+    },
+    "ui.ring\/on-verdigris@light-xl-pl.png" : {
+      "height" : 1296,
+      "sha256" : "6b4b6b76df6990e4431300ea9c21230f37ff74226f4607fe65e27a7aba59dcf8",
+      "width" : 1120
+    },
+    "ui.ring\/processing-unknown@dark-m-en.png" : {
+      "height" : 372,
+      "sha256" : "35dede77314100796554d5f9ac52001846529363568cb8a4c24f7b120f2d5616",
+      "width" : 1120
+    },
+    "ui.ring\/processing-unknown@light-m-en.png" : {
+      "height" : 372,
+      "sha256" : "8887591b0f68722cb684fea0cf192b9e8d41c6c100c76d210ad2c2dffc3c0810",
+      "width" : 1120
+    },
+    "ui.ring\/processing-unknown@light-xl-pl.png" : {
+      "height" : 456,
+      "sha256" : "f3e86e09c0facca16d4b3d9423b7aa415572b5e46b4785ce3b0aeb10679a2420",
+      "width" : 1120
+    },
+    "ui.ring\/processing@dark-m-en.png" : {
+      "height" : 1716,
+      "sha256" : "d91cd4b0525ff9e381264adce1c8c0517a67f8cd62ae2509ef23518da2aad4dd",
+      "width" : 1120
+    },
+    "ui.ring\/processing@light-m-en.png" : {
+      "height" : 1716,
+      "sha256" : "def8931b076177a9bdca337dc3c530a2ef64914f2714288e808b9aa2d341bc8b",
+      "width" : 1120
+    },
+    "ui.ring\/processing@light-xl-pl.png" : {
+      "height" : 2136,
+      "sha256" : "112092a56376c2fbff69fecf570ac30d62883d99d11da7fe8317c09ff8407dab",
+      "width" : 1120
+    },
+    "ui.ring\/reduced-motion@dark-m-en.png" : {
+      "height" : 1044,
+      "sha256" : "1365a084c3661256c8c133cc56e235775596012bbbbb7ffea33817c8c39d1098",
+      "width" : 1120
+    },
+    "ui.ring\/reduced-motion@light-m-en.png" : {
+      "height" : 1044,
+      "sha256" : "adef8589231106e8ec2713768451c16e5e469f57ca53304ab45c8bbb82fc3539",
+      "width" : 1120
+    },
+    "ui.ring\/reduced-motion@light-xl-pl.png" : {
+      "height" : 1296,
+      "sha256" : "148367167b85e81789e956d72855ac343c1ab888496b31d9e08057cc4ddaad49",
+      "width" : 1120
+    },
+    "ui.ring\/warning@dark-m-en.png" : {
+      "height" : 372,
+      "sha256" : "d68796e6ef29522e61cd25443a1950fff63d2c59e7ff8c2be4502673bcfb9b64",
+      "width" : 1120
+    },
+    "ui.ring\/warning@light-m-en.png" : {
+      "height" : 372,
+      "sha256" : "bd04020718d1514af423477fecb2fe1564b10208199b2b53a9bc94cdd0c723b0",
+      "width" : 1120
+    },
+    "ui.ring\/warning@light-xl-pl.png" : {
+      "height" : 456,
+      "sha256" : "5c89d0865f8b7382ea3570e249bc736c2fb16a7a1010f974662162f3700ce272",
+      "width" : 1120
     }
   },
   "fingerprint" : {

@@ -26,6 +26,7 @@ the app bundle with `-AppleLanguages "(pl)"` (ADR-style note: spec Q11).
 
 ## Adding a scene
 
+0. Shared components of `LintelUI` (not a plugin screen) put their scenes in `LintelUIGallery.scenes` (`Sources/LintelUI/Gallery/`); `GalleryCatalog` lists that group first (scene `ui.ring`, the working ring). Their golden PNGs are recorded with the same workflow.
 1. In the plugin target: `extension MyPlugin: GalleryProviding { public static var galleryScenes: [GalleryScene] }`, in a file
    under `#if DEBUG`. The gallery finds plugins through `PluginRegistry.all`; nothing else knows them.
 2. A `GalleryState` is an id (kebab-case, the golden's file name), a one-line English summary of what the owner approves, a

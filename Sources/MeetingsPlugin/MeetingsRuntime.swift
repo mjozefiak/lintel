@@ -20,7 +20,8 @@ struct MeetingsRuntime: Sendable {
         MicrophoneCapture(deviceUID: $0, deviceName: $1)
     }
     var makeSystemAudio: @Sendable () -> any AudioInput = { SystemAudioSource(backend: CoreAudioProcessTapBackend()) }
-    /// The default input as a log line, read when the microphone does not start.
+    /// The default input as a log line, read when the microphone does not start; its name and UID are hashed
+    /// (issue #269, `InputDeviceInfo.logDescription`).
     var inputDiagnostics: @Sendable () -> String = { DefaultInputObserver.diagnostics() }
     /// Yields when the system's default input changes while recording.
     var defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = { DefaultInputObserver.changes() }

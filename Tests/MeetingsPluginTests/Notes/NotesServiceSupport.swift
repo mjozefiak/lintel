@@ -90,7 +90,10 @@ final class NotesServiceRig {
         configure: @escaping @Sendable (inout NotesPipeline.Configuration) -> Void = { _ in },
         providerRunner: ProviderRunner? = nil,
         configureWhole: @escaping @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in },
-        modelWatchInterval: Duration = .seconds(15)
+        modelWatchInterval: Duration = .seconds(15),
+        markAwaiting: @escaping @Sendable (MeetingsStore, Int64) async -> Void = { store, id in
+            await AwaitingMarker.mark(store, id)
+        }
     ) throws {
         harness = try MeetingsHarness(settings: initial)
         library = harness.library()
@@ -114,7 +117,8 @@ final class NotesServiceRig {
             configure: { configuration in
                 configuration.busyPoll = .milliseconds(10)
                 configure(&configuration)
-            }, providerRunner: providerRunner, configureWhole: configureWhole, now: { now },
+            }, providerRunner: providerRunner, configureWhole: configureWhole,
+            markAwaiting: markAwaiting, now: { now },
             shutdownLimit: shutdownLimit, modelWatchInterval: modelWatchInterval,
             openModels: { id in opened.update { $0.append(id) } },
             changed: {
