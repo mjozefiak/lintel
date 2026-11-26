@@ -118,4 +118,4 @@ Every finding is settled inside the PR under review (`SDLC.md`, "Review findings
 - **Nit:** fixed in the same PR when it is cheap, otherwise dropped. Dropped nits are listed in one line of the review's summary comment. A nit is never filed as a new issue, never collected in a follow-up list and never turned into a tech-debt ticket.
 - **A real bug outside the PR's scope** (a defect a user could hit) is the only finding that becomes a new issue: `type:bug`, one `area:*`, no priority label.
 - **A flaky test** seen during review goes into the "Flaky tests" umbrella issue (#240) as a checklist line, not into a new issue.
-- The review applies no pipeline labels (`review`, `changes-requested`, `merge-queue` are retired) and posts no label-rationale comment; the verdict is the review itself and its summary comment.
+- The review sets the pipeline labels the installed skills use (`review`, `changes-requested`, `merge-queue`) and the QA lane label, and posts no label-rationale prose; the verdict is the review itself and its summary comment.
