@@ -24,23 +24,25 @@ extension MeetingsPlugin {
             whisperInstalled: ui.model.whisperInstalled)
         let isChosen = speech.id == selected.id
         let speechFolder = isChosen ? settings.speechModelFolder : nil
-        var chooseSpeechFolder: (@MainActor @Sendable (URL?) -> Void)?
-        if isChosen { chooseSpeechFolder = { settings.setSpeechModelFolder($0) } }
-        let diarization = ModelCatalog.diarizationCommunity1
-        let notesModel = settings.builtInLLMModel
-        let notes = notes
-        let llmManager = ui.llmManager
-        return [
+        // "Choose Folder…" writes the chosen model's key: offered only when the routed model is that one.
+        func speechUsage(chooseFolder: (@MainActor @Sendable (URL?) -> Void)?) -> ModelUsage {
             ModelUsage(
                 packageID: speech.id, kind: .speech,
                 role: LocalizedStringResource(
                     "Meeting transcripts", comment: "Models pane: what Meetings uses the speech model for"),
                 // With a chosen folder the downloaded copy is not needed; the pane shows the folder's state.
-                isRequired: speechFolder == nil, isSelected: true,
-                chooseFolder: chooseSpeechFolder,
-                customFolder: speechFolder,
-                isInUse: { await usage.isInUse(speech) },
-                reserveRemoval: usage.reserveRemoval),
+                isRequired: speechFolder == nil, isSelected: true, chooseFolder: chooseFolder,
+                customFolder: speechFolder, isInUse: { await usage.isInUse(speech) },
+                reserveRemoval: usage.reserveRemoval)
+        }
+        let speechModel =
+            isChosen ? speechUsage(chooseFolder: { settings.setSpeechModelFolder($0) }) : speechUsage(chooseFolder: nil)
+        let diarization = ModelCatalog.diarizationCommunity1
+        let notesModel = settings.builtInLLMModel
+        let notes = notes
+        let llmManager = ui.llmManager
+        return [
+            speechModel,
             ModelUsage(
                 packageID: diarization.id, kind: .diarization,
                 role: LocalizedStringResource(
