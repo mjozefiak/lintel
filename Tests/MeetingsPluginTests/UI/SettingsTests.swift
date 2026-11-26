@@ -175,7 +175,6 @@ import Testing
         model.selectSpeechModel("unknown")
         #expect(model.speech.package.id == "other-engine")
         #expect(signals == 1)
-        #expect(!model.usesPinnedLanguage)
     }
 }
 

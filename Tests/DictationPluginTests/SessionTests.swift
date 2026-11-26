@@ -123,6 +123,7 @@ final class FakeEngine: SpeechEngine, @unchecked Sendable {
         var cancelledCalls = 0
         var unloads = 0
         var finished = 0
+        var options: [SpeechRequestOptions] = []
     }
 
     let state = Mutex(State())
@@ -145,10 +146,15 @@ final class FakeEngine: SpeechEngine, @unchecked Sendable {
     }
 
     func transcribe(_ samples: [Float]) async throws -> TranscriptSegment {
+        try await transcribe(samples, options: .none)
+    }
+
+    func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
         let key = Int((samples.first ?? 0) * 100 + 0.5)
         state.withLock { state in
             state.calls += 1
             state.lengths.append(samples.count)
+            state.options.append(options)
         }
         await transcribeGate?.wait()
         do {

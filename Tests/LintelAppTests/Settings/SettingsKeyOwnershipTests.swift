@@ -39,6 +39,22 @@ import Testing
             .exempt("the updater is off (no SUPublicEDKey): the Updates group in General arrives with spec Step 4.5")
         ),
         (SettingsKeys.moveDeclined, .exempt("answer to the launch-time Move to Applications alert, set only there")),
+        (
+            SettingsKeys.speechLanguageMode,
+            .exempt("shared speech languages: edited in the Dictation and Meetings panes' Languages sheet (step 2.3)")
+        ),
+        (
+            SettingsKeys.speechLanguages,
+            .exempt("shared speech languages: edited in the Dictation and Meetings panes' Languages sheet (step 2.3)")
+        ),
+        (
+            SettingsKeys.speechSingleLanguage,
+            .exempt("shared speech languages: edited in the Dictation and Meetings panes' Languages sheet (step 2.3)")
+        ),
+        (
+            SettingsKeys.speechLegacyLanguageMigrated,
+            .exempt("internal flag: the one-time speech language migration ran")
+        ),
     ]
 
     private var root: URL {

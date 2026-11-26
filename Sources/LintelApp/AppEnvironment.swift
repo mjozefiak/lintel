@@ -40,6 +40,13 @@ struct AppEnvironment {
     #endif
     /// What the plugins of this app instance share (`PluginContext.services`).
     let services = AppPluginServices()
+    /// Wakes every plugin's `speechLanguages.changes` stream after an update, so all contexts share one setting.
+    let speechLanguageChanges = SpeechLanguageChangeHub()
+
+    /// The shared language setting every plugin context gets (`PluginContext.speechLanguages`).
+    var speechLanguages: HostSpeechLanguageSettings {
+        HostSpeechLanguageSettings(store: settings, hub: speechLanguageChanges)
+    }
 
     /// `Plugins/<id>/` under the data root.
     func storageDirectory(for id: PluginID) -> URL {
@@ -141,7 +148,8 @@ struct AppEnvironment {
             noteSourcesChanged: noteSourcesChanged,
             openNote: openNote,
             keptNoteCopies: keptNoteCopies,
-            deleteKeptNoteCopies: deleteKeptNoteCopies
+            deleteKeptNoteCopies: deleteKeptNoteCopies,
+            speechLanguages: speechLanguages
         )
     }
 
@@ -346,6 +354,8 @@ struct AppEnvironment {
                 || settings.value(forKey: PluginDefaultsMigration.migratedKey) != nil)
         PluginDefaultsMigration.run(settings: settings, isExistingInstall: existing)
         NotesDefaultMigration.run(settings: settings, isExistingInstall: existing)
+        // Not tied to "ran before": the old language keys exist only where the user picked a language.
+        SpeechLanguageMigration.run(settings: settings)
     }
 
     /// `ranking.sqlite` at the data root. If it cannot be opened, ranking falls back to memory for this

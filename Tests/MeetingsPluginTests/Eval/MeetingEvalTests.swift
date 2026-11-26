@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import LintelKit
 import LintelSpeech
 import Synchronization
 import Testing
@@ -22,6 +23,15 @@ import Testing
 /// `_VAD_EXIT_OFFSET`, `_VAD_MIN_SILENCE`, `_VAD_PADDING`; unset = the app's values; the run writes its counters
 /// under `capture` in the result), `_DIARIZATION_FOLDER`, `_SPEAKER_NAMES` (a JSON of oracle names that replace "Mówca N" after diarization), `_ALLOW_DEBUG`. The WAV must be
 /// 16 kHz mono. The transcript goes only into the JSON; the test prints numbers, never text.
+///
+/// **Automatic language** (spec `2026-11-23-automatic-language-detection`, step 2.5). `_LANGUAGE=auto` with
+/// `_LANGUAGES=pl,en` (the default list) records as the app does in Automatic mode: the live profile and the
+/// options of each request (`MeetingLanguage`), then the real `LanguageRepair` stage in `beforeReady` on the
+/// recorded spool, sharing one lease with the session. The repair decodes with Whisper when
+/// `_WHISPER_FOLDER` is set, else with Parakeet and the profile's script hint; `_REPAIR=0` skips it. `pl` / `en`
+/// stay the fixed baseline of `main` (no repair). Every run writes the `language` block (numbers only); a run with
+/// the repair marks each row `repaired`. In such a run `asr.processingSeconds` and `peakFootprintMB` include the
+/// repair (it runs before `ready`); `language.repair` has its own seconds and peak.
 ///
 /// **Replay.** `LINTEL_MEETING_EVAL_TRANSCRIPT=<result.json>` (an `EvalResult` an earlier run wrote) replaces
 /// `_AUDIO`: no recognition and no diarization, the saved `asr.segments` (with speakers) go straight into the
@@ -48,6 +58,30 @@ struct MeetingEvalTests {
     }
 
     private static func ms(_ value: Double) -> String { String(format: "%.1f", value) }
+
+    private static func seconds(_ duration: Duration) -> Double {
+        Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+    }
+
+    /// Numbers and closed codes only.
+    private static func printLanguage(_ block: EvalResult.Language) {
+        func list<Value>(_ values: [String: Value], _ format: (Value) -> String) -> String {
+            values.keys.sorted().map { "\($0):\(format(values[$0]!))" }.joined(separator: ",")
+        }
+        let settled = block.profileSettledAtMs.map(String.init) ?? "never"
+        print(
+            "MEETING-EVAL language settledAtMs=\(settled) confidentSeconds=\(ms(block.profileConfidentSeconds))"
+                + " shares=\(list(block.shares) { String(format: "%.3f", $0) }) requests=\(list(block.requests) { "\($0)" })"
+        )
+        if let repair = block.repair {
+            print(
+                "MEETING-EVAL repair engine=\(repair.engine) suspect=\(repair.suspect) redecoded=\(repair.redecoded)"
+                    + " replaced=\(repair.replaced) kept=\(repair.kept) skipped=\(repair.skipped) stop=\(repair.stop)"
+                    + " seconds=\(ms(repair.seconds)) beforeReadySeconds=\(ms(repair.beforeReadySeconds))"
+                    + " peakMB=\(ms(repair.peakFootprintMB)) changed=\(repair.changedSegments)"
+                    + " requests=\(list(repair.requests) { "\($0)" })")
+        }
+    }
 
     private static func unloadAndWait(_ runtime: LlamaRuntime) async {
         await runtime.unload()
@@ -87,16 +121,52 @@ struct MeetingEvalTests {
             let engineID = Self.value("ENGINE") ?? "parakeet-ultra"
             let language = Self.value("LANGUAGE") ?? "pl"
             let speechFolder = URL(filePath: try #require(Self.value("SPEECH_FOLDER")), directoryHint: .isDirectory)
-
-            let engine: any SpeechEngine
+            let isAutomatic = language == "auto"
+            // The user's list: the settings of an automatic run, and the identifier's hints for the profile numbers
+            // of every run (the baseline's too, so both report the same profile).
+            let languages = (Self.value("LANGUAGES") ?? "pl,en").split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            let whisperFolder = Self.value("WHISPER_FOLDER").map { URL(filePath: $0, directoryHint: .isDirectory) }
+            let tally = RequestTally()
+            let isWhisper = engineID == ModelCatalog.whisperLargeV3Turbo.id
+            let base: any SpeechEngine
             switch engineID {
-            case "parakeet-ultra":
-                let hint: String? = Self.value("PARAKEET_HINT") == "0" ? nil : language
-                engine = ParakeetEngine(language: { hint })
-            case "whisper-large-v3-turbo": engine = WhisperKitEngine(language: { language })
+            case ModelCatalog.parakeetUltra.id:
+                base = CountingEngine(base: ParakeetEngine(), tally: tally, isWhisper: false)
+            case ModelCatalog.whisperLargeV3Turbo.id:
+                base = CountingEngine(base: WhisperKitEngine(), tally: tally, isWhisper: true)
             default:
                 Issue.record("Unknown engine \(engineID)")
                 return
+            }
+
+            let engine: any SpeechEngine
+            let meetingLanguage: MeetingLanguage
+            if isAutomatic {
+                // As the app records: the shared setting in Automatic mode, the live profile and the options of each
+                // request (`MeetingLanguage`); the engine holds no language.
+                let settings = FixedSpeechLanguageSettings(.automatic, languages)
+                meetingLanguage = MeetingLanguage(settings: settings)
+                engine = base
+                let routed = MeetingEngineRouting.package(
+                    selected: ModelCatalog.parakeetUltra, selection: settings.current(),
+                    whisperInstalled: whisperFolder != nil
+                ).id
+                print("MEETING-EVAL routing engine=\(engineID) routed=\(routed) languages=\(languages.count)")
+            } else {
+                // The baseline of `main`: one fixed language for every segment, whatever the session's own options
+                // say. Whisper pins it, Parakeet gets its script hint (none with `_PARAKEET_HINT=0`).
+                guard ["pl", "en"].contains(language) else {
+                    Issue.record("Unknown language \(language): pl, en or auto")
+                    return
+                }
+                meetingLanguage = MeetingLanguage(settings: FixedSpeechLanguageSettings(.single(language), [language]))
+                let hint: String? = Self.value("PARAKEET_HINT") == "0" ? nil : language
+                engine = FixedOptionsEngine(
+                    base: base,
+                    options: isWhisper
+                        ? SpeechRequestOptions(whisperLanguage: .pinned(language))
+                        : SpeechRequestOptions(scriptHint: ScriptHint.hint(forLanguages: hint.map { [$0] } ?? [])))
             }
 
             let samples = try WAVFile.samples(from: Data(contentsOf: audioURL))
@@ -125,14 +195,59 @@ struct MeetingEvalTests {
             let keys = try testKeys()
             let store = try MeetingsStore.open(in: plugin, keys: keys)
             let vadFolder = speechFolder.appending(path: ModelCatalog.sileroVADPath)
+            // One lease for the session and the repair, as in the app: one resident model, Parakeet swapped for
+            // Whisper when the repair needs it.
+            let lease = SpeechEngineLease()
+            let spool = SpoolStorage(pluginDirectory: plugin)
+            let repairRun = Mutex<LanguageEval.RepairRun?>(nil)
+            var beforeReady: (@Sendable (Int64, UUID) async -> Void)?
+            if isAutomatic, Self.value("REPAIR") != "0" {
+                // The real stage on the recorded spool: Whisper when `_WHISPER_FOLDER` is set (what the app picks when
+                // Whisper is installed), else Parakeet with the profile's script hint. The repair's engine counts its
+                // requests too; when the lease hands it the session's engine instead, the phase flag still files them
+                // under the repair.
+                let speech =
+                    whisperFolder.map {
+                        RepairSpeech(
+                            kind: .whisper, modelID: ModelCatalog.whisperLargeV3Turbo.id, folder: $0,
+                            engine: isWhisper && $0 == speechFolder
+                                ? base : CountingEngine(base: WhisperKitEngine(), tally: tally, isWhisper: true))
+                    }
+                    ?? RepairSpeech(
+                        kind: .parakeet, modelID: ModelCatalog.parakeetUltra.id, folder: speechFolder,
+                        engine: isWhisper
+                            ? CountingEngine(base: ParakeetEngine(), tally: tally, isWhisper: false) : base)
+                let repair = LanguageRepair(
+                    store: store, speech: { speech }, lease: lease, hints: { languages },
+                    openTrack: LanguageRepair.spoolOpener(spool: spool, keys: keys))
+                beforeReady = { id, uuid in
+                    let hookStarted = ContinuousClock.now
+                    tally.enterRepair()
+                    let before = (try? store.languageSegments(meetingID: id)) ?? []
+                    let footprint = FootprintSampler()
+                    footprint.start()
+                    let started = ContinuousClock.now
+                    let report = await repair.run(meetingID: id, uuid: uuid)
+                    let seconds = Self.seconds(ContinuousClock.now - started)
+                    let peak = await footprint.stop()
+                    let after = (try? store.languageSegments(meetingID: id)) ?? []
+                    repairRun.withLock {
+                        $0 = LanguageEval.RepairRun(
+                            engine: speech.modelID, report: report, seconds: seconds,
+                            beforeReadySeconds: Self.seconds(ContinuousClock.now - hookStarted), peakFootprintMB: peak,
+                            before: before, changed: LanguageEval.changedIDs(before: before, after: after))
+                    }
+                }
+            }
 
             let session = MeetingSession(
-                store: store, keys: keys, spool: SpoolStorage(pluginDirectory: plugin),
+                store: store, keys: keys, spool: spool,
                 mic: asSystem ? UnavailableAudioInput() : source, system: asSystem ? source : nil,
                 makeVAD: { LazyVAD(modelFolder: vadFolder, tuning: tuning, recordsProbabilities: true) },
-                engine: engine, modelID: engineID, modelFolder: speechFolder, lease: SpeechEngineLease(),
+                engine: engine, modelID: engineID, modelFolder: speechFolder, lease: lease,
                 sleepAssertion: RecordingSleepAssertion(), gate: MeetingSessionGate(), limits: limits,
-                recordCounters: { value in counters.withLock { $0 = value } }, retriesMicrophone: !asSystem)
+                beforeReady: beforeReady, recordCounters: { value in counters.withLock { $0 = value } },
+                retriesMicrophone: !asSystem, language: meetingLanguage)
 
             let sampler = FootprintSampler()
             sampler.start()
@@ -162,6 +277,16 @@ struct MeetingEvalTests {
             }
             let segmentIDs = fetched.map(\.id)
             rows = fetched.map(\.segment)
+            let run = repairRun.withLock { $0 }
+            if let run {
+                for (index, id) in segmentIDs.enumerated() { rows[index].repaired = run.changed.contains(id) }
+            }
+            // The profile as the live transcript built it: the texts before the repair (a repaired segment is short,
+            // so it never counted anyway).
+            let live = try run?.before ?? store.languageSegments(meetingID: id)
+            let languageBlock = LanguageEval.block(
+                settle: LanguageEval.settle(live, identifier: NaturalLanguageIdentifier(), hints: languages),
+                languages: languages, tally: tally, repair: run)
             // `replayedSegments` counts the segments that waited in the spool (backlog or background queue) and were
             // transcribed after the meeting; `unfinishedSegments` are the ones still not transcribed.
             let deferred = outcome.replayedSegments + outcome.unfinishedSegments
@@ -171,8 +296,12 @@ struct MeetingEvalTests {
                 deferredSegments: deferred, segments: rows)
             result = EvalResult(
                 recording: name, audioSeconds: audioSeconds,
-                config: .init(engine: engineID, language: language, codeVersion: codeVersion), asr: asr)
+                config: .init(
+                    engine: engineID, language: language, codeVersion: codeVersion,
+                    languages: isAutomatic ? languages : nil), asr: asr)
             result.capture = counters.withLock { $0 }
+            result.language = languageBlock
+            Self.printLanguage(languageBlock)
             if let capture = result.capture {
                 let c = capture[asSystem ? .system : .mic]
                 print(
@@ -321,4 +450,20 @@ private final class EvalArraySource: AudioSampleSource {
         }
         return range.isEmpty ? nil : Array(samples[range])
     }
+}
+
+/// Sends every request with the same options, whatever the caller asked: the evaluation's fixed-language baseline.
+private struct FixedOptionsEngine: SpeechEngine {
+    let base: any SpeechEngine
+    let options: SpeechRequestOptions
+
+    var isLoaded: Bool { get async { await base.isLoaded } }
+    func load(modelFolder: URL) async throws { try await base.load(modelFolder: modelFolder) }
+    func transcribe(_ samples: [Float]) async throws -> TranscriptSegment {
+        try await base.transcribe(samples, options: options)
+    }
+    func transcribe(_ samples: [Float], options _: SpeechRequestOptions) async throws -> TranscriptSegment {
+        try await base.transcribe(samples, options: options)
+    }
+    func unload() async { await base.unload() }
 }

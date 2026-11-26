@@ -29,10 +29,18 @@ extension MeetingsPlugin {
             requiredPermissions, countedByPlugin: model.microphone == .notDetermined ? [.microphone] : [],
             reader: context.permissions)
         let notesOn = settings.notesEnabled
+        // The engine the next recording uses (`MeetingEngineRouting`): Whisper when the languages need it and it is
+        // installed (then the chosen model's own state does not matter), else the chosen model, and the language
+        // Whisper is missing for.
+        let chosen = model.speech.package
+        let route = MeetingEngineRouting.decide(
+            selected: chosen, selection: context.speechLanguages.current(), whisperInstalled: model.whisperInstalled)
+        let switchesToWhisper = route.engine == .whisper && chosen.id != ModelCatalog.whisperLargeV3Turbo.id
         let base = Self.settingsStatus(
             location: model.speech.location, microphone: model.microphone, library: library.status,
-            modelTitle: model.speech.package.title, packageID: model.speech.package.id, deniedPermissions: denied,
-            localNotesLine: notesOn && model.provider.isLocal,
+            modelTitle: switchesToWhisper ? ModelCatalog.whisperLargeV3Turbo.title : chosen.title,
+            packageID: chosen.id, deniedPermissions: denied, usesWhisperInstead: switchesToWhisper,
+            missingWhisperLanguage: route.missingWhisperLanguage, localNotesLine: notesOn && model.provider.isLocal,
             allowMicrophone: { await model.requestMicrophoneAccess() },
             retryLibrary: {
                 await library.openInBackground()
@@ -59,9 +67,17 @@ extension MeetingsPlugin {
 
     /// Most important first: a library that cannot be opened (nothing can be recorded; Try Again, nothing is
     /// deleted), then what recording needs: a microphone macOS has not asked about yet and the speech model
-    /// ("N things to do" with one "Fix Next" button, as in the prototype). The speaker model is optional and not
-    /// counted: finishing falls back to one speaker without it. `deniedPermissions` is how many denied required
-    /// permissions the shell adds to the detail; the number in the title counts them too.
+    /// ("N things to do" with one "Fix Next" button, as in the prototype), then Whisper for a language the
+    /// standard model cannot transcribe (spec `2026-11-23-automatic-language-detection`, Banner). The speaker model
+    /// is optional and not counted: finishing falls back to one speaker without it. `deniedPermissions` is how many
+    /// denied required permissions the shell adds to the detail; the number in the title counts them too.
+    ///
+    /// - Parameters:
+    ///   - usesWhisperInstead: the languages switch the recording to an installed Whisper, so the chosen model's
+    ///     own state does not stop it; `modelTitle` is then Whisper's.
+    ///   - missingWhisperLanguage: a language in play that needs Whisper while Whisper is not installed and the
+    ///     standard model is chosen. One more thing to do; its detail and "Get It in Models" show once nothing
+    ///     before it is left.
     static func settingsStatus(
         location: ModelLocation,
         microphone: MicrophoneAccess,
@@ -69,18 +85,24 @@ extension MeetingsPlugin {
         modelTitle: String,
         packageID: String,
         deniedPermissions: Int = 0,
+        usesWhisperInstead: Bool = false,
+        missingWhisperLanguage: String? = nil,
+        // The language Lintel's interface is shown in, as the Languages sheet names languages, not the Mac's region.
+        locale: Locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en"),
         localNotesLine: Bool = false,
         allowMicrophone: @escaping @MainActor @Sendable () async -> Void,
         retryLibrary: @escaping @MainActor @Sendable () async -> Void
     ) -> SettingsStatus? {
         if let paused = pausedStatus(library, retry: retryLibrary) { return paused }
-        let needsModel = location.folder == nil
+        let needsModel = !usesWhisperInstead && location.folder == nil
         let needsMicrophone = microphone == .notDetermined
         let getModel = SettingsStatusAction(
             title: LocalizedStringResource(
                 "Get It in Models", comment: "Settings banner button: opens the Models pane on the missing model"),
             destination: .models(packageID: packageID))
-        let title = ThingsToDo.title((needsModel ? 1 : 0) + (needsMicrophone ? 1 : 0) + deniedPermissions)
+        let title = ThingsToDo.title(
+            (needsModel ? 1 : 0) + (needsMicrophone ? 1 : 0) + (missingWhisperLanguage == nil ? 0 : 1)
+                + deniedPermissions)
         switch (needsModel, needsMicrophone) {
         case (true, true):
             // One button: the microphone first (it asks only on this click), then the banner offers the model.
@@ -119,6 +141,23 @@ extension MeetingsPlugin {
                         title: LocalizedStringResource(
                             "Allow Microphone", comment: "Button that asks for microphone access"),
                         destination: .plugin(id: allowMicrophoneActionID, perform: allowMicrophone))
+                ])
+        case (false, false) where missingWhisperLanguage != nil:
+            let code = missingWhisperLanguage ?? ""
+            let name = locale.localizedString(forLanguageCode: code) ?? code
+            return SettingsStatus(
+                level: .attention, title: title,
+                detail: LocalizedStringResource(
+                    "Get Whisper to transcribe \(name)",
+                    comment:
+                        "Settings → Meetings and Dictation banner detail: a listed language needs the Whisper model, which is not installed; the argument is the language's name"
+                ),
+                fix: [
+                    SettingsStatusAction(
+                        title: LocalizedStringResource(
+                            "Get It in Models",
+                            comment: "Settings banner button: opens the Models pane on the missing model"),
+                        destination: .models(packageID: ModelCatalog.whisperLargeV3Turbo.id))
                 ])
         case (false, false) where localNotesLine:
             return SettingsStatus(

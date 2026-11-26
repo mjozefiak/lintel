@@ -213,5 +213,8 @@ private final class LongTextEngine: SpeechEngine, @unchecked Sendable {
         }
         return TranscriptSegment(text: index == 0 ? words(first) : "short tail")
     }
+    func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
+        try await transcribe(samples)
+    }
     func unload() async {}
 }

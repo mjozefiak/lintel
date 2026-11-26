@@ -58,4 +58,22 @@ enum SettingsKeys {
     /// `Bool`, default `false`: the user chose "Don't ask again" in the launch-time "Move Lintel to Applications?"
     /// alert (spec `2026-11-19-updates-and-open-source-hygiene`, step 4.2).
     static let moveDeclined = "app.install.moveDeclined"
+
+    /// `String`, `auto` or `single`; missing or unknown means `auto`: the language of meetings and dictation is
+    /// recognised automatically, or pinned to `speechSingleLanguage`. Shared by Dictation and Meetings through
+    /// `PluginContext.speechLanguages` (spec `2026-11-23-automatic-language-detection`, step 2.1). The four `app.speech.*` keys are `nonisolated`
+    /// because `HostSpeechLanguageSettings` reads them from any thread.
+    nonisolated static let speechLanguageMode = "app.speech.languageMode"
+
+    /// `[String]` of catalog language codes, ordered, at most 10: Languages I speak. Missing or empty means the
+    /// list derived from the Mac's languages (else `["en"]`), which is never written until the user edits it.
+    nonisolated static let speechLanguages = "app.speech.languages"
+
+    /// `String`, a catalog language code, used only in `single` mode; missing or unknown means the first language
+    /// of the list.
+    nonisolated static let speechSingleLanguage = "app.speech.singleLanguage"
+
+    /// `Bool`, default `false`: the one-time move of `plugins.meetings.speechLanguage` and
+    /// `plugins.dictation.speechLanguage` into the shared list ran (`SpeechLanguageMigration`, spec step 2.3).
+    nonisolated static let speechLegacyLanguageMigrated = "app.speech.legacyLanguageMigrated"
 }

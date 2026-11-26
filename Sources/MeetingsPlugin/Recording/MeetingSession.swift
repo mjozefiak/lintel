@@ -1,4 +1,5 @@
 import Foundation
+import LintelKit
 import LintelSpeech
 import Synchronization
 import os
@@ -59,6 +60,8 @@ actor MeetingSession {
     private let logger: Logger
     private let inputs: [(channel: AudioChannel, audio: any AudioInput)]
     private let makeVAD: @Sendable () -> any VoiceActivityDetector
+    /// The shared language setting and this meeting's profile; every segment is sent with its options.
+    private let language: MeetingLanguage
     let meetingUUID: UUID
 
     private(set) var state = MeetingSessionState.idle
@@ -142,8 +145,10 @@ actor MeetingSession {
         recordCounters: @escaping @Sendable (CaptureCounters) -> Void = { _ in },
         retriesMicrophone: Bool = true, inputDiagnostics: @escaping @Sendable () -> String = { "" },
         defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = nil,
+        language: MeetingLanguage = MeetingLanguage(settings: FixedSpeechLanguageSettings()),
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "meetings")
     ) {
+        self.language = language
         self.retriesMicrophone = retriesMicrophone
         self.inputDiagnostics = inputDiagnostics
         self.defaultInputChanges = defaultInputChanges
@@ -853,9 +858,10 @@ actor MeetingSession {
         guard track.worker == nil else { return }
         let load = loadTask
         let logger = logger
+        let language = language
         track.worker = Task { [weak self] in
             while let self, let job = await self.nextJob(track) {
-                let outcome = await Self.transcribe(job.samples, load: load, logger: logger)
+                let outcome = await Self.transcribe(job.samples, load: load, language: language, logger: logger)
                 await self.resolved(track, job, outcome)
             }
         }
@@ -869,12 +875,16 @@ actor MeetingSession {
         return track.queue.removeFirst()
     }
 
+    /// The options are read when the segment is sent, not when it was cut: a profile that settled meanwhile (or a
+    /// list changed in Settings) applies to it.
     private static func transcribe(
-        _ samples: [Float], load: Task<SpeechLease?, Never>?, logger: Logger
+        _ samples: [Float], load: Task<SpeechLease?, Never>?, language: MeetingLanguage, logger: Logger
     ) async -> SegmentOutcome {
         guard let handle = await load?.value else { return .deferred }
         do {
-            switch try await handle.transcribe(samples) {
+            switch try await handle.transcribe(
+                samples, options: language.options(duration: Self.seconds(samples.count)))
+            {
             case .transcript(let segment): return .text(segment.text)
             case .spool: return .spool
             }
@@ -916,6 +926,7 @@ actor MeetingSession {
     private func accept(_ channel: AudioChannel, _ range: Range<Int>, _ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        language.observe(trimmed, duration: Double(range.count) / Double(AudioFormat.sampleRate))
         let start = Int64(Self.milliseconds(range.lowerBound))
         let end = Int64(Self.milliseconds(range.upperBound))
         switch channel {
@@ -931,6 +942,9 @@ actor MeetingSession {
     }
 
     private static func milliseconds(_ sample: Int) -> Int { sample * 1_000 / AudioFormat.sampleRate }
+
+    /// A sample count as seconds (the length a request's options look at).
+    private static func seconds(_ samples: Int) -> TimeInterval { Double(samples) / Double(AudioFormat.sampleRate) }
 
     /// Until when a track's text is final: the start of its earliest unfinished speech or deferred segment, the
     /// end of what it received while it lives, and for ever once it is dead and finished.
@@ -1213,7 +1227,9 @@ actor MeetingSession {
         continuation.yield(.replaying(remaining: deferredCount))
         let outcome: SegmentOutcome
         do {
-            switch try await handle.transcribe(samples) {
+            switch try await handle.transcribe(
+                samples, options: language.options(duration: Self.seconds(samples.count)))
+            {
             case .transcript(let segment): outcome = .text(segment.text)
             case .spool: outcome = .failed
             }

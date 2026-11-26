@@ -40,6 +40,10 @@ final class FakeEngine: SpeechEngine, @unchecked Sendable {
         return TranscriptSegment(text: "segment \(key)")
     }
 
+    func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
+        try await transcribe(samples)
+    }
+
     func unload() async {
         state.withLock {
             $0.loaded = false

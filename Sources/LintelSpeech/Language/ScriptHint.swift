@@ -5,8 +5,8 @@ import Foundation
 /// system, it does not pick a language. Sent only when every language in play is written in one known script,
 /// so Cyrillic or Greek speech is never forced into Latin letters (issues #132, #210).
 ///
-/// This is the future replacement of `ParakeetLanguage` (which knows only `pl` and `en`); the engines switch to it
-/// with the shared language setting, so today's behaviour does not change.
+/// The plugins send it per request (`SpeechRequestOptions.scriptHint`) since step 2.3 of the spec. `ParakeetLanguage`
+/// (only `pl` and `en`) is left only as the default of `ParakeetEngine(language:)` for tools and tests.
 public enum ScriptHint: String, Sendable, Equatable, CaseIterable {
     case latin
     case cyrillic

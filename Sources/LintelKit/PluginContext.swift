@@ -157,6 +157,10 @@ public struct PluginContext: Sendable {
     /// "Also delete kept copies"; `ownerErased` is true after Erase Data. Returns `false` when something could not
     /// be deleted. Added with the Notes workspace; the default deletes nothing and returns `true`.
     public let deleteKeptNoteCopies: @MainActor @Sendable (_ owner: PluginID, _ ownerErased: Bool) async -> Bool
+    /// The languages the user speaks, one setting shared by Dictation and Meetings (spec
+    /// `2026-11-23-automatic-language-detection`). Added with automatic language detection; the default is
+    /// `FixedSpeechLanguageSettings(.automatic, ["en"])`.
+    public let speechLanguages: any SpeechLanguageSettings
 
     public init(
         storageDirectory: URL,
@@ -194,7 +198,8 @@ public struct PluginContext: Sendable {
         keptNoteCopies: @escaping @MainActor @Sendable (_ owner: PluginID) async -> Int = { _ in 0 },
         deleteKeptNoteCopies: @escaping @MainActor @Sendable (_ owner: PluginID, _ ownerErased: Bool) async -> Bool = {
             _, _ in true
-        }
+        },
+        speechLanguages: any SpeechLanguageSettings = FixedSpeechLanguageSettings(.automatic, ["en"])
     ) {
         self.storageDirectory = storageDirectory
         self.settings = settings
@@ -226,5 +231,6 @@ public struct PluginContext: Sendable {
         self.openNote = openNote
         self.keptNoteCopies = keptNoteCopies
         self.deleteKeptNoteCopies = deleteKeptNoteCopies
+        self.speechLanguages = speechLanguages
     }
 }

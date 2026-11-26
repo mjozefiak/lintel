@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
+import LintelKit
 import LintelSpeech
+import LintelUI
 import Observation
 import os
 
@@ -34,6 +36,10 @@ final class DictationSettingsModel {
     }
     /// The speech models to choose from.
     let packages: [ModelPackage]
+    /// The shared "Languages I speak" (`PluginContext.speechLanguages`), edited by the Languages row's sheet.
+    @ObservationIgnored let speechLanguages: any SpeechLanguageSettings
+    /// The Whisper model is on this Mac: the sheet then offers no "Get It in Models".
+    private(set) var whisperInstalled = false
     @ObservationIgnored private let manager: ModelManager
     @ObservationIgnored private let settings: DictationSettings
     @ObservationIgnored private let authorizer: any MicrophoneAuthorizer
@@ -47,8 +53,10 @@ final class DictationSettingsModel {
         package: ModelPackage, packages: [ModelPackage]? = nil, manager: ModelManager, settings: DictationSettings,
         authorizer: any MicrophoneAuthorizer,
         listDevices: @escaping () -> [MicrophoneCapture.InputDevice] = MicrophoneCapture.inputDevices,
-        pickFolder: @escaping @MainActor () -> URL?, openURL: @escaping @MainActor (URL) -> Void
+        pickFolder: @escaping @MainActor () -> URL?, openURL: @escaping @MainActor (URL) -> Void,
+        speechLanguages: any SpeechLanguageSettings = FixedSpeechLanguageSettings()
     ) {
+        self.speechLanguages = speechLanguages
         self.packages = packages ?? ModelCatalog.all
         self.package = package
         self.manager = manager
@@ -61,14 +69,10 @@ final class DictationSettingsModel {
         restoresClipboard = settings.restoresClipboard
     }
 
-    /// The Whisper engine needs a pinned language; the Parakeet engine detects it.
-    var usesPinnedLanguage: Bool { package.id == ModelCatalog.whisperLargeV3Turbo.id }
-
-    var speechLanguage: String {
-        get { settings.speechLanguage }
-        set {
-            settings.setSpeechLanguage(newValue)
-        }
+    /// Every language the Languages sheet offers, from the catalog: the ones the standard model cannot transcribe
+    /// need Whisper.
+    static let speechLanguageOptions: [SpeechLanguageOption] = SpeechLanguageCatalog.all.map {
+        SpeechLanguageOption(code: $0.code, needsWhisper: !$0.parakeetSupported)
     }
 
     /// The speech model's id as chosen in Settings; choosing another one shows that model's own status.
@@ -98,6 +102,9 @@ final class DictationSettingsModel {
     func refresh() async {
         await refreshStatus()
         devices = listDevices()
+        let whisper = ModelCatalog.whisperLargeV3Turbo
+        let folder = package.id == whisper.id ? settings.speechModelFolder : nil
+        whisperInstalled = await manager.location(of: whisper, customFolder: folder).folder != nil
     }
 
     /// Re-reads only what the Settings banner shows: the model's place and the microphone access. Reads files

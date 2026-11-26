@@ -8,7 +8,6 @@ import LintelSpeech
 struct DictationSettings: Sendable {
     enum Key {
         static let speechModel = "speechModel"
-        static let speechLanguage = "speechLanguage"
         static let speechModelFolder = "speechModelFolder"
         static let inputDevice = "inputDevice"
         static let inputDeviceName = "inputDeviceName"
@@ -56,9 +55,6 @@ struct DictationSettings: Sendable {
     }
 
     var speechModelID: String { settings.string(Key.speechModel) ?? Self.defaultSpeechModel }
-
-    /// `pl` or `en`; only the Whisper engine uses it.
-    var speechLanguage: String { settings.string(Key.speechLanguage) == "en" ? "en" : "pl" }
 
     /// A folder the user downloaded the model into by hand.
     var speechModelFolder: URL? {
@@ -168,5 +164,4 @@ struct DictationSettings: Sendable {
     func setRestoresClipboard(_ value: Bool) { settings.set(value, for: Key.restoreClipboard) }
     func setVocabularyEnabled(_ value: Bool) { settings.set(value, for: Key.vocabularyEnabled) }
     func setSpeechModelID(_ id: String) { settings.set(id, for: Key.speechModel) }
-    func setSpeechLanguage(_ language: String) { settings.set(language, for: Key.speechLanguage) }
 }

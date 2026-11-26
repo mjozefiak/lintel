@@ -51,16 +51,17 @@ import Testing
         #expect(await engine.languageHint == .english)
     }
 
-    /// Dictation sends no hint (no owner decision for it yet); Meetings passes its Settings language.
-    @Test func onlyMeetingsPassesALanguage() throws {
+    /// Spec `2026-11-23-automatic-language-detection`, step 2.3: no plugin builds an engine with a language any more
+    /// (the lease shares one engine between them); every request carries its own `SpeechRequestOptions`.
+    @Test func noPluginBuildsAnEngineWithALanguage() throws {
         let sources = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appending(path: "Sources")
-        let dictation = try String(
-            contentsOf: sources.appending(path: "DictationPlugin/DictationPlugin.swift"), encoding: .utf8)
-        let meetings = try String(
-            contentsOf: sources.appending(path: "MeetingsPlugin/MeetingsRuntime.swift"), encoding: .utf8)
-        #expect(dictation.contains("ParakeetEngine()"))
-        #expect(!dictation.contains("ParakeetEngine(language:"))
-        #expect(meetings.contains("ParakeetEngine(language: { settings.speechLanguage })"))
+        for file in ["DictationPlugin/DictationPlugin.swift", "MeetingsPlugin/MeetingsRuntime.swift"] {
+            let source = try String(contentsOf: sources.appending(path: file), encoding: .utf8)
+            #expect(source.contains("ParakeetEngine()"), "\(file)")
+            #expect(source.contains("WhisperKitEngine()"), "\(file)")
+            #expect(!source.contains("ParakeetEngine(language:"), "\(file)")
+            #expect(!source.contains("WhisperKitEngine(language:"), "\(file)")
+        }
     }
 }

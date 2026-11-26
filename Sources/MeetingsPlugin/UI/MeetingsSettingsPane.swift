@@ -1,4 +1,5 @@
 import LintelKit
+import LintelSpeech
 import LintelUI
 import SwiftUI
 
@@ -167,18 +168,12 @@ struct MeetingsPaneContent: View {
         if model.diarization.usesCustomFolder {
             speakerModelRow
         }
-        if model.usesPinnedLanguage {
-            // Whisper listens for one language; Parakeet needs no choice.
-            MenuPicker(selection: $model.speechLanguage) {
-                Text("Polish", comment: "Dictation language choice").font(textSize.font(.body)).tag("pl")
-                Text("English", comment: "Dictation language choice").font(textSize.font(.body)).tag("en")
-            } label: {
-                label(
-                    Text("Language", comment: "Dictation settings label of the pinned language"),
-                    help: Text(
-                        "Whisper listens for the language you choose.",
-                        comment: "Settings → Dictation: help under the language of the Whisper model"))
-            }
+        // Shared with Dictation (spec 2026-11-23-automatic-language-detection): for every model, not only Whisper.
+        SpeechLanguagesSetting(
+            settings: model.speechLanguages, options: MeetingsSettingsModel.speechLanguageOptions,
+            whisperInstalled: model.whisperInstalled
+        ) {
+            openModels(ModelCatalog.whisperLargeV3Turbo.id)
         }
         selfNameRow
         MenuPicker(selection: Binding(get: { model.retentionDays }, set: { model.selectRetention($0) })) {

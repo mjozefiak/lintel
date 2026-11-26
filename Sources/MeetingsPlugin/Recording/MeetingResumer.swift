@@ -1,4 +1,5 @@
 import Foundation
+import LintelKit
 import LintelSpeech
 import os
 
@@ -95,6 +96,10 @@ struct MeetingResumer: MeetingResuming {
     /// What a detected range is widened by (`SegmentWindow`); the live session's values by default.
     let preRoll: Duration
     let postRoll: Duration
+    /// A new language profile per run over the shared setting (step 2.3), so one meeting's profile never reaches
+    /// another. It only gives the replayed segments their options; the language repair in `finalize` rebuilds the
+    /// whole meeting's profile from its stored segment texts (step 2.4).
+    let makeLanguage: @Sendable () -> MeetingLanguage
     let logger: Logger
 
     init(
@@ -105,8 +110,12 @@ struct MeetingResumer: MeetingResuming {
         finalize: @escaping @Sendable (Int64, UUID) async -> Void, echo: EchoSuppressor = EchoSuppressor(),
         now: @escaping @Sendable () -> Date = { Date() }, keepAudio: @escaping @Sendable () -> Bool = { false },
         preRoll: Duration = SegmentWindow.preRoll, postRoll: Duration = SegmentWindow.postRoll,
+        makeLanguage: @escaping @Sendable () -> MeetingLanguage = {
+            MeetingLanguage(settings: FixedSpeechLanguageSettings())
+        },
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "meetings")
     ) {
+        self.makeLanguage = makeLanguage
         self.preRoll = preRoll
         self.postRoll = postRoll
         self.keepAudio = keepAudio
@@ -324,13 +333,15 @@ struct MeetingResumer: MeetingResuming {
             return .stop(.databaseUnwritable)
         }
         var state = ReplayState(remaining: total)
+        let language = makeLanguage()
         for channel in [AudioChannel.system, .mic] {
             guard let ranges = missing[channel], !ranges.isEmpty,
                 let track = SpoolTrack(rawValue: channel.rawValue)
             else { continue }
             let result = await replay(
                 ranges.sorted { $0.lowerBound < $1.lowerBound }, channel: channel, track: track, meeting: meeting,
-                uuid: uuid, handle: handle, systemText: &systemText, state: &state, events: events)
+                uuid: uuid, handle: handle, language: language, systemText: &systemText, state: &state,
+                events: events)
             if let result {
                 await handle.release()
                 return .stop(result)
@@ -353,7 +364,7 @@ struct MeetingResumer: MeetingResuming {
     /// written).
     private func replay(
         _ ranges: [Range<Int>], channel: AudioChannel, track: SpoolTrack, meeting: RecoverableMeeting, uuid: UUID,
-        handle: SpeechLease, systemText: inout [TrackSegment], state: inout ReplayState,
+        handle: SpeechLease, language: MeetingLanguage, systemText: inout [TrackSegment], state: inout ReplayState,
         events: @escaping @Sendable (ResumeEvent) -> Void
     ) async -> ResumeOutcome? {
         guard
@@ -379,7 +390,8 @@ struct MeetingResumer: MeetingResuming {
             }
             let text: String
             do {
-                switch try await handle.transcribe(Array(window[from..<to])) {
+                let options = language.options(duration: Double(to - from) / Double(AudioFormat.sampleRate))
+                switch try await handle.transcribe(Array(window[from..<to]), options: options) {
                 case .transcript(let segment): text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 case .spool:
                     state.lost += 1
@@ -391,6 +403,7 @@ struct MeetingResumer: MeetingResuming {
                 return nil
             }
             guard !text.isEmpty else { return nil }
+            language.observe(text, duration: Double(to - from) / Double(AudioFormat.sampleRate))
             let segment = TrackSegment(
                 track: channel == .system ? .system : .microphone,
                 startMs: Int64(range.lowerBound * 1_000 / AudioFormat.sampleRate),

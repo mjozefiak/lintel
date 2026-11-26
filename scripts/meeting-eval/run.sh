@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Runs MeetingEvalTests in a release build and prints the path of the JSON it wrote.
 # Usage: run.sh --audio <wav> --out <dir> --name <n> --engine <parakeet-ultra|whisper-large-v3-turbo>
-#               --language <pl|en> --speech-folder <dir> [--notes-model <gguf>] [--diarization-folder <dir>] [--speaker-names <json>] [--allow-dirty]
+#               --language <pl|en|auto> --speech-folder <dir> [--notes-model <gguf>] [--diarization-folder <dir>] [--speaker-names <json>] [--allow-dirty]
+#               with --language auto: [--languages pl,en] [--whisper-folder <dir>] [--no-repair]
+#               (automatic language as the app records it, then the language repair with Whisper when
+#               --whisper-folder is given, else with Parakeet; compare runs with diff_segments.py)
 #        run.sh --transcript <result.json> --out <dir> --name <n> [notes options]   (replay: no audio, no ASR, no diarization)
 # Notes options: --notes-model <gguf> (quote track), or --notes-pipeline whole [--provider-model <alias>]
 #   [--llama-url http://127.0.0.1:<port> [--llama-budget <tokens>]] [--generations <n>] (provider track, see README);
@@ -18,9 +21,11 @@ die() { printf 'run.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
 
 audio="" out="" name="" engine="" language="" speech="" notes="" diar="" names="" allow_dirty=0
 transcript="" pipeline="" provider="" llama="" budget="" generations="" dump=""
+languages="" whisper="" norepair=""
 while [[ $# -gt 0 ]]; do
   if [[ "$1" == "--allow-dirty" ]]; then allow_dirty=1; shift; continue; fi
   if [[ "$1" == "--dump-rejections" ]]; then dump=1; shift; continue; fi
+  if [[ "$1" == "--no-repair" ]]; then norepair=1; shift; continue; fi
   [[ $# -ge 2 ]] || die "missing value for $1"
   case "$1" in
     --audio) audio="$2" ;;
@@ -38,6 +43,8 @@ while [[ $# -gt 0 ]]; do
     --llama-url) llama="$2" ;;
     --llama-budget) budget="$2" ;;
     --generations) generations="$2" ;;
+    --languages) languages="$2" ;;
+    --whisper-folder) whisper="$2" ;;
     *) die "unknown argument: $1" ;;
   esac
   shift 2
@@ -55,8 +62,11 @@ else
   [[ -f "$audio" ]] || die "audio file not found: $audio"
   [[ -d "$speech" ]] || die "speech folder not found: $speech"
   case "$engine" in parakeet-ultra | whisper-large-v3-turbo) ;; *) die "bad engine: $engine" ;; esac
-  case "$language" in pl | en) ;; *) die "bad language: $language" ;; esac
+  case "$language" in pl | en | auto) ;; *) die "bad language: $language" ;; esac
 fi
+[[ -z "$languages$whisper$norepair" || "$language" == "auto" ]] || die "--languages, --whisper-folder and --no-repair need --language auto"
+[[ -z "$languages" || "$languages" =~ ^[a-z]{2,3}(,[a-z]{2,3})*$ ]] || die "bad --languages: $languages"
+[[ -z "$whisper" || -d "$whisper" ]] || die "whisper folder not found: $whisper"
 case "$pipeline" in "" | map | whole) ;; *) die "bad --notes-pipeline: $pipeline" ;; esac
 [[ "$pipeline" != "whole" || -z "$notes" || -n "$llama" ]] || die "--notes-model is for the quote track; the provider track takes --provider-model or --llama-url"
 [[ -z "$llama$provider$budget$generations" || "$pipeline" == "whole" ]] || die "--provider-model, --llama-url, --llama-budget and --generations need --notes-pipeline whole"
@@ -75,6 +85,7 @@ out="$(abs "$out")"
 [[ -z "$speech" ]] || speech="$(abs "$speech")"
 [[ -z "$notes" ]] || notes="$(cd "$(dirname "$notes")" && pwd)/$(basename "$notes")"
 [[ -z "$diar" ]] || diar="$(abs "$diar")"
+[[ -z "$whisper" ]] || whisper="$(abs "$whisper")"
 [[ -z "$names" ]] || names="$(cd "$(dirname "$names")" && pwd)/$(basename "$names")"
 
 version="$(git rev-parse --short HEAD)"
@@ -121,6 +132,9 @@ env ${audio:+LINTEL_MEETING_EVAL_AUDIO="$audio"} \
   LINTEL_MEETING_EVAL_NAME="$name" \
   ${engine:+LINTEL_MEETING_EVAL_ENGINE="$engine"} \
   ${language:+LINTEL_MEETING_EVAL_LANGUAGE="$language"} \
+  ${languages:+LINTEL_MEETING_EVAL_LANGUAGES="$languages"} \
+  ${whisper:+LINTEL_MEETING_EVAL_WHISPER_FOLDER="$whisper"} \
+  ${norepair:+LINTEL_MEETING_EVAL_REPAIR=0} \
   ${speech:+LINTEL_MEETING_EVAL_SPEECH_FOLDER="$speech"} \
   LINTEL_MEETING_EVAL_CODE_VERSION="$version" \
   ${pipeline:+LINTEL_MEETING_EVAL_NOTES_PIPELINE="$pipeline"} \
@@ -137,7 +151,7 @@ env ${audio:+LINTEL_MEETING_EVAL_AUDIO="$audio"} \
   "$helper" --test-bundle-path "$binary" --testing-library swift-testing \
   --filter 'EvalTests/evaluatesARealRecording' >"$log" 2>&1 || rc=$?
 
-grep -E 'MeetingEval|Eval:|✘|Test run with|Suite ' "$log" | cut -c1-200 >&2 || true
+grep -E 'MEETING-EVAL|MeetingEval|Eval:|✘|Test run with|Suite ' "$log" | cut -c1-200 >&2 || true
 if [[ $rc -ne 0 ]]; then
   printf 'run.sh: last lines: %s\n' "$(tail -n 5 "$log" | cut -c1-200 | tr '\n' '|')" >&2
   die "MeetingEvalTests failed (exit $rc); full log kept: $log" 4

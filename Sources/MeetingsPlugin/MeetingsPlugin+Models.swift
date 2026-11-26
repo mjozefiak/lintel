@@ -10,26 +10,39 @@ import LintelSpeech
 ///   the model cards use: a meeting recording or finishing holds them, and its reservation keeps a new recording
 ///   from starting while a model is being removed.
 /// - The notes model is optional; it is in use while `NotesService` has work or a lease holds its file.
+/// - The speech model is the one the next recording would use (`MeetingEngineRouting`, spec
+///   `2026-11-23-automatic-language-detection` D3): Whisper when the languages need it and it is installed, so the
+///   Models pane shows it as used and needed and its removal is guarded. A folder can be chosen only for the model
+///   chosen in Settings: Whisper reached through the router is always its download.
 extension MeetingsPlugin {
     public var modelUsage: [ModelUsage] {
         let settings = settings
         let usage = ui.usage
-        let speech = ModelCatalog.package(id: settings.speechModelID) ?? ModelCatalog.parakeetUltra
-        let diarization = ModelCatalog.diarizationCommunity1
-        let notesModel = settings.builtInLLMModel
-        let notes = notes
-        let llmManager = ui.llmManager
-        return [
+        let selected = ModelCatalog.package(id: settings.speechModelID) ?? ModelCatalog.parakeetUltra
+        let speech = MeetingEngineRouting.package(
+            selected: selected, selection: context.speechLanguages.current(),
+            whisperInstalled: ui.model.whisperInstalled)
+        let isChosen = speech.id == selected.id
+        let speechFolder = isChosen ? settings.speechModelFolder : nil
+        // "Choose Folder…" writes the chosen model's key: offered only when the routed model is that one.
+        func speechUsage(chooseFolder: (@MainActor @Sendable (URL?) -> Void)?) -> ModelUsage {
             ModelUsage(
                 packageID: speech.id, kind: .speech,
                 role: LocalizedStringResource(
                     "Meeting transcripts", comment: "Models pane: what Meetings uses the speech model for"),
                 // With a chosen folder the downloaded copy is not needed; the pane shows the folder's state.
-                isRequired: settings.speechModelFolder == nil, isSelected: true,
-                chooseFolder: { settings.setSpeechModelFolder($0) },
-                customFolder: settings.speechModelFolder,
-                isInUse: { await usage.isInUse(speech) },
-                reserveRemoval: usage.reserveRemoval),
+                isRequired: speechFolder == nil, isSelected: true, chooseFolder: chooseFolder,
+                customFolder: speechFolder, isInUse: { await usage.isInUse(speech) },
+                reserveRemoval: usage.reserveRemoval)
+        }
+        let speechModel =
+            isChosen ? speechUsage(chooseFolder: { settings.setSpeechModelFolder($0) }) : speechUsage(chooseFolder: nil)
+        let diarization = ModelCatalog.diarizationCommunity1
+        let notesModel = settings.builtInLLMModel
+        let notes = notes
+        let llmManager = ui.llmManager
+        return [
+            speechModel,
             ModelUsage(
                 packageID: diarization.id, kind: .diarization,
                 role: LocalizedStringResource(

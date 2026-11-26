@@ -8,6 +8,7 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ### Changed
 
+- Lintel now recognises the language of meetings automatically, with a "Languages" row in the Dictation and Meetings settings (a list of the languages you speak, shared by both). Short phrases that were written in the wrong language are corrected when the meeting ends. If you had picked a language for the Whisper model, it is now the first language on your list; choose "Always one language" to keep it fixed. Dictation does not detect the language yet: Whisper dictation keeps using Polish unless you edit the list or choose "Always one language"; automatic detection for dictation comes later.
 - Meeting notes written by a provider (Claude) now follow a topic layout: a short intro, topics, decisions made and next steps.
 - On a new install, Dictation and Meetings are on, and app search, file search and clipboard history are add-ons that you turn on in Settings → Features. If you used Lintel before this version, every switch stays as it was.
 - The welcome screen starts with dictation and meeting notes. It asks for the launcher shortcut only when app search, file search or window management is on; the shortcut stays in Settings → General and works only while one of them is on.

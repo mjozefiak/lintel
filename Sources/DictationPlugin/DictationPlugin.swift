@@ -88,8 +88,9 @@ public final class DictationPlugin: LintelPlugin {
         self.settings = settings
         engine = SwitchingEngine(
             engines: [
+                // No language in the engines: every request carries its own options (`requestOptions`).
                 ModelCatalog.parakeetUltra.id: ParakeetEngine(),
-                ModelCatalog.whisperLargeV3Turbo.id: WhisperKitEngine(language: { settings.speechLanguage }),
+                ModelCatalog.whisperLargeV3Turbo.id: WhisperKitEngine(),
             ],
             selected: { settings.speechModelID })
         let models = ModelManagers.shared.manager(
@@ -127,7 +128,8 @@ public final class DictationPlugin: LintelPlugin {
             settings: settings,
             authorizer: settingsAuthorizer,
             pickFolder: { Self.chooseModelFolder() },
-            openURL: { url in Task { try? await workspace.open(url) } })
+            openURL: { url in Task { try? await workspace.open(url) } },
+            speechLanguages: context.speechLanguages)
         // The banner reads the model's place and the microphone; a change makes the shell read it again.
         let resultsChanged = context.resultsChanged
         settingsModel.onStatusChange = { resultsChanged() }
@@ -186,6 +188,27 @@ public final class DictationPlugin: LintelPlugin {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
+    /// What every segment of a new dictation is sent with (spec `2026-11-23-automatic-language-detection`, step
+    /// 2.3): Whisper pinned to the single language, else the first language of a list the user wrote; Parakeet no
+    /// hint (automatic dictation, with its short-dictation script re-decode, is Phase 3).
+    ///
+    /// Until Phase 3 a list nobody edited (`isDerived`: nothing stored, so it only mirrors the Mac's languages) must
+    /// not decide the language of a Whisper dictation: a Mac that speaks only English would pin a user who never
+    /// chose a language to English, where the hidden per-plugin setting this replaced gave `pl`. That default
+    /// stays (owner, 2026-11-26) until dictation detects its language itself; a list the user wrote, and a
+    /// language migrated from the old key (which writes the list), still win.
+    nonisolated static let legacyDictationLanguage = "pl"
+
+    nonisolated static func requestOptions(for selection: SpeechLanguageSelection) -> SpeechRequestOptions {
+        let language: String
+        switch selection.mode {
+        case .single(let code): language = code
+        case .automatic:
+            language = selection.isDerived ? legacyDictationLanguage : selection.languages.first ?? "en"
+        }
+        return SpeechRequestOptions(scriptHint: nil, whisperLanguage: .pinned(language))
+    }
+
     /// The formatter for a new session: none in raw mode, else the user's server or the built-in model.
     private static func formatter(
         settings: DictationSettings, transport: any HTTPTransport, builtIn: KeepWarmRuntime, logger: Logger
@@ -230,6 +253,7 @@ public final class DictationPlugin: LintelPlugin {
         let history = history
         let builtInLLM = builtInLLM
         let vocabulary = vocabulary
+        let speechLanguages = context.speechLanguages
         #if DEBUG
         let qaPlayback = qaPlayback
         let qaRecorder = qaRecorder
@@ -263,6 +287,7 @@ public final class DictationPlugin: LintelPlugin {
                             settings: settings, transport: transport, builtIn: builtInLLM, logger: context.logger),
                         replaceTerms: Self.termReplacement(settings: settings, vocabulary: vocabulary),
                         modelFolder: folder, lease: lease, modelID: settings.speechModelID,
+                        options: Self.requestOptions(for: speechLanguages.current()),
                         keepWarm: { settings.keepWarm }, logger: context.logger, onEvent: onEvent)
                 },
                 lease: lease,
