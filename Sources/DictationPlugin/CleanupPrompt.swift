@@ -110,20 +110,23 @@ enum CleanupPrompt {
         keep technical terms, names and code identifiers as spoken.
         - Never change, drop or add a number, unit, date, time, amount, name or any other detail (an adjective, \
         a quotation, a page number, a condition). Never convert or recalculate (inches stay inches), never round. \
-        Never replace a word with a different word or a synonym. Never leave out a sentence or a thought. Never \
-        shorten or summarise.
+        Never replace a word with a different word or a synonym. Never leave out a sentence or a thought (the part a \
+        speaker took back is not a thought: it goes). Never shorten or summarise.
         - Remove only: filler words and hesitations (um, uh, yyy, eee, no więc at the start of a sentence), false \
         starts, a word or phrase said twice in a row, and the part of a self-correction that the speaker took back.
         - Self-correction: when the speaker takes something back ("sorry", "actually no", "I mean", "wait", \
         "nie, czekaj", "to znaczy", "albo jednak", "a właściwie"), delete the withdrawn part and the signal \
-        words and keep only the corrected version, in its place in the sentence. This holds for numbers, \
-        hours, days and names too. A contrast that takes nothing back ("not X, but Y", "nie X, tylko Y") is a \
-        normal sentence: keep all of it.
+        words and keep only the corrected version, in its place in the sentence. The withdrawn part is the whole \
+        earlier stretch about the same detail (a day, an hour, a place, a name), not only the signal word, and it \
+        goes together with the words that belonged to it. Never leave both versions in the text. This holds for numbers, hours, days and names too. A contrast that takes nothing back ("not X, \
+        but Y", "nie X, tylko Y") is a normal sentence: keep all of it.
         - Write numbers, dates, times, amounts and percentages as digits, as they are spoken. Add punctuation \
         and capital letters.
-        - Smooth the style, and nothing more: fix the ending of a word that does not agree with its neighbours \
-        (case, gender, number) and keep the same word; split a very long sentence that strings clauses together \
-        into two or three sentences (a joining word may go) and keep the other words. Do not reorder words, do \
+        - Smooth the style, and nothing more: fix the ending of a word that clearly does not agree with its \
+        neighbours (case, gender, number) and keep the same word; split a very long sentence that strings clauses \
+        together into two or three sentences (a joining word may go) and keep the other words. Never swap a word \
+        for a synonym or a similar word ("like" does not become "about"), never change a verb's person or tense. \
+        When a stretch looks misheard or unclear, leave its words exactly as they are. Do not reorder words, do \
         not make the text more formal or more casual, do not add connecting words.
         - Lists: write a list only when the speaker enumerates ("first, second", "po pierwsze, po drugie") or \
         announces a list with a heading ("plan na tydzień", "to do") and then names the items. Put the lead-in on its \
@@ -151,6 +154,14 @@ enum CleanupPrompt {
     /// measured corpus; the short ones must stay one line.
     static let fullExamples: [(input: String, output: String)] = [
         (
+            "wyślij paczkę do Gdańska czekaj nie do Gdyni w poniedziałek i zadzwoń do mnie",
+            "Wyślij paczkę do Gdyni w poniedziałek i zadzwoń do mnie."
+        ),
+        (
+            "zamów taksówkę na ósmą albo jednak na siódmą bo prom odpływa wcześniej",
+            "Zamów taksówkę na 7, bo prom odpływa wcześniej."
+        ),
+        (
             "mamy dwa spotkanie w środę i jedno w piątek a w czwartek nie mamy żadnego",
             "Mamy dwa spotkania w środę i jedno w piątek, a w czwartek nie mamy żadnego."
         ),
@@ -169,6 +180,10 @@ enum CleanupPrompt {
         (
             "w zeszłym tygodniu przenieśliśmy backup na nowy serwer teraz działa w nocy a wczoraj skończył się w czterdzieści minut stary serwer zostaje do końca miesiąca potem go wyłączamy i przenosimy też monitoring jeszcze muszę poprawić dokumentację",
             "W zeszłym tygodniu przenieśliśmy backup na nowy serwer. Teraz działa w nocy, a wczoraj skończył się w 40 minut.\n\nStary serwer zostaje do końca miesiąca. Potem go wyłączamy i przenosimy też monitoring.\n\nJeszcze muszę poprawić dokumentację."
+        ),
+        (
+            "yeah it took like three days to fix that and it was in prod for like a month",
+            "Yeah, it took like three days to fix that, and it was in prod for like a month."
         ),
         (
             "cześć będę za dziesięć minut weź mi proszę kawę dzięki",
@@ -197,9 +212,10 @@ enum CleanupPrompt {
         level == .full ? fullSystem : system
     }
 
-    /// Standard's examples, then (at Full) the layout, paragraph and style ones.
+    /// Standard's examples; at Full the layout, paragraph and style ones come first and Standard's after them, so the
+    /// examples nearest to the transcript are the self-corrections, lists and numbers that the model gets wrong first.
     static func examples(for level: DictationSettings.CleanupLevel) -> [(input: String, output: String)] {
-        level == .full ? examples + fullExamples : examples
+        level == .full ? fullExamples + examples : examples
     }
 
     /// The request's messages at the Standard level (today's behaviour).

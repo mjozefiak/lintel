@@ -65,9 +65,22 @@ import Testing
         #expect(off.effectiveLevel == nil)
     }
 
-    @Test func fullIsOfferedInTheShippedBuild() {
-        #expect(DictationSettings.fullIsOffered)
-        #expect(DictationSettings(PluginSettings(pluginID: "dictation", store: MemorySettingsStore())).offersFull)
+    @Test func fullIsNotOfferedUntilItsTargetsPass() {
+        // The first measurement (2026-11-26) missed the self-correction target, so the shipped flag is off.
+        #expect(!DictationSettings.fullIsOffered)
+        #expect(!DictationSettings(PluginSettings(pluginID: "dictation", store: MemorySettingsStore())).offersFull)
+    }
+
+    @Test func aDebugBuildCanOfferFullForQA() {
+        #if DEBUG
+        let store = MemorySettingsStore([
+            "plugins.dictation.qaOfferFull": .bool(true), "plugins.dictation.mode": .string("cleanup"),
+            "plugins.dictation.cleanupLevel": .string("full"),
+        ])
+        let qa = DictationSettings(PluginSettings(pluginID: "dictation", store: store))
+        #expect(qa.offersFull)
+        #expect(qa.effectiveLevel == .full)
+        #endif
     }
 
     @Test func aBuildWithoutLevelsReadsOnlyTheModeKey() {
@@ -208,7 +221,8 @@ import Testing
     private func pick(_ values: [String: SettingValue]) async -> (
         formatter: (any TextFormatter)?, transport: ScriptedTransport, runtime: ScriptedRuntime
     ) {
-        let settings = DictationSettings(PluginSettings(pluginID: "dictation", store: MemorySettingsStore(values)))
+        let settings = DictationSettings(
+            PluginSettings(pluginID: "dictation", store: MemorySettingsStore(values)), offersFull: true)
         let transport = ScriptedTransport(.content("Zadzwonię jutro."))
         let runtime = ScriptedRuntime()
         await runtime.script(answer: "Zadzwonię jutro.")

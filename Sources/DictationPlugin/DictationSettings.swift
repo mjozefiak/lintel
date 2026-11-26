@@ -66,15 +66,22 @@ struct DictationSettings: Sendable {
     static let defaultKeepWarmMinutes = 10
 
     /// Whether Full is offered and runs. Spec phase 2: Full ships only when its measured targets pass; with this off a
-    /// stored `full` (a newer build wrote it) shows and runs as Standard and the popup has no Full.
-    static let fullIsOffered = true
+    /// stored `full` (a newer build wrote it) shows and runs as Standard and the popup has no Full. **Off since the first
+    /// measurement (2026-11-26):** Full met every target but one, self-corrections OK 57 % against Standard's 71 % on the
+    /// owner's corpus (4 of 7 items against 5 of 7), so it waits for the owner's decision. A DEBUG build turns it on for
+    /// QA with `plugins.dictation.qaOfferFull=true`.
+    static let fullIsOffered = false
 
     private let settings: PluginSettings
     let offersFull: Bool
 
     init(_ settings: PluginSettings, offersFull: Bool = DictationSettings.fullIsOffered) {
         self.settings = settings
+        #if DEBUG
+        self.offersFull = offersFull || settings.bool("qaOfferFull", default: false)
+        #else
         self.offersFull = offersFull
+        #endif
     }
 
     var speechModelID: String { settings.string(Key.speechModel) ?? Self.defaultSpeechModel }

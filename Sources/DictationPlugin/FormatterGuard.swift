@@ -37,9 +37,11 @@ enum FormatterGuard {
     static let plainLengthRange = 0.85...1.15
 
     /// Full's plain range (spec phase 2): wide enough for the style edits (a doubled phrase, a joining word at a
-    /// sentence split). It contains Standard's, so a chunk Standard accepts for its length is never rejected at Full;
-    /// the number, language and invention checks carry the fidelity.
-    static let fullPlainLengthRange = 0.6...1.15
+    /// sentence split). It contains Standard's, so a chunk Standard accepts for its length is never rejected at Full.
+    /// The spec's 0.6 was tightened to 0.7 from the eval: the accepted plain chunks of the owner's corpus and FLEURS PL/EN
+    /// (Full prompt v1, 2026-11-26) never went below 0.77, so 0.6 only let a dropped sentence through; the number,
+    /// language and invention checks carry the rest of the fidelity.
+    static let fullPlainLengthRange = 0.7...1.15
 
     /// Standard's check. Kept for every caller that has no level.
     static func check(input: String, output rawOutput: String) -> Verdict {
@@ -66,7 +68,7 @@ enum FormatterGuard {
             if InventedLayout.adds(to: input, in: output) { return .rejected(.inventedLayout) }
             // A self-correction withdraws a number on purpose, so only the other chunks must keep every number.
             if kind != .correction,
-                !SpokenNumbers.lostNumbers(in: withoutListMarkers(output), comparedTo: input).isEmpty
+                !SpokenNumbers.lostNumbers(in: output, comparedTo: input).isEmpty
             {
                 return .rejected(.lostNumber)
             }
