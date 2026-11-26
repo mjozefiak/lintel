@@ -1,7 +1,7 @@
-/* Lintel post-meeting actions: clickable prototype, iteration 1 (2026-11-26).
+/* Lintel post-meeting actions: clickable prototype, iteration 3 (2026-11-26).
    Built on the accepted direction sketch (.ai/prototypes/lintel-direction, owner decisions 2026-11-24): notes explorer,
    working ring, warm neutrals, Verdigris only on the primary button, the selection and live state.
-   Query: ?screen=note|inbox|apps|after  &pop=<action id: open the task hover card>  &tab=notes|actions|mine|transcript  &state=ready|finding|none|done|errors|offline|graduate
+   Query: ?screen=note|inbox|apps|after  &pop=<action id: open the task hover card>  &tab=notes|actions|mine|transcript  &state=ready|finding|none|done|errors|offline  &phase=proc|ready  &after=stay|dot|none
           &mail=acct|mcp|nomail  &theme=light|dark  &lang=en|pl  &ts=m|l|xl  &chrome=0  &sel=<action id>
    All names, addresses and data are fictional. Nothing here is a decision until the owner picks it (see README). */
 (function () {
@@ -9,7 +9,7 @@
 
   const COPY = {
     en: {
-      bar: { screen: 'Screen', note: 'Meeting note', inbox: 'Actions inbox', apps: 'Connected apps', after: 'After the meeting', layout: 'Where (Q3)', tab: 'Tab', inline: 'In Notes', inboxL: 'Tab + inbox', state: 'State', ready: 'Ready', finding: 'Finding', none: 'None found', done: 'All done', errors: 'Errors', offline: 'Not connected', graduate: 'Ask less', mail: 'Account (Q1, Q2 decided)', acct: 'Google/Microsoft', mcp: 'Connector (MCP)', nomail: 'No account', theme: 'Theme', light: 'Light', dark: 'Dark', lang: 'Language' },
+      bar: { screen: 'Screen', note: 'Meeting note', inbox: 'Actions inbox', apps: 'Connected apps', after: 'After the meeting', layout: 'Where (Q3)', tab: 'Tab', inline: 'In Notes', inboxL: 'Tab + inbox', state: 'State', ready: 'Ready', finding: 'Finding', none: 'None found', done: 'All done', errors: 'Errors', offline: 'Not connected', mail: 'Account (Q1, Q2 decided)', acct: 'Google/Microsoft', mcp: 'Connector (MCP)', nomail: 'No account', theme: 'Theme', light: 'Light', dark: 'Dark', lang: 'Language' },
       me: 'Anna Nowak', meMail: 'anna.nowak@brightline.example',
       searchNotes: 'Search notes', record: 'Record Meeting', settings: 'Settings',
       nav: { all: 'All notes', meetings: 'Meetings', dictations: 'Dictations', actions: 'Actions', folders: 'Folders', newFolder: 'New Folder', dictionary: 'Dictionary' },
@@ -67,7 +67,6 @@
         expired: ['Your Google sign-in expired', 'Sign in again to send this. Nothing was sent.'], signIn: 'Sign In Again',
         findT: 'Finding actions in this meeting…', findS: 'You can keep working. Lintel lets you know when they’re ready.',
         noneT: 'No actions in this meeting', noneS: 'Lintel didn’t hear an email to send, a meeting to set up or a ticket to create. Your tasks are in Notes.', showNotes: 'Show Notes',
-        gradT: 'You added 3 events just for you without changes.', gradS: 'Add events like this without asking? Events with guests always ask.', gradYes: 'Add Without Asking', gradNo: 'Keep Asking',
         inlineH: 'Ready to do', inActions: 'Show in Actions', popVia: { mail: 'Email', event: 'Calendar', jira: 'Jira ticket', linear: 'Linear issue' }, taskHint: 'Point at a task to see the action Lintel prepared.'
       },
       A: {
@@ -79,12 +78,12 @@
           desc: 'Start of the Nordlys Energy project: plan, service levels, who does what in January.' },
         a3: { type: 'jira', by: 'Marek Lis', t: 'Ticket: write up the service levels', q: 'I’ll write up the service levels by Wednesday.',
           project: 'SALES · Sales ops', itype: 'Task', summary: 'Write up the service levels for Nordlys Energy', assignee: 'Marek Lis', due: 'Wed 2 Dec',
-          desc: 'Nordlys Energy needs the service levels in writing before Ingrid Halvorsen signs. Agreed on the client call of 26 November.' },
+          desc: 'Nordlys Energy needs the service levels in writing before Ingrid Halvorsen signs.' },
         a4: { type: 'mail', by: 'Ingrid Halvorsen', guard: true, t: 'Email the contract draft to Nordlys’ lawyer', q: 'Please send the contract draft to our lawyer, olsen@fjordlaw.example.',
           to: [], subject: 'Contract draft: Nordlys Energy', body: 'Hello,\n\nIngrid Halvorsen asked me to send you the contract draft for the work starting on 12 January. I’ll attach it before sending.\n\nBest regards,\nAnna Nowak' },
         a5: { type: 'jira', by: '?', unsure: true, t: 'Ticket: book a room in Bergen for the workshop', q: 'I’ll book a room in Bergen for the workshop.',
           project: 'SALES · Sales ops', itype: 'Task', summary: 'Book a room in Bergen for the Nordlys workshop', assignee: '', due: '',
-          desc: 'Room for the January workshop with Nordlys Energy in Bergen. From the client call of 26 November.' },
+          desc: 'Room for the January workshop with Nordlys Energy in Bergen.' },
         s1: { type: 'linear', by: 'You', t: 'Issue: CRM export drops the last row', q: 'I’ll log the export bug for the CRM team.',
           team: 'CRM', summary: 'CSV export drops the last row', priority: 'High', desc: 'Seen by sales twice this week. Steps: export any list with more than 100 rows.' },
         s2: { type: 'event', by: 'You', mine: true, t: 'Block 2 hours for the Q4 forecast', q: 'I’ll block Friday morning for the forecast.',
@@ -92,6 +91,8 @@
       },
       inbox: { t: 'Actions', s: 'Everything Lintel prepared after your meetings, in one place.', empty: 'Nothing to review' },
       after: {
+        procHover: ['Writing notes', 'Finding actions'], ready: (n) => n ? `Ready · ${n} actions` : 'Ready', open: 'Open', close: 'Close', replay: 'Play again', phaseL: 'Pill', proc: 'Processing', readyL: 'Ready', afterL: 'After the pill (Q15)', stay: 'Stays until closed', dot: '8 s, then a dot on the ring', none: '8 s, nothing',
+        cap2: 'P10 (owner): after the audio is saved, the pill shows only the closing ring (#273, OD-9; hover: what it is doing). When the notes AND the actions are ready it turns into “Ready · 5 actions · Open”; the meeting row and the Actions inbox show the count. No macOS notification. Open goes to the meeting’s Notes. What stays after the pill is Q15 (toolbar).',
         notifT: '5 actions ready', notifS: 'Client call: Nordlys Energy · 2 need you', notifB: 'Review', now: 'now',
         menu: [['Record Meeting', '⌃⌥M'], ['Actions to review', '5'], ['Open Lintel', ''], ['Settings…', '⌘,']],
         cap: 'Q6: how you learn that actions are ready. Shown here: one macOS notification per meeting, and a dot on the menu bar ring while something waits. The list row also says “5 to review”.'
@@ -99,18 +100,17 @@
       set: {
         side: { general: 'General', dictation: 'Dictation', meetings: 'Meetings & notes', ai: 'AI assistant', apps: 'Connected apps', privacy: 'Privacy & data', addons: 'Add-ons', about: 'About & help' },
         lead: 'After a meeting, Lintel prepares emails, invites and tickets in these apps. Nothing is sent until you approve it.',
-        mailH: 'Email and calendar', toolsH: 'Work tools', askH: 'When Lintel may act without asking',
+        mailH: 'Email and calendar', toolsH: 'Work tools',
         google: ['Google', 'anna.nowak@brightline.example · sends the emails and invites you approve'],
         ms: ['Microsoft 365', 'Outlook mail and calendar'], mailMcp: ['Other mail', 'Through a connector from Lintel’s list'], macCal: ['Calendar on this Mac', 'Events just for you, without guests'],
         jira: ['Jira', 'brightline.atlassian.net · your key is kept in your keychain'], linear: ['Linear', 'Through Linear’s own connector'], asana: ['Asana', 'Through Asana’s own connector'],
         connected: 'Connected', allowed: 'Allowed', notConn: 'Not connected', connect: 'Connect…', disconnect: 'Disconnect', remove: 'Remove',
         missing: 'Missing an app? Tell us which one.',
-        ask: [['Events just for you', 'No guests, only your calendar.', 'Ask every time'], ['Tickets assigned to you', 'You said you’d do it, and it’s assigned to you.', 'Ask every time'], ['Emails, and anything for other people', 'Always asks. This can’t be changed.', '']],
         foot: 'Actions are found by the assistant that writes your notes: This Mac. Change it in AI assistant.'
       }
     },
     pl: {
-      bar: { screen: 'Ekran', note: 'Notatka ze spotkania', inbox: 'Skrzynka akcji', apps: 'Połączone aplikacje', after: 'Po spotkaniu', layout: 'Gdzie (P3)', tab: 'Zakładka', inline: 'W Notatkach', inboxL: 'Zakładka + skrzynka', state: 'Stan', ready: 'Gotowe', finding: 'Szukanie', none: 'Brak', done: 'Wszystko zrobione', errors: 'Błędy', offline: 'Bez połączenia', graduate: 'Pytaj rzadziej', mail: 'Konto (P1, P2 zdecydowane)', acct: 'Google/Microsoft', mcp: 'Łącznik (MCP)', nomail: 'Bez konta', theme: 'Motyw', light: 'Jasny', dark: 'Ciemny', lang: 'Język' },
+      bar: { screen: 'Ekran', note: 'Notatka ze spotkania', inbox: 'Skrzynka akcji', apps: 'Połączone aplikacje', after: 'Po spotkaniu', layout: 'Gdzie (P3)', tab: 'Zakładka', inline: 'W Notatkach', inboxL: 'Zakładka + skrzynka', state: 'Stan', ready: 'Gotowe', finding: 'Szukanie', none: 'Brak', done: 'Wszystko zrobione', errors: 'Błędy', offline: 'Bez połączenia', mail: 'Konto (P1, P2 zdecydowane)', acct: 'Google/Microsoft', mcp: 'Łącznik (MCP)', nomail: 'Bez konta', theme: 'Motyw', light: 'Jasny', dark: 'Ciemny', lang: 'Język' },
       me: 'Anna Nowak', meMail: 'anna.nowak@brightline.example',
       searchNotes: 'Szukaj w notatkach', record: 'Nagraj spotkanie', settings: 'Ustawienia',
       nav: { all: 'Wszystkie notatki', meetings: 'Spotkania', dictations: 'Dyktowania', actions: 'Akcje', folders: 'Foldery', newFolder: 'Nowy folder', dictionary: 'Słownik' },
@@ -168,7 +168,6 @@
         expired: ['Logowanie do Google wygasło', 'Zaloguj się ponownie, żeby to wysłać. Nic nie zostało wysłane.'], signIn: 'Zaloguj się ponownie',
         findT: 'Szukam akcji w tym spotkaniu…', findS: 'Możesz dalej pracować. Lintel da znać, gdy będą gotowe.',
         noneT: 'Brak akcji w tym spotkaniu', noneS: 'Lintel nie usłyszał maila do wysłania, spotkania do umówienia ani ticketu do założenia. Twoje zadania są w Notatkach.', showNotes: 'Pokaż notatki',
-        gradT: '3 wydarzenia tylko dla Ciebie dodane bez zmian.', gradS: 'Dodawać takie bez pytania? Wydarzenia z gośćmi zawsze pytają.', gradYes: 'Dodawaj bez pytania', gradNo: 'Pytaj dalej',
         inlineH: 'Gotowe do zrobienia', inActions: 'Pokaż w Akcjach', popVia: { mail: 'Mail', event: 'Kalendarz', jira: 'Ticket w Jirze', linear: 'Zgłoszenie w Linear' }, taskHint: 'Najedź na zadanie, żeby zobaczyć akcję przygotowaną przez Lintel.'
       },
       A: {
@@ -180,12 +179,12 @@
           desc: 'Start projektu Nordlys Energy: plan, poziomy usług, kto co robi w styczniu.' },
         a3: { type: 'jira', by: 'Marek Lis', t: 'Ticket: spisać poziomy usług', q: 'Spiszę poziomy usług do środy.',
           project: 'SALES · Sales ops', itype: 'Zadanie', summary: 'Spisać poziomy usług dla Nordlys Energy', assignee: 'Marek Lis', due: 'śr. 2 gru',
-          desc: 'Nordlys Energy potrzebuje poziomów usług na piśmie, zanim Ingrid Halvorsen podpisze. Ustalone na rozmowie z klientem 26 listopada.' },
+          desc: 'Nordlys Energy potrzebuje poziomów usług na piśmie, zanim Ingrid Halvorsen podpisze.' },
         a4: { type: 'mail', by: 'Ingrid Halvorsen', guard: true, t: 'Mail z projektem umowy do prawnika Nordlys', q: 'Proszę wysłać projekt umowy naszemu prawnikowi, olsen@fjordlaw.example.',
           to: [], subject: 'Projekt umowy: Nordlys Energy', body: 'Dzień dobry,\n\nIngrid Halvorsen poprosiła mnie o przesłanie projektu umowy na prace startujące 12 stycznia. Dołączę go przed wysłaniem.\n\nZ pozdrowieniami\nAnna Nowak' },
         a5: { type: 'jira', by: '?', unsure: true, t: 'Ticket: zarezerwować salę w Bergen na warsztat', q: 'Zarezerwuję salę w Bergen na warsztat.',
           project: 'SALES · Sales ops', itype: 'Zadanie', summary: 'Zarezerwować salę w Bergen na warsztat z Nordlys', assignee: '', due: '',
-          desc: 'Sala na styczniowy warsztat z Nordlys Energy w Bergen. Z rozmowy z klientem 26 listopada.' },
+          desc: 'Sala na styczniowy warsztat z Nordlys Energy w Bergen.' },
         s1: { type: 'linear', by: 'Ty', t: 'Zgłoszenie: eksport z CRM gubi ostatni wiersz', q: 'Zgłoszę błąd eksportu zespołowi CRM.',
           team: 'CRM', summary: 'Eksport CSV gubi ostatni wiersz', priority: 'Wysoki', desc: 'Sprzedaż trafiła na to dwa razy w tym tygodniu. Kroki: wyeksportuj dowolną listę z ponad 100 wierszami.' },
         s2: { type: 'event', by: 'Ty', mine: true, t: 'Zablokować 2 godziny na prognozę Q4', q: 'Zablokuję sobie piątkowy poranek na prognozę.',
@@ -193,6 +192,8 @@
       },
       inbox: { t: 'Akcje', s: 'Wszystko, co Lintel przygotował po Twoich spotkaniach, w jednym miejscu.', empty: 'Nic do sprawdzenia' },
       after: {
+        procHover: ['Piszę notatki', 'Szukam akcji'], ready: (n) => n ? `Gotowe · ${n} akcji` : 'Gotowe', open: 'Otwórz', close: 'Zamknij', replay: 'Odtwórz jeszcze raz', phaseL: 'Pastylka', proc: 'Przetwarzanie', readyL: 'Gotowe', afterL: 'Po pastylce (P15)', stay: 'Zostaje do zamknięcia', dot: '8 s, potem kropka na pierścieniu', none: '8 s, nic',
+        cap2: 'P10 (właściciel): po zapisaniu audio pastylka pokazuje tylko zamykający się pierścień (#273, OD-9; po najechaniu: co robi). Gdy notatki I akcje są gotowe, zmienia się w „Gotowe · 5 akcji · Otwórz”; wiersz spotkania i skrzynka Akcje pokazują licznik. Bez powiadomienia macOS. Otwórz prowadzi do Notatek spotkania. Co zostaje po pastylce: P15 (pasek u góry).',
         notifT: '5 akcji gotowych', notifS: 'Rozmowa z klientem: Nordlys Energy · 2 czekają na Ciebie', notifB: 'Sprawdź', now: 'teraz',
         menu: [['Nagraj spotkanie', '⌃⌥M'], ['Akcje do sprawdzenia', '5'], ['Otwórz Lintel', ''], ['Ustawienia…', '⌘,']],
         cap: 'P6: skąd wiesz, że akcje są gotowe. Tu: jedno powiadomienie macOS na spotkanie i kropka na pierścieniu w pasku menu, póki coś czeka. Wiersz na liście mówi też „5 do sprawdzenia”.'
@@ -200,13 +201,12 @@
       set: {
         side: { general: 'Ogólne', dictation: 'Dyktowanie', meetings: 'Spotkania i notatki', ai: 'Asystent AI', apps: 'Połączone aplikacje', privacy: 'Prywatność i dane', addons: 'Dodatki', about: 'O programie i pomoc' },
         lead: 'Po spotkaniu Lintel przygotowuje maile, zaproszenia i tickety w tych aplikacjach. Nic nie zostanie wysłane, dopóki tego nie zatwierdzisz.',
-        mailH: 'Poczta i kalendarz', toolsH: 'Narzędzia do pracy', askH: 'Kiedy Lintel może działać bez pytania',
+        mailH: 'Poczta i kalendarz', toolsH: 'Narzędzia do pracy',
         google: ['Google', 'anna.nowak@brightline.example · wysyła zatwierdzone przez Ciebie maile i zaproszenia'],
         ms: ['Microsoft 365', 'Poczta i kalendarz Outlook'], mailMcp: ['Inna poczta', 'Przez łącznik z listy Lintela'], macCal: ['Kalendarz na tym Macu', 'Wydarzenia tylko dla Ciebie, bez gości'],
         jira: ['Jira', 'brightline.atlassian.net · klucz jest w Twoim pęku kluczy'], linear: ['Linear', 'Przez własny łącznik Linear'], asana: ['Asana', 'Przez własny łącznik Asany'],
         connected: 'Połączone', allowed: 'Dozwolone', notConn: 'Niepołączone', connect: 'Połącz…', disconnect: 'Odłącz', remove: 'Usuń',
         missing: 'Brakuje aplikacji? Napisz, której.',
-        ask: [['Wydarzenia tylko dla Ciebie', 'Bez gości, tylko Twój kalendarz.', 'Pytaj za każdym razem'], ['Tickety przypisane do Ciebie', 'Zadanie padło z Twoich ust i jest przypisane do Ciebie.', 'Pytaj za każdym razem'], ['Maile i wszystko dla innych osób', 'Zawsze pyta. Tego nie można zmienić.', '']],
         foot: 'Akcje znajduje ten sam asystent, który pisze notatki: Ten Mac. Zmienisz to w Asystencie AI.'
       }
     }
@@ -262,7 +262,10 @@
   const S = {
     screen: pick('screen', ['note', 'inbox', 'apps', 'after'], 'note'),
     layout: 'inbox', // Q3 decided: Actions tab + Actions inbox in the sidebar
-    state: pick('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline', 'graduate'], 'ready'),
+    state: pick('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline'], 'ready'),
+    phase: pick('phase', ['proc', 'ready'], 'proc'), // P10: the pill after the recording
+    after: pick('after', ['stay', 'dot', 'none'], 'stay'), // Q15 (open): what stays once the Ready pill is gone
+    pillGone: false,
     mail: pick('mail', ['acct', 'mcp', 'nomail'], 'acct'),
     theme: pick('theme', ['light', 'dark'], prefersDark ? 'dark' : 'light'),
     lang: pick('lang', ['en', 'pl'], 'en'),
@@ -272,7 +275,7 @@
     tab: pick('tab', ['notes', 'actions', 'mine', 'transcript'], 'notes'), // Q4 decided: a meeting always opens on Notes
     pop: null,
     open: qs.get('sel') || 'a1',
-    st: {}, edits: {}, who: {}, err: {}, toast: null, grad: false, hlq: '', component: ''
+    st: {}, edits: {}, who: {}, err: {}, toast: null, hlq: '', component: ''
   };
   if (S.screen === 'inbox') S.layout = 'inbox';
   const t = () => COPY[S.lang];
@@ -280,11 +283,10 @@
 
   function applyState() {
     S.st = { a1: 'ready', a2: 'ready', a3: 'ready', a4: 'need', a5: 'need', s1: 'ready', s2: 'ready' };
-    S.who = {}; S.err = {}; S.grad = false; S.toast = null; S.component = '';
+    S.who = {}; S.err = {}; S.toast = null; S.component = '';
     if (S.state === 'done') Object.assign(S.st, { a1: 'done', a2: 'done', a3: 'done', a4: 'dismissed', a5: 'done' }), (S.who.a5 = 'me');
     if (S.state === 'errors') Object.assign(S.st, { a1: 'failed', a3: 'failed' }), (S.open = qs.get('sel') || 'a3');
     if (S.state === 'offline') Object.assign(S.st, { a1: 'expired', a2: 'expired', a3: 'disconnected' }), (S.open = qs.get('sel') || 'a3');
-    if (S.state === 'graduate') { S.st.s2 = 'done'; S.grad = true; S.item = 'sync'; S.open = 's2'; }
   }
   applyState();
 
@@ -441,9 +443,6 @@
     const body = isOpen ? `<div class="ab">${evidence(c, id, a)}${notices(c, id, a)}${form(c, id, a)}<div class="sendas">${viaLine(c, a)}</div>${buttons(c, id, a)}</div>` : '';
     return `<div class="ac ${isOpen ? 'open' : ''} ${s === 'dismissed' ? 'dim' : ''}" data-card="${id}">${head}${body}${isOpen ? '' : resultLine(c, id, a)}</div>`;
   }
-  function gradOffer(c) {
-    return S.grad ? `<div class="grad">${ring('mark', 18)}<div class="tx"><b>${c.a.gradT}</b><div class="help">${c.a.gradS}</div></div><button class="btn" data-act="grad">${c.a.gradYes}</button><button class="btn" data-act="grad">${c.a.gradNo}</button></div>` : '';
-  }
   function actionsBlock(c, item) {
     if (item === 'nordlys' && S.state === 'finding') return `<div class="astate">${ring('progress', 44, 0.7)}<h3>${c.a.findT}</h3><p>${c.a.findS}</p></div><div class="alist"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>`;
     if (item === 'nordlys' && S.state === 'none') return `<div class="astate">${ring('open', 64)}<h3>${c.a.noneT}</h3><p>${c.a.noneS}</p><button class="btn" data-tab="notes">${c.a.showNotes}</button></div>`;
@@ -451,7 +450,7 @@
     const w = waiting(item), n = needs(item);
     const d = list.filter((id) => S.st[id] === 'done').length, x = list.filter((id) => S.st[id] === 'dismissed').length;
     const head = w ? `<div class="ahead"><span class="t">${c.a.hdr(list.length, n)}</span><span class="s">${c.a.hdrSub}</span></div>` : `<div class="ahead"><span class="t">${ic('check')} ${c.a.allDone}</span><span class="s">${c.a.allDoneSub(d, x)}</span></div>`;
-    return `${head}<div class="alist">${list.map((id) => actionCard(c, id)).join('')}</div>${item === 'sync' ? gradOffer(c) : ''}<div class="trust">${ic('lock')}${c.a.trust}</div>`;
+    return `${head}<div class="alist">${list.map((id) => actionCard(c, id)).join('')}</div><div class="trust">${ic('lock')}${c.a.trust}</div>`;
   }
 
   // ---------- note ----------
@@ -535,26 +534,31 @@
       <div class="gh">${s.mailH}</div><div class="group">${row('g', 'G', s.google, gState)}${row('c', ic('cal'), s.macCal, `<span class="okdot">${s.allowed}</span>`)}${row('c', 'M', s.ms, `<button class="btn">${s.connect}</button>`)}${row('c', ic('plug'), s.mailMcp, S.mail === 'mcp' ? `<span class="okdot">${s.connected}</span><button class="btn">${s.disconnect}</button>` : `<button class="btn">${s.connect}</button>`)}</div>
       <div class="gh">${s.toolsH}</div><div class="group">${row('j', 'J', s.jira, jiraState)}${row('l', 'L', s.linear, `<button class="btn">${s.connect}</button>`)}${row('a', 'A', s.asana, `<button class="btn">${s.connect}</button>`)}</div>
       <div class="foot" style="margin-top:8px"><button class="link" style="color:var(--sec)">${s.missing}</button></div>
-      <div class="gh">${s.askH}</div><div class="group">${s.ask.map(([l, h, v]) => `<div class="row"><div class="lbl">${l}<div class="help">${h}</div></div>${v ? pop(S.grad ? '' : v) : `<span class="okdot off">${S.lang === 'pl' ? 'Zawsze pyta' : 'Always asks'}</span>`}</div>`).join('')}</div>
       <div class="foot">${ring('mark', 13)}${s.foot}</div>`;
     return `<div class="win setw">${side}<div class="spage">${body}</div></div>`;
   }
 
-  // ---------- after the meeting: notification + menu bar ----------
+  // ---------- after the meeting: the pill (P10) ----------
+  const pRing = (work) => `<svg class="pglyph pring ${work ? 'work' : ''}" viewBox="0 0 20 20" aria-hidden="true"><circle class="arc" cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="${work ? '20 44' : '36 44'}" transform="rotate(-60 10 10)"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/></svg>`;
+  const pCheck = '<svg class="pglyph" viewBox="0 0 20 20" aria-hidden="true" style="color:var(--plive)"><circle cx="10" cy="10" r="8" fill="currentColor"/><path d="m6.2 10.2 2.6 2.6 5-5.4" stroke="var(--pon)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function afterScr(c) {
-    const f = c.after;
-    return `<div class="vstack"><div class="desk"><div class="mbar"><b></b><span>Finder</span><span class="sp"></span><span class="mbadge">${ring('mark', 15)}</span><span>${S.lang === 'pl' ? 'czw. 11:52' : 'Thu 11:52'}</span></div>
-      <div class="nb"><span class="appi c" style="width:36px;height:36px;border-radius:9px">${ring('mark', 22)}</span><div class="tx"><div style="display:flex"><span class="a">${f.notifT}</span><span class="sp"></span><span class="tm">${f.now}</span></div><div class="s">${f.notifS}</div><div class="bb"><button class="btn" data-go="note">${f.notifB}</button></div></div></div>
-      <div class="mdrop" style="top:30px;right:96px">${f.menu.map(([l, k], i) => `<div class="mi ${i === 1 ? 'hl' : ''}"><span>${l}</span><span class="n">${k}</span></div>${i === 1 ? '<div class="sep"></div>' : ''}`).join('')}</div>
-      </div><div class="caption">${f.cap}</div></div>`;
+    const f = c.after, n = ids('nordlys').length;
+    const seg = (key, opts) => `<span class="sk-seg" role="group" aria-label="${key}" style="margin-left:6px">${opts.map(([v, l]) => `<button type="button" data-set="${key}" data-val="${v}" aria-pressed="${S[key] === v}">${l}</button>`).join('')}</span>`;
+    const pill = S.pillGone ? '' : S.phase === 'proc'
+      ? `<div class="pill" tabindex="0" role="status" aria-label="${f.procHover.join(', ')}">${pRing(true)}<span class="more"><span class="psec">${f.procHover[S.procStep || 0]}</span></span></div>`
+      : `<div class="pill" role="status">${pCheck}<span>${f.ready(n)}</span><button class="pact" data-go="note">${f.open}</button><button class="px" data-act="pillx" aria-label="${f.close}"><svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>`;
+    const dot = S.pillGone && S.after === 'dot';
+    return `<div class="vstack"><div class="desk"><div class="mbar"><b></b><span>Finder</span><span class="sp"></span><span class="${dot ? 'mbadge' : ''}" style="display:inline-grid">${ring('mark', 15)}</span><span>${S.lang === 'pl' ? 'czw. 11:52' : 'Thu 11:52'}</span></div>
+      <div class="pillstage">${pill}</div></div>
+      <div class="caption">${f.cap2}<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center"><span>${f.phaseL}</span>${seg('phase', [['proc', f.proc], ['ready', f.readyL]])}<span>${f.afterL}</span>${seg('after', [['stay', f.stay], ['dot', f.dot], ['none', f.none]])}<button class="btn" data-act="replay">${f.replay}</button></div></div></div>`;
   }
 
   // ---------- shell ----------
   function bar() {
     const b = t().bar;
     const seg = (key, opts) => `<span class="sk-seg" role="group" aria-label="${key}">${opts.map(([v, l]) => `<button type="button" data-set="${key}" data-val="${v}" aria-pressed="${S[key] === v}">${l}</button>`).join('')}</span>`;
-    return `<div id="sk-bar"><b>Lintel · actions · iteration 2</b><label>${b.screen}</label>${seg('screen', [['note', b.note], ['inbox', b.inbox], ['apps', b.apps], ['after', b.after]])}
-      <label>${b.state}</label>${seg('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline', 'graduate'].map((k) => [k, b[k]]))}
+    return `<div id="sk-bar"><b>Lintel · actions · iteration 3</b><label>${b.screen}</label>${seg('screen', [['note', b.note], ['inbox', b.inbox], ['apps', b.apps], ['after', b.after]])}
+      <label>${b.state}</label>${seg('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline'].map((k) => [k, b[k]]))}
       <label>${b.mail}</label>${seg('mail', [['acct', b.acct], ['mcp', b.mcp], ['nomail', b.nomail]])}
       <label>${b.theme}</label>${seg('theme', [['light', b.light], ['dark', b.dark]])}<label>${b.lang}</label>${seg('lang', [['en', 'EN'], ['pl', 'PL']])}
       ${seg('ts', [['m', 'M'], ['l', 'L'], ['xl', 'XL']])}<button type="button" class="sk-seg" style="background:none;color:#F1EEE9;padding:3px 9px" data-act="reset">Reset</button></div>`;
@@ -564,6 +568,7 @@
     p.set('screen', S.screen); p.set('state', S.state); if (S.mail !== 'acct') p.set('mail', S.mail);
     p.set('theme', S.theme); p.set('lang', S.lang); if (S.ts !== 'm') p.set('ts', S.ts); if (!S.chrome) p.set('chrome', '0');
     if (S.item !== 'nordlys') p.set('item', S.item); if (S.tab !== 'notes') p.set('tab', S.tab); if (S.open !== 'a1') p.set('sel', S.open);
+    if (S.screen === 'after') { p.set('phase', S.phase); if (S.after !== 'stay') p.set('after', S.after); }
     history.replaceState(null, '', location.pathname + '?' + p.toString());
   }
   const SCREENS = { note: noteScr, inbox: inboxScr, apps: appsScr, after: afterScr };
@@ -609,11 +614,13 @@
       S[d.set] = d.val;
       if (d.set === 'screen' && d.val === 'inbox') S.layout = 'inbox';
       if (d.set === 'layout' && d.val !== 'inbox' && S.screen === 'inbox') S.screen = 'note';
+      if (d.set === 'phase' || d.set === 'after') { clearTimeout(pillT); clearInterval(procT); S.pillGone = false; if (S.phase === 'ready') armPill(); }
+      if (d.set === 'screen' && d.val === 'after') { syncURL(); playPill(); return; }
       if (d.set === 'state') { S.open = d.val === 'errors' || d.val === 'offline' ? 'a3' : 'a1'; S.item = 'nordlys'; S.tab = 'notes'; S.edits = {}; applyState(); }
       syncURL(); render(); return;
     }
     if (d.go) { S.screen = d.go; if (d.go === 'inbox') S.layout = 'inbox'; syncURL(); render(); return; }
-    if (d.item) { S.item = d.item; S.open = d.item === 'sync' ? 's1' : 'a1'; if (S.state === 'graduate' && d.item === 'sync') S.open = 's2'; syncURL(); render(); return; }
+    if (d.item) { S.item = d.item; S.open = d.item === 'sync' ? 's1' : 'a1'; syncURL(); render(); return; }
     if (d.tab) { S.tab = d.tab; S.hlq = ''; S.pop = null; syncURL(); render(); return; }
     if (d.open) { S.open = S.open === d.open && S.screen === 'note' ? '' : d.open; render(); return; }
     if (d.who) { S.who[d.id] = d.who; S.st[d.id] = 'ready'; delete S.err[d.id]; render(); return; }
@@ -626,7 +633,8 @@
     else if (a === 'undo') { if (S.toast) { const T = S.toast; S.st[T.id] = t().A[T.id].guard || (t().A[T.id].unsure && !S.who[T.id]) ? 'need' : 'ready'; S.open = T.id; } clearInterval(timer); clearTimeout(timer); S.toast = null; render(); }
     else if (a === 'reconnect') { S.st[id] = 'ready'; if (id === 'a3') { S.st.a1 = S.st.a1 === 'expired' ? 'ready' : S.st.a1; S.st.a2 = S.st.a2 === 'expired' ? 'ready' : S.st.a2; } render(); }
     else if (a === 'component') { S.component = S.lang === 'pl' ? 'Umowy' : 'Contracts'; render(); }
-    else if (a === 'grad') { S.grad = false; render(); }
+    else if (a === 'pillx') { clearTimeout(pillT); S.pillGone = true; render(); }
+    else if (a === 'replay') playPill();
     else if (a === 'reset') { clearInterval(timer); clearTimeout(timer); S.edits = {}; S.hlq = ''; S.item = 'nordlys'; S.tab = 'notes'; S.open = S.state === 'errors' || S.state === 'offline' ? 'a3' : 'a1'; applyState(); render(); const st = document.querySelector('[role=status]'); if (st) st.focus(); }
   });
   document.addEventListener('input', (e) => {
@@ -663,6 +671,19 @@
     if (S.pop) { clearTimeout(leaveT); leaveT = setTimeout(() => { S.pop = null; render(); }, 200); }
   });
   document.addEventListener('focusin', (e) => { const tk = e.target.closest('[data-task]'); if (tk && (!S.pop || S.pop.id !== tk.dataset.task)) { showPop(tk); const el = document.querySelector(`[data-task="${tk.dataset.task}"]`); if (el) el.focus(); } });
+  // P10 pill: processing (closing ring, hover says what it does) → Ready · N actions → per Q15.
+  let pillT = null, procT = null;
+  function armPill() { clearTimeout(pillT); if (S.after !== 'stay') pillT = setTimeout(() => { S.pillGone = true; render(); }, 8000); }
+  function playPill() {
+    clearTimeout(pillT); clearInterval(procT);
+    S.phase = 'proc'; S.procStep = 0; S.pillGone = false; render();
+    procT = setInterval(() => {
+      S.procStep++;
+      if (S.procStep >= 2) { clearInterval(procT); S.phase = 'ready'; syncURL(); render(); armPill(); return; }
+      render();
+    }, 2500);
+  }
   render();
+  if (S.screen === 'after' && !qs.get('phase')) playPill(); else if (S.screen === 'after' && S.phase === 'ready') armPill();
   if (qs.get('pop')) { const tk = document.querySelector(`[data-task="${qs.get('pop')}"]`); if (tk) showPop(tk); }
 })();

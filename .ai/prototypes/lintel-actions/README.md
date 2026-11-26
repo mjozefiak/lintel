@@ -1,11 +1,11 @@
-# lintel-actions: post-meeting actions (prototype, iteration 2, 2026-11-26)
+# lintel-actions: post-meeting actions (prototype, iteration 3, 2026-11-26)
 
 Clickable HTML prototype for the owner's vision of 2026-11-26: after a meeting you get **ready-to-run actions**, not a to-do list. The email is already written, the meeting is already set up, the Jira ticket is already filled in. You check each one and approve it with one click, all in one place. **Nothing here is decided until the owner picks it** (owner rule 2026-11-19: no default is accepted for actions or chat). This is design only, with no Swift code and no spec. The spec comes after the owner accepts the prototype and after the detection-quality spike (brainstorm decision 9).
 
 - Open: `cd .ai/prototypes/lintel-actions && python3 -m http.server 8771 --bind 127.0.0.1`, then `http://127.0.0.1:8771/index.html`. Opening `index.html` directly also works.
 - Built on the accepted direction sketch `.ai/prototypes/lintel-direction` (owner decisions 2026-11-24: notes explorer as the main view, the working ring, warm neutrals, Verdigris only on the primary button, the selection and live state, neutral links, Notes · My notes · Transcript tabs) and on spec #255 (`.ai/specs/2026-11-24-notes-explorer-main-window.md`). The tokens and primitives are copied unchanged from `lintel-direction/lintel.html`.
 - Toolbar (not part of the design): screen, state, **Account** (Google/Microsoft, connector (MCP), no account; Q1 and Q2 decided), theme, language (EN/PL), text size (M/L/XL), Reset.
-- Query: `?screen=note|inbox|apps|after&tab=notes|actions|mine|transcript&pop=a1..a5&state=ready|finding|none|done|errors|offline|graduate&mail=acct|mcp|nomail&theme=light|dark&lang=en|pl&ts=m|l|xl&sel=a1..a5|s1|s2&chrome=0`.
+- Query: `?screen=note|inbox|apps|after&tab=notes|actions|mine|transcript&pop=a1..a5&phase=proc|ready&after=stay|dot|none&state=ready|finding|none|done|errors|offline&mail=acct|mcp|nomail&theme=light|dark&lang=en|pl&ts=m|l|xl&sel=a1..a5|s1|s2&chrome=0`.
 - All names, addresses, companies and data are fictional (`*.example`).
 
 ## What you can click
@@ -14,10 +14,10 @@ Clickable HTML prototype for the owner's vision of 2026-11-26: after a meeting y
 - **Meeting note → Actions tab**: five actions from "Client call: Nordlys Energy". Click a row to open its card. The fields are editable in place. **Send** starts a 10-second countdown with **Undo**. "Add to Calendar" and "Create in Jira" finish at once and show Undo for 6 seconds. **Dismiss** greys the row out and offers Restore. **Show in Transcript** jumps to the sentence the action came from. ⌘↩ approves and ⌘⌫ dismisses the open card. After each approval the next card that needs you opens.
 - **Other speaker** (a4): Ingrid said an email address. The card says who asked, leaves **To** empty, and Send asks you to add the recipient.
 - **Unsure speaker** (a5): two people were on the same microphone. The card asks "Who will do it?" (You, Marek Lis, or No one, dismiss). The assignee fills in from the answer.
-- **States**: Finding (ring closing and placeholder rows), None found, All done (results with "Open in Jira / Calendar / Gmail" links), Errors (no internet for mail, Jira needs a component), Not connected (Jira not connected, Google sign-in expired; the draft stays), Ask less (the offer to stop asking for events just for you, shown on Weekly sales sync).
+- **States**: Finding (ring closing and placeholder rows), None found, All done (results with "Open in Jira / Calendar / Gmail" links), Errors (no internet for mail, Jira needs a component), Not connected (Jira not connected, Google sign-in expired; the draft stays).
 - **Actions inbox** (Q3: the Actions tab plus this inbox in the sidebar): one list of every waiting action across meetings, with the card on the right.
-- **Connected apps** (Settings): Google, Calendar on this Mac, Microsoft 365, other mail through a connector, Jira, Linear, Asana, and "When Lintel may act without asking".
-- **After the meeting**: one macOS notification per meeting and the menu bar ring with a dot plus "Actions to review 5".
+- **Connected apps** (Settings): Google, Calendar on this Mac, Microsoft 365, other mail through a connector, Jira, Linear, Asana (Q13).
+- **After the meeting** (Q10): once the audio is saved, the pill shows only the closing ring (#273 pill family, OD-9); hovering says "Writing notes" / "Finding actions". When notes and actions are both ready it becomes "Ready · 5 actions · Open ✕". No macOS notification. The screen plays the sequence on open ("Play again"); the caption switches the phase and the Q15 variant (what stays after the pill).
 
 ## Decisions applied
 
@@ -30,6 +30,14 @@ From the 2026-11-23 brainstorm (not asked again): actions before chat; approval 
 - **Delivery order for sending:** draft → Microsoft → Google (the owner starts Google verification now, in parallel) → MCP.
 - **Q3 = C.** The Actions tab in the note plus the Actions inbox in the sidebar (the layout switch is gone).
 - **Q4 = changed by the owner.** A meeting always opens on Notes. A task linked to an action shows, on hover after a short delay, a card with the action's details and a way into the Actions section.
+
+**Owner decisions 2026-11-26 (Q5–Q14)**:
+- Q5 = A: one open card at a time, fields editable at once.
+- Q6: quote + speaker on the card before approval, plus Show in Transcript. **Nothing is added to the created ticket, invitation or email** (no trace of the source); the fixture descriptions no longer say "Agreed on the client call…".
+- Q7 = A (mail held 10 s with Undo; event and ticket undone by deleting). Q8 = A (both buttons filled). Q9: no bulk approval in v1.
+- Q10 = changed by the owner: the pill after the recording (above), no macOS notification. Open question Q15 below.
+- Q11: "ask less" is **not in v1**: the state, the offer and the Settings section "When Lintel may act without asking" are removed.
+- Q12 = A. Q13 = Linear + Asana (+ the mail connectors). Q14 = A (detection runs by itself after the notes).
 
 ## Shape (om-ux-shape, short)
 
@@ -49,25 +57,13 @@ From the 2026-11-23 brainstorm (not asked again): actions before chat; approval 
 
 | # | Question | Options | Recommendation |
 |---|---|---|---|
-| Q2 | Meetings with guests | **Decided: A + D**, .ics as the fallback without an account | — |
-| Q3 | Where the actions live | **Decided: C** (tab + inbox) | — |
-| Q4 | Which tab a meeting opens on | **Decided (owner's own option)**: always Notes; linked tasks show a hover card | — |
-| Q5 | Card form | A) one card open at a time, editable in place (prototype); B) all cards expanded; C) read-only card with Edit | A |
-| Q6 | Evidence on the card | A) quote + speaker always visible (prototype); B) behind "Why?"; C) quote + surrounding lines | A |
-| Q7 | Undo after approval | A) mail held 10 s with Undo, other actions undone by deleting what was created (prototype); B) no Undo, only a result link | A |
-| Q8 | Two filled buttons on the note screen (Record Meeting + the card's approve button) | A) keep both filled; B) the card button tinted; C) Record Meeting unfilled while Actions is open | A |
-| Q9 | Bulk approval | A) none in v1; B) "Approve all just for you"; C) "Approve all" | A |
-| Q10 | How you learn actions are ready | A) only in the app; B) + one macOS notification per meeting; C) B + a dot on the menu bar ring (prototype) | C |
-| Q11 | When to offer "ask less" (only-you actions) | A) after 3 approvals without edits, plus a Settings switch (prototype); B) only the switch; C) not in v1 | A |
-| Q12 | "Assigned to you" in Jira | A) you said it AND the Jira assignee is you; B) only the assignee | A |
-| Q13 | Curated MCP connectors in v1 (plus the mail connectors from Q1) | A) Linear + Asana; B) + Notion and Slack; C) Linear only | A |
-| Q14 | When detection runs | A) automatically after the notes; B) only when you click "Find actions" | A |
+| Q15 | What stays once the "Ready · 5 actions" pill is gone (there is no macOS notification, so a missed pill leaves only the count inside the app) | A) the pill stays until Open or ✕; B) the pill goes after 8 s, then a dot on the menu bar ring until you open the actions; C) the pill goes after 8 s, nothing else | B |
 
-Sent to the owner through L0: Q2 alone; Q3–Q8 (card and layout) and Q9–Q14 (behaviour) as two batches.
+Q1–Q14 are decided (above).
 
 ## Design notes
 
-- **One filled button per screen** is broken on the note screen (Record Meeting + approve); that is Q8.
+- **Two filled buttons on the note screen** (Record Meeting + approve): kept, owner Q8 = A.
 - **Speaker labels are gender-neutral** ("Ty:" / "You:"). Polish verbs never assume the user's gender.
 - **No timestamps in notes** (owner 2026-11-19). The card shows the quote and "Show in Transcript", with no time.
 - Calendar conflict checks are not shown: write-only calendar access cannot read events. Through a Google or Microsoft account it becomes possible (Q2).

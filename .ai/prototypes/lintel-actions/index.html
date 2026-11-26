@@ -396,6 +396,23 @@ textarea.in2{display:block;min-height:118px;line-height:1.5;padding:7px 9px;resi
 .tpop .pn .ic{width:13px;height:13px}
 .tpop .pa{display:flex;justify-content:flex-end;margin-top:10px}
 .tpop .pa .ic{width:11px;height:11px}
+/* P10: the pill after a recording (#273 pill family, OD-9 closing ring) */
+.pillstage{position:absolute;left:0;right:0;top:44px;display:flex;justify-content:center}
+.pill{--plive:var(--accent);--pon:var(--onacc);--psec:#5d5850;--pbtn:rgba(0,0,0,.07);display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px 0 10px;border-radius:999px;font-weight:500;white-space:nowrap;background:rgba(255,255,255,.72);color:#1d1b18;backdrop-filter:blur(18px) saturate(1.6);box-shadow:0 6px 22px rgba(0,0,0,.18),0 0 0 .5px rgba(0,0,0,.12)}
+.dark .pill{--psec:#b8b2a8;--pbtn:rgba(255,255,255,.12);background:rgba(40,38,35,.66);color:#f3f0ea;box-shadow:0 6px 22px rgba(0,0,0,.45),0 0 0 .5px rgba(255,255,255,.14)}
+.ts-l .pill{height:35px}.ts-xl .pill{height:38px}
+.pglyph{width:16px;height:16px;flex:none;display:block}
+.pring{color:var(--plive)}.pring .arc{transform-box:fill-box;transform-origin:center}
+.pring.work .arc{animation:pclose 1.6s ease-in-out infinite}
+@keyframes pclose{0%{stroke-dasharray:10 40}100%{stroke-dasharray:38 40}}
+@media (prefers-reduced-motion:reduce){.pring.work .arc{animation:none}}
+.pill .more{display:none}.pill:hover .more,.pill:focus-within .more{display:inline-flex}
+.pill .psec{color:var(--psec)}
+.pill .pact{font:inherit;font-weight:600;font-size:.923rem;border:0;border-radius:999px;padding:0 10px;height:24px;background:var(--pbtn);color:inherit;cursor:pointer}
+.pill .px{border:0;background:transparent;color:var(--psec);width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;cursor:pointer;padding:0}
+.pill .px svg{width:12px;height:12px}
+.desk{height:300px}
+.caption .sk-seg button{color:inherit}.caption .sk-seg button[aria-pressed=true]{color:#0F1A17}
 </style>
 </head>
 <body>
