@@ -27378,6 +27378,366 @@
           }
         }
       }
+    },
+    "Languages" : {
+      "comment" : "Settings row and sheet title: the languages the user speaks, shared by voice features",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Languages"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Języki"
+          }
+        }
+      }
+    },
+    "speechLanguages.edit" : {
+      "comment" : "Settings Languages row: opens the languages sheet",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zmień…"
+          }
+        }
+      }
+    },
+    "Edit Languages" : {
+      "comment" : "Settings Languages row: spoken name of the button that opens the languages sheet",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Languages"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zmień języki"
+          }
+        }
+      }
+    },
+    "Shared by Dictation and Meetings." : {
+      "comment" : "Settings Languages row: the same list is used by both voice features",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared by Dictation and Meetings."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wspólne dla dyktowania i spotkań."
+          }
+        }
+      }
+    },
+    "Automatic · %@" : {
+      "comment" : "Settings Languages row: automatic detection and the listed languages, e.g. Polish, English",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic · %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatycznie · %@"
+          }
+        }
+      }
+    },
+    "Always %@" : {
+      "comment" : "Settings Languages row: every recording is in this one language, e.g. Always Polish",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Always %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zawsze %@"
+          }
+        }
+      }
+    },
+    "Automatic (recommended)" : {
+      "comment" : "Languages sheet: mode in which Lintel recognises the language itself",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic (recommended)"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatycznie (zalecane)"
+          }
+        }
+      }
+    },
+    "Lintel recognises the language by itself. The list helps with short phrases." : {
+      "comment" : "Languages sheet: explanation under Automatic (recommended)",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel recognises the language by itself. The list helps with short phrases."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel sam rozpoznaje język. Lista pomaga przy krótkich wypowiedziach."
+          }
+        }
+      }
+    },
+    "Always one language" : {
+      "comment" : "Languages sheet: mode in which every recording uses the one chosen language",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Always one language"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zawsze jeden język"
+          }
+        }
+      }
+    },
+    "How Lintel picks the language" : {
+      "comment" : "Languages sheet: spoken name of the Automatic / Always one choice",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How Lintel picks the language"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jak Lintel wybiera język"
+          }
+        }
+      }
+    },
+    "Languages I speak" : {
+      "comment" : "Languages sheet: heading of the ordered list of the user's languages",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Languages I speak"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Języki, którymi mówię"
+          }
+        }
+      }
+    },
+    "Add Language…" : {
+      "comment" : "Languages sheet: button that opens the searchable list of languages",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Language…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dodaj język…"
+          }
+        }
+      }
+    },
+    "Search Languages" : {
+      "comment" : "Languages sheet: placeholder of the search field in Add Language",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search Languages"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szukaj języków"
+          }
+        }
+      }
+    },
+    "No languages found." : {
+      "comment" : "Languages sheet: the search in Add Language matches nothing",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No languages found."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie znaleziono języków."
+          }
+        }
+      }
+    },
+    "Needs the Whisper model." : {
+      "comment" : "Languages sheet: under a language the standard speech model cannot write",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs the Whisper model."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wymaga modelu Whisper."
+          }
+        }
+      }
+    },
+    "Drag to change the order." : {
+      "comment" : "Languages sheet: spoken hint on a listed language",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag to change the order."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przeciągnij, aby zmienić kolejność."
+          }
+        }
+      }
+    },
+    "With this list, meetings and dictation use the Whisper model. It is slower than the standard one." : {
+      "comment" : "Languages sheet: note above Done when a listed language needs the Whisper model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With this list, meetings and dictation use the Whisper model. It is slower than the standard one."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przy tej liście spotkania i dyktowanie używają modelu Whisper. Jest wolniejszy niż standardowy."
+          }
+        }
+      }
+    },
+    "With this language, meetings and dictation use the Whisper model. It is slower than the standard one." : {
+      "comment" : "Languages sheet: note above Done when the one pinned language needs the Whisper model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "With this language, meetings and dictation use the Whisper model. It is slower than the standard one."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przy tym języku spotkania i dyktowanie używają modelu Whisper. Jest wolniejszy niż standardowy."
+          }
+        }
+      }
+    },
+    "From your Mac’s languages." : {
+      "comment" : "Languages sheet: the list comes from the languages set in macOS, nothing was chosen yet",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From your Mac’s languages."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Z języków Twojego Maca."
+          }
+        }
+      }
+    },
+    "You can list up to 10 languages." : {
+      "comment" : "Languages sheet: Add Language is disabled because the list is full",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can list up to 10 languages."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Możesz dodać najwyżej 10 języków."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
