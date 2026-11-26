@@ -60,10 +60,71 @@ import Testing
         #expect(checked.accepted.count == 1)
     }
 
-    @Test func anIntroductionAtAnotherSpeakerIsRefused() {
-        let refused = rejection(
-            proposal(speaker: "Mówca 2", name: "Marek", kind: .introduction, quote: "nazywam się Marek"))
-        #expect(refused == .quoteAtAnotherSpeaker)
+    @Test func anIntroductionTakesTheSpeakerOfTheQuoteNotTheModelsLabel() {
+        // A small model often gives the label of another line (step 1.5); the transcript says who said it.
+        let checked = result([
+            proposal(speaker: "Mówca 2", name: "Marek", kind: .introduction, quote: "nazywam się Marek")
+        ])
+        #expect(checked.accepted.count == 1)
+        #expect(checked.accepted.first?.speaker == "Mówca 1")
+        #expect(checked.accepted.first?.segment == 0)
+    }
+
+    @Test func anIntroductionWhoseQuoteTwoSpeakersSaidIsRefused() {
+        let echoed =
+            transcript + [
+                NameSegment(speaker: "Mówca 3", startMs: 60_000, endMs: 69_000, text: "Powtarzam: nazywam się Marek.")
+            ]
+        let checked = NameEvidenceGuard(segments: echoed).check([
+            proposal(speaker: "Mówca 1", name: "Marek", kind: .introduction, quote: "nazywam się Marek")
+        ])
+        #expect(checked.accepted.isEmpty)
+        #expect(checked.rejections[.quoteAtAnotherSpeaker] == 1)
+    }
+
+    @Test func anIntroductionWithTheNameInAnotherCaseIsAGreeting() {
+        // Step 1.5: "witam panią Elżbietę" is the chair greeting a guest, not the chair's own name.
+        let greeting = [
+            NameSegment(speaker: "Mówca 1", startMs: 0, endMs: 9_000, text: "Witam serdecznie panią Ewelinę Testową.")
+        ]
+        let checked = NameEvidenceGuard(segments: greeting).check([
+            proposal(
+                speaker: "Mówca 1", name: "Ewelina Testowa", kind: .introduction,
+                quote: "Witam serdecznie panią Ewelinę Testową")
+        ])
+        #expect(checked.accepted.isEmpty)
+        #expect(checked.rejections[.introductionNotNominative] == 1)
+        // The same case as a vocative or an announcement is fine: they name somebody else.
+        let reply =
+            greeting + [
+                NameSegment(speaker: "Mówca 2", startMs: 10_000, endMs: 19_000, text: "Dziękuję za zaproszenie.")
+            ]
+        let announced = NameEvidenceGuard(segments: reply).check([
+            proposal(
+                speaker: "Mówca 1", name: "Ewelina Testowa", kind: .announced,
+                quote: "Witam serdecznie panią Ewelinę Testową")
+        ])
+        #expect(announced.accepted.first?.speaker == "Mówca 2")
+    }
+
+    @Test func aQuoteThatOpensWithAShortSentenceIsFoundByTheSentenceWithTheName() {
+        // The search cuts a literal quote at its first sentence end; "Dzień dobry" alone is too short a match.
+        let greeting = [
+            NameSegment(
+                speaker: "Mówca 1", startMs: 0, endMs: 9_000, text: "Dzień dobry. Ala Testowa, dział sprzedaży.")
+        ]
+        let checked = NameEvidenceGuard(segments: greeting).check([
+            proposal(
+                speaker: "Mówca 1", name: "Ala Testowa", kind: .introduction,
+                quote: "Dzień dobry. Ala Testowa, dział sprzedaży")
+        ])
+        #expect(checked.accepted.first?.name == "Ala Testowa")
+        #expect(checked.accepted.first?.speaker == "Mówca 1")
+        // A sentence without the name is never the one that counts.
+        let elsewhere = NameEvidenceGuard(segments: greeting).check([
+            proposal(speaker: "Mówca 1", name: "Ala", kind: .introduction, quote: "Dział sprzedaży. Tu nikt")
+        ])
+        #expect(elsewhere.accepted.isEmpty)
     }
 
     @Test func aQuoteThatIsNotThereIsRefused() {
@@ -135,13 +196,26 @@ import Testing
         #expect(checked.accepted.first?.kind == .addressed)
     }
 
-    @Test func aVocativeWhoseSpeakerDoesNotAnswerIsRefused() {
-        let refused = rejection(
-            proposal(speaker: "Mówca 3", name: "Marek", kind: .addressed, quote: "nazywam się Marek"))
-        #expect(refused == .addressedNotAnswered)
-        let wrong = rejection(
-            proposal(speaker: "Mówca 2", name: "Marek", kind: .addressed, quote: "Marku, zrobisz to do piątku"))
-        #expect(wrong == .addressedNotAnswered)
+    @Test func aVocativeNamesTheNextSpeakerWhateverLabelTheModelGave() {
+        let checked = result([
+            proposal(speaker: "Mówca 1", name: "Marek", kind: .addressed, quote: "Marku, zrobisz to do piątku")
+        ])
+        #expect(checked.accepted.first?.speaker == "Mówca 3")
+    }
+
+    @Test func aVocativeWithoutAnAnswerIsRefused() {
+        // The caller goes on talking, or nobody speaks after the quote.
+        let going = [
+            NameSegment(speaker: "Mówca 1", startMs: 0, endMs: 9_000, text: "Marku, zrobisz to do piątku?"),
+            NameSegment(speaker: "Mówca 1", startMs: 10_000, endMs: 19_000, text: "Nie słyszę odpowiedzi."),
+        ]
+        for segments in [going, Array(going.prefix(1))] {
+            let checked = NameEvidenceGuard(segments: segments).check([
+                proposal(speaker: "Mówca 2", name: "Marek", kind: .addressed, quote: "Marku, zrobisz to do piątku")
+            ])
+            #expect(checked.accepted.isEmpty)
+            #expect(checked.rejections[.addressedNotAnswered] == 1)
+        }
     }
 
     // MARK: An announcement
@@ -157,14 +231,24 @@ import Testing
         #expect(checked.accepted.first?.kind == .announced)
     }
 
-    @Test func anAnnouncementWhoseSpeakerDoesNotSpeakNextIsRefused() {
-        // The announcer keeps the floor, or somebody other than the claimed cluster speaks next.
-        let chair = rejection(
-            proposal(speaker: "Mówca 2", name: "Kowalski", kind: .announced, quote: "Głos ma pan poseł Kowalski"))
-        #expect(chair == .announcedNotAnswered)
-        let other = rejection(
-            proposal(speaker: "Mówca 1", name: "Kowalski", kind: .announced, quote: "Głos ma pan poseł Kowalski"))
-        #expect(other == .announcedNotAnswered)
+    @Test func anAnnouncementNamesTheNextSpeakerWhateverLabelTheModelGave() {
+        // Step 1.5: the local model gave the announcer's own label.
+        let checked = result([
+            proposal(speaker: "Mówca 2", name: "Kowalski", kind: .announced, quote: "Głos ma pan poseł Kowalski")
+        ])
+        #expect(checked.accepted.first?.speaker == "Mówca 3")
+    }
+
+    @Test func anAnnouncementAfterWhichTheChairKeepsTheFloorIsRefused() {
+        let chair = [
+            NameSegment(speaker: "Mówca 2", startMs: 0, endMs: 9_000, text: "Głos ma pan poseł Kowalski."),
+            NameSegment(speaker: "Mówca 2", startMs: 10_000, endMs: 19_000, text: "Ale najpierw ogłoszenie."),
+        ]
+        let checked = NameEvidenceGuard(segments: chair).check([
+            proposal(speaker: "Mówca 3", name: "Kowalski", kind: .announced, quote: "Głos ma pan poseł Kowalski")
+        ])
+        #expect(checked.accepted.isEmpty)
+        #expect(checked.rejections[.announcedNotAnswered] == 1)
     }
 
     // MARK: Counts
@@ -177,8 +261,9 @@ import Testing
             proposal(speaker: "Mówca 1", name: "Anna", kind: .introduction, quote: "nazywam się Marek"),
             proposal(speaker: "Mówca 3", name: "Marek", kind: .referred, quote: "Marku, zrobisz to do piątku"),
         ])
-        #expect(checked.accepted.count == 1)
-        #expect(checked.rejections[.quoteAtAnotherSpeaker] == 1)
+        // The second one is accepted too: its speaker is the transcript's, not the label the model gave.
+        #expect(checked.accepted.count == 2)
+        #expect(checked.rejections[.quoteAtAnotherSpeaker] == nil)
         #expect(checked.rejections[.quoteNotInTranscript] == 1)
         #expect(checked.rejections[.nameNotInQuote] == 1)
         #expect(checked.rejections[.referredKind] == 1)

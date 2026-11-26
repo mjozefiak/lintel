@@ -344,6 +344,11 @@ import Testing
     @Test func namesMatchOnlyByEqualityOrACaseEnding() {
         #expect(NotesText.namesMatch("marek", "marka"))
         #expect(NotesText.namesMatch("marek", "markowi"))
+        // The mobile e of `-eł` (step 1.5): Paweł / Pawła / Pawłem, but not Pawlak.
+        #expect(NotesText.namesMatch("pawel", "pawla"))
+        #expect(NotesText.namesMatch("pawel", "pawlem"))
+        #expect(!NotesText.namesMatch("pawel", "pawlak"))
+        #expect(!NotesText.namesMatch("marcel", "marcin"))
         #expect(NotesText.namesMatch("anna", "annie") == false || NotesText.namesMatch("anna", "annie"))
         #expect(NotesText.namesMatch("ewa", "ewy"))
         #expect(NotesText.namesMatch("kowalski", "kowalski"))

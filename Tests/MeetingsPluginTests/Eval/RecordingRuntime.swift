@@ -17,10 +17,17 @@ final class RecordingRuntime: LLMRuntime {
 
     private let inner: any LLMRuntime
     private let storage = Mutex<[Record]>([])
+    private let names = Mutex<[String]>([])
 
     init(_ inner: any LLMRuntime) { self.inner = inner }
 
+    /// The notes' completions (MAP, REDUCE, verifier); the speaker names request is kept apart.
     var records: [Record] { storage.withLock { $0 } }
+    /// The answers of the speaker names pass (`SpeakerNamePrompt`), for `<name>.names.json` only.
+    var namesAnswers: [String] { names.withLock { $0 } }
+    /// Why a names request threw (the error's case and numbers, e.g. `promptTooLong(tokens:limit:)`; no text).
+    var namesFailures: [String] { failures.withLock { $0 } }
+    private let failures = Mutex<[String]>([])
 
     var contextLength: Int { inner.contextLength }
     var isLoaded: Bool { get async { await inner.isLoaded } }
@@ -33,6 +40,16 @@ final class RecordingRuntime: LLMRuntime {
     }
 
     func generateResult(messages: [ChatMessage], maxTokens: Int) async throws -> GenerationResult {
+        if messages.first?.content == SpeakerNamePrompt.system {
+            do {
+                let result = try await inner.generateResult(messages: messages, maxTokens: maxTokens)
+                names.withLock { $0.append(result.text) }
+                return result
+            } catch {
+                failures.withLock { $0.append(String(describing: error)) }
+                throw error
+            }
+        }
         let result = try await inner.generateResult(messages: messages, maxTokens: maxTokens)
         let isMap = messages.first.map { NotesPrompt.isMapSystem($0.content) } ?? false
         storage.withLock {

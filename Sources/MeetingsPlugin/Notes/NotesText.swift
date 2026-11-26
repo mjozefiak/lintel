@@ -214,7 +214,7 @@ enum NotesText {
     }
 
     /// Names match only when equal (after the fold of case and diacritics) or when they differ by a case ending
-    /// (`Marek`/`Marka`/`Markowi`, `Ewa`/`Ewy`, `Anna`/`Annie`). Both at least 3 letters. `Marcin`/`Marcel`,
+    /// (`Marek`/`Marka`/`Markowi`, `Paweł`/`Pawła`, `Ewa`/`Ewy`, `Anna`/`Annie`). Both at least 3 letters. `Marcin`/`Marcel`,
     /// `Maria`/`Marian`, `Julia`/`Julian` do not match.
     static func namesMatch(_ first: String, _ second: String) -> Bool {
         if first == second { return true }
@@ -247,9 +247,12 @@ enum NotesText {
         return sharedPrefix(a, b) >= min(5, shorter)
     }
 
-    /// `marek` → `mark`: the `e` that drops out in `Marka`, `Markowi`.
+    /// `marek` → `mark`, `pawel` → `pawl`: the `e` that drops out in `Marka`, `Markowi`, `Pawła`, `Pawłem`.
     private static func elided(_ name: String) -> String {
-        name.hasSuffix("ek") && name.count > 3 ? String(name.dropLast(2)) + "k" : name
+        guard name.count > 3, let last = name.last, name.hasSuffix("e" + String(last)), "kl".contains(last) else {
+            return name
+        }
+        return String(name.dropLast(2)) + String(last)
     }
 
     private static func sharedPrefix(_ a: [Character], _ b: [Character]) -> Int {

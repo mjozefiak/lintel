@@ -120,9 +120,60 @@ import Testing
             from: segments([
                 "Zaczynamy.", "Wczoraj Marek mówił o ofercie.", "Anno, a ty co myślisz?", "Dobrze.", "Koniec.",
             ]))
+        // The vocative's excerpt (first tier) takes the bare name next to it; nothing reaches into segment 0.
         #expect(result.excerpts.count == 1)
-        #expect(result.excerpts.first?.range == 0...3)
+        #expect(result.excerpts.first?.range == 1...3)
+        #expect(result.excerpts.first?.isPrimary == true)
         #expect(result.candidates.map(\.name).sorted() == ["Anno", "Marek"])
+    }
+
+    @Test func bareWordsDoNotChainThePhraseExcerpts() {
+        // Step 1.5: in a long meeting nearly every segment has a capitalised word; merged into one tier they made
+        // excerpts of dozens of segments. A bare word makes its own excerpt from what the phrases leave.
+        let result = NameMentionExtractor().excerpts(
+            from: segments([
+                "Wczoraj Marek mówił.", "Potem Ewa dodała.", "Głos ma pan Kowalski.", "Dziękuję bardzo.",
+                "Teraz Gdynia i Sopot.", "Koniec.",
+            ]))
+        #expect(result.excerpts.map(\.range) == [0...0, 1...3, 4...5])
+        #expect(result.excerpts.map(\.isPrimary) == [false, true, false])
+    }
+
+    @Test func aNeighbourWithoutACandidateIsTrimmed() {
+        let long = (1...30).map { "słowo\($0)" }.joined(separator: " ")
+        let result = NameMentionExtractor().excerpts(from: segments([long, "Głos ma pan Kowalski.", long]))
+        let lines = result.excerpts.first?.segments.map(\.text) ?? []
+        // Before the name: its last words; after it: its first words (who answers and how).
+        #expect(lines.first == (19...30).map { "słowo\($0)" }.joined(separator: " "))
+        #expect(lines.last == (1...12).map { "słowo\($0)" }.joined(separator: " "))
+        #expect(lines[1] == "Głos ma pan Kowalski.")
+    }
+
+    @Test func aLongSegmentIsCutToAWindowAroundItsCandidate() {
+        let before = (1...20).map { "a\($0)" }.joined(separator: " ")
+        let after = (1...20).map { "b\($0)" }.joined(separator: " ")
+        let text = before + " głos ma pan Kowalski, " + after + "."
+        let result = NameMentionExtractor().excerpts(from: segments([text]))
+        let line = result.excerpts.first?.segments.first?.text ?? ""
+        #expect(line.hasPrefix("… "))
+        #expect(line.hasSuffix(" …"))
+        #expect(line.contains("głos ma pan Kowalski,"))
+        #expect(!line.contains("a1 "))
+        #expect(!line.contains("b20"))
+    }
+
+    @Test func fittingKeepsThePhrasesFirstAndCountsTheRest() {
+        let outcome = NameMentionExtractor().excerpts(
+            from: segments([
+                "Wczoraj Marek mówił.", "Potem Ewa dodała.", "Głos ma pan Kowalski.", "Dziękuję bardzo.",
+                "Teraz Gdynia i Sopot.", "Koniec.",
+            ]))
+        let phrase = NameMentionExtractor.estimatedTokens(of: outcome.excerpts[1])
+        let fitted = NameMentionExtractor.fitting(outcome, budget: phrase)
+        #expect(fitted.excerpts.map(\.range) == [1...3])
+        #expect(fitted.droppedExcerpts == 2)
+        #expect(NameMentionExtractor.fitting(outcome, budget: 0).excerpts.isEmpty)
+        #expect(NameMentionExtractor.fitting(outcome, budget: 100_000).excerpts.count == 3)
     }
 
     @Test func everyExcerptStartsAtTheCandidate() {

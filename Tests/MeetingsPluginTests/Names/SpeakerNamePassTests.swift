@@ -50,7 +50,8 @@ import Testing
         #expect(generator.released == 1)
         #expect(generator.calls.count == 1)
         #expect(outcome.answers == 4)
-        #expect(outcome.excerpts == 1)
+        // The phrases make one excerpt; "czyli Ewa" is a bare word, so its own (second tier).
+        #expect(outcome.excerpts == 2)
         #expect(outcome.droppedExcerpts == 0)
         #expect(outcome.accepted.count == 4)
         #expect(outcome.rejections.isEmpty)
@@ -69,13 +70,43 @@ import Testing
         #expect(outcome.accepted.contains { $0.kind == .announced && $0.name == "Ewa" && $0.speaker == "Mówca 3" })
     }
 
-    @Test func anAnswerWithACutTokenLimitIsNoEvidence() async {
-        let generator = ScriptedGenerator { _, _ in
-            GenerationResult(text: Self.answer, stoppedByTokenLimit: true)
-        }
+    @Test func anAnswerCutByTheTokenLimitKeepsItsCompleteEntries() async {
+        // A loop until the limit (step 1.5): the complete entries count, the open one at the end does not, and a
+        // repeated entry is read once.
+        let entry =
+            #"{"speaker": "Mówca 1", "name": "Marek", "kind": "introduction", "quote": "nazywam się Marek", "confidence": "high"}"#
+        let looping = "[\n  " + Array(repeating: entry, count: 3).joined(separator: ",\n  ") + #",\n  {"speaker": "Mów"#
+        let generator = ScriptedGenerator { _, _ in GenerationResult(text: looping, stoppedByTokenLimit: true) }
         let outcome = await pass(generator).run(segments: transcript(), conditions: .init())
-        #expect(outcome.accepted.isEmpty && outcome.answers == 0)
+        #expect(outcome.status == .answered)
+        #expect(outcome.answers == 1)
+        #expect(outcome.accepted.map(\.name) == ["Marek"])
         #expect(generator.released == 1)
+    }
+
+    @Test func theExcerptsFitTheGeneratorsBudget() async throws {
+        // A long meeting's excerpts do not fit the built-in model's context (step 1.5): the pass sends what fits,
+        // the phrases first, and counts the rest as dropped.
+        let configuration = SpeakerNamePass.Configuration()
+        let noRoom = ScriptedGenerator.answering("[]", budget: configuration.answerMaxTokens)
+        let none = await pass(noRoom).run(segments: transcript(), conditions: .init())
+        #expect(noRoom.calls.isEmpty)
+        #expect(none.status == .noExcerpts)
+        #expect(none.droppedExcerpts == 2)
+
+        let all = NameMentionExtractor().excerpts(from: transcript())
+        let phrase = NameMentionExtractor.estimatedTokens(of: try #require(all.excerpts.first))
+        let budget = try #require(
+            (configuration.answerMaxTokens...20_000).first {
+                configuration.excerptBudget(inputBudgetTokens: $0) >= phrase
+            })
+        let oneFits = ScriptedGenerator.answering(Self.answer, budget: budget)
+        let outcome = await pass(oneFits).run(segments: transcript(), conditions: .init())
+        #expect(outcome.excerpts == 1)
+        #expect(outcome.droppedExcerpts == 1)
+        let sent = oneFits.calls.first?.last?.content ?? ""
+        #expect(sent.contains("nazywam się Marek"))
+        #expect(!sent.contains("czyli Ewa"))
     }
 
     // MARK: Failures

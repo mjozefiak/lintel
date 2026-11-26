@@ -37,14 +37,14 @@ import Testing
     }
 
     @Test func thePromptMatchesItsGolden() throws {
-        let url = try golden("speaker-names-prompt-v1.txt")
+        let url = try golden("speaker-names-prompt-v2.txt")
         if ProcessInfo.processInfo.environment["LINTEL_UPDATE_GOLDEN"] != nil {
             try rendered.write(
                 to: TestPaths.repoRoot.appending(
-                    path: "Tests/MeetingsPluginTests/Fixtures/speaker-names-prompt-v1.txt"),
+                    path: "Tests/MeetingsPluginTests/Fixtures/speaker-names-prompt-v2.txt"),
                 atomically: true, encoding: .utf8)
         }
-        #expect(SpeakerNamePrompt.version == "names1")
+        #expect(SpeakerNamePrompt.version == "names2")
         #expect(try String(contentsOf: url, encoding: .utf8) == rendered)
     }
 

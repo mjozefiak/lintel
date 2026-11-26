@@ -34,9 +34,24 @@ struct SpeakerNamePass: Sendable {
     struct Configuration: Sendable {
         /// The whole request, load included: the spec's limit of the pass (spec: Risks → performance).
         var timeout: Duration = .seconds(60)
-        /// The JSON answer of a whole pass, well under the model's context.
-        var answerMaxTokens = 2000
+        /// The JSON answer of a whole pass, well under the model's context (step 1.5: answers held 3 to 9
+        /// entries, about 500 tokens; a longer one is a loop, and its complete entries are still read).
+        var answerMaxTokens = 1200
+        /// The share of the generator's context (less the answer and the fixed part of the prompt) the excerpts
+        /// may take by the estimate: `NotesText.estimateTokens` is a heuristic, and an excerpt block over the real
+        /// limit fails the whole request (`promptTooLong`).
+        var excerptBudgetShare = 0.8
         init() {}
+
+        /// The estimated tokens the excerpts may take for a generator with `inputBudgetTokens`.
+        func excerptBudget(inputBudgetTokens: Int) -> Int {
+            let fixed =
+                NotesText.estimateTokens(SpeakerNamePrompt.system)
+                + NotesText.estimateTokens(SpeakerNamePrompt.exampleExcerpts)
+                + NotesText.estimateTokens(SpeakerNamePrompt.exampleAnswer)
+            let room = Double(max(0, inputBudgetTokens - answerMaxTokens)) * excerptBudgetShare
+            return max(0, Int(room) - fixed)
+        }
     }
 
     struct Outcome: Equatable, Sendable {
@@ -48,8 +63,8 @@ struct SpeakerNamePass: Sendable {
             case noExcerpts
             /// The model answered (an empty or unusable answer included): the evidence is what passed the guard.
             case answered
-            /// No answer: the writer could not be opened, the request failed, the time limit came first, the
-            /// answer was cut by the token limit or the task was cancelled.
+            /// No answer: the writer could not be opened, the request failed, the time limit came first or the
+            /// task was cancelled. An answer cut by the token limit is `answered` with its complete entries.
             case failed
         }
 
@@ -97,7 +112,9 @@ struct SpeakerNamePass: Sendable {
                 speaker: SpeakerNamePrompt.sanitized(segment.speaker), startMs: segment.startMs,
                 endMs: segment.endMs, text: SpeakerNamePrompt.sanitized(segment.text))
         }
-        let extraction = NameMentionExtractor(knownNames: knownNames).excerpts(from: segments)
+        let extraction = NameMentionExtractor.fitting(
+            NameMentionExtractor(knownNames: knownNames).excerpts(from: segments),
+            budget: configuration.excerptBudget(inputBudgetTokens: generator.profile.inputBudgetTokens))
         var outcome = Outcome(droppedExcerpts: extraction.droppedExcerpts)
         guard conditions.notesEnabled, conditions.namesFromConversation, !conditions.isChannelMeeting else {
             return outcome
@@ -113,7 +130,7 @@ struct SpeakerNamePass: Sendable {
         let generator = generator
         let maxTokens = configuration.answerMaxTokens
         let started = now()
-        let answer: String?
+        let answer: GenerationResult?
         do {
             answer =
                 try await NotesDeadline.run(limit: configuration.timeout, sleep: sleep) { report in
@@ -128,8 +145,7 @@ struct SpeakerNamePass: Sendable {
                         let generated = try await generator.generateResult(
                             messages: messages, maxTokens: maxTokens, onPhase: nil)
                         await generator.release()
-                        // An answer cut by the token limit is no JSON array: never trusted.
-                        return generated.stoppedByTokenLimit ? nil : generated.text
+                        return generated
                     } catch {
                         await generator.release()
                         throw error
@@ -139,9 +155,10 @@ struct SpeakerNamePass: Sendable {
             answer = nil
         }
         outcome.elapsedMs = Self.milliseconds(now() - started)
-        guard let text = answer, !Task.isCancelled else { return outcome }
+        guard let answer, !Task.isCancelled else { return outcome }
         outcome.status = .answered
-        let proposals = SpeakerNameParser.proposals(from: text)
+        // An answer cut by the token limit keeps its complete entries; the guard checks each one.
+        let proposals = SpeakerNameParser.proposals(from: answer.text, cut: answer.stoppedByTokenLimit)
         outcome.answers = proposals.count
         let checked = NameEvidenceGuard(segments: segments).check(proposals)
         outcome.accepted = checked.accepted
