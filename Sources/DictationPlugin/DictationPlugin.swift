@@ -207,6 +207,13 @@ public final class DictationPlugin: LintelPlugin {
         }
     }
 
+    /// The model the history records for a dictation: the built-in model's id or the server's model name at a level that
+    /// runs a model, and `nil` at Light or Off, where no model ran (the note's column stays empty, never a fake name).
+    nonisolated static func formatterModel(settings: DictationSettings) -> String? {
+        guard settings.usesModel else { return nil }
+        return settings.llmSource == .builtIn ? settings.builtInLLMModel.id : settings.llmModel
+    }
+
     /// The words Light keeps: the vocabulary's terms and spoken variants, empty while the vocabulary is switched off.
     nonisolated static func protectedWords(
         settings: DictationSettings, vocabulary: VocabularyStore
@@ -297,11 +304,7 @@ public final class DictationPlugin: LintelPlugin {
                 frontmostBundleID: { context.workspace.frontmostApplication?.bundleIdentifier },
                 formatMode: { settings.effectiveLevel == nil ? .raw : .clean },
                 speechModelID: { settings.speechModelID },
-                formatterModel: {
-                    // Light ran no model: the history says so with an empty column, never a model's name.
-                    guard settings.usesModel else { return nil }
-                    return settings.llmSource == .builtIn ? settings.builtInLLMModel.id : settings.llmModel
-                }))
+                formatterModel: { Self.formatterModel(settings: settings) }))
         self.controller = controller
         relay.controller = controller
         history.open()

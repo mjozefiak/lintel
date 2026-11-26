@@ -130,6 +130,36 @@ import Testing
 
 /// What each level picks when a dictation starts, and that Light never reaches a model.
 @Suite struct CleanupLevelFormatterTests {
+    private func settings(_ values: [String: SettingValue] = [:]) -> DictationSettings {
+        DictationSettings(PluginSettings(pluginID: "dictation", store: MemorySettingsStore(values)))
+    }
+
+    @Test func theHistoryModelIsNilForLightAndOffAndTheModelsNameAtStandard() {
+        // Off and Light run no model, so nothing is recorded (empty column, never a fake name).
+        #expect(DictationPlugin.formatterModel(settings: settings()) == nil)
+        #expect(
+            DictationPlugin.formatterModel(
+                settings: settings([
+                    "plugins.dictation.mode": .string("cleanup"),
+                    "plugins.dictation.cleanupLevel": .string("light"),
+                    "plugins.dictation.llmSource": .string("builtIn"),
+                ])) == nil)
+        // Standard records the model that ran: the built-in model's id, or the server's model name.
+        #expect(
+            DictationPlugin.formatterModel(
+                settings: settings([
+                    "plugins.dictation.mode": .string("cleanup"),
+                    "plugins.dictation.llmSource": .string("builtIn"),
+                ])) == LLMModelCatalog.defaultModel.id)
+        #expect(
+            DictationPlugin.formatterModel(
+                settings: settings([
+                    "plugins.dictation.mode": .string("cleanup"),
+                    "plugins.dictation.llmSource": .string("server"),
+                    "plugins.dictation.llmModel": .string("qwen"),
+                ])) == "qwen")
+    }
+
     private func pick(_ values: [String: SettingValue]) async -> (
         formatter: (any TextFormatter)?, transport: ScriptedTransport, runtime: ScriptedRuntime
     ) {
