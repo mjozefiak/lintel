@@ -13,10 +13,15 @@ import LintelCore
 /// - only counters and codes leave this type; it never logs text.
 ///
 /// What it cannot see (named limits): a false sentence without a number, date or proper noun passes. A capitalised
-/// word at the start of a sentence or after a colon is not checked as a name, so an invented person who opens a
-/// line ("Zenon prepares the report") passes; only the owner field is checked against the recording. A clock time
-/// is checked by its hour only, and the English "ten" and "one" in a line are never read as numbers. The quality
-/// gate counts such sentences by hand in the finished notes.
+/// word at the START of a sentence is not checked as a name: an ordinary word the meeting did not say as such
+/// ("Skipping…", "Zdecydowano…") opens many good lines, so dropping every such line would cost more than the rare
+/// invented person it removes; an invented person who opens a line passes, and the quality gate counts such
+/// sentences by hand. A capitalised word after a colon or a semicolon is checked as a name, and so is the owner
+/// field. A clock time is checked by its hour against the spoken numbers and hours, and by its minutes: every
+/// field after the hour must be said too or be zero, so an invented "22:45" goes while "22:00" stands. A time the
+/// meeting said as "half past ten" or "wpół do jedenastej" is written down as 10:30 only when 30 was said as a
+/// number too, which is a known false removal (the guard has no clock-phrase reading). A decimal is compared in
+/// tenths (Polish "półtora" is "1.5"), and a numeric date ("15.03") stands when its day and month were said.
 struct NotesFactGuard: Sendable {
     enum Rule: String, Sendable, CaseIterable { case numbers, dates, names, shape }
 
@@ -259,6 +264,9 @@ extension NotesFactGuard {
         let temporal: Set<String>
         let relative: Set<Int>
         let links: Set<String>
+        /// The words a line may use for a number that are mostly a pronoun in the meeting's language: "ten" and
+        /// "one" are the numbers 10 and 1 only in an English meeting.
+        let ambiguous: Set<String>
 
         init(utterances: [NotesUtterance]) {
             var all: [String] = []
@@ -277,9 +285,12 @@ extension NotesFactGuard {
             for index in all.indices.dropLast() { set.insert(all[index] + all[index + 1]) }
             words = set
             byInitial = Dictionary(grouping: set, by: { $0.first ?? " " })
-            // In a Polish meeting "ten" is the pronoun (this), never the number 10.
-            let polish = NotesLanguage.dominant(in: utterances.map(\.text).joined(separator: " ")) == .polish
-            values = NotesNumberForms.spokenValues(polish ? all.map { $0 == "ten" ? "_" : $0 } : all)
+            let language = NotesLanguage.dominant(in: utterances.map(\.text).joined(separator: " "))
+            // Outside an English meeting "ten" is the Polish pronoun (this) and "one" the Polish "they", never
+            // the numbers 10 and 1: both are left out of the spoken numbers.
+            let numbers = language == .english ? all : all.map { ["ten", "one"].contains($0) ? "_" : $0 }
+            values = NotesNumberForms.spokenValues(numbers)
+            ambiguous = language == .english ? ["second", "sto", "stu"] : ["second", "sto", "stu", "ten", "one"]
             self.units = units
             hours = NotesNumberForms.spokenHours(all)
             temporal = Set(all.compactMap { Temporal.group(of: $0) })
@@ -291,9 +302,15 @@ extension NotesFactGuard {
             for unit in NotesText.numberUnits(text) {
                 if units.contains(unit) { continue }
                 if unit.contains(":") {
-                    let hour = Int(unit.prefix { $0 != ":" }) ?? -1
-                    if values.contains(hour) || hours.contains(hour) || hours.contains(hour % 12) { continue }
-                    return false
+                    let fields = unit.split(separator: ":").compactMap { Int($0.prefix { $0.isNumber }) }
+                    guard let hour = fields.first else { return false }
+                    if !(values.contains(hour) || hours.contains(hour) || hours.contains(hour % 12)) { return false }
+                    // The minutes (and seconds) too: "22:45" says nothing about 45 if only 22 was spoken.
+                    for field in fields.dropFirst()
+                    where field != 0 && !values.contains(field) && !hours.contains(field) {
+                        return false
+                    }
+                    continue
                 }
                 // "4,200": a thousands separator, not a decimal.
                 let pieces = unit.split(separator: ".", omittingEmptySubsequences: false)
@@ -305,8 +322,19 @@ extension NotesFactGuard {
                 }
                 if unit.contains(where: { ".,/-".contains($0) }) {
                     let parts = unit.split { ".,/-".contains($0) }.compactMap { Int($0.prefix { $0.isNumber }) }
-                    if unit.contains("."), parts.count > 1, !unit.contains("/") { return false }
+                    if unit.contains("."), parts.count > 1, !unit.contains("/") {
+                        // "1.5": a decimal, compared in tenths ("półtora" is 15); "15.03": a date.
+                        if parts.count == 2, parts.allSatisfy({ values.contains($0) }) { continue }
+                        if parts.count == 2, pieces.count == 2, pieces[1].count == 1, parts[0] <= 1_000_000,
+                            values.contains(parts[0] * 10 + parts[1])
+                        {
+                            continue
+                        }
+                        if Self.isSaidDate(parts, values: values, temporal: temporal) { continue }
+                        return false
+                    }
                     if !parts.isEmpty, parts.allSatisfy({ values.contains($0) }) { continue }
+                    if Self.isSaidDate(parts, values: values, temporal: temporal) { continue }
                     return false
                 }
                 if let value = Int(unit.prefix { $0.isNumber }), values.contains(value) { continue }
@@ -319,8 +347,8 @@ extension NotesFactGuard {
                     masked.append("#")
                 } else if masked.last == "#", NotesNumberForms.isMagnitude(word) {
                     continue
-                } else if Self.ambiguousWords.contains(word) {
-                    masked.append("_")  // Polish "ten" (this) is English "ten"
+                } else if ambiguous.contains(word) {
+                    masked.append("_")
                 } else {
                     masked.append(word)
                 }
@@ -328,7 +356,14 @@ extension NotesFactGuard {
             return NotesNumberForms.spokenValues(masked, skipOne: true).isSubset(of: values)
         }
 
-        private static let ambiguousWords: Set<String> = ["ten", "second", "one", "sto", "stu"]
+        /// A numeric date (`15.03`, `15/03/2026`) whose day was said as a number and whose month was said as a
+        /// month name; with a year, the year must be said too.
+        private static func isSaidDate(_ parts: [Int], values: Set<Int>, temporal: Set<String>) -> Bool {
+            guard (2...3).contains(parts.count), (1...31).contains(parts[0]),
+                let group = Temporal.monthGroup(parts[1]), values.contains(parts[0]), temporal.contains(group)
+            else { return false }
+            return parts.count == 2 || values.contains(parts[2])
+        }
 
         func datesAreSaid(in text: String) -> Bool {
             NotesText.words(text).allSatisfy { word in
@@ -338,12 +373,22 @@ extension NotesFactGuard {
         }
 
         func namesAreSaid(in text: String) -> Bool {
-            for token in NotesText.tokens(text) where token.capitalised && !token.startsSentence {
+            for token in NotesText.tokens(text) where token.capitalised {
                 let word = token.word
                 guard word.count >= 2, !word.contains(where: \.isNumber) else { continue }
+                if Self.isCapitalisedForPlace(token) { continue }
                 if !isKnown(word) { return false }
             }
             return true
+        }
+
+        /// A capital that only marks the start of the line is not a name: it passes unchecked, because an
+        /// ordinary word the meeting did not say as such ("Skipping…", "Zdecydowano…") opens many lines. A capital
+        /// after a colon or a semicolon (`Ustalenia: Zenon …`) is a name in both languages, so that one is checked.
+        static func isCapitalisedForPlace(_ token: NotesText.WordToken) -> Bool {
+            guard token.startsSentence else { return false }
+            // The first word of the line, or the first after a full stop, exclamation or question mark.
+            return token.start == 0 || token.sentenceEnd != nil
         }
 
         private func isKnown(_ word: String) -> Bool {

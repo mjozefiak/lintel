@@ -49,7 +49,11 @@ struct RealWholeNotesTests {
                 let checked = NotesFactGuard(utterances: corpus.utterances, durationMs: corpus.durationMs).check(final)
                 let rubric = WholeNotesRubric.score(draft: checked.draft, gold: corpus.gold)
                 if let out = Self.environment["LINTEL_WHOLE_NOTES_OUT"] {
-                    let directory = URL(filePath: out).appending(path: "synthetic")
+                    let base = URL(filePath: out)
+                    try #require(
+                        base.path.hasPrefix("/Volumes/LintelMeetingEval/work/"),
+                        "LINTEL_WHOLE_NOTES_OUT goes only into the encrypted image")
+                    let directory = base.appending(path: "synthetic")
                     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                     try (result.markdown ?? "").write(
                         to: directory.appending(
@@ -287,8 +291,46 @@ final class LlamaServerGenerator: HarnessGenerator, @unchecked Sendable {
     }
 }
 
+/// Ends a child process from outside its wait: the harness's time limit and a cancelled task both stop it, so a
+/// generator left running by a test never outlives the test. Only a running child is signalled, and a stop asked
+/// for before the child started is carried out as soon as it starts.
+final class ChildWatchdog: @unchecked Sendable {
+    private let state = Mutex((process: Process?.none, stopRequested: false))
+
+    /// True once a stop was asked for (the time limit or a cancellation), false when the child ended by itself.
+    var stopped: Bool { state.withLock { $0.stopRequested } }
+
+    func attach(_ process: Process) {
+        let stop = state.withLock { state -> Bool in
+            state.process = process
+            return state.stopRequested
+        }
+        if stop { Self.stop(process) }
+    }
+
+    func stop() {
+        let process = state.withLock { state -> Process? in
+            state.stopRequested = true
+            return state.process
+        }
+        if let process { Self.stop(process) }
+    }
+
+    private static func stop(_ process: Process) {
+        guard process.isRunning else { return }
+        let pid = process.processIdentifier
+        process.terminate()
+        DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+            guard process.isRunning else { return }
+            kill(pid, SIGKILL)
+        }
+    }
+}
+
 /// A `NotesGenerating` over the Claude Code CLI with the isolation flags of ADR 0011. Test-only: the app has no
 /// such generator. The prompt goes through stdin; the child gets an allowlisted environment and an empty folder.
+/// The child is stopped when the request takes longer than `LINTEL_WHOLE_NOTES_TIMEOUT` seconds (600 by default)
+/// and when the task is cancelled; a stopped child ends the request with an error, never with a partial answer.
 final class ClaudeCLIGenerator: NotesGenerating, @unchecked Sendable {
     struct Failure: Error { var detail: String }
 
@@ -339,23 +381,35 @@ final class ClaudeCLIGenerator: NotesGenerating, @unchecked Sendable {
         process.standardOutput = output
         process.standardError = error
 
-        let data: Data = try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global().async {
-                do {
-                    try process.run()
-                    DispatchQueue.global().async {
-                        try? input.fileHandleForWriting.write(contentsOf: Data(serialized.input.utf8))
-                        try? input.fileHandleForWriting.close()
+        let watchdog = ChildWatchdog()
+        let limit = Double(environment["LINTEL_WHOLE_NOTES_TIMEOUT"] ?? "") ?? 600
+        let limitItem = DispatchWorkItem { watchdog.stop() }
+        DispatchQueue.global().asyncAfter(deadline: .now() + limit, execute: limitItem)
+        defer { limitItem.cancel() }
+        let data: Data = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global().async {
+                    do {
+                        try process.run()
+                        watchdog.attach(process)
+                        DispatchQueue.global().async {
+                            try? input.fileHandleForWriting.write(contentsOf: Data(serialized.input.utf8))
+                            try? input.fileHandleForWriting.close()
+                        }
+                        DispatchQueue.global().async { _ = try? error.fileHandleForReading.readToEnd() }
+                        let data = (try? output.fileHandleForReading.readToEnd()) ?? Data()
+                        process.waitUntilExit()
+                        continuation.resume(returning: data)
+                    } catch {
+                        continuation.resume(throwing: error)
                     }
-                    DispatchQueue.global().async { _ = try? error.fileHandleForReading.readToEnd() }
-                    let data = (try? output.fileHandleForReading.readToEnd()) ?? Data()
-                    process.waitUntilExit()
-                    continuation.resume(returning: data)
-                } catch {
-                    continuation.resume(throwing: error)
                 }
             }
+        } onCancel: {
+            watchdog.stop()
         }
+        try Task.checkCancellation()
+        if watchdog.stopped { throw Failure(detail: "the child was stopped: the time limit or a cancellation") }
         struct Reply: Decodable {
             struct Usage: Decodable {
                 var inputTokens: Int?
@@ -388,5 +442,41 @@ final class ClaudeCLIGenerator: NotesGenerating, @unchecked Sendable {
         }
         state.withLock { $0.texts.append(text) }
         return GenerationResult(text: text, stoppedByTokenLimit: false)
+    }
+}
+
+/// The harness's own stop path, with a real child (`/bin/sleep`) so the test does not need a model.
+@Suite struct ChildWatchdogTests {
+    @Test func aStopEndsTheChildAtOnce() async throws {
+        let process = Process()
+        process.executableURL = URL(filePath: "/bin/sleep")
+        process.arguments = ["30"]
+        let watchdog = ChildWatchdog()
+        try process.run()
+        watchdog.attach(process)
+        let started = ContinuousClock.now
+        watchdog.stop()
+        process.waitUntilExit()
+        #expect(watchdog.stopped)
+        #expect(!process.isRunning)
+        #expect(process.terminationReason == .uncaughtSignal, "the child ended by itself, not by the stop")
+        #expect(process.terminationStatus == SIGTERM)
+        #expect(ContinuousClock.now - started < .seconds(5), "the child was not stopped")
+    }
+
+    /// A stop asked for before the child starts is carried out as soon as it starts (a cancelled task can reach
+    /// the generator before `Process.run` did).
+    @Test func aStopBeforeTheStartIsCarriedOut() async throws {
+        let process = Process()
+        process.executableURL = URL(filePath: "/bin/sleep")
+        process.arguments = ["30"]
+        let watchdog = ChildWatchdog()
+        watchdog.stop()
+        try process.run()
+        watchdog.attach(process)
+        process.waitUntilExit()
+        #expect(watchdog.stopped)
+        #expect(process.terminationReason == .uncaughtSignal, "the child ended by itself, not by the stop")
+        #expect(process.terminationStatus == SIGTERM)
     }
 }

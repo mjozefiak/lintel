@@ -3,7 +3,8 @@
  "language": "pl",
  "durationSec": 600,
  "fake": {
-  "number": "7400",
+  "number": "8800",
+  "numberSpelled": "osiem tysięcy osiemset",
   "weekday": "środę",
   "name": "Kwantoris",
   "person": "Zenon",
