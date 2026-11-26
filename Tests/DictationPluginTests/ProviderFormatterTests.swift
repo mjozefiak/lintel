@@ -1,6 +1,7 @@
 import Foundation
 import LintelKit
 import LintelSpeech
+import LintelTestSupport
 import Synchronization
 import Testing
 
@@ -31,11 +32,41 @@ import Testing
         #expect(process.contentRuns == 1)
     }
 
-    @Test func theRequestGoesOnTheInteractiveLaneWithTheChosenModel() async throws {
+    @Test func theRequestCarriesTheChosenModel() async throws {
         let process = FakeProviderProcess(answer: Self.tidy)
         _ = try await formatter(process).format(chunk: Self.chunk, previousContext: nil)
         let spec = try #require(process.specs.first)
         #expect(spec.arguments.contains("sonnet"))
+    }
+
+    /// A whole-transcript meeting-notes run holds the provider for minutes; a dictation chunk must not wait for it.
+    @Test func aDictationChunkDoesNotWaitForARunningMeetingNotesRun() async throws {
+        let held = Latch()
+        let release = Latch()
+        let process = FakeProviderProcess { call, spec in
+            if call == 1 {
+                held.open()
+                await release.wait()
+            }
+            return FakeProviderProcess.output(answer: Self.tidy)
+        }
+        // One runner, one gate: the same provider, two consumers.
+        let runner = FakeProviderProcess.runner(process)
+        let notes = Task {
+            try await runner.run(
+                ProviderRequest(
+                    feature: .meetingsNotes, model: "sonnet",
+                    messages: [ChatMessage(role: "user", content: "invented transcript")]),
+                authorization: { .allowed })
+        }
+        await held.wait()
+        let formatter = ProviderFormatter(
+            runner: runner, selection: Self.selection, currentSelection: { Self.selection })
+        let result = try await formatter.format(chunk: Self.chunk, previousContext: nil)
+        #expect(result.outcome == .formatted)
+        #expect(process.contentRuns == 2)
+        release.open()
+        _ = try await notes.value
     }
 
     @Test func withoutTheUsersChoiceNothingStarts() async throws {
