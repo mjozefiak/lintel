@@ -32,12 +32,15 @@ import Testing
         #expect(
             firstSettings.value(forKey: SettingsKeys.commandShortcutDefaultsApplied)
                 == .stringArray(["clipboard.history"]))
+        // The marker exists in memory but never in the file: only the write filter keeps it out.
+        let firstFileKeys = try keysInFile(at: url)
+        #expect(!firstFileKeys.contains(SettingsKeys.commandShortcutDefaultsApplied))
 
         let secondSettings = QAFileSettingsStore(url: url, seeded: [:])
         let second = HotkeyService(registrar: InMemoryHotkeyRegistrar(), settings: secondSettings, readOccupied: { [] })
         second.syncCommands([history]) { _ in }
         #expect(second.commandShortcut("clipboard.history")?.displayString == "⇧⌘V")
-        // The marker never reaches the file, so a third launch starts clean as well.
+        // A third launch reads the same file and starts clean as well.
         let third = QAFileSettingsStore(url: url, seeded: [:])
         #expect(third.value(forKey: SettingsKeys.commandShortcutDefaultsApplied) == nil)
     }
@@ -54,9 +57,19 @@ import Testing
         try Data(stale.utf8).write(to: url)
 
         let settings = QAFileSettingsStore(url: url, seeded: [:])
+        // Opening the file writes the filtered snapshot back, so the stale marker is gone before anything reads it.
+        let healedFileKeys = try keysInFile(at: url)
+        #expect(!healedFileKeys.contains(SettingsKeys.commandShortcutDefaultsApplied))
         let hotkeys = HotkeyService(registrar: InMemoryHotkeyRegistrar(), settings: settings, readOccupied: { [] })
         hotkeys.syncCommands([history]) { _ in }
         #expect(hotkeys.commandShortcut("clipboard.history")?.displayString == "⇧⌘V")
+    }
+
+    /// The keys as they literally sit in `qa-settings.json`, not as the store loads them.
+    private func keysInFile(at url: URL) throws -> Set<String> {
+        let data = try Data(contentsOf: url)
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return Set(object.keys)
     }
 }
 #endif

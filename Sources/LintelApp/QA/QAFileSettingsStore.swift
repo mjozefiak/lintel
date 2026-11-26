@@ -11,7 +11,8 @@ nonisolated final class QAFileSettingsStore: SettingsStore {
 
     /// Keys that never survive a relaunch. `app.hotkey.commandDefaultsApplied` marks commands whose default
     /// shortcut was stored once; in QA mode the shortcuts themselves live only in the run's in-memory registrar
-    /// (`HotkeyService`), so a second launch must apply the defaults again instead of trusting the marker (#300).
+    /// (`InMemoryHotkeyRegistrar`), so a second launch must apply the defaults again instead of trusting the marker
+    /// (#300).
     /// The key still works within one launch; it is just never written to or read back from the file.
     static let ephemeralKeys: Set<String> = [SettingsKeys.commandShortcutDefaultsApplied]
 
