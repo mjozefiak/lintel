@@ -46,7 +46,8 @@ struct DictationSettings: Sendable {
         case light
         /// Today's cleanup by a language model (`CleanupPrompt`).
         case standard
-        /// Standard plus layout and light style edits (a later phase); read as Standard until it exists.
+        /// Standard plus email layout, paragraphs for a longer dictation and a smoothed style (spec phase 2, owner
+        /// decision 2026-11-26). Offered only while `DictationSettings.fullIsOffered` is on.
         case full
 
         /// Whether a language model does the work at this level.
@@ -64,10 +65,16 @@ struct DictationSettings: Sendable {
     static let defaultSpeechModel = "parakeet-ultra"
     static let defaultKeepWarmMinutes = 10
 
-    private let settings: PluginSettings
+    /// Whether Full is offered and runs. Spec phase 2: Full ships only when its measured targets pass; with this off a
+    /// stored `full` (a newer build wrote it) shows and runs as Standard and the popup has no Full.
+    static let fullIsOffered = true
 
-    init(_ settings: PluginSettings) {
+    private let settings: PluginSettings
+    let offersFull: Bool
+
+    init(_ settings: PluginSettings, offersFull: Bool = DictationSettings.fullIsOffered) {
         self.settings = settings
+        self.offersFull = offersFull
     }
 
     var speechModelID: String { settings.string(Key.speechModel) ?? Self.defaultSpeechModel }
@@ -104,13 +111,14 @@ struct DictationSettings: Sendable {
         settings.string(Key.cleanupLevel).flatMap(CleanupLevel.init(rawValue:)) ?? .standard
     }
 
-    /// The level that runs now: `nil` while the cleanup is off. `full` is not offered yet (phase 2), so a stored
-    /// `full` (a newer build wrote it) runs as Standard.
+    /// The level that runs now: `nil` while the cleanup is off. A stored `full` runs as Standard while Full is not
+    /// offered.
     var effectiveLevel: CleanupLevel? {
         guard mode == .cleanup else { return nil }
         switch cleanupLevel {
         case .light: return .light
-        case .standard, .full: return .standard
+        case .standard: return .standard
+        case .full: return offersFull ? .full : .standard
         }
     }
 

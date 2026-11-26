@@ -23,13 +23,13 @@ struct DictationGalleryTests {
         return url.appending(path: "Tests/MeetingsPluginTests/Gallery/Goldens", directoryHint: .isDirectory)
     }()
 
-    @Test("ids are unique and well formed, every state has a summary, the four states exist")
+    @Test("ids are unique and well formed, every state has a summary, the six states exist")
     func scenesAreValid() {
         let scenes = DictationPlugin.galleryScenes
         #expect(GalleryScene.validationProblems(scenes).isEmpty, "\(GalleryScene.validationProblems(scenes))")
         #expect(scenes.map(\.id) == ["dictation.tidy-up"])
         let ids = Set(scenes.flatMap { $0.states.map(\.id) })
-        #expect(ids == ["off", "light", "standard", "standard-dimmed"])
+        #expect(ids == ["off", "light", "standard", "full", "full-small-model", "standard-dimmed"])
     }
 
     @Test("every state draws real content in the CI appearances")

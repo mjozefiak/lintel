@@ -159,6 +159,40 @@ enum SpokenNumbers {
         }
     }
 
+    /// The numbers of `input` that `output` has lost: every number written in digits and the value of every whole run
+    /// of number words ("dwadzieścia pięć" is 25, not 20 and 5) that `output` holds neither in digits nor in words.
+    /// Used at Full, where a long chunk could drop a sentence and its numbers and still pass the length range.
+    static func lostNumbers(in output: String, comparedTo input: String) -> [Int] {
+        let kept = allowed(in: output)
+        var lost = written(in: input).map(\.joined).filter { !kept.contains($0) }
+        lost += wholeRunValues(in: input).filter { !kept.contains($0) }
+        return lost
+    }
+
+    /// The value of each whole run of consecutive number words, in order; a run that is not one number is skipped.
+    static func wholeRunValues(in text: String) -> [Int] {
+        var values: [Int] = []
+        var run: [Word] = []
+        func flush() {
+            if !run.isEmpty, let value = evaluate(run[...]) { values.append(value) }
+            run = []
+        }
+        let words = tokens(in: text)
+        for (index, token) in words.enumerated() {
+            if let word = word(for: token) {
+                run.append(word)
+            } else if joiners.contains(token), !run.isEmpty, index + 1 < words.count,
+                self.word(for: words[index + 1]) != nil
+            {
+                continue
+            } else {
+                flush()
+            }
+        }
+        flush()
+        return values
+    }
+
     private static func tokens(in text: String) -> [String] {
         text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
     }

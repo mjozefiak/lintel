@@ -27540,6 +27540,96 @@
           }
         }
       }
+    },
+    "Full" : {
+      "comment" : "Settings → Dictation, Tidy up my text: layout, paragraphs and a smoother style",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pełne"
+          }
+        }
+      }
+    },
+    "Also lays out emails and long texts and smooths the style. Numbers and names stay." : {
+      "comment" : "Settings → Dictation: help under Tidy up my text at the Full level",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also lays out emails and long texts and smooths the style. Numbers and names stay."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Układa też maile i długie teksty oraz wygładza styl. Liczby i nazwy zostają."
+          }
+        }
+      }
+    },
+    "Works best with the Recommended assistant." : {
+      "comment" : "Settings → Dictation: under Tidy up my text at Full, shown with the smallest built-in model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works best with the Recommended assistant."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Działa najlepiej z zalecanym asystentem."
+          }
+        }
+      }
+    },
+    "Hi Anna, the report is ready. We still need to talk about the budget. Thanks, Tom" : {
+      "comment" : "Settings → Dictation: invented sentence as dictated, Full example",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi Anna, the report is ready. We still need to talk about the budget. Thanks, Tom"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cześć Anno, raport jest gotowy. Musimy jeszcze omówić budżet. Dzięki, Tomek"
+          }
+        }
+      }
+    },
+    "Hi Anna,⏎⏎The report is ready.⏎⏎We still need to talk about the budget.⏎⏎Thanks,⏎Tom" : {
+      "comment" : "Settings → Dictation: the Full example after tidying; ⏎ marks a line break",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi Anna,⏎⏎The report is ready.⏎⏎We still need to talk about the budget.⏎⏎Thanks,⏎Tom"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cześć Anno,⏎⏎Raport jest gotowy.⏎⏎Musimy jeszcze omówić budżet.⏎⏎Dzięki,⏎Tomek"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

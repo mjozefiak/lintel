@@ -200,9 +200,10 @@ public final class DictationPlugin: LintelPlugin {
         case .standard, .full:
             switch settings.llmSource {
             case .server:
-                return LocalLLMFormatter(transport: transport, target: { settings.llmTarget }, logger: logger)
+                return LocalLLMFormatter(
+                    transport: transport, target: { settings.llmTarget }, level: level, logger: logger)
             case .builtIn:
-                return BuiltInFormatter(runtime: builtIn, logger: logger)
+                return BuiltInFormatter(runtime: builtIn, level: level, logger: logger)
             }
         }
     }
