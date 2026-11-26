@@ -238,21 +238,57 @@ private func entry(_ raw: String, formatted: String? = nil, at date: Date = base
         #expect(try reopened.trashedStamps(ids: [single]) == [single: singleStamp])
     }
 
-    @Test func aSingleTrashNeverReusesABatchStampAndRestoreBatchPutsBackOnlyThatBatch() throws {
+    @Test func aSingleTrashReturnsItsStampAndTrashingAgainIsANoOpWithTheSameStamp() throws {
         let (store, directory) = try open()
         defer { withExtendedLifetime(directory) {} }
-        let earlier = try add(store, "wcześniej")
-        try store.trash(id: earlier, at: base.addingTimeInterval(-day))
-        let b1 = try add(store, "partia 1")
-        let b2 = try add(store, "partia 2")
+        let id = try add(store, "a")
+        let first = try #require(try store.trash(id: id, at: base).stamp)
+        #expect(first == TrashStamp.date(micros: TrashStamp.micros(base)))
+        #expect(try store.trash(id: id, at: base.addingTimeInterval(day)) == .alreadyTrashed(first))
+        #expect(try store.trashedStamps(ids: [id]) == [id: first])
+        #expect(try store.trash(id: 9_999, at: base) == .missing)
+    }
+
+    @Test func aSingleTrashNeverReusesABatchStamp() throws {
+        let (store, directory) = try open()
+        defer { withExtendedLifetime(directory) {} }
+        try add(store, "partia")
+        try add(store, "później")
         #expect(try store.trashAll(at: base) == 2)
         let newcomer = try add(store, "nowy")
         // The same instant as the batch: the store moves the stamp on by 1 µs.
         let stamp = try #require(try store.trash(id: newcomer, at: base).stamp)
         #expect(TrashStamp.micros(stamp) == TrashStamp.micros(base) + 1)
         #expect(try store.restoreBatch(deletedAt: base) == 2)
-        #expect(try store.trashedStamps(ids: [b1, b2, newcomer, earlier]).keys.sorted() == [earlier, newcomer])
+        #expect(try store.trashedStamps(ids: [newcomer]) == [newcomer: stamp])
+    }
+
+    @Test func restoreBatchPutsBackExactlyThatBatchNeverARowDeletedEarlierOrLater() throws {
+        let (store, directory) = try open()
+        defer { withExtendedLifetime(directory) {} }
+        let earlier = try add(store, "wcześniej")
+        let b1 = try add(store, "partia 1")
+        let b2 = try add(store, "partia 2")
+        let later = try add(store, "później")
+        try store.trash(id: earlier, at: base.addingTimeInterval(-day))
+        // The batch moves every live row at that moment: put the later one back first, then trash it afterwards.
+        #expect(try store.trashAll(at: base) == 3)
+        try store.restore(ids: [later])
+        try store.trash(id: later, at: base.addingTimeInterval(day))
+        #expect(try store.restoreBatch(deletedAt: base) == 2)
+        #expect(Set(try store.trashedStamps(ids: [earlier, b1, b2, later]).keys) == [earlier, later])
         #expect(try store.restoreBatch(deletedAt: base) == 0)
+    }
+
+    @Test func restoreOfALiveEntryIsANoOpAndAMissingIdIsReturned() throws {
+        let (store, directory) = try open()
+        defer { withExtendedLifetime(directory) {} }
+        let live = try add(store, "żywy")
+        let trashed = try add(store, "kosz")
+        try store.trash(id: trashed, at: base)
+        #expect(try store.restore(ids: [live, trashed, 9_999]) == [9_999])
+        #expect(try store.trashedCount() == 0)
+        #expect(try store.liveCount() == 2)
     }
 
     @Test func purgeAtIsTheEarlierOfThirtyDaysAfterTheDeleteAndTheRetentionLimit() {
@@ -361,5 +397,28 @@ extension DictationStore.TrashOutcome {
         #expect(history.applyRetention(purgesTrash: true) == 1)
         #expect(try store.trashedCount() == 1)
         #expect(history.entryCount == 2)
+    }
+
+    @Test func aPurgeIsAnnouncedAndClearHistoryRemovesRecentlyDeletedWithTheRest() throws {
+        let directory = try TemporaryDirectory()
+        let keychain = MemoryKeychain()
+        let now = base.addingTimeInterval(100 * day)
+        _ = try seed(directory, keychain, now: now)
+        let changes = Shared(0)
+        let (history, _) = makeHistory(
+            directory: directory, keychain: keychain, clock: ContinuousClock(), runsJob: false, now: now,
+            changed: { changes.update { $0 += 1 } })
+        history.open()
+        defer { history.close() }
+        let store = try #require(history.store)
+        // A purge that deleted something tells the panel and Notes; one that deleted nothing does not.
+        #expect(history.applyRetention(purgesTrash: true) == 1)
+        #expect(changes.value == 1)
+        #expect(history.applyRetention(purgesTrash: true) == 0)
+        #expect(changes.value == 1)
+        // Clear History is not restricted to live rows (Phase 5 decides whether its count and rule change).
+        try history.clear()
+        #expect(try store.count() == 0)
+        #expect(try store.trashedCount() == 0)
     }
 }
