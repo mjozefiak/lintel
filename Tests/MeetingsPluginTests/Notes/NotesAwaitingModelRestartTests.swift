@@ -138,6 +138,28 @@ import Testing
         #expect(try rig.store.meetingsAwaitingNotesModel().isEmpty)
     }
 
+    @Test func aProviderChosenBeforeARestartSendsNothingAndEndsTheWait() async throws {
+        let process = CountingProviderProcess(answer: ProviderFixtures.draft)
+        let rig = try NotesServiceRig(providerRunner: ProviderFixtures.runner(process))
+        rig.file.update { $0 = nil }
+        await rig.start()
+        let id = try await rig.addMeeting()
+        rig.library.meetingReady(id)
+        #expect(await rig.settle())
+        #expect(try rig.store.meetingsAwaitingNotesModel() == [id])
+
+        // The provider is chosen while the app is not running, so no `refreshAvailability` saw it.
+        rig.harness.settings.setValue(.string("claude-code"), forKey: "plugins.meetings.notesProvider")
+        rig.harness.settings.setValue(.string("sonnet"), forKey: "plugins.meetings.notesProviderModel")
+        await rig.restart()
+        #expect(await rig.settle())
+        #expect(process.contentRuns == 0, "a meeting that waited for the built-in model is never sent to a provider")
+        #expect(rig.llm.calls.isEmpty)
+        #expect(try rig.record(id).status == .none)
+        #expect(!rig.service.board.snapshot.needsModel(for: id))
+        #expect(try rig.store.meetingsAwaitingNotesModel().isEmpty)
+    }
+
     @Test func aMeetingThatFinishedWhileNotesWereOffIsNotMarked() async throws {
         let rig = try NotesServiceRig(settings: ["plugins.meetings.notesEnabled": .bool(false)])
         rig.file.update { $0 = nil }
