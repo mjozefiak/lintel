@@ -5,7 +5,7 @@ import LintelUI
 
 /// DEBUG only: the scenes of the design gallery, found through `PluginRegistry.all` (the one place that knows the concrete
 /// plugins): a plugin type that conforms to `GalleryProviding` brings its scenes. Scenes of the shell itself come
-/// with its own screens (spec `2026-11-23-swiftui-design-gallery`, phase 5).
+/// from `ShellGallery`, one group at the end (spec `2026-11-23-swiftui-design-gallery`, phase 5).
 @MainActor enum GalleryCatalog {
     struct Group: Identifiable {
         let id: String
@@ -13,14 +13,20 @@ import LintelUI
         let scenes: [GalleryScene]
     }
 
+    /// The id of the group that holds the shell's own scenes (`ShellGallery`).
+    static let shellGroupID = "shell"
+
     static var groups: [Group] {
-        PluginRegistry.all.compactMap { type in
+        let plugins = PluginRegistry.all.compactMap { type -> Group? in
             guard let provider = type as? any GalleryProviding.Type else { return nil }
             let scenes = provider.galleryScenes
             guard !scenes.isEmpty else { return nil }
             return Group(
                 id: type.manifest.id.rawValue, title: String(localized: type.manifest.displayName), scenes: scenes)
         }
+        let shell = ShellGallery.galleryScenes
+        guard !shell.isEmpty else { return plugins }
+        return plugins + [Group(id: shellGroupID, title: "Shell", scenes: shell)]
     }
 
     static var scenes: [GalleryScene] { groups.flatMap(\.scenes) }
