@@ -14,12 +14,18 @@ scripts/dictation-eval/run.sh \
   --input  <raw transcripts>.jsonl \
   --out    <result>.jsonl \
   --model  <Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf> \
-  [--app lintel-offline-v2]
+  [--level standard] [--app lintel-offline-v2]
+
+scripts/dictation-eval/run.sh --input <raw transcripts>.jsonl --out <result>.jsonl --level light   # no model
 
 LINTEL_DICTATION_SCORER=<path>/tools/score_dictation.py \
   scripts/dictation-eval/score.sh <result>.jsonl --markdown            # the 40-item corpus
   scripts/dictation-eval/score.sh --fleurs=pl <result>.jsonl --markdown  # FLEURS
 ```
+
+`--level` is the cleanup level of the app (`light`, `standard` or `full`). `light` runs `LightCleaner` alone: no
+model, no `--model`, app label `lintel-offline-light`, and the output adds `latency_us` (Light takes microseconds, so
+`latency_ms` is 0). `standard` (default) is the model path above. `full` is refused until its phase exists.
 
 Input and output lines: `{"id", "app", "output", "latency_ms", "wall_ms"}`. The output adds `chunks`,
 `fell_back` and `rejections` (guard reasons), which the scorer ignores. `app` defaults to
