@@ -94,7 +94,7 @@ Rules:
 - INTRO uses only facts from the points: no new names, numbers, dates or places. Write it in the language of the points, without times. It names the main subjects of the TOPIC lines and never makes one point the subject of the whole meeting. It says that something was agreed or decided only when a DEC id says it. Start each sentence of it with "The meeting" or with a word of the points.
 - An empty list is written as -.
 
-Po polsku: zwracasz tylko identyfikatory punktów w sekcjach, najwyżej 6 tematów TOPIC w kolejności rozmowy (każdy z 2 do 6 punktów SUM i krótką nazwą do 8 słów, ze słów jego punktów, bez imion, liczb i dat; nigdy temat z jednym punktem) oraz wstęp INTRO z 1 do 3 zdań, bez nowych imion, liczb i dat, każde zdanie zaczyna się od „Spotkanie” albo od słowa z punktów; wstęp wymienia główne tematy, nie robi z jednego punktu tematu całego spotkania i mówi o ustaleniach tylko przy punkcie DEC. Duplikaty (także zadania) pomijasz, zostawiając najlepszy punkt.
+Po polsku: zwracasz tylko identyfikatory punktów w sekcjach, najwyżej 6 tematów TOPIC w kolejności rozmowy (każdy z 2 do 6 punktów SUM i krótką nazwą do 8 słów, ze słów jego punktów, bez imion, liczb i dat; nigdy temat z jednym punktem) oraz wstęp INTRO z 1 do 3 zdań, bez nowych imion, liczb i dat, każde zdanie zaczyna się od „Spotkanie” albo od słowa z punktów. Duplikaty (także zadania) pomijasz, zostawiając najlepszy punkt.
 
 ### user
 <points>
@@ -108,7 +108,7 @@ You merge partial intros of one meeting into one. The user message holds the int
 
 Reply with exactly one line: INTRO: 1 to 3 sentences, at most 70 words, using only facts from the intros (no new names, numbers or dates), in their language. Say that something was agreed or decided only when an intro says it. Start each sentence with "The meeting" or with a word of the intros.
 
-Po polsku: jeden wstęp z 1 do 3 zdań, tylko z faktów z podanych wstępów; o ustaleniach tylko wtedy, gdy mówi o nich wstęp; każde zdanie zaczyna się od „Spotkanie” albo od słowa z wstępów.
+Po polsku: jeden wstęp z 1 do 3 zdań, tylko z faktów z podanych wstępów; każde zdanie zaczyna się od „Spotkanie” albo od słowa z wstępów.
 
 ### user
 <summaries>

@@ -214,8 +214,7 @@ enum NotesPrompt {
         Po polsku: zwracasz tylko identyfikatory punktów w sekcjach, najwyżej \(maxTopics) tematów TOPIC \
         w kolejności rozmowy (każdy z 2 do 6 punktów SUM i krótką nazwą do 8 słów, ze słów jego punktów, bez \
         imion, liczb i dat; nigdy temat z jednym punktem) oraz wstęp INTRO z 1 do 3 zdań, bez nowych imion, \
-        liczb i dat, każde zdanie zaczyna się od „Spotkanie” albo od słowa z punktów; wstęp wymienia główne \
-        tematy, nie robi z jednego punktu tematu całego spotkania i mówi o ustaleniach tylko przy punkcie DEC. Duplikaty \
+        liczb i dat, każde zdanie zaczyna się od „Spotkanie” albo od słowa z punktów. Duplikaty \
         (także zadania) pomijasz, zostawiając najlepszy punkt.
         """
     }
@@ -238,8 +237,8 @@ enum NotesPrompt {
         intros (no new names, numbers or dates), in their language. Say that something was agreed or decided \
         only when an intro says it. Start each sentence with "The meeting" or with a word of the intros.
 
-        Po polsku: jeden wstęp z 1 do 3 zdań, tylko z faktów z podanych wstępów; o ustaleniach tylko wtedy, \
-        gdy mówi o nich wstęp; każde zdanie zaczyna się od „Spotkanie” albo od słowa z wstępów.
+        Po polsku: jeden wstęp z 1 do 3 zdań, tylko z faktów z podanych wstępów; każde zdanie zaczyna się od \
+        „Spotkanie” albo od słowa z wstępów.
         """
 
     /// The merge of the topics of several REDUCE batches; `maxTopics` as in `reduceSystem`.
