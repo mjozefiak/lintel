@@ -21,7 +21,7 @@ enum ProviderEval {
     static let estimatedMillisecondsPerWord = 400
 
     /// The limit of one request in the eval. Generous on purpose: the eval measures the tail, it does not cut it; the
-    /// release limits of the spec (Standard 2 s, Full 6 s) are applied by `provider_summary.py` afterwards.
+    /// release limits of the spec (Standard 4 s, Full 6 s; A10, A11) are applied by `provider_summary.py` afterwards.
     static let requestTimeout: Duration = .seconds(60)
 
     /// One chunk of a replayed session: its text, the end of the previous raw chunk as context (300 characters, as

@@ -8,7 +8,8 @@ Full's checks) comes from `score.sh` and `check_full.py` on the same file.
 
 Usage: provider_summary.py <result.jsonl>... [--limit-ms N] [--markdown]
 
---limit-ms  the release limit to judge against; default by the file's level: Standard 2000, Full 6000 (spec A10, A11)
+--limit-ms  the release limit to judge against; default by the file's level: Standard 4000, Full 6000 (spec A10, A11;
+            Standard was 2000 before the Phase 4 measurement)
 
 Percentiles are nearest-rank: p90 is the value at rank ceil(0.9 * n) of the sorted list, so it is always a measured
 value. The latency gate of a level is p90 <= limit; whether a level is offered also needs its quality targets.
@@ -20,7 +21,7 @@ import json
 import math
 import sys
 
-LIMITS_MS = {"standard": 2000, "full": 6000}
+LIMITS_MS = {"standard": 4000, "full": 6000}
 
 
 def percentile(values, share):

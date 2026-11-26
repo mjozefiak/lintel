@@ -56,8 +56,8 @@ prompt, check out each commit and run the same input.
 Measures the external AI provider as a cleanup source before the app has one. Each chunk goes through `ProviderRunner`
 (the isolation check of the argv, the authorization before the start, the FIFO gate) to the real Claude Code CLI, with
 the level's `CleanupPrompt` and the same `FormatterGuard`. **The text is sent to Anthropic**, so the tool is off unless
-both variables are set, and it is given public text only: FLEURS. The owner's corpus is not sent without the owner's
-explicit consent (spec A14).
+both variables are set. Give it public text (FLEURS); the owner's corpus is sent only with the owner's explicit consent
+(spec A14: given for the Phase 4 measurement on 2026-11-26).
 
 ```sh
 LINTEL_DICTATION_EVAL_PROVIDER=claude-code LINTEL_DICTATION_EVAL_PROVIDER_MODEL=sonnet \
@@ -79,7 +79,7 @@ python3 -I scripts/dictation-eval/check_full.py --raw <raw>.jsonl --out <full re
   number. The speech engine's time for the last segment is not: it is the same for every source.
 - **Provider failures apart.** `provider_failures` holds closed codes (`failed.rateLimited`, `timedOut`, ...) and the
   chunk stays raw; `rejections` are the guard's, as for the local source. One request may take 60 s in the eval: the
-  tail is measured, not cut. `provider_summary.py` applies the release limits of the spec (Standard 2 s, Full 6 s)
+  tail is measured, not cut. `provider_summary.py` applies the release limits of the spec (Standard 4 s since the Phase 4 measurement, A10; Full 6 s)
   afterwards and prints p50, p90 (nearest rank), the dictations over the limit and the latency gate (p90 at or under the
   limit). A level is offered for the provider only when the gate passes **and** the level's quality targets hold.
 - After 5 dictations in a row whose every chunk failed at the provider the run stops (no login, a limit).
