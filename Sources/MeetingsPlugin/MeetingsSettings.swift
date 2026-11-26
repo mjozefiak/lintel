@@ -12,6 +12,7 @@ struct MeetingsSettings: Sendable {
         static let speechModelFolder = "speechModelFolder"
         static let diarizationModelFolder = "diarizationModelFolder"
         static let inputDevice = "inputDevice"
+        static let inputDeviceName = "inputDeviceName"
         static let voiceProcessing = "voiceProcessing"
         static let systemAudio = "systemAudio"
         static let diarization = "diarization"
@@ -25,6 +26,7 @@ struct MeetingsSettings: Sendable {
         static let qaProviderScenario = "qaProviderScenario"
         static let qaAccountName = "qaAccountName"
         static let qaProviderBinary = "qaProviderBinary"
+        static let qaNotesDownload = "qaNotesDownload"
         static let notesChunkTokens = "notesChunkTokens"
         static let notesReduceInputTokens = "notesReduceInputTokens"
         static let suggestMeetings = "suggestMeetings"
@@ -87,7 +89,12 @@ struct MeetingsSettings: Sendable {
 
     // MARK: Notes
 
-    var notesEnabled: Bool { settings.bool(Key.notesEnabled, default: false) }
+    /// Automatic notes after each meeting, written by the built-in model on this Mac unless the user chose a provider.
+    /// On by default since issue #252 (owner decision 2026-11-24); an install from before keeps its old value `false`
+    /// (`NotesDefaultMigration` in `LintelApp` pins it). The model is never downloaded without a click.
+    static let defaultNotesEnabled = true
+
+    var notesEnabled: Bool { settings.bool(Key.notesEnabled, default: Self.defaultNotesEnabled) }
 
     /// The built-in notes model; the default one (the smallest) when none is chosen, the stored id left the
     /// catalog or the model no longer fits this Mac's memory.
@@ -250,8 +257,20 @@ struct MeetingsSettings: Sendable {
         }
     }
 
-    func setInputDevice(_ uid: String?) {
+    /// The chosen device's name as Settings showed it, kept so the message "Microphone … is unavailable" can name a
+    /// device that is unplugged; `nil` when the choice predates the name (the UID may still tell, for USB).
+    var inputDeviceName: String? {
+        guard let name = settings.string(Key.inputDeviceName), !name.isEmpty else { return nil }
+        return name
+    }
+
+    func setInputDevice(_ uid: String?, name: String? = nil) {
         if let uid { settings.set(uid, for: Key.inputDevice) } else { settings.removeValue(for: Key.inputDevice) }
+        if uid != nil, let name, !name.isEmpty {
+            settings.set(name, for: Key.inputDeviceName)
+        } else {
+            settings.removeValue(for: Key.inputDeviceName)
+        }
     }
 
     func setVoiceProcessing(_ value: Bool) { settings.set(value, for: Key.voiceProcessing) }
@@ -316,6 +335,17 @@ struct MeetingsSettings: Sendable {
         #endif
     }
 
+    /// DEBUG only (`--qa-setting plugins.meetings.qaNotesDownload=missing|partial|downloading|offline|noSpace|installed`):
+    /// the state the "Notes on this Mac" offer of the `meetings.setup` step shows, with nothing downloaded or read
+    /// from the disk (the free space of `noSpace` is invented). Release builds never read it.
+    var qaNotesDownload: NotesDownloadQAState? {
+        #if DEBUG
+        settings.string(Key.qaNotesDownload).flatMap(NotesDownloadQAState.init(rawValue:))
+        #else
+        nil
+        #endif
+    }
+
     /// DEBUG only (`--qa-setting plugins.meetings.qaProviderStatus=ready|notInstalled|notSignedIn|incompatibleVersion`):
     /// the state the provider's row and banner show, with no process started. Release builds never read it.
     var qaProviderStatus: ProviderStatus? {
@@ -331,6 +361,11 @@ struct MeetingsSettings: Sendable {
     func setRetentionDays(_ days: Int) { settings.set(max(0, days), for: Key.retentionDays) }
     func setKeepAudio(_ value: Bool) { settings.set(value, for: Key.keepAudio) }
     func setOrphanAudioDays(_ days: Int) { settings.set(days, for: Key.orphanAudioDays) }
+}
+
+/// The states `plugins.meetings.qaNotesDownload` (DEBUG only) can force on the "Notes on this Mac" offer.
+enum NotesDownloadQAState: String, Sendable {
+    case missing, partial, downloading, offline, noSpace, installed
 }
 
 /// The external provider and model that write the notes: the user's choice in settings, which is the consent.

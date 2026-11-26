@@ -25,13 +25,25 @@ import Testing
         #expect(ProviderChoiceModel.surfacesProvider(notesEnabled: true, isLocal: false))
         #expect(ProviderChoiceModel.surfacesProvider(notesEnabled: true, isLocal: true))
         #expect(!ProviderChoiceModel.surfacesProvider(notesEnabled: false, isLocal: true))
-        for file in [
-            "Sources/MeetingsPlugin/UI/MeetingsSettingsPane.swift",
-            "Sources/MeetingsPlugin/MeetingsPlugin+Status.swift",
-        ] {
-            let source = try String(contentsOf: Self.root.appending(path: file), encoding: .utf8)
-            #expect(source.contains("surfacesProvider("), "\(file) must decide through surfacesProvider")
-        }
+        // The pane shows the sections through `NotesWrittenBySections`, which decides through `surfacesProvider` (the
+        // same view the design gallery draws); the banner decides in `MeetingsPlugin+Status`.
+        let views = try String(
+            contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/Notes/ProviderChoiceViews.swift"),
+            encoding: .utf8)
+        let sections = try #require(views.range(of: "struct NotesWrittenBySections"), "NotesWrittenBySections is gone")
+        // The struct's own body: up to the next line that starts a declaration at the left margin.
+        let rest = views[sections.upperBound...]
+        let body = rest.range(of: "\n}\n").map { rest[..<$0.lowerBound] } ?? rest
+        #expect(body.contains("surfacesProvider("), "NotesWrittenBySections must decide through surfacesProvider")
+        let status = try String(
+            contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/MeetingsPlugin+Status.swift"),
+            encoding: .utf8)
+        #expect(status.contains("surfacesProvider("), "MeetingsPlugin+Status must decide through surfacesProvider")
+        let pane = try String(
+            contentsOf: Self.root.appending(path: "Sources/MeetingsPlugin/UI/MeetingsSettingsPane.swift"),
+            encoding: .utf8)
+        #expect(
+            pane.contains("NotesWrittenBySections("), "the pane must show the section through NotesWrittenBySections")
     }
 
     // MARK: B2 and B3 a running job follows the choice

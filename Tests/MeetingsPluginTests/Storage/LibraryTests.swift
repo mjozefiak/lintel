@@ -210,6 +210,21 @@ private func mode(_ url: URL) throws -> Int {
 
 @MainActor
 @Suite struct MeetingsSettingsTests {
+    @Test func theChosenMicrophoneKeepsItsNameUntilTheChoiceChanges() throws {
+        let settings = try MeetingsHarness().meetingsSettings
+        #expect(settings.inputDeviceName == nil)
+        settings.setInputDevice("usb-1", name: "USB MICROPHONE")
+        #expect(settings.inputDevice == "usb-1")
+        #expect(settings.inputDeviceName == "USB MICROPHONE")
+        // A choice without a name (an older one) does not keep a stale name.
+        settings.setInputDevice("usb-2")
+        #expect(settings.inputDeviceName == nil)
+        settings.setInputDevice("usb-1", name: "USB MICROPHONE")
+        settings.setInputDevice(nil)
+        #expect(settings.inputDevice == nil)
+        #expect(settings.inputDeviceName == nil)
+    }
+
     @Test func defaultsMatchTheSpecTable() throws {
         let settings = try MeetingsHarness().meetingsSettings
         #expect(settings.speechModelID == "parakeet-ultra")
@@ -219,7 +234,7 @@ private func mode(_ url: URL) throws -> Int {
         #expect(settings.voiceProcessing == false)
         #expect(settings.diarization == true)
         #expect(settings.consentReminder == true)
-        #expect(settings.notesEnabled == false)
+        #expect(settings.notesEnabled == true)
         #expect(settings.builtInLLMModel.id == LLMModelCatalog.defaultModel.id)
         #expect(settings.notesChunkTokens == 3_000)
         #expect(settings.notesReduceInputTokens == 4_500)

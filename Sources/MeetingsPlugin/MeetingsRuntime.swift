@@ -16,8 +16,14 @@ struct MeetingsRuntime: Sendable {
     /// At most one recording at a time, shared by everything that can start one.
     let gate = MeetingSessionGate()
     let logger: Logger
-    var makeMicrophone: @Sendable (String?) -> any AudioInput = { MicrophoneCapture(deviceUID: $0) }
+    var makeMicrophone: @Sendable (_ deviceUID: String?, _ deviceName: String?) -> any AudioInput = {
+        MicrophoneCapture(deviceUID: $0, deviceName: $1)
+    }
     var makeSystemAudio: @Sendable () -> any AudioInput = { SystemAudioSource(backend: CoreAudioProcessTapBackend()) }
+    /// The default input as a log line, read when the microphone does not start.
+    var inputDiagnostics: @Sendable () -> String = { DefaultInputObserver.diagnostics() }
+    /// Yields when the system's default input changes while recording.
+    var defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = { DefaultInputObserver.changes() }
 
     @MainActor
     init(context: PluginContext, settings: MeetingsSettings) {
@@ -79,17 +85,20 @@ struct MeetingsRuntime: Sendable {
         // A recording of the system audio only gets a microphone that never starts: the session carries on
         // with the other track.
         let microphone: any AudioInput =
-            request.recordsMicrophone ? makeMicrophone(settings.inputDevice) : UnavailableAudioInput()
+            request.recordsMicrophone
+            ? makeMicrophone(settings.inputDevice, settings.inputDeviceName) : UnavailableAudioInput()
         return MeetingSession(
             store: request.store, keys: request.keys, spool: request.spool, mic: microphone,
             system: request.recordsSystemAudio ? makeSystemAudio() : nil,
-            makeVAD: { LazyVAD(modelFolder: vadFolder) }, engine: makeEngine(modelID: request.modelID),
+            makeVAD: { LazyVAD(modelFolder: vadFolder, tuning: MeetingVAD.tuning, recordsProbabilities: true) },
+            engine: makeEngine(modelID: request.modelID),
             modelID: request.modelID, modelFolder: request.modelFolder, sleepAssertion: IOKitSleepAssertion(),
             gate: gate, beforeReady: finalizer.hook, sourceBundleID: request.sourceBundleID,
             keepAudio: { [settings] in settings.keepAudio },
             recordCounters: Self.counterRecorder(
                 directory: request.spool.root.deletingLastPathComponent(), logger: logger),
-            logger: logger)
+            retriesMicrophone: request.recordsMicrophone, inputDiagnostics: inputDiagnostics,
+            defaultInputChanges: defaultInputChanges, logger: logger)
     }
 
     /// Writes a finished meeting's counters (numbers only) next to the library; a failure is logged and nothing else.
@@ -149,7 +158,8 @@ actor FolderResolvingVAD: VoiceActivityDetector {
     func process(_ samples: [Float]) async throws -> [VADEvent] {
         if detector == nil {
             guard let folder = await folder() else { throw ModelMissing() }
-            detector = try SileroVAD(modelFolder: folder.appending(path: ModelCatalog.sileroVADPath))
+            detector = try SileroVAD(
+                modelFolder: folder.appending(path: ModelCatalog.sileroVADPath), tuning: MeetingVAD.tuning)
         }
         return try await detector?.process(samples) ?? []
     }

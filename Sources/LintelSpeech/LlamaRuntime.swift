@@ -117,9 +117,32 @@ public actor LlamaRuntime: LLMRuntime {
         guard tokens.count + maxTokens <= contextLength else {
             throw LlamaError.promptTooLong(tokens: tokens.count, limit: contextLength - maxTokens)
         }
-        llama_memory_clear(llama_get_memory(engine.context), true)
-        try Self.decodePrompt(tokens, in: engine)
-        return try Self.sample(maxTokens: maxTokens, in: engine)
+        // Chunks of one dictation and the next dictation start with the same system prompt and examples, so
+        // what the context already holds for that start is kept and only the rest of the prompt is decoded.
+        let reused = Self.reuse(engine.cachedTokens, for: tokens, in: engine)
+        engine.cachedTokens = []
+        try Self.decodePrompt(tokens, from: reused, in: engine)
+        engine.cachedTokens = tokens
+        do {
+            return try Self.sample(maxTokens: maxTokens, in: engine)
+        } catch {
+            // The context holds a half-made answer: the next prompt starts from nothing.
+            engine.cachedTokens = []
+            throw error
+        }
+    }
+
+    /// How many leading tokens of `tokens` the context already holds, after dropping everything behind them
+    /// (the answer of the last request, a different tail). Always leaves one token to decode, which gives the
+    /// logits the first answer token is sampled from. Clears the context when it cannot drop only a tail.
+    private static func reuse(_ cached: [llama_token], for tokens: [llama_token], in engine: Engine) -> Int {
+        let memory = llama_get_memory(engine.context)
+        var shared = 0
+        let limit = min(cached.count, tokens.count - 1)
+        while shared < limit, cached[shared] == tokens[shared] { shared += 1 }
+        if shared > 0, llama_memory_seq_rm(memory, 0, Int32(shared), -1) { return shared }
+        llama_memory_clear(memory, true)
+        return 0
     }
 
     // MARK: llama.cpp
@@ -174,10 +197,10 @@ public actor LlamaRuntime: LLMRuntime {
         return Array(tokens.prefix(Int(count)))
     }
 
-    private static func decodePrompt(_ tokens: [llama_token], in engine: Engine) throws {
+    private static func decodePrompt(_ tokens: [llama_token], from start: Int, in engine: Engine) throws {
         let step = 512
         var tokens = tokens
-        var offset = 0
+        var offset = start
         while offset < tokens.count {
             try Task.checkCancellation()
             let count = min(step, tokens.count - offset)
@@ -230,6 +253,8 @@ public actor LlamaRuntime: LLMRuntime {
         let model: OpaquePointer
         let context: OpaquePointer
         let vocabulary: OpaquePointer
+        /// The prompt tokens the context holds from position 0, for `reuse`. Only the actor's queue touches it.
+        var cachedTokens: [llama_token] = []
 
         init(model: OpaquePointer, context: OpaquePointer, vocabulary: OpaquePointer) {
             self.model = model

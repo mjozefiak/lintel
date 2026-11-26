@@ -18,9 +18,12 @@ struct NotesDraft: Equatable, Sendable {
     struct Topic: Equatable, Sendable {
         var name: String?
         var points: [String]
+        /// Set by the fact guard on the topic that collects the points of a topic whose name it refused.
+        var isOther = false
     }
 
     var title: String?
+    /// The intro paragraph (`INTRO:`; the older `SUMMARY:` is read into it).
     var summary: String?
     var decisions: [Item] = []
     var tasks: [Task] = []
@@ -37,7 +40,7 @@ struct NotesDraft: Equatable, Sendable {
         func time(_ ms: Int?) -> String { ms.map { "~" + NotesText.clock(milliseconds: $0) } ?? "~" }
         var out: [String] = []
         if let title { out.append("TITLE: \(title)") }
-        if let summary { out.append("SUMMARY: \(summary)") }
+        if let summary { out.append("INTRO: \(summary)") }
         for item in decisions { out.append("DECISION | \(time(item.timeMs)) | \(item.text)") }
         for task in tasks {
             out.append("TASK | \(time(task.timeMs)) | \(task.person ?? "-") | \(task.due ?? "-") | \(task.text)")
@@ -59,7 +62,7 @@ enum NotesDraftParser {
         /// The last non-empty line has no valid shape: the answer was probably cut off.
         var lastLineMalformed = false
 
-        /// The one rule of a failed attempt: a cut answer, or an answer with neither `SUMMARY` nor an item.
+        /// The one rule of a failed attempt: a cut answer, or an answer with neither `INTRO` nor an item.
         var isUsable: Bool { !lastLineMalformed && !draft.isEmpty }
     }
 
@@ -78,7 +81,7 @@ enum NotesDraftParser {
                 } else if value.isEmpty {
                     lastValid = false
                 }
-            } else if let value = value(of: line, keyword: "SUMMARY:") {
+            } else if let value = value(of: line, keyword: "INTRO:") ?? value(of: line, keyword: "SUMMARY:") {
                 if draft.summary == nil, !value.isEmpty {
                     draft.summary = value
                 } else if value.isEmpty {

@@ -24,15 +24,19 @@ final class NotesSettingsModel {
     private(set) var progress: ModelProgress?
     private(set) var errorMessage: String?
     private(set) var isInUse = false
+    /// The free space the download needs and what is free, read with the model's place (`nil` while installed).
+    private(set) var space: ModelSpaceCheck?
 
     @ObservationIgnored private let settings: MeetingsSettings
-    @ObservationIgnored private let service: NotesService
+    @ObservationIgnored private let service: any ProviderNotesControl
     @ObservationIgnored private let manager: ModelManager
     @ObservationIgnored private let lease: LLMLease
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var downloadGeneration = 0
 
-    init(settings: MeetingsSettings, service: NotesService, manager: ModelManager, lease: LLMLease = .shared) {
+    init(
+        settings: MeetingsSettings, service: any ProviderNotesControl, manager: ModelManager, lease: LLMLease = .shared
+    ) {
         self.settings = settings
         self.service = service
         self.manager = manager
@@ -52,7 +56,12 @@ final class NotesSettingsModel {
     func refresh() async {
         model = settings.builtInLLMModel
         wasReplaced = settings.builtInLLMModelWasReplaced
+        if let state = settings.qaNotesDownload {
+            showQAState(state)
+            return
+        }
         location = await manager.location(of: model.package)
+        space = location.folder == nil ? await manager.spaceCheck(for: model.package) : nil
         if let file = modelFile {
             let leased = await lease.isInUse(modelID: file.path)
             isInUse = service.isBusy || leased
@@ -73,7 +82,8 @@ final class NotesSettingsModel {
     }
 
     func download() {
-        guard downloadTask == nil else { return }
+        // A forced QA state downloads nothing.
+        guard downloadTask == nil, settings.qaNotesDownload == nil else { return }
         errorMessage = nil
         let package = model.package
         progress = ModelProgress(bytesDone: 0, bytesTotal: package.totalBytes)
@@ -99,6 +109,30 @@ final class NotesSettingsModel {
     }
 
     func cancelDownload() { downloadTask?.cancel() }
+
+    /// DEBUG only (`plugins.meetings.qaNotesDownload`, `docs/qa.md`): the offer in one state, with nothing read from
+    /// the disk or the network. The sizes are the chosen model's; the free space of `noSpace` is invented.
+    private func showQAState(_ state: NotesDownloadQAState) {
+        let total = model.package.totalBytes
+        let needed = total + total / 10
+        progress = nil
+        errorMessage = nil
+        isInUse = false
+        space = ModelSpaceCheck(needed: needed, available: 200 << 30)
+        location = .missing
+        switch state {
+        case .missing: break
+        case .partial: location = .partial(bytes: total * 2 / 5)
+        case .downloading: progress = ModelProgress(bytesDone: total * 2 / 5, bytesTotal: total)
+        case .offline:
+            location = .partial(bytes: total * 2 / 5)
+            errorMessage = MeetingsModelMessages.message(for: URLError(.notConnectedToInternet))
+        case .noSpace: space = ModelSpaceCheck(needed: needed, available: needed / 3)
+        case .installed:
+            space = nil
+            location = .installed(URL(filePath: "/qa/models/llm/\(model.package.id)", directoryHint: .isDirectory))
+        }
+    }
 
     /// Resolves once a running download has ended (tests).
     func waitForDownload() async { await downloadTask?.value }

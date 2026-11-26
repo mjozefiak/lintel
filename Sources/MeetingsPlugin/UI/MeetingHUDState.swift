@@ -1,4 +1,5 @@
 import Foundation
+import LintelSpeech
 
 /// What the meeting HUD shows (spec: UI/UX → HUD recording). Pure data, so every state, its texts, its buttons
 /// and its VoiceOver announcements are testable without a window. It carries counts, durations and levels,
@@ -46,13 +47,23 @@ enum MeetingHUDState: Equatable, Sendable {
         var unavailable: Set<AudioChannel> = []
         /// The library could not take a segment or the spool failed; the transcript may be incomplete.
         var writeProblem = false
+        /// The microphone chosen in Settings is not available and the system's input is recorded instead.
+        var microphoneFallback: MicrophoneFallback?
+        /// "Try again" was pressed and the microphone is being started again.
+        var retryingMicrophone = false
 
         var notice: Notice? {
             if lowDisk { return .lowDisk }
             if writeProblem { return .writeProblem }
+            if retryingMicrophone, recordsMicrophone, lost.contains(.mic) || unavailable.contains(.mic) {
+                return .retryingMicrophone
+            }
             if lost.contains(.mic) { return .deviceDisconnected }
             if lost.contains(.system) { return .systemAudioLost }
-            if unavailable.contains(.mic), recordsMicrophone { return .deviceDisconnected }
+            if unavailable.contains(.mic), recordsMicrophone { return .microphoneNotRecorded }
+            if let microphoneFallback, recordsMicrophone, !showsConsent {
+                return .microphoneFallback(microphoneFallback)
+            }
             if noMicrophoneAudio, recordsMicrophone { return .noMicrophoneAudio }
             if unavailable.contains(.system) || noSystemAudio, recordsSystem { return .noSystemAudio }
             if let secondsLeft { return .limitCountdown(secondsLeft) }
@@ -64,11 +75,22 @@ enum MeetingHUDState: Equatable, Sendable {
         }
     }
 
+    /// The names for "“…” unavailable – using “…”"; either can be unknown. Never a UID.
+    struct MicrophoneFallback: Equatable, Sendable {
+        var requested: String?
+        var using: String?
+    }
+
     /// The second line of the recording pill.
     enum Notice: Equatable, Sendable {
         case lowDisk
         case writeProblem
         case deviceDisconnected
+        /// The microphone never started (and the automatic retries failed): only the system audio is recorded.
+        case microphoneNotRecorded
+        /// The chosen microphone is unavailable: the system's input is recorded instead.
+        case microphoneFallback(MicrophoneFallback)
+        case retryingMicrophone
         case systemAudioLost
         case noSystemAudio
         case noMicrophoneAudio
@@ -111,6 +133,8 @@ enum MeetingHUDState: Equatable, Sendable {
         /// The speech model is missing or unusable: `PluginContext.openModels`.
         case openModels
         case openMicrophoneSettings
+        /// Starts a microphone that is not recording again (`MeetingSession.retryMicrophone`).
+        case retryMicrophone
         /// Puts the consent sentence on the pasteboard (MEET-1.6).
         case copyConsentText
         case recordSystemAudioOnly
@@ -211,6 +235,17 @@ extension MeetingHUDState {
         case .deviceDisconnected:
             return String(
                 localized: "Microphone disconnected", comment: "Meeting HUD notice when the microphone track ended")
+        case .microphoneNotRecorded:
+            return String(
+                localized: "Your microphone is not being recorded",
+                comment:
+                    "Meeting HUD notice when the microphone could not be started, only the system audio is recorded")
+        case .microphoneFallback(let fallback):
+            return Self.fallbackText(fallback)
+        case .retryingMicrophone:
+            return String(
+                localized: "Trying the microphone again…",
+                comment: "Meeting HUD notice while the microphone is being started again after 'Try again'")
         case .systemAudioLost:
             return String(
                 localized: "System audio stopped", comment: "Meeting HUD notice when the system track ended")
@@ -246,6 +281,10 @@ extension MeetingHUDState {
         }
     }
 
+    private static func fallbackText(_ fallback: MicrophoneFallback) -> String {
+        InputFallback(requestedName: fallback.requested, usingName: fallback.using).message
+    }
+
     /// The buttons next to the text. The recording pill has "Zakończ" and, for notices that have a place to
     /// go, a link.
     var actions: [Action] {
@@ -255,6 +294,7 @@ extension MeetingHUDState {
             case .noSystemAudio?: [.openSettings, .stop]
             case .consent?: [.copyConsentText, .stop]
             case .noMicrophoneAudio?: [.openMicrophoneSettings, .stop]
+            case .microphoneNotRecorded?, .deviceDisconnected?: [.retryMicrophone, .stop]
             default: [.stop]
             }
         case .allowMicrophone:
@@ -280,6 +320,8 @@ extension MeetingHUDState {
             String(
                 localized: "Open Privacy settings", comment: "Meeting HUD button that opens the microphone privacy pane"
             )
+        case .retryMicrophone:
+            String(localized: "Try again", comment: "Meeting HUD button that starts the microphone again")
         case .copyConsentText:
             String(
                 localized: "Copy message",
@@ -315,6 +357,9 @@ extension MeetingHUDState {
 
     /// A pill with a detail line is taller.
     var hasDetailLine: Bool { detail != nil }
+
+    /// The pill's height: the title row, plus the one-line detail when there is one.
+    var pillHeight: CGFloat { hasDetailLine ? 68 : 44 }
 
     /// How long a final state stays before the HUD disappears; `nil` while the state is live. A message with
     /// a decision in it stays longer.

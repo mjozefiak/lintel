@@ -163,6 +163,24 @@
         }
       }
     },
+    "The launcher is off" : {
+      "comment" : "Settings → General banner: no plugin searches",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The launcher is off"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wyszukiwarka jest wyłączona"
+          }
+        }
+      }
+    },
     "Toggle Raw Markdown" : {
       "comment" : "Notes menu: switches the editor between Formatted and Raw",
       "extractionState" : "manual",
@@ -195,6 +213,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Naciśnij %@ ponownie, aby usunąć"
+          }
+        }
+      }
+    },
+    "Turn on Apps, Files or Window Management in Features to use the shortcut." : {
+      "comment" : "Settings → General banner detail: the main shortcut works once a search add-on is on",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Apps, Files or Window Management in Features to use the shortcut."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włącz Aplikacje, Pliki lub Zarządzanie oknami w Funkcjach, aby używać skrótu."
           }
         }
       }
@@ -3727,24 +3763,6 @@
         }
       }
     },
-    "Notes are on, but their model is not downloaded." : {
-      "comment" : "Meeting window banner when the notes model is missing",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notes are on, but their model is not downloaded."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notatki są włączone, ale ich model nie jest pobrany."
-          }
-        }
-      }
-    },
     "Notes model needed" : {
       "comment" : "Meeting library badge: notes are on but the model is missing",
       "extractionState" : "manual",
@@ -3831,24 +3849,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Otwórz jej panel, aby spróbować ponownie. Nic nie zostało usunięte."
-          }
-        }
-      }
-    },
-    "Optional: let a model on this Mac write notes after each meeting. It is a large download that starts only when you press the button." : {
-      "comment" : "Meetings onboarding step about the notes model",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Optional: let a model on this Mac write notes after each meeting. It is a large download that starts only when you press the button."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opcjonalnie: pozwól modelowi na tym Macu pisać notatki po każdym spotkaniu. To duże pobranie, które zaczyna się dopiero po naciśnięciu przycisku."
           }
         }
       }
@@ -4033,20 +4033,20 @@
         }
       }
     },
-    "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac." : {
+    "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings." : {
       "comment" : "Welcome screen: text of the first page",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac."
+            "value" : "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Szukaj aplikacji i plików, wklejaj z historii, dyktuj, miej notatki ze spotkań. Wszystko na tym Macu."
+            "value" : "Dyktuj w dowolnej aplikacji i miej notatki ze spotkań, wszystko na tym Macu. Wyszukiwanie, historię schowka i inne dodatki włączysz w Ustawieniach."
           }
         }
       }
@@ -10257,6 +10257,114 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mikrofon odłączony"
+          }
+        }
+      }
+    },
+    "“%@” unavailable – using “%@”" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholders are device names",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” unavailable – using “%@”"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%1$@” niedostępny – używam „%2$@”"
+          }
+        }
+      }
+    },
+    "“%@” unavailable – using the system input" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholder is its name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” unavailable – using the system input"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@” niedostępny – używam wejścia systemowego"
+          }
+        }
+      }
+    },
+    "Chosen microphone unavailable – using “%@”" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholder is the name of the input used",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chosen microphone unavailable – using “%@”"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybrany mikrofon niedostępny – używam „%@”"
+          }
+        }
+      }
+    },
+    "Chosen microphone unavailable – using the system input" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chosen microphone unavailable – using the system input"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybrany mikrofon niedostępny – używam wejścia systemowego"
+          }
+        }
+      }
+    },
+    "Your microphone is not being recorded" : {
+      "comment" : "Meeting HUD notice when the microphone could not be started, only the system audio is recorded",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your microphone is not being recorded"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twój mikrofon nie jest nagrywany"
+          }
+        }
+      }
+    },
+    "Trying the microphone again…" : {
+      "comment" : "Meeting HUD notice while the microphone is being started again after 'Try again'",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trying the microphone again…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponawiam próbę z mikrofonem…"
           }
         }
       }
@@ -27177,6 +27285,96 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sprawdź aktualizacje…"
+          }
+        }
+      }
+    },
+    "Notes on this Mac: Lintel writes your meeting notes here, without the internet." : {
+      "comment" : "Meetings onboarding step about the notes model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes on this Mac: Lintel writes your meeting notes here, without the internet."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki na tym Macu: Lintel pisze notatki ze spotkań tutaj, bez internetu."
+          }
+        }
+      }
+    },
+    "You can record now. Notes are written once the model is on this Mac." : {
+      "comment" : "Meetings onboarding: notes wait for the notes model, recording does not",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can record now. Notes are written once the model is on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Możesz już nagrywać. Notatki powstaną, gdy model będzie na tym Macu."
+          }
+        }
+      }
+    },
+    "Not enough free space. The notes model needs %@, and %@ is free." : {
+      "comment" : "Meetings onboarding: the disk is too full for the notes model; needed and free space",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough free space. The notes model needs %@, and %@ is free."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Za mało miejsca na dysku. Model notatek potrzebuje %1$@, a wolne jest tylko %2$@."
+          }
+        }
+      }
+    },
+    "Continue Download (%@ left)" : {
+      "comment" : "Meetings onboarding: resumes a notes model download that stopped part of the way",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue Download (%@ left)"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wznów pobieranie (zostało %@)"
+          }
+        }
+      }
+    },
+    "Notes will be written once the notes model is on this Mac." : {
+      "comment" : "Meeting window banner when the notes model is missing",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes will be written once the notes model is on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki powstaną, gdy model notatek będzie na tym Macu."
           }
         }
       }

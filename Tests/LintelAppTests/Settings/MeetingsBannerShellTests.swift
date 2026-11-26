@@ -17,6 +17,8 @@ import Testing
 
     @Test func meetingsOffShowTheNeutralTurnOnBanner() async throws {
         defer { env.tearDown() }
+        // On by default since 2026-11-24: this is a user who turned it off (or an old install that never turned it on).
+        env.settings.setValue(.bool(false), forKey: SettingsKeys.pluginEnabled("meetings"))
         let host = env.makeHost([MeetingsPlugin.self])
         await host.start()
         let model = SettingsHostModel(host: host, reader: FakePermissionsReader())

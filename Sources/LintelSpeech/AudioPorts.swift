@@ -31,9 +31,16 @@ public enum MicrophoneAccess: Equatable, Sendable {
 /// One piece of transcribed speech.
 public struct TranscriptSegment: Equatable, Sendable {
     public let text: String
+    /// Whisper's own doubt about the decoding, for the language repair (spec 2026-11-23-automatic-language-
+    /// detection): the highest no-speech probability of the decoded windows. `nil` for Parakeet.
+    public let noSpeechProb: Float?
+    /// Whisper's mean log probability of the decoded windows. `nil` for Parakeet.
+    public let avgLogProb: Float?
 
-    public init(text: String) {
+    public init(text: String, noSpeechProb: Float? = nil, avgLogProb: Float? = nil) {
         self.text = text
+        self.noSpeechProb = noSpeechProb
+        self.avgLogProb = avgLogProb
     }
 }
 
@@ -43,7 +50,16 @@ public protocol SpeechEngine: Sendable {
     var isLoaded: Bool { get async }
     func load(modelFolder: URL) async throws
     func transcribe(_ samples: [Float]) async throws -> TranscriptSegment
+    /// Transcribes with what this one request asks for (a script hint, a language). The default ignores the
+    /// options, so an engine that knows nothing about them keeps working unchanged.
+    func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment
     func unload() async
+}
+
+extension SpeechEngine {
+    public func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
+        try await transcribe(samples)
+    }
 }
 
 public struct VADEvent: Equatable, Sendable {
@@ -66,6 +82,14 @@ public struct VADEvent: Equatable, Sendable {
 public protocol VoiceActivityDetector: Sendable {
     /// Feeds samples of any length and returns the boundaries found so far.
     func process(_ samples: [Float]) async throws -> [VADEvent]
+
+    /// The speech probabilities (0...1, one per 256 ms chunk) computed since the last call, oldest first; they
+    /// are only kept when the detector was asked to record them. A detector that has none returns `[]`.
+    func drainProbabilities() async -> [Float]
+}
+
+extension VoiceActivityDetector {
+    public func drainProbabilities() async -> [Float] { [] }
 }
 
 /// The recording's samples in memory, dropping what has been handed to the engine. Indexes are counted from

@@ -33,6 +33,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = Logger(subsystem: "com.lintelapp", category: "app")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        // The design gallery (`--qa-gallery…`) is a developer tool: nothing of the app is created for it, no data root,
+        // no plugin, no hotkey.
+        if let options = try? QAOptions.parse(ProcessInfo.processInfo.arguments),
+            options.showsGallery || options.runsGalleryBatch
+        {
+            runGallery(options)
+            return
+        }
+        #endif
         let environment: AppEnvironment
         do {
             environment = try makeEnvironment()
@@ -214,6 +224,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     #if DEBUG
     private var qaOptions: QAOptions?
+    private var galleryWindow: GalleryWindowController?
+
+    /// `--qa-gallery` opens the window (and quits after `--qa-quit-after`, with `--qa-snapshot` writing its content);
+    /// `--qa-gallery-export|compare|record` draw, report and exit with a code.
+    private func runGallery(_ options: QAOptions) {
+        if options.runsGalleryBatch {
+            Task {
+                let code = await GalleryBatch.run(options)
+                exit(code)
+            }
+            return
+        }
+        let controller = GalleryWindowController()
+        controller.show(appearance: options.appearance == .dark ? .dark : .light)
+        galleryWindow = controller
+        if let quitAfter = options.quitAfter {
+            schedule(after: quitAfter) { [weak controller] in
+                if let path = options.snapshotPath { controller?.writeSnapshot(to: path) }
+                NSApp.terminate(nil)
+            }
+        }
+    }
     /// `--qa-quit-after` fired while the `--qa-move-prompt` alert was up.
     private var qaQuitDuringMovePrompt = false
 

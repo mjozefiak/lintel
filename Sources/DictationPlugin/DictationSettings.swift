@@ -11,6 +11,7 @@ struct DictationSettings: Sendable {
         static let speechLanguage = "speechLanguage"
         static let speechModelFolder = "speechModelFolder"
         static let inputDevice = "inputDevice"
+        static let inputDeviceName = "inputDeviceName"
         static let keepWarmMinutes = "keepWarmMinutes"
         static let restoreClipboard = "restoreClipboard"
         static let mode = "mode"
@@ -147,8 +148,20 @@ struct DictationSettings: Sendable {
         }
     }
 
-    func setInputDevice(_ uid: String?) {
+    /// The chosen device's name as Settings showed it, kept so the message "Microphone … is unavailable" can name a
+    /// device that is unplugged; `nil` when the choice predates the name (the UID may still tell, for USB).
+    var inputDeviceName: String? {
+        guard let name = settings.string(Key.inputDeviceName), !name.isEmpty else { return nil }
+        return name
+    }
+
+    func setInputDevice(_ uid: String?, name: String? = nil) {
         if let uid { settings.set(uid, for: Key.inputDevice) } else { settings.removeValue(for: Key.inputDevice) }
+        if uid != nil, let name, !name.isEmpty {
+            settings.set(name, for: Key.inputDeviceName)
+        } else {
+            settings.removeValue(for: Key.inputDeviceName)
+        }
     }
 
     func setKeepWarmMinutes(_ minutes: Int) { settings.set(minutes, for: Key.keepWarmMinutes) }

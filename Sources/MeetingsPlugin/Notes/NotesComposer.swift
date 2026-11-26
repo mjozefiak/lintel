@@ -28,15 +28,21 @@ enum NotesComposer {
         var person: String
         var due: String
         var nothing: String
+        /// The headings of the topic layout (`NotesLayout`, spec `2026-11-25-meeting-notes-structure`).
+        var decisionsMade: String
+        var nextSteps: String
+        var otherTopic: String
 
         static let polish = Labels(
             summary: "Podsumowanie", keyPoints: "Omówione tematy", decisions: "Decyzje", tasks: "Zadania",
             questions: "Otwarte kwestie", participants: "Uczestnicy", person: "osoba", due: "termin",
-            nothing: "W nagraniu nie znaleziono decyzji, zadań ani otwartych kwestii.")
+            nothing: "W nagraniu nie znaleziono decyzji, zadań ani otwartych kwestii.",
+            decisionsMade: "Podjęte decyzje", nextSteps: "Następne kroki", otherTopic: "Inne")
         static let english = Labels(
             summary: "Summary", keyPoints: "Topics discussed", decisions: "Decisions", tasks: "Action items",
             questions: "Open questions", participants: "Participants", person: "owner", due: "due",
-            nothing: "No decisions, action items or open questions were found in the recording.")
+            nothing: "No decisions, action items or open questions were found in the recording.",
+            decisionsMade: "Decisions", nextSteps: "Next steps", otherTopic: "Other")
 
         /// Labels in the language of the transcript; `fallback` when the text does not tell.
         static func forLanguage(_ language: NotesLanguage, fallback: NotesLanguage = .english) -> Labels {

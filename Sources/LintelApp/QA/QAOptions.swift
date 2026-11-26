@@ -134,6 +134,25 @@ struct QAOptions: Equatable {
     /// `--qa-updates beta` (and `pending`): the fake updater runs a `-beta.N` version, so the note shows.
     var updatesBeta = false
 
+    /// `--qa-gallery`: opens the design gallery window (every scene and state of the plugins, drawn by the real views over
+    /// fictional data; spec `2026-11-23-swiftui-design-gallery`) instead of the app's windows. With `--qa-snapshot` and
+    /// `--qa-quit-after` the window's content is written as a PNG. No plugin starts.
+    var showsGallery = false
+    /// `--qa-gallery-export <dir>`: draws the full matrix of every state (in the process's language) to
+    /// `<dir>/<scene>/<state>/<variant>.png` and quits. `--qa-gallery-scene <id>` limits it to one scene.
+    var galleryExport: URL?
+    var galleryScene: String?
+    /// `--qa-gallery-language en|pl`: the language the batch modes draw. It must be the language of the process, which
+    /// `-AppleLanguages "(pl)"` sets: texts are read from the process's language, not from the view.
+    var galleryLanguage: String?
+    /// `--qa-gallery-compare <dir>` / `--qa-gallery-record <dir>`: compares or writes the golden PNGs of the CI subset in
+    /// that language, with the gallery's renderer and diff, and quits (exit code 1 on a difference).
+    var galleryCompare: URL?
+    var galleryRecord: URL?
+
+    /// A gallery mode that draws and quits: no plugin or window of the app is started for it.
+    var runsGalleryBatch: Bool { galleryExport != nil || galleryCompare != nil || galleryRecord != nil }
+
     /// The file plugin's DEBUG-only fake home and its roots, which QA mode always sets
     /// (`AppEnvironment.qaFileIndexSettings`).
     /// The Windows plugin's DEBUG-only scripted files (`WindowsSettings.Key.qaScriptedFiles`), always on in QA mode.
@@ -213,6 +232,23 @@ struct QAOptions: Equatable {
                 guard let value = iterator.next() else { throw .missingValue(argument) }
                 guard let mode = MainWindowState.Mode(rawValue: value) else { throw .invalidValue(argument, value) }
                 options.windowMode = mode
+            case "--qa-gallery":
+                options.showsGallery = true
+            case "--qa-gallery-export":
+                options.galleryExport = URL(
+                    filePath: try Self.pathValue(argument, iterator.next()), directoryHint: .isDirectory)
+            case "--qa-gallery-compare":
+                options.galleryCompare = URL(
+                    filePath: try Self.pathValue(argument, iterator.next()), directoryHint: .isDirectory)
+            case "--qa-gallery-record":
+                options.galleryRecord = URL(
+                    filePath: try Self.pathValue(argument, iterator.next()), directoryHint: .isDirectory)
+            case "--qa-gallery-scene":
+                options.galleryScene = try Self.pathValue(argument, iterator.next())
+            case "--qa-gallery-language":
+                let value = try Self.pathValue(argument, iterator.next())
+                guard ["en", "pl"].contains(value) else { throw .invalidValue(argument, value) }
+                options.galleryLanguage = value
             case "--qa-onboarding":
                 options.showsOnboarding = true
             case "--qa-about":

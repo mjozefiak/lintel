@@ -46,6 +46,12 @@ final class TextPaster {
 
     /// The scheduled restore of the last paste, for tests to wait on.
     private(set) var pendingRestore: Task<Void, Never>?
+    /// True from the paste that scheduled a restore until that restore has written or been skipped. The
+    /// controller reports it as `.processing`, so an update does not quit Lintel between the paste and the
+    /// restore and leave the dictated text on the clipboard.
+    private(set) var isRestorePending = false
+    /// Counts scheduled restores, so only the latest one clears `isRestorePending`.
+    private var restoreGeneration = 0
 
     init(
         pasteboard: any PasteboardClient,
@@ -151,7 +157,13 @@ final class TextPaster {
         let pasteboard = pasteboard
         let clock = clock
         let logger = logger
-        pendingRestore = Task { @MainActor in
+        restoreGeneration &+= 1
+        let generation = restoreGeneration
+        isRestorePending = true
+        pendingRestore = Task { @MainActor [weak self] in
+            defer {
+                if let self, self.restoreGeneration == generation { self.isRestorePending = false }
+            }
             try? await clock.sleep(for: Self.restoreDelay)
             guard !Task.isCancelled, pasteboard.changeCount == written else {
                 logger.info("The pasteboard changed after the paste; not restoring it")

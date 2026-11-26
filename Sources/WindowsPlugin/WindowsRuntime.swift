@@ -60,6 +60,9 @@ final class WindowsRuntime: WindowSwitching {
     private(set) var engineConfig: EngineConfig
     /// Called when Accessibility is granted, before windows are restored (the plugin re-runs the self-check).
     var onTrustGranted: () async -> Void = {}
+    /// Called after the windows were put back (or arranged) following a grant: the plugin re-reads the Settings
+    /// banner's inputs, so a "Windows are parked" banner clears without waiting for the next activation.
+    var onTrustHandled: () async -> Void = {}
     /// Where the runtime is in its one life (`WindowsRuntime+Lifecycle.swift`).
     var phase = Phase.idle
     /// The newest problem the engine reported, for the Settings banner.
@@ -245,6 +248,8 @@ final class WindowsRuntime: WindowSwitching {
                 // the windows again (the restore left it still, and without Accessibility nothing was tiled).
                 await engine.send(.showWorkspace(current))
             }
+            guard !Task.isCancelled else { return }
+            await self.onTrustHandled()
         }
     }
 }

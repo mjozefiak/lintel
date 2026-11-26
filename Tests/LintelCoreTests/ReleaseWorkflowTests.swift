@@ -210,6 +210,29 @@ import Testing
         #expect(signCondition.components(separatedBy: "||")[0].contains("refs/tags/v"))
     }
 
+    /// The `sign` job runs next to the Developer ID key. The DMG window is laid out by the vendored dmgbuild
+    /// (`scripts/dmg/vendor`, run by `scripts/make-dmg.sh` with `/usr/bin/python3 -I`), so the job installs nothing and
+    /// restores no cache: no `pip`, no virtual environment and no `actions/cache` (ADR 0012, BACKWARD_COMPATIBILITY.md §4).
+    @Test func signJobInstallsNoPythonPackagesAndRestoresNoCache() throws {
+        let sign = code(try #require(try jobs()["sign"])).joined(separator: "\n")
+        #expect(sign.firstMatch(of: /\bpip3?\b/) == nil, "the sign job must not run pip")
+        #expect(
+            sign.firstMatch(of: /\bvenv\b|\bvirtualenv\b/) == nil, "the sign job must not create a virtual environment")
+        #expect(!sign.contains("actions/cache"), "the sign job must not restore a cache")
+        #expect(
+            sign.contains("scripts/make-dmg.sh --skip-build"), "the sign job builds the DMG with the repository script")
+        let make = code(
+            try String(contentsOf: Self.root.appending(path: "scripts/make-dmg.sh"), encoding: .utf8)
+                .components(separatedBy: "\n")
+        ).joined(separator: "\n")
+        #expect(
+            make.contains("PYTHON=/usr/bin/python3") && make.contains("\"$PYTHON\" -I -B"),
+            "make-dmg.sh runs the vendored dmgbuild with the system Python in isolated mode")
+        #expect(
+            make.firstMatch(of: /\bpip3?\b|\bvenv\b|curl |https?:\/\//) == nil,
+            "make-dmg.sh installs and downloads nothing")
+    }
+
     @Test func keepsTheTriggersOfTheMainBranchPush() throws {
         let lines = try workflow().components(separatedBy: "\n")
         let onBlock = code(lines).prefix { $0 != "permissions:" }.joined(separator: "\n")
@@ -221,13 +244,24 @@ import Testing
         #expect(pullRequestPaths.contains("Resources/*.entitlements"))
         let build = code(try #require(try jobs()["build"])).joined(separator: "\n")
         #expect(build.contains("if: github.actor != 'dependabot[bot]'"))
-        // One step: the condition, a step timeout above the watchdog limit (800 s + samples + kill < 16 min) and the
+        // The test step: the condition, a step timeout above the watchdog limit (800 s + samples + kill < 16 min) and the
         // watchdog around swift test.
         #expect(
             build.contains(
                 "if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')\n"
                     + "        timeout-minutes: 16\n"
-                    + "        run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test\n"))
+                    + "        run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test --skip-build\n")
+        )
+        // The test targets compile in their own step first, so the watchdog covers only running the tests (#263).
+        #expect(
+            build.contains(
+                "      - name: Build tests\n"
+                    + "        if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')\n"
+                    + "        timeout-minutes: 15\n"
+                    + "        run: swift build --build-tests\n"))
+        let buildTests = try #require(build.range(of: "      - name: Build tests\n"))
+        let runTests = try #require(build.range(of: "      - name: Test\n"))
+        #expect(buildTests.lowerBound < runTests.lowerBound)
         #expect(
             build.contains(
                 "        if: failure() || cancelled()\n"

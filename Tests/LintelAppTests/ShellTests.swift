@@ -50,7 +50,7 @@ private let repositoryRoot = URL(filePath: #filePath)
         #expect(notices.contains("Redistributions in binary form must reproduce the above copyright"))
         #expect(notices.contains("Copyright (C) 2015-2025 Gwendal Roué"))
         #expect(notices.contains("Copyright (c) Sindre Sorhus"))
-        #expect(notices.contains("FluidAudio 0.18.2"))
+        #expect(notices.contains("FluidAudio 0.18.4"))
         #expect(notices.contains("WhisperKit 1.1.1"))
         #expect(notices.contains("Creative Commons Attribution 4.0"))
 

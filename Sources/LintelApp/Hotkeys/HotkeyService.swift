@@ -54,6 +54,11 @@ final class HotkeyService {
 
     /// The current main shortcut, for menus and settings.
     private(set) var mainShortcut: HotkeyShortcut?
+    /// Whether the main shortcut is registered with the system. Only while an active plugin searches (owner decision
+    /// 2026-11-24): with every launcher add-on off the panel finds nothing, so the key stays free for other apps. The
+    /// stored shortcut is kept either way.
+    private(set) var isMainShortcutActive = false
+    @ObservationIgnored private var onMainShortcut: (@MainActor () -> Void)?
     /// Whether Spotlight (or another symbolic hotkey) holds Command-Space right now.
     private(set) var spotlightHoldsCommandSpace = false
 
@@ -81,10 +86,30 @@ final class HotkeyService {
         ShortcutPolicy.defaultShortcut(occupied: readOccupied())
     }
 
-    /// Applies the default when the user has not chosen a shortcut, and starts listening.
-    func start(onMainShortcut action: @escaping @MainActor () -> Void) {
+    /// Applies the default when the user has not chosen a shortcut, and starts listening when `active`.
+    func start(onMainShortcut action: @escaping @MainActor () -> Void, active: Bool = true) {
         refreshDefault()
-        registrar.setHandler(for: .main, action)
+        onMainShortcut = action
+        setMainShortcutActive(active)
+    }
+
+    /// Storing a shortcut registers it with the system, also while no handler listens; an inactive launcher gives the
+    /// key back at once.
+    private func releaseMainShortcutIfInactive() {
+        if !isMainShortcutActive { registrar.removeHandler(for: .main) }
+    }
+
+    /// Registers the main shortcut (`true`) or unregisters it (`false`); the stored shortcut is not touched. Does
+    /// nothing before `start` or when nothing changes.
+    func setMainShortcutActive(_ active: Bool) {
+        guard let onMainShortcut, active != isMainShortcutActive else { return }
+        if active {
+            registrar.setHandler(for: .main, onMainShortcut)
+        } else {
+            registrar.removeHandler(for: .main)
+        }
+        isMainShortcutActive = active
+        logger.info("Main shortcut \(active ? "registered" : "unregistered", privacy: .public)")
     }
 
     /// Re-reads the symbolic hotkeys and moves the main shortcut to the current default unless the user
@@ -97,6 +122,7 @@ final class HotkeyService {
         if resolved != current {
             registrar.setShortcut(resolved, for: .main)
             logger.info("Main shortcut set to the default \(resolved?.displayString ?? "none", privacy: .public)")
+            releaseMainShortcutIfInactive()
         }
         mainShortcut = registrar.shortcut(for: .main)
     }
@@ -105,6 +131,7 @@ final class HotkeyService {
     func userRecordedMainShortcut() {
         settings.setValue(.bool(true), forKey: SettingsKeys.hotkeyUserDefined)
         mainShortcut = registrar.shortcut(for: .main)
+        releaseMainShortcutIfInactive()
     }
 
     /// Goes back to the automatic default (the onboarding step's "Skip").
@@ -211,6 +238,8 @@ final class InMemoryHotkeyRegistrar: HotkeyRegistrar {
     /// Tests set this to false to simulate another app holding Escape.
     var escapeAvailable = true
     private(set) var escapeReleases = 0
+    /// How often each name's key was given back (`removeHandler`).
+    private(set) var releases: [HotkeyName: Int] = [:]
 
     func shortcut(for name: HotkeyName) -> HotkeyShortcut? { shortcuts[name] }
 
@@ -229,6 +258,7 @@ final class InMemoryHotkeyRegistrar: HotkeyRegistrar {
     func removeHandler(for name: HotkeyName) {
         handlers[name] = nil
         keyEventHandlers[name] = nil
+        releases[name, default: 0] += 1
     }
 
     func claimEscape(_ action: @escaping @MainActor () -> Void) -> EscapeKeyClaim {

@@ -66,8 +66,16 @@ final class KeyboardShortcutsRegistrar: HotkeyRegistrar {
     }
 
     func removeHandler(for name: HotkeyName) {
-        // Cancelling ends the event stream, which removes the handler and unregisters the shortcut.
+        // Cancelling ends the event stream and removes the handler. KeyboardShortcuts 1.10.0 does not give the key
+        // back then (the name stays in its handler table), and `setShortcut` registers a shortcut that has no handler
+        // at all, so the key is released here. `setHandler` registers it again.
         listeners.removeValue(forKey: name)?.cancel()
+        KeyboardShortcuts.disable(.init(name))
+        // Once more after what the library has already queued on the main queue (a listener's first registration).
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.listeners[name] == nil else { return }
+            KeyboardShortcuts.disable(.init(name))
+        }
     }
 }
 

@@ -314,13 +314,10 @@ struct MeetingsSetupView: View {
                 }
             }
 
-            // Optional and never counted in the checkmarks: notes are off until the user turns them on.
-            WelcomeStepItem(
-                Text(
-                    "Optional: let a model on this Mac write notes after each meeting. It is a large download that starts only when you press the button.",
-                    comment: "Meetings onboarding step about the notes model")
-            ) {
-                NotesSettingsRows(model: model.notes)
+            // Notes are on by default (#252); the model is only offered, never counted in the checkmarks (the
+            // switch stays reachable), and nothing here holds up Continue.
+            WelcomeStepItem(NotesOnThisMacRows.text) {
+                NotesOnThisMacRows(model: model.notes)
             }
 
             MeetingsSuggestionsSetupPart(model: model)
