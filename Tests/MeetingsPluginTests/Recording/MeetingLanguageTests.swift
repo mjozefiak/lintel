@@ -214,3 +214,66 @@ private let automatic = SpeechLanguageSelection(mode: .automatic, languages: ["p
         #expect(sent.allSatisfy { $0 == SpeechRequestOptions(scriptHint: .cyrillic, whisperLanguage: .pinned("uk")) })
     }
 }
+
+/// Step 2.5: Whisper Automatic in a scripted meeting (fake engine and identifier): what each segment was sent with,
+/// short and long, before and after the profile settles, and the 10th long segment's re-check.
+@Suite(.serialized) struct MeetingWhisperAutomaticTests {
+    @Test func eachSegmentGetsTheChoiceOfItsLengthAndTheProfile() async throws {
+        // (code, seconds, identified language): short ones are never identified (the profile ignores them).
+        var utterances: [(code: Int, seconds: Double, language: String?)] = [
+            (61, 2, nil), (62, 12, "en"), (63, 2, nil), (64, 12, "en"), (65, 12, "en"),
+        ]
+        // Settled after 65 (36 s of English): ten more long segments, the 10th is checked again.
+        utterances += (66...75).map { ($0, 6, "en") }
+        utterances.append((76, 1.5, nil))
+
+        var texts: [Int: String] = [:]
+        var answers: [String: LanguageGuess] = [:]
+        var mic = TrackScript()
+        for utterance in utterances {
+            texts[utterance.code] = placeholder(utterance.code)
+            if let language = utterance.language { answers[placeholder(utterance.code)] = confident(language) }
+            mic.silence(1)
+            mic.say(utterance.code, seconds: utterance.seconds)
+        }
+        mic.silence(2)
+        let rig = try SessionRig(texts: texts)
+        let session = rig.session(
+            mic: mic, system: nil, withSystem: false,
+            language: MeetingLanguage(
+                settings: ChangingSpeechLanguages(["pl", "en"]), identifier: TableIdentifier(answers)))
+        _ = try await session.start()
+        rig.mic.push(mic.samples)
+        rig.mic.end()
+        let outcome = await session.finish()
+        #expect(outcome.result == .ready)
+
+        let sent = rig.engine.options
+        #expect(sent.map(\.code) == utterances.map(\.code))
+        let detect = { (fallback: String) in WhisperLanguageChoice.detect(candidates: ["pl", "en"], fallback: fallback)
+        }
+        let expected: [WhisperLanguageChoice] =
+            [
+                .pinned("pl"),  // short, no profile yet: the first listed language
+                detect("pl"),  // long, no profile: detected, a failed detection falls back to the first listed
+                .pinned("en"),  // short: the profile's dominant language
+                detect("en"), detect("en"),  // long, unsettled: detected, falls back to the dominant language
+            ] + (66...74).map { _ in .pinned("en") } + [detect("en"), .pinned("en")]
+        #expect(sent.map(\.options.whisperLanguage) == expected)
+    }
+
+    /// A detection that fails is the engine's business: the options always carry a language to fall back to, and
+    /// Always one language never detects.
+    @Test func everyDetectionCarriesAFallbackAndSingleModeNeverDetects() {
+        var whisper = AutomaticWhisperLanguage()
+        let automatic = SpeechLanguageSelection(mode: .automatic, languages: ["uk", "pl"], isDerived: false)
+        let fresh = MeetingLanguage.options(for: automatic, profile: LanguageProfile(), duration: 10, whisper: &whisper)
+        #expect(fresh.whisperLanguage == .detect(candidates: ["uk", "pl"], fallback: "uk"))
+        let single = SpeechLanguageSelection(mode: .single("pl"), languages: ["uk", "pl"], isDerived: false)
+        for duration in [0.5, 10, 60] {
+            #expect(
+                MeetingLanguage.options(for: single, profile: LanguageProfile(), duration: duration, whisper: &whisper)
+                    .whisperLanguage == .pinned("pl"))
+        }
+    }
+}

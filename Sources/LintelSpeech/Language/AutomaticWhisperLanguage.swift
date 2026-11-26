@@ -15,8 +15,9 @@ import Foundation
 ///
 /// Memory only: a counter and language codes.
 public struct AutomaticWhisperLanguage: Sendable, Equatable {
-    /// A segment shorter than this is never detected (the profile's own lower bound, #132).
-    public static let minimumDetectionDuration: TimeInterval = LanguageProfile.minimumDuration
+    /// A segment shorter than this is never detected: the engine's own lower bound, the same 3 s as the profile's
+    /// (#132).
+    public static let minimumDetectionDuration = TimeInterval(WhisperKitEngine.minimumDetectionSeconds)
     /// After the profile settled, every this-many-th long segment is detected again.
     public static let recheckInterval = 10
     /// The language of a session with no list and no profile: the product's core language.
