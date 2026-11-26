@@ -59,7 +59,7 @@ import Testing
     @Test func theRowsFollowThePrototypeOrder() throws {
         let source = try Self.paneSource()
         let rows = [
-            "\"Basics\"", "\"Dictate\"", "\"Speech model\"", "TidyUpRow(choice:", "\"Input device\"",
+            "\"Basics\"", "\"Dictate\"", "\"Speech model\"", "TidyUpRow(", "\"Input device\"",
             "\"Restore the clipboard after pasting\"", "\"Keep a history\"", "\"Keep for\"", "\"At most\"",
             "\"Clear History…\"",
         ]
