@@ -608,12 +608,15 @@ public enum LiveRecordingFailure: Error, Sendable, Equatable {
 /// | The recording notices | Status |
 /// |---|---|
 /// | System audio unavailable at the start (`unavailable(.system)`), microphone fine | `hearing: .microphoneOnly`, no warning |
-/// | The microphone is denied or not recorded, system audio fine | `hearing: .callOnly` |
+/// | The microphone was never part of the recording: denied, system-audio-only, or not started after the start retries (`microphoneNotRecorded`) | `hearing: .callOnly`, no warning |
 /// | System audio was lost during the recording (`lost(.system)`) | `warning: .callAudioMissing` |
 /// | The system track heard nothing for about 20 s (`noSystemAudio`) | `warning: .silence` |
 /// | The microphone track is digitally silent (`noMicrophoneAudio`) | `warning: .microphoneSilent` |
-/// | The microphone was lost (device gone, `microphoneNotRecorded`) | `warning: .microphoneLost` |
+/// | The microphone was recorded and then went away mid-meeting (`deviceDisconnected`, `lost(.mic)`) | `warning: .microphoneLost`; `hearing` stays as it was |
 /// | Low disk space, a write problem, the time-limit countdown | HUD only, never a status |
+///
+/// Each HUD notice is in exactly one row. `microphoneLost` is a warning and leaves `hearing` untouched: the
+/// recording did hear the microphone until it went away, and the warning says it stopped.
 ///
 /// The notes' own failure is not a status: after `processing` comes `idle`, and the state of the notes is read
 /// from `NoteSummary.state` (`writing`, `partial`, `failed`) of the owner's note.
@@ -624,7 +627,8 @@ public enum LiveRecordingStatus: Sendable, Equatable {
         case everyone
         /// Only the microphone (no system audio); the UI offers "Fix Call Audio".
         case microphoneOnly
-        /// Only the call's audio (the microphone is denied or not recorded); the UI offers "Fix Microphone".
+        /// Only the call's audio: the microphone was never part of the recording (denied, system audio only, not
+        /// started); the UI offers "Fix Microphone".
         case callOnly
     }
 
@@ -636,7 +640,7 @@ public enum LiveRecordingStatus: Sendable, Equatable {
         case callAudioMissing
         /// The microphone is digitally silent (about 10 s).
         case microphoneSilent
-        /// The microphone was lost during the recording (the device went away, it stopped being recorded).
+        /// The microphone was recorded and then went away during the meeting (the device was disconnected).
         case microphoneLost
     }
 

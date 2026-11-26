@@ -282,12 +282,28 @@ struct ScriptedTrashSource: NoteSourceTrash {
         #expect(LiveRecordingStatus.Warning.microphoneSilent == .microphoneSilent)
     }
 
+    /// No `default`: adding a case to the closed set stops this from compiling until the UI sentence exists.
+    private func sentenceKey(_ failure: LiveRecordingFailure) -> String {
+        switch failure {
+        case .microphoneDenied: "microphoneDenied"
+        case .alreadyRecording: "alreadyRecording"
+        case .libraryUnavailable: "libraryUnavailable"
+        case .modelMissing: "modelMissing"
+        case .stillProcessing: "stillProcessing"
+        case .noAudioInput: "noAudioInput"
+        case .lowDisk: "lowDisk"
+        case .modelBusy: "modelBusy"
+        case .discarded: "discarded"
+        case .other: "other"
+        }
+    }
+
     @Test func theFailureSetCoversTheHUDProblems() {
         let all: [LiveRecordingFailure] = [
             .microphoneDenied, .alreadyRecording, .libraryUnavailable, .modelMissing, .stillProcessing,
             .noAudioInput, .lowDisk, .modelBusy, .discarded, .other,
         ]
-        #expect(Set(all.map { "\($0)" }).count == all.count)
+        #expect(Set(all.map(sentenceKey)).count == all.count)
         // A discarded recording names its meeting, so Notes can keep the user's own writing as a manual note.
         let key = NoteKey(pluginID: "meetings", id: "m1")
         #expect(
