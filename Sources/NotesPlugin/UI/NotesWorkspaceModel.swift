@@ -181,6 +181,8 @@ final class NotesWorkspaceModel {
     var holdsLoading = false
     /// QA (`plugins.notes.qaSearch`): the text typed into the search field once the first list is in.
     var initialSearch: String?
+    /// QA (`plugins.notes.qaSelect`): the row selected once the first list is in, and the preview's tab.
+    var initialSelection: (id: NoteItemID, tab: PreviewTab?)?
     /// `plugins.notes.qaEditor`: `on` or `readonly` shows the open note in the editor.
     var qaEditor: String?
     /// `plugins.notes.qaAttribution=mixed`.
@@ -447,6 +449,11 @@ final class NotesWorkspaceModel {
             initialSearch = nil
             searchText = text
             await runSearch()
+        }
+        if let (id, tab) = initialSelection {
+            initialSelection = nil
+            select(row: id)
+            if let tab { selectPreviewTab(tab) }
         }
         #endif
         for await _ in environment.library.changes(sourceSetChanges: environment.sourceSetChanges()) {

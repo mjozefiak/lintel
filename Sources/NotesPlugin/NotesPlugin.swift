@@ -337,6 +337,12 @@ public final class NotesPlugin: LintelPlugin {
         #if DEBUG
         openQAFixtureTabs(in: model)
         applyQAState(to: model)
+        if let raw = context.settings.string(NotesSettingsKey.qaSelect) {
+            let parts = raw.split(separator: "@", maxSplits: 1).map(String.init)
+            if let raw = parts.first, let id = NoteRoute.itemID(for: WorkspaceRoute(kind: NoteRoute.kind, id: raw)) {
+                model.initialSelection = (id, parts.count == 2 ? PreviewTab(rawValue: parts[1]) : nil)
+            }
+        }
         #endif
         return model
     }
