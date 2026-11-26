@@ -40,7 +40,8 @@ public struct GalleryVariant: Hashable, Sendable {
     ]
 
     /// What the owner approves: 2 appearances × {S, M, XL} × 2 languages. `L` stays out (its scale lies between M
-    /// and XL, and XL is the upper bound for wrapping); a scene may add it by name.
+    /// and XL, and XL is the upper bound for wrapping); a state may add it to the owner's sheet with
+    /// `GalleryState.includesLargeInSheet` (`sheetMatrix`), which leaves what CI compares unchanged.
     public static let fullMatrix: [GalleryVariant] = {
         var variants: [GalleryVariant] = []
         for language in ["en", "pl"] {
@@ -52,6 +53,21 @@ public struct GalleryVariant: Hashable, Sendable {
         }
         return variants
     }()
+
+    /// The owner's sheet of one state: `fullMatrix`, plus L in both appearances and languages when `includesLarge`
+    /// (a component whose sizes are set per text size, like the HUD pill's 28 / 32 / 35 / 38 pt).
+    public static func sheetMatrix(includesLarge: Bool) -> [GalleryVariant] {
+        guard includesLarge else { return fullMatrix }
+        var variants: [GalleryVariant] = []
+        for language in ["en", "pl"] {
+            for size in [TextSize.small, .medium, .large, .extraLarge] {
+                for appearance in Appearance.allCases {
+                    variants.append(GalleryVariant(appearance: appearance, textSize: size, language: language))
+                }
+            }
+        }
+        return variants
+    }
 
     /// The variants of `all` that are drawn in `language`.
     public static func only(_ language: String, in all: [GalleryVariant]) -> [GalleryVariant] {
@@ -102,18 +118,26 @@ public struct GalleryState: Identifiable, Sendable {
     public let summary: String
     public let presentation: GalleryPresentation
     public let variants: [GalleryVariant]
+    /// The owner's sheet (export, the window's "Full matrix") also draws the L size; CI compares `variants` only.
+    public let includesLargeInSheet: Bool
     public let make: @MainActor @Sendable () -> AnyView
 
     public init(
         id: String, summary: String, presentation: GalleryPresentation,
-        variants: [GalleryVariant] = GalleryVariant.ciSubset,
+        variants: [GalleryVariant] = GalleryVariant.ciSubset, includesLargeInSheet: Bool = false,
         make: @escaping @MainActor @Sendable () -> AnyView
     ) {
         self.id = id
         self.summary = summary
         self.presentation = presentation
         self.variants = variants
+        self.includesLargeInSheet = includesLargeInSheet
         self.make = make
+    }
+
+    /// What the owner's sheet draws for this state.
+    public var sheetVariants: [GalleryVariant] {
+        GalleryVariant.sheetMatrix(includesLarge: includesLargeInSheet)
     }
 }
 

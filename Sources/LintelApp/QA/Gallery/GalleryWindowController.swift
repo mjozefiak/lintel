@@ -149,7 +149,7 @@ private struct GalleryStateCard: View {
     private var language: String { GalleryRenderer.processLanguage }
 
     private var variants: [GalleryVariant] {
-        let all = fullMatrix ? GalleryVariant.fullMatrix : state.variants
+        let all = fullMatrix ? state.sheetVariants : state.variants
         return all.filter { $0.language == language }
     }
 

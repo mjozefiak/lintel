@@ -6,7 +6,7 @@ import SwiftUI
 /// are Core Animation layer animations: the live gallery shows them moving, and a picture (`cacheDisplay`) draws the
 /// layer's model values, so it is always the first frame.
 public enum LintelUIGallery {
-    @MainActor public static var scenes: [GalleryScene] { [LintelRingGallery.scene] }
+    @MainActor public static var scenes: [GalleryScene] { [LintelRingGallery.scene, LintelPillGallery.scene] }
 }
 
 /// One state of the ring: a row for a meeting mark and a row for a dictation mark, each at three sizes (a row mark,

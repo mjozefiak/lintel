@@ -97,7 +97,9 @@ public struct LintelPill: View {
     @ViewBuilder private func liveView(_ live: PillLive) -> some View {
         switch live {
         case .wave(let level):
-            PillWave(level: level, scale: PillMetrics.scale(textSize), reduced: reduced, animates: !reduced && motion != .frozen)
+            PillWave(
+                level: level, scale: PillMetrics.scale(textSize), reduced: reduced,
+                animates: !reduced && motion != .frozen)
         case .clock(let time, let amber):
             Text(verbatim: time)
                 .font(font.monospacedDigit())

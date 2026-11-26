@@ -118,7 +118,11 @@ public struct PillHoverRoot: View {
             content, expanded: hover.isExpanded, onAction: onAction,
             onKeyboardFocus: { hover.keyboardFocus($0) }
         )
-        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { hover.pillFrame = $0 }
+        .onGeometryChange(for: CGRect.self) {
+            $0.frame(in: .global)
+        } action: {
+            hover.pillFrame = $0
+        }
         .frame(width: PillMetrics.panelSize.width, height: PillMetrics.panelSize.height, alignment: alignment)
         .animation(reduced ? nil : .spring(duration: 0.2), value: hover.isExpanded)
     }

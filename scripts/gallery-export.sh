@@ -6,7 +6,7 @@
 #
 # Texts come from the language of the PROCESS (almost every string is String(localized:) without a bundle or locale),
 # so the app bundle runs twice, once with -AppleLanguages "(en)" and once with "(pl)". Output:
-#   <dir>/<scene>/<state>/<variant>.png   (variant: <light|dark>-<s|m|xl>-<en|pl>)
+#   <dir>/<scene>/<state>/<variant>.png   (variant: <light|dark>-<s|m|xl>-<en|pl>; also l for a state with includesLargeInSheet)
 #   <dir>/index.html                      a contact sheet with no external resources
 # Local runs are a working preview: another macOS build draws text differently from the CI runner, so only the
 # sheet and goldens of the gallery-goldens.yml run are what the owner approves.
