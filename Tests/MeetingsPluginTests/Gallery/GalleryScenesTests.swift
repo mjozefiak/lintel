@@ -90,6 +90,10 @@ struct GalleryScenesTests {
             let key = GalleryGoldens.sha256(try GalleryRenderer.pngData(try #require(first[state.id])))
             byPicture[key, default: []].append(state.id)
         }
+        // The picture groups with more than one state ARE the declared alias groups, in both directions: a group that
+        // falls apart (job-running starts to differ from ready-sonnet) makes its summary false, so it fails here too.
+        let shared = Set(byPicture.values.filter { $0.count > 1 }.map { Set($0) })
+        #expect(shared == Set(Self.aliasGroups), "the states that draw the same picture are \(shared)")
         for ids in byPicture.values where ids.count > 1 {
             #expect(
                 Self.aliasGroups.contains { Set(ids) == $0 },

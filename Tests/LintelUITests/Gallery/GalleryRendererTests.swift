@@ -175,7 +175,8 @@ struct GalleryRendererTests {
         #expect(GalleryRenderer.peakInFlight == 1, "the gate lets one render in at a time")
     }
 
-    @Test("a render cancelled while it waits for the gate does not strand the next one")
+    @Test(
+        "a render cancelled while it waits for the gate does not strand the next one", .timeLimit(.minutes(1)))
     func aCancelledRenderReleasesTheGate() async throws {
         let first = Task { @MainActor in try await GalleryRenderer.render(state(), lightM).pixelsWide }
         let second = Task { @MainActor in try await GalleryRenderer.render(state(), lightM).pixelsWide }
