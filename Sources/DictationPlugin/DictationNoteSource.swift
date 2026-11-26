@@ -50,7 +50,12 @@ final class NoteChangeHub: Sendable {
 /// hands an old key to a new entry; a key of another store id is simply absent.
 ///
 /// While the history is not open (switched off, Keychain locked or denied, failed) `list`, `exists` and
-/// `content` throw, and only an open store reports a note as absent. Dictated text never reaches a log.
+/// `content` throw, and only an open store reports a note as absent.
+///
+/// It is also the Recently deleted of the history (`NoteSourceTrash`): `list` and every search leave a trashed
+/// entry out, while `exists` and `content` still answer for it (it is not gone, so Notes keeps its overlays),
+/// `actions` of a key is always empty and `delete` is permanent and works on a trashed entry. Dictated text never
+/// reaches a log.
 final class DictationNoteSource: NoteSource {
     static let maxPageSize = 200
 
@@ -61,16 +66,23 @@ final class DictationNoteSource: NoteSource {
     /// Runs between the lookup of the entry and the delete on the main actor. A test seam: production passes
     /// nothing, tests close the history here to reproduce the history closing in that gap.
     private let beforeDelete: @Sendable () async -> Void
+    /// `plugins.dictation.retentionDays` as it is now (0 keeps everything): it bounds `purgeAt` of a trashed entry.
+    private let retentionDays: @Sendable () -> Int
+    private let now: @Sendable () -> Date
 
     init(
         history: DictationHistory, hub: NoteChangeHub,
         appName: @escaping @Sendable (String) -> String? = DictationNoteSource.installedAppName,
-        beforeDelete: @escaping @Sendable () async -> Void = {}
+        beforeDelete: @escaping @Sendable () async -> Void = {},
+        retentionDays: @escaping @Sendable () -> Int = { 0 },
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.history = history
         self.hub = hub
         self.appName = appName
         self.beforeDelete = beforeDelete
+        self.retentionDays = retentionDays
+        self.now = now
     }
 
     static func installedAppName(_ bundleID: String) -> String? {
@@ -109,14 +121,16 @@ final class DictationNoteSource: NoteSource {
         let text = (query?.isEmpty == false) ? query?.raw : nil
         let size = min(max(1, limit), Self.maxPageSize)
         let appName = appName
+        let retentionDays = retentionDays()
         return try await Self.page(
-            store: store, storeID: storeID, text: text, position: position, size: size, appName: appName)
+            store: store, storeID: storeID, text: text, position: position, size: size, appName: appName,
+            retentionDays: retentionDays)
     }
 
     @concurrent
     private static func page(
         store: DictationStore, storeID: String, text: String?, position: DictationStore.NotePosition?, size: Int,
-        appName: @Sendable (String) -> String?
+        appName: @Sendable (String) -> String?, retentionDays: Int
     ) async throws -> NotePage {
         try Task.checkCancellation()
         let entries = try store.noteEntries(matching: text, after: position, limit: size + 1)
@@ -124,7 +138,8 @@ final class DictationNoteSource: NoteSource {
         let shown = Array(entries.prefix(size))
         let words = text.map(WordPrefixes.words(of:)) ?? []
         let items = shown.map { entry -> NoteSummary in
-            var summary = DictationNoteMapping.summary(entry, storeID: storeID, appName: appName)
+            var summary = DictationNoteMapping.summary(
+                entry, storeID: storeID, appName: appName, retentionDays: retentionDays)
             if !words.isEmpty {
                 summary.matches = DictationNoteMapping.matches(entry, words: words)
             }
@@ -174,17 +189,23 @@ final class DictationNoteSource: NoteSource {
         let (store, storeID) = try open
         guard let row = try rowID(of: key, storeID: storeID) else { return nil }
         let appName = appName
-        return try await Self.content(store: store, storeID: storeID, row: row, appName: appName)
+        let retentionDays = retentionDays()
+        return try await Self.content(
+            store: store, storeID: storeID, row: row, appName: appName, retentionDays: retentionDays)
     }
 
+    /// An entry in Recently deleted still has its content, with `deletedAt` and `purgeAt` set; `nil` only after a
+    /// permanent delete, the purge or retention.
     @concurrent
     private static func content(
-        store: DictationStore, storeID: String, row: Int64, appName: @Sendable (String) -> String?
+        store: DictationStore, storeID: String, row: Int64, appName: @Sendable (String) -> String?,
+        retentionDays: Int
     ) async throws -> NoteContent? {
         try Task.checkCancellation()
-        guard let entry = try store.entry(row) else { return nil }
+        guard let entry = try store.entry(row, includingTrashed: true) else { return nil }
         return NoteContent(
-            summary: DictationNoteMapping.summary(entry, storeID: storeID, appName: appName),
+            summary: DictationNoteMapping.summary(
+                entry, storeID: storeID, appName: appName, retentionDays: retentionDays),
             layers: DictationNoteMapping.layers(entry), speakers: [], details: DictationNoteMapping.details(entry))
     }
 
@@ -194,7 +215,7 @@ final class DictationNoteSource: NoteSource {
     func delete(_ key: NoteKey) async throws {
         let (store, storeID) = try open
         guard let row = try rowID(of: key, storeID: storeID) else { return }
-        guard try store.entry(row) != nil else { return }
+        guard try store.entry(row, includingTrashed: true) != nil else { return }
         await beforeDelete()
         let history = history
         // `DictationHistory.delete` does nothing while the store is gone, which would read as success: the
@@ -209,6 +230,175 @@ final class DictationNoteSource: NoteSource {
     func actions(for key: NoteKey) -> [NoteSourceAction] { [] }
 
     func makeChanges() -> AsyncStream<Void> { hub.makeStream() }
+}
+
+// MARK: - Recently deleted
+
+extension DictationNoteSource: NoteSourceTrash {
+    /// Keys per call; a larger batch is processed in chunks of this size.
+    static let trashChunk = 500
+
+    /// Moves the entry to Recently deleted and returns the stamp the history used (the existing one for an entry
+    /// that is there already). Dictation is never recording or processing, so there is no `busy`; an entry that
+    /// is not in this history is `notFound`, a key that is not this source's shape is an invalid argument.
+    @discardableResult
+    func trash(_ key: NoteKey) async throws -> Date {
+        let (store, storeID) = try open
+        guard let row = try rowID(of: key, storeID: storeID) else { throw NoteSourceError.notFound }
+        let now = now()
+        let outcome = try await Self.trashEntry(store: store, row: row, at: now)
+        switch outcome {
+        case .trashed(let stamp):
+            history.announceChange()
+            return stamp
+        case .alreadyTrashed(let stamp):
+            return stamp
+        case .missing:
+            throw NoteSourceError.notFound
+        }
+    }
+
+    @concurrent
+    private static func trashEntry(store: DictationStore, row: Int64, at now: Date) async throws
+        -> DictationStore.TrashOutcome
+    {
+        try store.trash(id: row, at: now)
+    }
+
+    func trashAll(at deletedAt: Date) async throws -> TrashBatch {
+        let (store, _) = try open
+        let moved = try await Self.trashEverything(store: store, at: deletedAt)
+        if moved > 0 { history.announceChange() }
+        return TrashBatch(
+            deletedAt: TrashStamp.date(micros: TrashStamp.micros(deletedAt)), moved: moved, stayed: 0)
+    }
+
+    @concurrent
+    private static func trashEverything(store: DictationStore, at: Date) async throws -> Int {
+        try store.trashAll(at: at)
+    }
+
+    /// The row ids of the keys that are this store's, and the keys that cannot be (another plugin, another store
+    /// id, not `<store id>/<row id>`).
+    private func rows(of keys: [NoteKey], storeID: String) -> (rows: [Int64: NoteKey], foreign: Set<NoteKey>) {
+        var rows: [Int64: NoteKey] = [:]
+        var foreign = Set<NoteKey>()
+        for key in keys {
+            if let row = (try? rowID(of: key, storeID: storeID)) ?? nil {
+                rows[row] = key
+            } else {
+                foreign.insert(key)
+            }
+        }
+        return (rows, foreign)
+    }
+
+    @discardableResult
+    func restore(_ keys: [NoteKey]) async throws -> Set<NoteKey> {
+        let (store, storeID) = try open
+        // A key that is not this store's has no entry here: it is "no longer there", like a purged one.
+        let (wanted, foreign) = rows(of: keys, storeID: storeID)
+        let ids = Array(wanted.keys)
+        var missing = Set<Int64>()
+        for start in stride(from: 0, to: ids.count, by: Self.trashChunk) {
+            let chunk = Array(ids[start..<min(start + Self.trashChunk, ids.count)])
+            missing.formUnion(try await Self.restoreChunk(store: store, ids: chunk))
+        }
+        if !ids.isEmpty { history.announceChange() }
+        return foreign.union(missing.compactMap { wanted[$0] })
+    }
+
+    @concurrent
+    private static func restoreChunk(store: DictationStore, ids: [Int64]) async throws -> Set<Int64> {
+        try store.restore(ids: ids)
+    }
+
+    func restoreBatch(deletedAt: Date) async throws -> Int {
+        let (store, _) = try open
+        let restored = try await Self.restoreBatch(store: store, deletedAt: deletedAt)
+        if restored > 0 { history.announceChange() }
+        return restored
+    }
+
+    @concurrent
+    private static func restoreBatch(store: DictationStore, deletedAt: Date) async throws -> Int {
+        try store.restoreBatch(deletedAt: deletedAt)
+    }
+
+    func liveCount() async throws -> Int {
+        let (store, _) = try open
+        return try await Self.liveCount(store: store)
+    }
+
+    @concurrent
+    private static func liveCount(store: DictationStore) async throws -> Int { try store.liveCount() }
+
+    func trashedCount() async throws -> Int {
+        let (store, _) = try open
+        return try await Self.trashedCount(store: store)
+    }
+
+    @concurrent
+    private static func trashedCount(store: DictationStore) async throws -> Int { try store.trashedCount() }
+
+    func trashed(after: NoteCursor?, limit: Int) async throws -> NotePage {
+        let (store, storeID) = try open
+        let position = try after.map(Self.trashPosition(of:))
+        let size = min(max(1, limit), Self.maxPageSize)
+        let appName = appName
+        let retentionDays = retentionDays()
+        return try await Self.trashedPage(
+            store: store, storeID: storeID, position: position, size: size, appName: appName,
+            retentionDays: retentionDays)
+    }
+
+    @concurrent
+    private static func trashedPage(
+        store: DictationStore, storeID: String, position: DictationStore.TrashPosition?, size: Int,
+        appName: @Sendable (String) -> String?, retentionDays: Int
+    ) async throws -> NotePage {
+        try Task.checkCancellation()
+        let entries = try store.trashedEntries(after: position, limit: size + 1)
+        let total = try store.trashedCount()
+        try Task.checkCancellation()
+        let shown = Array(entries.prefix(size))
+        let items = shown.map {
+            DictationNoteMapping.summary($0, storeID: storeID, appName: appName, retentionDays: retentionDays)
+        }
+        let next = entries.count > size ? shown.last.flatMap(trashCursor(after:)) : nil
+        return NotePage(items: items, next: next, total: total)
+    }
+
+    private static func trashCursor(after entry: DictationEntry) -> NoteCursor? {
+        entry.deletedAt.map { NoteCursor(token: "\(TrashStamp.micros($0))|\(entry.id)") }
+    }
+
+    private static func trashPosition(of cursor: NoteCursor) throws -> DictationStore.TrashPosition {
+        let parts = cursor.token.split(separator: "|", omittingEmptySubsequences: false)
+        guard parts.count == 2, let micros = Int64(parts[0]), let id = Int64(parts[1]) else {
+            throw DictationNoteSourceError.invalidArgument
+        }
+        return DictationStore.TrashPosition(micros: micros, id: id)
+    }
+
+    func trashedKeys(_ keys: [NoteKey]) async throws -> [NoteKey: Date] {
+        let (store, storeID) = try open
+        let (wanted, _) = rows(of: keys, storeID: storeID)
+        let ids = Array(wanted.keys)
+        var result: [NoteKey: Date] = [:]
+        for start in stride(from: 0, to: ids.count, by: Self.trashChunk) {
+            let chunk = Array(ids[start..<min(start + Self.trashChunk, ids.count)])
+            for (row, stamp) in try await Self.stamps(store: store, ids: chunk) {
+                if let key = wanted[row] { result[key] = stamp }
+            }
+        }
+        return result
+    }
+
+    @concurrent
+    private static func stamps(store: DictationStore, ids: [Int64]) async throws -> [Int64: Date] {
+        try store.trashedStamps(ids: ids)
+    }
 }
 
 /// Words of a search text, matched as prefixes of the words of a layer (like the full-text index does).
@@ -266,14 +456,26 @@ enum DictationNoteMapping {
         }
     }
 
-    static func summary(_ entry: DictationEntry, storeID: String, appName: (String) -> String?) -> NoteSummary {
+    /// How many words the text Return pastes has; `nil` for none (the row shows no count).
+    static func wordCount(_ entry: DictationEntry) -> Int? {
+        let count = entry.bestText.split(whereSeparator: \.isWhitespace).count
+        return count > 0 ? count : nil
+    }
+
+    /// `retentionDays` is the history retention setting: it only bounds `purgeAt` of an entry in Recently deleted.
+    static func summary(
+        _ entry: DictationEntry, storeID: String, appName: (String) -> String?, retentionDays: Int = 0
+    ) -> NoteSummary {
         let title = DictationPresentation.title(entry)
         return NoteSummary(
             id: DictationNoteSource.key(storeID: storeID, row: entry.id), kind: .dictation,
             title: title.isEmpty ? nil : title, startedAt: entry.createdAt,
             durationMs: entry.durationMs > 0 ? entry.durationMs : nil,
             sourceApp: entry.targetBundleID.flatMap(appName).flatMap { $0.isEmpty ? nil : $0 },
-            state: state(entry.formatStatus))
+            state: state(entry.formatStatus), deletedAt: entry.deletedAt,
+            purgeAt: entry.deletedAt.map {
+                TrashStamp.purgeAt(deletedAt: $0, createdAt: entry.createdAt, retentionDays: retentionDays)
+            }, wordCount: wordCount(entry))
     }
 
     /// The text as Markdown that renders as the same plain text: invisible characters removed, every line its own

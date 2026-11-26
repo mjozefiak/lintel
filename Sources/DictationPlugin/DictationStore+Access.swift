@@ -56,7 +56,8 @@ extension DictationStore {
         try write { db in try db.execute(sql: "DELETE FROM dictation_entry") }
     }
 
-    /// Deletes entries older than `cutoff` and everything beyond the `maximumCount` newest. Returns how many.
+    /// Deletes entries older than `cutoff` (live and trashed alike, at once) and every live entry beyond the
+    /// `maximumCount` newest: an entry in Recently deleted does not count toward the maximum. Returns how many.
     @discardableResult
     func applyRetention(cutoff: Date, maximumCount: Int) throws -> Int {
         let ids = try read { db -> [Int64] in
@@ -64,7 +65,11 @@ extension DictationStore {
                 db, sql: "SELECT id FROM dictation_entry WHERE created_at < ?",
                 arguments: [cutoff.timeIntervalSince1970])
             let surplus = try Int64.fetchAll(
-                db, sql: "SELECT id FROM dictation_entry ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?",
+                db,
+                sql: """
+                    SELECT id FROM dictation_entry WHERE deleted_at IS NULL
+                    ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?
+                    """,
                 arguments: [max(0, maximumCount)])
             return Array(Set(old).union(surplus))
         }
@@ -78,6 +83,8 @@ extension DictationStore {
 
     // MARK: Reading
 
+    /// Every row, the ones in Recently deleted included (Clear History removes them too); `liveCount` is the
+    /// ones the history shows.
     func count() throws -> Int {
         try read { db in try Int.fetchOne(db, sql: "SELECT count(*) FROM dictation_entry") ?? 0 }
     }
@@ -85,8 +92,8 @@ extension DictationStore {
     /// Newest first, optionally only entries with (`formatted`) or without (`raw`) a cleaned text.
     func recent(limit: Int, filter: HistoryFilter? = nil) throws -> [DictationEntry] {
         try read { db in
-            var sql = "SELECT * FROM dictation_entry"
-            if let clause = filter?.clause { sql += " WHERE " + clause }
+            var sql = "SELECT * FROM dictation_entry WHERE deleted_at IS NULL"
+            if let clause = filter?.clause { sql += " AND " + clause }
             sql += " ORDER BY created_at DESC, id DESC LIMIT ?"
             return try Row.fetchAll(db, sql: sql, arguments: [max(0, limit)]).compactMap(Self.entry)
         }
@@ -99,7 +106,7 @@ extension DictationStore {
             var sql = """
                 SELECT dictation_entry.* FROM dictation_entry
                 JOIN dictation_fts ON dictation_fts.rowid = dictation_entry.id
-                WHERE dictation_fts MATCH ?
+                WHERE dictation_fts MATCH ? AND dictation_entry.deleted_at IS NULL
                 """
             if let clause = filter?.clause { sql += " AND dictation_entry." + clause }
             sql += " ORDER BY dictation_fts.rank LIMIT ?"
@@ -135,7 +142,7 @@ extension DictationStore {
     }
 
     private func noteConditions(matching text: String?, after: NotePosition?) -> (String, StatementArguments)? {
-        var conditions: [String] = []
+        var conditions = ["deleted_at IS NULL"]
         var arguments = StatementArguments()
         if let after {
             conditions.append("(created_at < ? OR (created_at = ? AND id < ?))")
@@ -146,10 +153,11 @@ extension DictationStore {
             conditions.append("id IN (SELECT rowid FROM dictation_fts WHERE dictation_fts MATCH ?)")
             arguments += [pattern]
         }
-        return (conditions.isEmpty ? "" : "WHERE " + conditions.joined(separator: " AND "), arguments)
+        return ("WHERE " + conditions.joined(separator: " AND "), arguments)
     }
 
-    /// The entries with these ids (what `exists` asks for).
+    /// The entries with these ids, the ones in Recently deleted included (what `exists` asks for: a trashed entry
+    /// is not gone).
     func entries(ids: [Int64]) throws -> [DictationEntry] {
         guard !ids.isEmpty else { return [] }
         let marks = ids.map { _ in "?" }.joined(separator: ", ")
@@ -160,14 +168,17 @@ extension DictationStore {
         }
     }
 
-    func entry(_ id: Int64) throws -> DictationEntry? {
-        try read { db in
-            try Row.fetchOne(db, sql: "SELECT * FROM dictation_entry WHERE id = ?", arguments: [id])
-                .flatMap(Self.entry)
+    /// One entry; one in Recently deleted only with `includingTrashed` (the note source's `content` and `delete`).
+    func entry(_ id: Int64, includingTrashed: Bool = false) throws -> DictationEntry? {
+        let live = includingTrashed ? "" : " AND deleted_at IS NULL"
+        return try read { db in
+            try Row.fetchOne(
+                db, sql: "SELECT * FROM dictation_entry WHERE id = ?" + live, arguments: [id]
+            ).flatMap(Self.entry)
         }
     }
 
-    private static func entry(_ row: Row) -> DictationEntry? {
+    static func entry(_ row: Row) -> DictationEntry? {
         guard let id: Int64 = row["id"], let created: Double = row["created_at"], let raw: String = row["raw_text"]
         else { return nil }
         return DictationEntry(
@@ -177,7 +188,8 @@ extension DictationStore {
             formatStatus: FormatStatus(rawValue: row["format_status"] ?? "") ?? .none,
             detectedLanguages: row["detected_languages"] ?? "", speechModelID: row["speech_model_id"] ?? "",
             formatterModel: row["formatter_model"], targetBundleID: row["target_bundle_id"],
-            pasteResult: PasteResult(rawValue: row["paste_result"] ?? "") ?? .pasted)
+            pasteResult: PasteResult(rawValue: row["paste_result"] ?? "") ?? .pasted,
+            deletedAt: (row["deleted_at"] as Double?).map(TrashStamp.date(column:)))
     }
 }
 

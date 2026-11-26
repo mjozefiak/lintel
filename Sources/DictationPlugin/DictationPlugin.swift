@@ -147,7 +147,8 @@ public final class DictationPlugin: LintelPlugin {
         vocabularyModel = VocabularyPanelModel(
             store: vocabulary, settings: settings,
             revealInFinder: { url in workspace.revealInFinder([url]) })
-        noteSource = DictationNoteSource(history: history, hub: noteChanges)
+        noteSource = DictationNoteSource(
+            history: history, hub: noteChanges, retentionDays: { settings.retentionDays })
         historyModel = HistorySettingsModel(settings: settings, history: history)
         let keptNoteCopies = context.keptNoteCopies
         let deleteKeptNoteCopies = context.deleteKeptNoteCopies
