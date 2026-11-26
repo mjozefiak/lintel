@@ -21,8 +21,14 @@ struct NotesReduceOutput: Equatable, Sendable {
 ///   two neighbouring utterances of the same speaker when the first has no sentence end (a sentence the
 ///   recognizer cut in two). Never spliced across sentences or speakers. The comparison is on normalised words
 ///   and a word may differ only by a known Polish ending (`NotesText.wordsMatch`).
+/// - A quote that does not match that way (a word changed, words left out) is anchored to the shortest fragment
+///   of one sentence of one speaker that holds 80 % of its content words in order (`anchor`, rules `g1`); the
+///   fragment then IS the quote: the details, negation, drift, person and due date are checked against its words
+///   only, and the point is refused when its text uses a word of the model's quote the fragment does not hold.
 /// - A point whose text holds a digit, address, number word, weekday, month, capitalised name or sentence
-///   starter that the quote, its utterance and its speaker do not have is REMOVED (reason `unsupportedDetail`),
+///   starter that the quote, its utterance and its speaker do not have is REMOVED (reason `unsupportedDetail`;
+///   a summary point's first word passes when the transcript writes it in lowercase and never as a name, rules
+///   `g1`),
 ///   as is one that turns a negation around (`negationChanged`) or, for a summary point, drifts from its quote
 ///   (`driftedFromQuote`). The text of the transcript is never shown in its place: the notes are a summary, not
 ///   a list of quotes. A decision, a task or a summary point whose sentence is a question becomes an open

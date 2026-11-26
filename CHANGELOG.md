@@ -9,6 +9,7 @@ section (pre-releases use `x.y.z-beta.N`).
 ### Changed
 
 - Meeting notes written by a provider (Claude) now follow a topic layout: a short intro, topics, decisions made and next steps.
+- Meeting notes written by the model on this Mac keep more of the points it finds: a point whose quote differs from the recording by a word or a few left-out words is checked against the words that were really said, and a point that starts with an ordinary word is no longer taken for a name. Numbers, dates, names and negations are checked as strictly as before (notes rules g1).
 - On a new install, Dictation and Meetings are on, and app search, file search and clipboard history are add-ons that you turn on in Settings → Features. If you used Lintel before this version, every switch stays as it was.
 - The welcome screen starts with dictation and meeting notes. It asks for the launcher shortcut only when app search, file search or window management is on; the shortcut stays in Settings → General and works only while one of them is on.
 - On a new install, Lintel writes notes after each meeting with the model on this Mac; nothing is sent anywhere. The welcome screen offers the notes model download (with its size, and with the space needed when the disk is too full). Until the model is downloaded, meetings are recorded and saved as before and say that their notes are written once the model is on this Mac; meetings recorded since Lintel started get their notes as soon as the download finishes. If you used Lintel before this version, the notes switch stays as it was.
