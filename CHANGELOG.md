@@ -10,6 +10,8 @@ section (pre-releases use `x.y.z-beta.N`).
 
 - Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
 
+- Dictation: a **Full** level of Tidy up my text (email layout, paragraphs for a long dictation, smoother style) is built and tested but not offered yet; it appears in the popup when it passes its quality checks.
+
 ### Changed
 
 - Notes: the Notes section now has a sidebar with All notes, Meetings and Dictations (with counts), a list grouped by day with a ring and one line of facts per note, and a preview of the selected note with the tabs Notes, My notes and Transcript. A search stays in the list you are in, and "Search All Notes" widens it. Empty lists say what to do next. The window has a Settings row at the bottom of the sidebar.

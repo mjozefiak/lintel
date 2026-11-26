@@ -120,7 +120,9 @@ struct DictationPaneContent: View {
                         comment: "Settings → Dictation: help under the language of the Whisper model"))
             }
         }
-        TidyUpRow(choice: $formatting.choice)
+        TidyUpRow(
+            choice: $formatting.choice, choices: formatting.choices, showsSmallModelHint: formatting.showsSmallModelHint
+        )
         // The model, the server and "Try it" belong to Standard; Light runs on rules and needs none of them.
         if formatting.usesModel {
             cleanupRows

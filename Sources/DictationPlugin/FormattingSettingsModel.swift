@@ -13,17 +13,33 @@ final class FormattingSettingsModel {
         case result(original: String, text: String, cleaned: Bool)
     }
 
-    /// The values of the popup. Full comes with its own phase; a stored `full` is shown, and runs, as Standard.
+    /// The values of the popup. A stored `full` is shown, and runs, as Standard while Full is not offered
+    /// (`DictationSettings.offersFull`).
     enum TidyChoice: String, CaseIterable, Sendable {
-        case off, light, standard
+        case off, light, standard, full
 
         init(_ settings: DictationSettings) {
             switch settings.effectiveLevel {
             case nil: self = .off
             case .light: self = .light
-            case .standard, .full: self = .standard
+            case .standard: self = .standard
+            case .full: self = .full
             }
         }
+
+        /// The level a model runs at, `nil` for Off and Light, which run no model.
+        var modelLevel: DictationSettings.CleanupLevel? {
+            switch self {
+            case .off, .light: nil
+            case .standard: .standard
+            case .full: .full
+            }
+        }
+    }
+
+    /// The values the popup lists: Full only while it is offered.
+    var choices: [TidyChoice] {
+        TidyChoice.allCases.filter { $0 != .full || settings.offersFull }
     }
 
     /// The text "Try it" cleans up.
@@ -42,6 +58,9 @@ final class FormattingSettingsModel {
                 settings.setMode(.cleanup)
             case .standard:
                 settings.setCleanupLevel(.standard)
+                settings.setMode(.cleanup)
+            case .full:
+                settings.setCleanupLevel(.full)
                 settings.setMode(.cleanup)
             }
             tryState = .idle
@@ -74,7 +93,7 @@ final class FormattingSettingsModel {
 
     @ObservationIgnored private let settings: DictationSettings
     @ObservationIgnored private let probe: EndpointProbe
-    @ObservationIgnored private let formatter: LocalLLMFormatter
+    @ObservationIgnored private let transport: any HTTPTransport
     @ObservationIgnored private let llmModels: ModelManager?
     @ObservationIgnored private let runtime: KeepWarmRuntime?
     @ObservationIgnored private var tryTask: Task<Void, Never>?
@@ -90,7 +109,7 @@ final class FormattingSettingsModel {
         self.llmModels = llmModels
         self.runtime = runtime
         probe = EndpointProbe(transport: transport)
-        formatter = LocalLLMFormatter(transport: transport, target: { settings.llmTarget })
+        self.transport = transport
         let offered = LLMModelCatalog.available(physicalMemory: physicalMemory)
         builtInModels = offered.isEmpty ? [LLMModelCatalog.defaultModel] : offered
         let chosen = settings.builtInLLMModel
@@ -102,11 +121,18 @@ final class FormattingSettingsModel {
         selectedModel = settings.llmModel
     }
 
-    /// Whether anything is tidied (Light or Standard).
+    /// Whether anything is tidied (Light, Standard or Full).
     var isCleanupOn: Bool { choice != .off }
 
-    /// Whether a language model (the built-in one or a server) does the tidying: only Standard. Light needs none.
-    var usesModel: Bool { choice == .standard }
+    /// Whether a language model (the built-in one or a server) does the tidying: Standard and Full. Light needs none.
+    var usesModel: Bool { choice.modelLevel != nil }
+
+    /// Full on the smallest catalog model: it works, but the larger one does it better (spec A6), so the pane says so.
+    var showsSmallModelHint: Bool {
+        guard choice == .full, isBuiltIn else { return false }
+        let smallest = LLMModelCatalog.all.min { $0.residentBytes < $1.residentBytes }
+        return builtInModel == smallest
+    }
 
     /// The models of the selected server, from the last probe.
     var models: [String] {
@@ -187,11 +213,13 @@ final class FormattingSettingsModel {
     func tryIt() {
         guard tryTask == nil, hasTarget else { return }
         tryState = .running
+        let level = choice.modelLevel ?? .standard
         let formatter: any TextFormatter
         if isBuiltIn, let runtime {
-            formatter = BuiltInFormatter(runtime: runtime)
+            formatter = BuiltInFormatter(runtime: runtime, level: level)
         } else {
-            formatter = self.formatter
+            let settings = settings
+            formatter = LocalLLMFormatter(transport: transport, target: { settings.llmTarget }, level: level)
         }
         tryTask = Task { [weak self] in
             let sample = Self.sample
