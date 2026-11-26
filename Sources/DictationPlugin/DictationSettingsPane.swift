@@ -25,7 +25,7 @@ struct DictationSettingsPane: View {
 }
 
 /// The Dictation pane (prototype `set-dictation`): Basics (Dictate, Speech model with its
-/// one-line summary, Clean up text and, while it is on, where it runs), a collapsed Advanced (Input device,
+/// one-line summary, Tidy up my text and, at Standard, where it runs), a collapsed Advanced (Input device,
 /// restore the clipboard) and History (Keep a history, Keep for, At most, Clear History…). The model, the
 /// microphone and the history's state are the host's banner; downloads live in Models, the microphone in
 /// Permissions.
@@ -120,25 +120,10 @@ struct DictationPaneContent: View {
                         comment: "Settings → Dictation: help under the language of the Whisper model"))
             }
         }
-        Toggle(isOn: Binding(get: { formatting.isCleanupOn }, set: { formatting.mode = $0 ? .cleanup : .raw })) {
-            label(
-                Text("Clean up text", comment: "Settings → Dictation: switch that formats the text"), help: cleanupHelp)
-        }
-        .toggleStyle(.switch)
-        if formatting.isCleanupOn {
+        TidyUpRow(choice: $formatting.choice)
+        // The model, the server and "Try it" belong to Standard; Light runs on rules and needs none of them.
+        if formatting.usesModel {
             cleanupRows
-        }
-    }
-
-    private var cleanupHelp: Text {
-        if !formatting.isBuiltIn && (formatting.isCleanupOn || !formatting.offersBuiltIn) {
-            Text(
-                "Your server on this Mac fixes punctuation and filler words.",
-                comment: "Settings → Dictation: help under Clean up text when the user's server formats")
-        } else {
-            Text(
-                "Built-in model fixes punctuation and filler words.",
-                comment: "Settings → Dictation: help under Clean up text")
         }
     }
 
