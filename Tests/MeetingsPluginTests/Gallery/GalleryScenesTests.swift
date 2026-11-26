@@ -148,15 +148,19 @@ struct GoldenBudgetTests {
         #expect(total <= Self.budget, "the goldens take \(total) bytes; the budget is \(Self.budget)")
     }
 
-    @Test("no golden image belongs to a state that no longer exists")
+    /// The folder is shared by every plugin's scenes (CI compares one folder); each plugin's test owns the scenes whose id
+    /// starts with its own prefix and leaves the others alone.
+    private static let prefix = "meetings."
+
+    @Test("no golden image of this plugin belongs to a state that no longer exists")
     func noOrphans() throws {
         let expected = GalleryGoldens.expectedFiles(GalleryTestSupport.scenes)
         let root = GalleryTestSupport.goldens.standardizedFileURL.path + "/"
         let orphans = try files().map { String($0.standardizedFileURL.path.dropFirst(root.count)) }
-            .filter { !expected.contains($0) }
+            .filter { $0.hasPrefix(Self.prefix) && !expected.contains($0) }
         #expect(orphans.isEmpty, "delete these goldens: \(orphans.sorted())")
         if let manifest = GalleryGoldens.loadManifest(in: GalleryTestSupport.goldens) {
-            let listed = Set(manifest.files.keys)
+            let listed = Set(manifest.files.keys).filter { $0.hasPrefix(Self.prefix) }
             #expect(listed.subtracting(expected).isEmpty, "goldens.json lists \(listed.subtracting(expected).sorted())")
         }
     }

@@ -331,7 +331,7 @@ struct MeetingNoteSourceExplorerFieldTests {
         }
         let decision = NotesPoint(id: "d", kind: .decision, timeMs: 1_000, quote: "q", text: "[x] Ship it [link](x)")
         let verdict = NotesGuard.ReduceVerdict(
-            decisions: [decision], tasks: tasks, questions: [], summary: nil, summaryReplaced: false, rejectedIDs: 0)
+            decisions: [decision], tasks: tasks, questions: [], rejectedIDs: 0)
         let markdown = NotesComposer.markdown(verdict: verdict, participants: ["Anna"], labels: .english)
         let withTasks = try rig.key("notes")
         try rig.store.setNotes(try #require(rig.rig.ids["notes"]), markdown: markdown, status: .ok)

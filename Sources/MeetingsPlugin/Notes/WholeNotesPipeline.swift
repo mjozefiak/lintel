@@ -50,7 +50,7 @@ struct WholeNotesPipeline: Sendable {
         ) -> NotesResult {
             NotesResult(
                 status: status, markdown: markdown, droppedCount: dropped, failedChunks: [], chunkCount: parts,
-                verifiedPointCount: 0, reduceFailed: false, summaryReplaced: false, rejectedIDs: 0,
+                verifiedPointCount: 0, reduceFailed: false, rejectedIDs: 0,
                 language: language, promptVersion: WholeNotesPrompt.version)
         }
         guard !utterances.isEmpty else { return result(.ok) }

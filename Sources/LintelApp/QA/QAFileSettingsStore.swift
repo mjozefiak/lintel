@@ -9,6 +9,13 @@ import Synchronization
 nonisolated final class QAFileSettingsStore: SettingsStore {
     static let fileName = "qa-settings.json"
 
+    /// Keys that never survive a relaunch. `app.hotkey.commandDefaultsApplied` marks commands whose default
+    /// shortcut was stored once; in QA mode the shortcuts themselves live only in the run's in-memory registrar
+    /// (`InMemoryHotkeyRegistrar`), so a second launch must apply the defaults again instead of trusting the marker
+    /// (#300).
+    /// The key still works within one launch; it is just never written to or read back from the file.
+    static let ephemeralKeys: Set<String> = [SettingsKeys.commandShortcutDefaultsApplied]
+
     private struct Stored: Codable {
         var kind: String
         var bool: Bool?
@@ -45,7 +52,7 @@ nonisolated final class QAFileSettingsStore: SettingsStore {
         if let data = try? Data(contentsOf: url),
             let stored = try? JSONDecoder().decode([String: Stored].self, from: data)
         {
-            for (key, entry) in stored { loaded[key] = entry.value }
+            for (key, entry) in stored where !Self.ephemeralKeys.contains(key) { loaded[key] = entry.value }
         }
         for (key, value) in seeded { loaded[key] = value }
         values = Mutex(loaded)
@@ -65,7 +72,7 @@ nonisolated final class QAFileSettingsStore: SettingsStore {
     }
 
     private func persist(_ snapshot: [String: SettingValue]) {
-        let stored = snapshot.mapValues(Stored.init)
+        let stored = snapshot.filter { !Self.ephemeralKeys.contains($0.key) }.mapValues(Stored.init)
         guard let data = try? JSONEncoder().encode(stored) else { return }
         try? data.write(to: url, options: .atomic)
     }

@@ -345,8 +345,17 @@ pasting into another app cannot be faked. Check the HUD, the Settings pane and t
 
 ### Dictation formatting (Phase 2)
 
+Cleanup levels (spec `2026-11-25-dictation-cleanup-levels`, Phase 1): Settings → Dictation → Basics → "Tidy up my text" is
+Off, Light or Standard (Full comes with its phase). Screenshots of the pane at each value, light and dark, English and
+Polish, need no model and no server: `--qa --qa-window settings --qa-settings dictation` with
+`--qa-setting plugins.dictation.mode=raw` (Off), `--qa-setting plugins.dictation.mode=cleanup
+--qa-setting plugins.dictation.cleanupLevel=light` (Light) or `--qa-setting plugins.dictation.mode=cleanup` (Standard),
+`--qa-appearance light|dark`, `--qa-snapshot <png> --qa-quit-after 6` and `-AppleLanguages "(pl)"` from the app bundle.
+The model, server and "Try it" rows show only at Standard. The popup's states are also gallery scene `dictation.tidy-up`.
+Light needs no model: with no model downloaded and no server set, dictation at Light still removes "yyy"/"um" (by hand).
+
 The formatting server is the user's own, so it cannot be faked in CI. With Ollama (or LM Studio,
-llama-server) running and a model pulled, turn on Settings → Dictation → Basics → Clean up text and check:
+llama-server) running and a model pulled, set Settings → Dictation → Basics → Tidy up my text to Standard and check:
 
 - the server and model are found and chosen by themselves, "Try it" shows a cleaned sample;
 - an address such as `http://example.com` or `192.168.1.5` is refused in the Address field;
@@ -780,9 +789,12 @@ keeping every other isolation (temporary data root, in-memory Keychain, no globa
 pass with `--qa-setting plugins.windows.floatingApps=<comma-separated bundle ids>` (a list setting). Hotkeys stay off
 because the shortcut library keeps its recorded shortcuts in the real defaults domain. `--qa-persistent-settings` keeps
 the QA settings in `<data root>/qa-settings.json` (inside the isolated root; command-line `--qa-setting` values win at
-every launch), so a second launch sees what the first stored. `--qa-setting plugins.windows.qaCapturable=true` (DEBUG
-only) makes the zone overlay, the HUD and the display identifier capturable for screenshots (the menu bar strip is a
-status item and was never excluded); release builds always keep them out of screen sharing (`ScreenCapture`).
+every launch), so a second launch sees what the first stored. The commands' default shortcuts are re-applied at every
+launch (the QA registrar is in-memory, so no shortcut survives a relaunch): `app.hotkey.commandDefaultsApplied` is never
+kept in `qa-settings.json`, and a second launch shows the default shortcuts again, never empty ones (#300).
+`--qa-setting plugins.windows.qaCapturable=true` (DEBUG only) makes the zone overlay, the HUD and the display
+identifier capturable for screenshots (the menu bar strip is a status item and was never excluded); release builds
+always keep them out of screen sharing (`ScreenCapture`).
 `--qa-setting plugins.windows.qaDragTrace=<file>` (DEBUG only) appends one line per snap drag with the time of each
 stage from the engine receiving the first moved event to the overlay being ordered in
 (`ingest`, `flushStart`, `read`, `reportedOnMain`, `targets`, `overlayShown`, in ms): the part before `ingest` is the

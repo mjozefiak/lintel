@@ -70,6 +70,11 @@ class StructureTests(unittest.TestCase):
         flat = "Intro.\n\n" + "".join("- point %d.\n" % i for i in range(20))
         self.assertEqual(failed(result(flat, minutes=40)), ["no_headingless_points"])
 
+    def test_the_built_in_fallback_list_has_the_codes_heading(self):
+        # Issue #303: findings without a topic name stand under the code's heading, so the rule holds.
+        fallback = "Intro.\n\n### Omówione tematy\n\n" + "".join("- point %d.\n" % i for i in range(6))
+        self.assertEqual(failed(result(fallback + topic("A", 2), minutes=40)), [])
+
     def test_a_short_meeting_has_no_topic_headings(self):
         flat = "Krótka rozmowa o kurierze.\n\n- one.\n- two.\n- three.\n"
         self.assertEqual(failed(result(flat, minutes=8)), [])

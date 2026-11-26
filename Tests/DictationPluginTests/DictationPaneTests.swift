@@ -59,7 +59,7 @@ import Testing
     @Test func theRowsFollowThePrototypeOrder() throws {
         let source = try Self.paneSource()
         let rows = [
-            "\"Basics\"", "\"Dictate\"", "\"Speech model\"", "\"Clean up text\"", "\"Input device\"",
+            "\"Basics\"", "\"Dictate\"", "\"Speech model\"", "TidyUpRow(choice:", "\"Input device\"",
             "\"Restore the clipboard after pasting\"", "\"Keep a history\"", "\"Keep for\"", "\"At most\"",
             "\"Clear History…\"",
         ]
@@ -305,9 +305,7 @@ import Testing
             "Allow the microphone and get the speech model.", "History is paused (dictation)",
             "Try Again (dictation history)", "Lintel can’t read the history’s key. Nothing was deleted.",
             "The history couldn’t be opened. Dictation still works.", "Speech model: %@.",
-            "Press to start and again to stop, or hold.", "Clean up text",
-            "Built-in model fixes punctuation and filler words.",
-            "Your server on this Mac fixes punctuation and filler words.", "Keep a history",
+            "Press to start and again to stop, or hold.", "Tidy up my text", "Keep a history",
             "Whisper listens for the language you choose.",
             "Lintel pastes through the clipboard and puts back what was there a second later.",
         ] {

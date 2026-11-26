@@ -256,7 +256,9 @@ struct MeetingEvalTests {
             let started = clock.now
             let notes: NotesResult
             do {
-                notes = try await pipeline.run(utterances: utterances)
+                // The length of the recording, as the app passes the meeting's length (the topic limit).
+                notes = try await pipeline.run(
+                    utterances: utterances, durationMs: Int((result.audioSeconds * 1000).rounded()))
             } catch {
                 await Self.unloadAndWait(runtime)
                 throw error
