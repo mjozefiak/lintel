@@ -1,5 +1,6 @@
 import Foundation
 import LintelKit
+import LintelTestSupport
 import Testing
 
 @testable import DictationPlugin
@@ -122,7 +123,7 @@ import Testing
         let model = FormattingSettingsModel(settings: settings, transport: transport)
         model.choice = .light
         model.choice = .standard
-        for _ in 0..<200 where transport.requests.isEmpty { try? await Task.sleep(for: .milliseconds(10)) }
+        await pollUntil("a server request after switching to Standard") { !transport.requests.isEmpty }
         #expect(!transport.requests.isEmpty)
     }
 }
