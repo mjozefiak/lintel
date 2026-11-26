@@ -345,8 +345,17 @@ pasting into another app cannot be faked. Check the HUD, the Settings pane and t
 
 ### Dictation formatting (Phase 2)
 
+Cleanup levels (spec `2026-11-25-dictation-cleanup-levels`, Phase 1): Settings → Dictation → Basics → "Tidy up my text" is
+Off, Light or Standard (Full comes with its phase). Screenshots of the pane at each value, light and dark, English and
+Polish, need no model and no server: `--qa --qa-window settings --qa-settings dictation` with
+`--qa-setting plugins.dictation.mode=raw` (Off), `--qa-setting plugins.dictation.mode=cleanup
+--qa-setting plugins.dictation.cleanupLevel=light` (Light) or `--qa-setting plugins.dictation.mode=cleanup` (Standard),
+`--qa-appearance light|dark`, `--qa-snapshot <png> --qa-quit-after 6` and `-AppleLanguages "(pl)"` from the app bundle.
+The model, server and "Try it" rows show only at Standard. The popup's states are also gallery scene `dictation.tidy-up`.
+Light needs no model: with no model downloaded and no server set, dictation at Light still removes "yyy"/"um" (by hand).
+
 The formatting server is the user's own, so it cannot be faked in CI. With Ollama (or LM Studio,
-llama-server) running and a model pulled, turn on Settings → Dictation → Basics → Clean up text and check:
+llama-server) running and a model pulled, set Settings → Dictation → Basics → Tidy up my text to Standard and check:
 
 - the server and model are found and chosen by themselves, "Try it" shows a cleaned sample;
 - an address such as `http://example.com` or `192.168.1.5` is refused in the Address field;

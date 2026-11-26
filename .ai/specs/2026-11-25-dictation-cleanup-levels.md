@@ -216,7 +216,7 @@ Every level is measured with `scripts/dictation-eval/` (from `feat/dictation-cle
 
 | Level | Must hold | Target |
 |---|---|---|
-| Light | FLEURS PL and EN WER ≤ raw + 0.1 pt; no number, term or non-filler word changed on any item (diff of raw vs Light output shows only list fillers and spacing/capitals); processing time p50 ≤ 5 ms per dictation | corpus "forbidden words left" ≤ 40 % (raw 62 %) — fillers only, corrections stay by design |
+| Light | FLEURS PL and EN WER ≤ raw + 0.1 pt; no number, term or non-filler word changed on any item (diff of raw vs Light output shows only list fillers and spacing/capitals); processing time p50 ≤ 5 ms per dictation | none. Corpus "forbidden words left" is informational only (raw 62 %, Light 58 % measured in Phase 1): Light removes fillers only by design, the rest of those words are self-corrections and list lead-ins, which are Standard's job. The earlier target "≤ 40 %" was wrong for a filler list and is dropped (owner decision 2026-11-26); Light stays without a model (A3 not taken) |
 | Standard | D2's targets (FLEURS WER ≤ raw + 0.3 pt; self-corrections OK ≥ 60 %; forbidden left ≤ 15 %; lists in `pl-list-01/02`, `en-list-01`; none of the meaning changes from the benchmark) | unchanged from D2 |
 | Full | invented greetings or sign-offs: 0; numbers and terms: 100 % kept (guard counters 0 misses after fallback); terms % ≥ Standard; self-corrections ≥ Standard; `chat`/`code`/`keep-not-correction` WER ≤ Standard + 1 pt; on `mail` items with a spoken greeting, the greeting is alone on the first line (new check in the eval script) | mail items: ≥ 2 paragraphs when ≥ 2 pauses were spoken |
 
