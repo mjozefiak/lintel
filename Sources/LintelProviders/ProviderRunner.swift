@@ -3,8 +3,9 @@ import LintelSpeech
 
 /// The one way to run a process with content. It asks the consumer's authorization directly before every start,
 /// after the request has left the queue; a refusal, an unverified descriptor or an argv that breaks an isolation
-/// requirement ends in an error and no process. The one consumer is `MeetingsPlugin`'s `ProviderNotesGenerator`, whose
-/// authorization is "the provider is chosen in settings right now".
+/// requirement ends in an error and no process. The consumers are `MeetingsPlugin`'s `ProviderNotesGenerator` and
+/// `DictationPlugin`'s `ProviderFormatter`; the authorization of each is "the provider is chosen in settings right
+/// now".
 public struct ProviderRunner: Sendable {
     private let system: ProviderSystem
     private let gate: ProviderGate
@@ -60,7 +61,7 @@ public struct ProviderRunner: Sendable {
         let id = descriptor.id
         let system = self.system
         let started = ContinuousClock.now
-        let output: ProviderProcessOutput = try await gate.withSlot(id) {
+        let output: ProviderProcessOutput = try await gate.withSlot(id, lane: request.lane) {
             // After the queue, directly before the start: the consumer's answer at this moment.
             if case .denied(let reason) = await authorization() {
                 ProviderLog.record(.refusedNotAuthorized, provider: id)
@@ -84,23 +85,25 @@ public struct ProviderRunner: Sendable {
 
     // MARK: probes (no user content)
 
-    public func status(of provider: ProviderID) async -> ProviderStatus {
-        await report(of: provider).status
+    public func status(of provider: ProviderID, lane: ProviderLane = .background) async -> ProviderStatus {
+        await report(of: provider, lane: lane).status
     }
 
     /// The status and the CLI's version number (`2.1.329`), for the Settings row. The two probes carry no content.
-    public func report(of provider: ProviderID) async -> ProviderStatusReport {
+    /// `lane` is the queue the two probes wait in: a consumer the user waits for (dictation's Settings row) asks on
+    /// `interactive`, so a long background run does not keep its check on "checking".
+    public func report(of provider: ProviderID, lane: ProviderLane = .background) async -> ProviderStatusReport {
         guard let descriptor = descriptors.first(where: { $0.id == provider }) else {
             return ProviderStatusReport(status: .notInstalled, version: nil)
         }
         do {
-            let version = try await probe(descriptor, arguments: descriptor.versionArguments, stdin: Data())
+            let version = try await probe(descriptor, arguments: descriptor.versionArguments, stdin: Data(), lane: lane)
             guard version.ending == .exited, version.exitCode == 0 else {
                 return ProviderStatusReport(status: .incompatibleVersion, version: nil)
             }
             let number = ProviderVersion(parsing: String(decoding: version.stdout, as: UTF8.self))
                 .map { $0.parts.map(String.init).joined(separator: ".") }
-            let auth = try await probe(descriptor, arguments: descriptor.authStatusArguments, stdin: Data())
+            let auth = try await probe(descriptor, arguments: descriptor.authStatusArguments, stdin: Data(), lane: lane)
             let authData = auth.exitCode == 0 ? auth.stdout : nil
             return ProviderStatusReport(
                 status: descriptor.status(versionOutput: version.stdout, authOutput: authData), version: number)
@@ -250,11 +253,11 @@ public struct ProviderRunner: Sendable {
         return PreparedSpec(value: value, workspace: workspace)
     }
 
-    private func probe(_ descriptor: ProviderDescriptor, arguments: [String], stdin: Data) async throws
-        -> ProviderProcessOutput
+    private func probe(_ descriptor: ProviderDescriptor, arguments: [String], stdin: Data, lane: ProviderLane)
+        async throws -> ProviderProcessOutput
     {
         let system = self.system
-        return try await gate.withSlot(descriptor.id) {
+        return try await gate.withSlot(descriptor.id, lane: lane) {
             let binary = try await prepareBinary(descriptor)
             let spec = try makeSpec(
                 binary: binary.url, descriptor: descriptor, arguments: arguments, stdin: stdin, timeout: .seconds(30))
