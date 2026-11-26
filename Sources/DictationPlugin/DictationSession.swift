@@ -67,6 +67,8 @@ actor DictationSession {
     private let vad: any VoiceActivityDetector
     private let engine: any SpeechEngine
     private let lease: SpeechEngineLease
+    /// Sent with every segment of this dictation (the engine is shared with Meetings through the lease).
+    private let options: SpeechRequestOptions
     private let modelID: String
     private let keepWarm: @Sendable () -> Duration
     private let formatter: (any TextFormatter)?
@@ -110,6 +112,7 @@ actor DictationSession {
         modelFolder: URL,
         lease: SpeechEngineLease = SpeechEngineLease(),
         modelID: String = "dictation",
+        options: SpeechRequestOptions = .none,
         keepWarm: @escaping @Sendable () -> Duration = { .seconds(600) },
         maximumDuration: Duration = .seconds(20 * 60),
         warningBefore: Duration = .seconds(2 * 60),
@@ -120,6 +123,7 @@ actor DictationSession {
         self.vad = vad
         self.engine = engine
         self.lease = lease
+        self.options = options
         self.modelID = modelID
         self.keepWarm = keepWarm
         self.formatter = formatter
@@ -353,6 +357,7 @@ actor DictationSession {
         guard !samples.isEmpty else { return }
         let load = loadTask
         let logger = logger
+        let options = options
         // The engine takes one segment at a time (the lease queue); asking in the order the segments were said
         // keeps the order in which they are transcribed the same as the order in which they were spoken.
         let previous = segments.last
@@ -360,7 +365,9 @@ actor DictationSession {
             guard let handle = await load?.value else { return nil }
             _ = await previous?.value
             do {
-                guard case .transcript(let segment) = try await handle.transcribe(samples) else { return nil }
+                guard case .transcript(let segment) = try await handle.transcribe(samples, options: options) else {
+                    return nil
+                }
                 return segment.text
             } catch {
                 if !Task.isCancelled {

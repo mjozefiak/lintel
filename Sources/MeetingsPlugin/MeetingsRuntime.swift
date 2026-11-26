@@ -11,6 +11,8 @@ import os
 /// that reach AVAudioEngine and Core Audio.
 struct MeetingsRuntime: Sendable {
     let settings: MeetingsSettings
+    /// The shared "Languages I speak" setting (`PluginContext.speechLanguages`), read for every segment.
+    let speechLanguages: any SpeechLanguageSettings
     let speechManager: ModelManager
     let diarizationManager: ModelManager
     /// At most one recording at a time, shared by everything that can start one.
@@ -28,6 +30,7 @@ struct MeetingsRuntime: Sendable {
     @MainActor
     init(context: PluginContext, settings: MeetingsSettings) {
         self.settings = settings
+        speechLanguages = context.speechLanguages
         logger = context.logger
         speechManager = ModelManagers.shared.manager(
             for: context.modelsDirectory.appending(path: MeetingsUI.speechDirectoryName, directoryHint: .isDirectory),
@@ -55,15 +58,19 @@ struct MeetingsRuntime: Sendable {
 
     /// One engine per recording, fixed to the model the recording started with: a change in Settings during
     /// the meeting applies to the next one.
+    /// The engines hold no language: every request carries its own `SpeechRequestOptions` (`MeetingLanguage`),
+    /// because the lease shares one engine with Dictation.
     func makeEngine(modelID: String) -> any SpeechEngine {
-        let settings = settings
-        return SwitchingEngine(
+        SwitchingEngine(
             engines: [
-                ModelCatalog.parakeetUltra.id: ParakeetEngine(language: { settings.speechLanguage }),
-                ModelCatalog.whisperLargeV3Turbo.id: WhisperKitEngine(language: { settings.speechLanguage }),
+                ModelCatalog.parakeetUltra.id: ParakeetEngine(),
+                ModelCatalog.whisperLargeV3Turbo.id: WhisperKitEngine(),
             ],
             selected: { modelID })
     }
+
+    /// A new profile for one recording or one recovery run, over the shared language setting.
+    func makeLanguage() -> MeetingLanguage { MeetingLanguage(settings: speechLanguages) }
 
     // MARK: Session
 
@@ -98,7 +105,7 @@ struct MeetingsRuntime: Sendable {
             recordCounters: Self.counterRecorder(
                 directory: request.spool.root.deletingLastPathComponent(), logger: logger),
             retriesMicrophone: request.recordsMicrophone, inputDiagnostics: inputDiagnostics,
-            defaultInputChanges: defaultInputChanges, logger: logger)
+            defaultInputChanges: defaultInputChanges, language: makeLanguage(), logger: logger)
     }
 
     /// Writes a finished meeting's counters (numbers only) next to the library; a failure is logged and nothing else.
@@ -121,7 +128,8 @@ struct MeetingsRuntime: Sendable {
             speech: {
                 guard case .ready(let id, let folder) = await runtime.speechLookup() else { return nil }
                 return ResumeSpeech(engine: runtime.makeEngine(modelID: id), modelID: id, folder: folder)
-            }, finalize: finalizer.hook, keepAudio: { [settings] in settings.keepAudio }, logger: logger)
+            }, finalize: finalizer.hook, keepAudio: { [settings] in settings.keepAudio },
+            makeLanguage: { runtime.makeLanguage() }, logger: logger)
     }
 }
 

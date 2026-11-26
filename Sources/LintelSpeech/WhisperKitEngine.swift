@@ -12,8 +12,9 @@ public actor WhisperKitEngine: SpeechEngine {
     private var kit: WhisperKit?
     private let language: @Sendable () -> String
 
-    /// - Parameter language: `pl` or `en`, read for every segment so a change in Settings applies at once.
-    public init(language: @escaping @Sendable () -> String) {
+    /// - Parameter language: the language of a request that asks for none (`SpeechRequestOptions.whisperLanguage`
+    ///   `nil`). The plugins send a language with every request, so it is only the default of tools and tests.
+    public init(language: @escaping @Sendable () -> String = { "en" }) {
         self.language = language
     }
 

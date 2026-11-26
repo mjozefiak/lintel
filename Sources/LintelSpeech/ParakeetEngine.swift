@@ -12,8 +12,8 @@ public actor ParakeetEngine: SpeechEngine {
     private var manager: AsrManager?
     private let language: @Sendable () -> String?
 
-    /// - Parameter language: `pl` or `en`, read for every segment; `nil` (the default, and dictation's choice)
-    ///   sends no hint. The hint limits the decoder's script, not the language (it keeps Cyrillic out of Polish
+    /// - Parameter language: `pl` or `en`, read for a request without a script hint; `nil` (the default, and what
+    ///   both plugins use since they send a hint per request) sends no hint. The hint limits the decoder's script, not the language (it keeps Cyrillic out of Polish
     ///   speech; it does not stop Latin-script English), see `ParakeetLanguage`.
     public init(language: @escaping @Sendable () -> String? = { nil }) {
         self.language = language
