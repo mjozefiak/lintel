@@ -107,6 +107,34 @@ import Testing
         #expect(rig.model.notes.choiceState == .notInstalled)
     }
 
+    /// #298: with Local writing the notes, the Model row says when the model is missing, like the speech row.
+    @Test func theLocalModelRowSaysWhenTheModelIsMissing() throws {
+        #expect(NotesWrittenByRows.localModelHelp(state: .installed) == .usedForEveryMeeting)
+        #expect(NotesWrittenByRows.localModelHelp(state: .customFolder) == .usedForEveryMeeting)
+        #expect(NotesWrittenByRows.localModelHelp(state: .notInstalled) == .summary(.notInstalled))
+        #expect(NotesWrittenByRows.localModelHelp(state: .downloading) == .summary(.downloading))
+        let rig = try SettingsRig()
+        let title = rig.model.notes.model.package.title
+        let summary = ModelChoiceRow.summary(title: title, state: rig.model.notes.choiceState)
+        #expect(summary == "\(title) · not installed")
+        #expect(ModelChoiceRow.actionTitle(for: .notInstalled) == "Get it in Models")
+    }
+
+    @Test func theLocalModelRowFollowsTheForcedStates() throws {
+        let rig = try SettingsRig()
+        rig.model.notes.showQAState(.installed)
+        #expect(NotesWrittenByRows.localModelHelp(state: rig.model.notes.choiceState) == .usedForEveryMeeting)
+        rig.model.notes.showQAState(.missing)
+        #expect(NotesWrittenByRows.localModelHelp(state: rig.model.notes.choiceState) == .summary(.notInstalled))
+        rig.model.notes.showQAState(.downloading)
+        #expect(NotesWrittenByRows.localModelHelp(state: rig.model.notes.choiceState) == .summary(.downloading))
+    }
+
+    @Test func thePaneGivesTheNotesSectionTheWayToModels() throws {
+        let source = try Self.paneSource()
+        #expect(source.contains("notes: model.notes, openModels: openModels)"))
+    }
+
     // MARK: Banner
 
     private func status(

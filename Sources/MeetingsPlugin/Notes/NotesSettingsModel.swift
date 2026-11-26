@@ -112,7 +112,7 @@ final class NotesSettingsModel {
 
     /// DEBUG only (`plugins.meetings.qaNotesDownload`, `docs/qa.md`): the offer in one state, with nothing read from
     /// the disk or the network. The sizes are the chosen model's; the free space of `noSpace` is invented.
-    private func showQAState(_ state: NotesDownloadQAState) {
+    func showQAState(_ state: NotesDownloadQAState) {
         let total = model.package.totalBytes
         let needed = total + total / 10
         progress = nil
