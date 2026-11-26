@@ -240,6 +240,36 @@
       "sha256" : "68141f8e5e5ceb5d55c5d68f8e3428185e7f1ab7a09a8179890557cb608c2f55",
       "width" : 1360
     },
+    "meetings.notes-provider\/local-model-downloading@dark-m-en.png" : {
+      "height" : 360,
+      "sha256" : "6966f54700a2e54e8ad490e11c6bea4545aaee22d695409ba2b7553cf4cd5dac",
+      "width" : 1360
+    },
+    "meetings.notes-provider\/local-model-downloading@light-m-en.png" : {
+      "height" : 360,
+      "sha256" : "9659d4f44dbd97a35467ef7998bf53dd173fa7096647b6822e9c45a6d6e4335d",
+      "width" : 1360
+    },
+    "meetings.notes-provider\/local-model-downloading@light-xl-pl.png" : {
+      "height" : 440,
+      "sha256" : "5b5522fe9b30e9f445d50d02963e87927b6809d3faf6f5150f7b03cb41802fc7",
+      "width" : 1360
+    },
+    "meetings.notes-provider\/local-model-missing@dark-m-en.png" : {
+      "height" : 360,
+      "sha256" : "8cba5ce331ae0f8690fcb52c9a600d71fc35c3cf9392509d0352bbed7696b3bd",
+      "width" : 1360
+    },
+    "meetings.notes-provider\/local-model-missing@light-m-en.png" : {
+      "height" : 360,
+      "sha256" : "1573a2023ee5d3fdf8860e8767be0f915cd228bfcfa0be4789d1fecde5f4dc2e",
+      "width" : 1360
+    },
+    "meetings.notes-provider\/local-model-missing@light-xl-pl.png" : {
+      "height" : 440,
+      "sha256" : "c2586892d24a8eb244e09f3d601133621c91266e00aab3b5a880891a19a25cec",
+      "width" : 1360
+    },
     "meetings.notes-provider\/local-notes-off@dark-m-en.png" : {
       "height" : 80,
       "sha256" : "5b9816677b3a74f969ffe44fd897da30ec0f0f187a8270fd81420502a55919f8",
@@ -442,7 +472,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45820925104",
+  "recordRun" : "45891901531",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
