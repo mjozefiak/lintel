@@ -539,7 +539,7 @@
   }
 
   // ---------- after the meeting: the pill (P10) ----------
-  const pRing = (work) => `<svg class="pglyph pring ${work ? 'work' : ''}" viewBox="0 0 20 20" aria-hidden="true"><circle class="arc" cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="${work ? '20 44' : '36 44'}" transform="rotate(-60 10 10)"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/></svg>`;
+  const pRing = (work) => `<svg class="pglyph pring ${work ? 'work' : ''}" viewBox="0 0 20 20" aria-hidden="true"><circle class="arc" cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" pathLength="100" stroke-dasharray="${work ? '45 100' : '80 100'}" transform="rotate(-60 10 10)"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/></svg>`;
   const pCheck = '<svg class="pglyph" viewBox="0 0 20 20" aria-hidden="true" style="color:var(--plive)"><circle cx="10" cy="10" r="8" fill="currentColor"/><path d="m6.2 10.2 2.6 2.6 5-5.4" stroke="var(--pon)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   function afterScr(c) {
     const f = c.after, n = ids('nordlys').length;
