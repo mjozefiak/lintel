@@ -163,10 +163,12 @@ struct AppEnvironment {
         LegacyDataMigration(fileManager: fileManager).run(supportDirectory: support, cachesDirectory: caches)
         let root = support.appending(path: "Lintel", directoryHint: .isDirectory)
         try createPrivateDirectory(root, fileManager: fileManager)
+        let settings = UserDefaultsSettingsStore()
+        pinPreviousPluginDefaults(dataRoot: root, settings: settings, fileManager: fileManager)
         let environment = AppEnvironment(
             dataRoot: root,
             cachesRoot: caches.appending(path: "Lintel", directoryHint: .isDirectory),
-            settings: UserDefaultsSettingsStore(),
+            settings: settings,
             keychain: SystemKeychainClient(),
             pasteboardName: nil,
             usage: openRanking(in: root),
@@ -188,17 +190,20 @@ struct AppEnvironment {
         try createPrivateDirectory(root, fileManager: fileManager)
         let fileHome = root.appending(path: "files-home", directoryHint: .isDirectory)
         try createPrivateDirectory(fileHome, fileManager: fileManager)
-        var seeded = qaHUDSettings(
-            qaIdentitySettings(
-                qaNotesSettings(
-                    qaAppActivitySettings(
-                        qaFileIndexSettings(options.settings, emptyHome: fileHome.path),
-                        activity: options.appActivity,
-                        live: options.liveAppActivity
-                    ),
-                    fixtures: options.notesFixtures
-                )),
-            hud: options.hud
+        var seeded = qaAudioSettings(
+            qaHUDSettings(
+                qaIdentitySettings(
+                    qaNotesSettings(
+                        qaAppActivitySettings(
+                            qaFileIndexSettings(options.settings, emptyHome: fileHome.path),
+                            activity: options.appActivity,
+                            live: options.liveAppActivity
+                        ),
+                        fixtures: options.notesFixtures
+                    )),
+                hud: options.hud
+            ),
+            options: options
         )
         // A QA run never opens an open or save panel: they write their sizes into the real defaults domain.
         if seeded[QAOptions.windowsScriptedFilesKey] == nil { seeded[QAOptions.windowsScriptedFilesKey] = .bool(true) }
@@ -206,11 +211,17 @@ struct AppEnvironment {
             options.persistentSettings
             ? QAFileSettingsStore(url: root.appending(path: QAFileSettingsStore.fileName), seeded: seeded)
             : InMemorySettingsStore(seeded)
+        // In-memory settings are new on every run, so only a run that keeps them can be an install that ran before;
+        // otherwise a second run on the same `--qa-data-root` would get the old defaults.
+        pinPreviousPluginDefaults(
+            dataRoot: root, settings: settings, fileManager: fileManager, settingsPersist: options.persistentSettings)
         let environment = AppEnvironment(
             dataRoot: root,
             cachesRoot: root.appending(path: "Caches", directoryHint: .isDirectory),
             settings: settings,
-            keychain: InMemoryKeychainClient(),
+            keychain: options.persistentSettings
+                ? QAFileKeychainClient(url: root.appending(path: QAFileKeychainClient.fileName))
+                : InMemoryKeychainClient(),
             pasteboardName: NSPasteboard.Name("com.lintelapp.qa.\(ProcessInfo.processInfo.processIdentifier)"),
             usage: openRanking(in: root),
             registersGlobalHotkeys: false,
@@ -269,6 +280,27 @@ struct AppEnvironment {
         return result
     }
 
+    /// A QA run never records the tester's microphone or taps the system audio: meetings and dictation get WAV files
+    /// (`--qa-meeting-mic-wav`, `--qa-meeting-system-wav`) or silence, and the permission as granted. These keys are
+    /// forced: a `--qa-setting` cannot turn the switches off. `LintelMain` also makes the real audio objects throw
+    /// (`RealAudioGuard`).
+    static func qaAudioSettings(_ settings: [String: SettingValue], options: QAOptions) -> [String: SettingValue] {
+        var result = settings
+        result[QAOptions.meetingsAudioKey] = .bool(true)
+        result[QAOptions.dictationAudioKey] = .bool(true)
+        // Always written (the flag, else this run's `--qa-setting`, else empty): with `--qa-persistent-settings` a
+        // path of an earlier run would otherwise stay in the settings file and play again.
+        let paths: [(String, URL?)] = [
+            (QAOptions.meetingsMicWAVKey, options.meetingMicWAV),
+            (QAOptions.meetingsSystemWAVKey, options.meetingSystemWAV),
+            (QAOptions.meetingsSpoolDirectoryKey, options.meetingSpoolDirectory),
+        ]
+        for (key, url) in paths {
+            result[key] = url.map { .string($0.path) } ?? settings[key] ?? .string("")
+        }
+        return result
+    }
+
     /// `--qa-hud dictation:<state>` / `meeting:<state>` switches the plugin on and gives it the state to draw
     /// (`plugins.<id>.qaHUD`); the plugin shows its HUD view in a QA panel, without microphone or permissions.
     static func qaHUDSettings(_ settings: [String: SettingValue], hud: QAHUDRequest?) -> [String: SettingValue] {
@@ -298,6 +330,23 @@ struct AppEnvironment {
         return result
     }
     #endif
+
+    /// Runs `PluginDefaultsMigration` and `NotesDefaultMigration` before `openRanking` creates `ranking.sqlite` (the
+    /// sign of an earlier launch) and before the host reads any `plugins.<id>.enabled` or a plugin reads its settings.
+    /// Whether the install ran before is decided once, before either step writes its marker, so a new install's
+    /// first launch is never taken for an old one because #251's step has just marked it. `settingsPersist` is false
+    /// only for a QA run with in-memory settings, which is always a new install.
+    static func pinPreviousPluginDefaults(
+        dataRoot: URL, settings: any SettingsStore, fileManager: FileManager, settingsPersist: Bool = true
+    ) {
+        let existing =
+            settingsPersist
+            && (PluginDefaultsMigration.isExistingInstall(
+                dataRoot: dataRoot, settings: settings, fileManager: fileManager)
+                || settings.value(forKey: PluginDefaultsMigration.migratedKey) != nil)
+        PluginDefaultsMigration.run(settings: settings, isExistingInstall: existing)
+        NotesDefaultMigration.run(settings: settings, isExistingInstall: existing)
+    }
 
     /// `ranking.sqlite` at the data root. If it cannot be opened, ranking falls back to memory for this
     /// session instead of stopping the app.

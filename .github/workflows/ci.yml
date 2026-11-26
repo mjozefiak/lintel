@@ -14,18 +14,23 @@ concurrency:
 
 jobs:
   test:
+    # The ruleset of main requires this check by name: keep the name, and keep it one job that always runs (a
+    # docs-only pull request skips only the Thread Sanitizer step, see "Classify changes").
     name: Build, test and lint
     # Xcode 27 (macOS 27 SDK, Swift 6.4) on Apple silicon. GitHub's Xcode 27 image is in public
     # preview; if the label disappears, macos-26 with Xcode 26 is the fallback (the code avoids
     # macOS 27-only APIs). See the Phase 0 PR for the decision.
     runs-on: xcode-27
-    # Sum of the step limits below (about 40 min) plus checkout, toolchain, build and lint.
+    # Each step limit below is that step's worst case on its own; this limit bounds the whole run (a normal run
+    # is far shorter, see the step times in the PR that introduced the single sanitizer step and the caches).
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         timeout-minutes: 5
         with:
           submodules: true
+          # The merge commit and its first parent (the base), for "Classify changes".
+          fetch-depth: 2
 
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         timeout-minutes: 5
@@ -33,12 +38,45 @@ jobs:
           xcode-version: latest-stable
 
       - name: Toolchain
+        id: toolchain
         timeout-minutes: 2
         run: |
           echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
           xcodebuild -version
           swift --version
           sw_vers
+          # The cache key: build products of one compiler are never restored into another.
+          echo "id=$({ xcodebuild -version; swift --version 2>&1; } | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      # A pull request that changes only documentation (scripts/ci-docs-only.sh) skips the Thread Sanitizer run and
+      # nothing else: every test it runs also runs in "Test", and several tests read the docs (the repository-wide
+      # name and home-path scans, the changelog, the landing page), so the build, the tests and the lint stay.
+      # A push to main always runs everything.
+      - name: Classify changes
+        id: changes
+        timeout-minutes: 2
+        run: |
+          docs_only=false
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            if files=$(git diff --name-only --no-renames HEAD^1 HEAD); then
+              echo "changed files: $(printf '%s\n' "$files" | grep -c .)"
+              if printf '%s\n' "$files" | scripts/ci-docs-only.sh; then docs_only=true; fi
+            else
+              echo "::warning::could not diff the merge commit against its base; running everything"
+            fi
+          fi
+          echo "docs-only: $docs_only"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+
+      # Dependencies and their build products (the repository's own targets rebuild, because the checkout gives
+      # every source a new modification time). Saved only when the job succeeds.
+      - name: Restore the build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        timeout-minutes: 10
+        with:
+          path: .build
+          key: build-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: build-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-
 
       - name: Build
         timeout-minutes: 12
@@ -54,38 +92,74 @@ jobs:
         timeout-minutes: 16
         run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test
 
-      - name: Test PluginHost under Thread Sanitizer
-        timeout-minutes: 17
-        run: scripts/test-with-watchdog.sh --limit 900 --name tsan-pluginhost -- swift test --sanitize=thread --filter "PluginHostTests|RecoveryOrderingTests|PluginServicesTests"
-
-      - name: Test Notes writers and registry under Thread Sanitizer
-        timeout-minutes: 6
-        run: scripts/test-with-watchdog.sh --limit 220 --name tsan-notes -- swift test --sanitize=thread --filter NotesPluginTests
-
-      - name: Test FileIndex and FilesPlugin under Thread Sanitizer
-        timeout-minutes: 5
-        run: scripts/test-with-watchdog.sh --limit 170 --name tsan-files -- swift test --sanitize=thread --filter FilesPluginTests
-
-      - name: Test model leases under Thread Sanitizer
-        timeout-minutes: 5
-        run: scripts/test-with-watchdog.sh --limit 160 --name tsan-leases -- swift test --sanitize=thread --filter "SpeechEngineLeaseTests|LLMLeaseTests|ModelManagerRegistryTests|ModelManagerQueueTests|DictationSessionLeaseTests"
-
-      - name: Test the window engine under Thread Sanitizer
-        timeout-minutes: 5
-        run: scripts/test-with-watchdog.sh --limit 170 --name tsan-windows -- swift test --sanitize=thread --filter "WindowEngineTests|WindowEngineConcurrencyTests|EventFlowTests|EngineStopTests|StopBudgetTests|EchoAndJournalOrderTests|RecoveryTests|StartStopRaceTests|WaiterLeakTests|LayoutStrategyTests|ToyStrategyTests|TilingEngineTests|ZoneEngineTests|ZoneDragControllerTests|ZoneDragSignalTests"
-
-      - name: Test the provider process runner and the notes provider under Thread Sanitizer
+      # The design gallery's golden images (spec 2026-11-23-swiftui-design-gallery). Right after "Test", whose debug
+      # build the app bundle reuses, before the Thread Sanitizer builds. It must not hide the steps after it, so it
+      # does not fail the job here (`continue-on-error`): the step "Fail on gallery differences" at the end does. Both
+      # languages come from the app bundle, the build the owner approves (it has the accent colour and the compiled
+      # string catalog that `swift test` lacks); the language is a property of the process (`-AppleLanguages`). A
+      # change of the renderer fingerprint (macOS build, Xcode) fails here on every open PR until the goldens are
+      # recorded again (gallery-goldens.yml).
+      - name: Gallery snapshots
+        id: gallery
+        continue-on-error: true
         timeout-minutes: 8
-        run: scripts/test-with-watchdog.sh --limit 360 --name tsan-providers -- swift test --sanitize=thread --filter "LintelProvidersTests|ProviderNotesMatrixTests|ProviderNotesGeneratorTests"
+        env:
+          LINTEL_SNAPSHOT_ARTIFACTS: ${{ runner.temp }}/gallery-diffs
+        run: |
+          set -euo pipefail
+          LINTEL_GALLERY_XCODE="$(xcodebuild -version | tr '\n' ' ')"
+          export LINTEL_GALLERY_XCODE
+          started=$SECONDS
+          CONFIGURATION=debug scripts/make-app.sh
+          echo "make-app: $((SECONDS - started)) s"
+          status=0
+          for language in en pl; do
+            dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+              --qa-gallery-compare Tests/MeetingsPluginTests/Gallery/Goldens --qa-gallery-language "$language" \
+              -AppleLanguages "($language)" -AppleLocale "$language" || status=1
+          done
+          echo "gallery step: $((SECONDS - started)) s"
+          exit "$status"
 
-      # The shared latches and clocks every test target waits on (atomic registration, one resume, cancellation).
-      - name: Test the shared test support under Thread Sanitizer
-        timeout-minutes: 5
-        run: scripts/test-with-watchdog.sh --limit 200 --name tsan-test-support -- swift test --sanitize=thread --filter LintelTestSupportTests
+      # The sanitizer build has its own scratch path, so it never overwrites the plain build in .build and both are
+      # cached as they are.
+      - name: Restore the Thread Sanitizer build cache
+        if: steps.changes.outputs.docs_only != 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        timeout-minutes: 10
+        with:
+          path: .build-tsan
+          key: build-tsan-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: build-tsan-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-
+
+      # One run for every suite that has to pass under the Thread Sanitizer: PluginHost, the Notes writers and
+      # registry, FileIndex and FilesPlugin, the model leases, the window engine, the provider process runner and
+      # the notes provider, and the shared test support (latches and clocks). The filter is the union of what used
+      # to be seven steps, so the sanitizer build and the test bundle are made once. CIWorkflowTests keeps the list.
+      - name: Test under Thread Sanitizer
+        if: steps.changes.outputs.docs_only != 'true'
+        timeout-minutes: 28
+        run: scripts/test-with-watchdog.sh --limit 1500 --name tsan -- swift test --sanitize=thread --scratch-path .build-tsan --filter "PluginHostTests|RecoveryOrderingTests|PluginServicesTests|NotesPluginTests|FilesPluginTests|SpeechEngineLeaseTests|LLMLeaseTests|ModelManagerRegistryTests|ModelManagerQueueTests|DictationSessionLeaseTests|WindowEngineTests|WindowEngineConcurrencyTests|EventFlowTests|EngineStopTests|StopBudgetTests|EchoAndJournalOrderTests|RecoveryTests|StartStopRaceTests|WaiterLeakTests|LayoutStrategyTests|ToyStrategyTests|TilingEngineTests|ZoneEngineTests|ZoneDragControllerTests|ZoneDragSignalTests|LintelProvidersTests|ProviderNotesMatrixTests|ProviderNotesGeneratorTests|LintelTestSupportTests"
 
       - name: Format lint
         timeout-minutes: 3
         run: swift format lint --strict -r Sources Tests
+
+      # `actual.png`, `diff.png` and `fingerprint.json` of the pictures that differ, only on a failure.
+      - name: Upload gallery diffs
+        if: ${{ !cancelled() && steps.gallery.outcome != 'success' && steps.gallery.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gallery-diffs
+          path: ${{ runner.temp }}/gallery-diffs
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail on gallery differences
+        if: ${{ !cancelled() && steps.gallery.outcome != 'success' && steps.gallery.outcome != 'skipped' }}
+        run: |
+          echo "The step 'Gallery snapshots' did not pass: pictures differ from the goldens (artifact gallery-diffs), or the app did not build."
+          exit 1
 
       # A hung test run leaves stack samples and the names of the unfinished tests here (never test output).
       - name: Upload watchdog diagnostics

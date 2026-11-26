@@ -48,6 +48,22 @@ import Testing
         }
     }
 
+    /// A `--qa` run swaps the microphone and the system tap for WAV files or silence in `MeetingsRuntime`
+    /// (`QAAudioTests` checks that it does). So the real sources are built in that one file only, next to the QA check.
+    @Test func theRealAudioSourcesAreBuiltOnlyInTheRuntime() throws {
+        let sources = ["MicrophoneCapture(", "SystemAudioSource(", "CoreAudioProcessTapBackend("]
+        for url in TestPaths.meetingsSourceFiles() {
+            let name = url.lastPathComponent
+            let text = try Self.code(url)
+            for source in sources where text.contains(source) {
+                let allowed = name == "MeetingsRuntime.swift" || name == "MeetingsSystem.swift"
+                #expect(allowed, "\(name) builds \(source) outside MeetingsRuntime and MeetingsSystem")
+            }
+        }
+        let runtime = try Self.code(TestPaths.meetingsSource(named: "MeetingsRuntime.swift"))
+        #expect(runtime.contains("settings.qaAudio"), "MeetingsRuntime no longer checks for a QA run")
+    }
+
     @Test func noTestBuildsARealPart() throws {
         let files = Self.swiftFiles(under: "Tests/MeetingsPluginTests") + Self.swiftFiles(under: "Tests/LintelAppTests")
         #expect(files.contains { $0.lastPathComponent == "QuietSystem.swift" })

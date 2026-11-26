@@ -50,11 +50,15 @@ struct WholeNotesPipeline: Sendable {
         ) -> NotesResult {
             NotesResult(
                 status: status, markdown: markdown, droppedCount: dropped, failedChunks: [], chunkCount: parts,
-                verifiedPointCount: 0, reduceFailed: false, summaryReplaced: false, rejectedIDs: 0,
+                verifiedPointCount: 0, reduceFailed: false, rejectedIDs: 0,
                 language: language, promptVersion: WholeNotesPrompt.version)
         }
         guard !utterances.isEmpty else { return result(.ok) }
 
+        // The length of the meeting decides the most topics (code, not the model); without it the last utterance
+        // plus one minute, as the fact guard does.
+        let lengthMs = durationMs ?? ((utterances.map(\.startMs).max() ?? 0) + 60_000)
+        let maxTopics = NotesLayout.maxTopics(durationMs: lengthMs)
         let budget = generator.profile.inputBudgetTokens
         let parts = Self.parts(of: utterances, budget: budget, partTokens: configuration.partTokens)
         if parts.count > configuration.maxParts { throw NotesFailure.transcriptTooLong }
@@ -66,7 +70,8 @@ struct WholeNotesPipeline: Sendable {
             if parts.count == 1 {
                 let transcript = WholeNotesPrompt.transcriptLines(utterances)
                 final = try await write {
-                    WholeNotesPrompt.messages(transcript: transcript, language: language, reminder: $0)
+                    WholeNotesPrompt.messages(
+                        transcript: transcript, language: language, maxTopics: maxTopics, reminder: $0)
                 }
             } else {
                 var drafts: [String] = []
@@ -75,7 +80,7 @@ struct WholeNotesPipeline: Sendable {
                     let messages = { (reminder: Bool) in
                         WholeNotesPrompt.messages(
                             transcript: WholeNotesPrompt.transcriptLines(part), language: language,
-                            part: (index + 1, parts.count), reminder: reminder)
+                            part: (index + 1, parts.count), maxTopics: maxTopics, reminder: reminder)
                     }
                     guard let draft = try await write(messages) else {
                         await generator.release()
@@ -84,7 +89,9 @@ struct WholeNotesPipeline: Sendable {
                     drafts.append(draft.lines)
                 }
                 onEvent(.map(done: parts.count, total: parts.count + 1))
-                final = try await write({ WholeNotesPrompt.mergeMessages(drafts: drafts, reminder: $0) })
+                final = try await write({
+                    WholeNotesPrompt.mergeMessages(drafts: drafts, maxTopics: maxTopics, reminder: $0)
+                })
             }
             await generator.release()
             onEvent(.finishing)
@@ -95,7 +102,8 @@ struct WholeNotesPipeline: Sendable {
             }
             let labels = NotesComposer.Labels.forLanguage(language, fallback: configuration.fallbackLanguage)
             let markdown = NotesDraftComposer.markdown(
-                draft: checked.draft, participants: NotesPipeline.participants(of: utterances), labels: labels)
+                draft: checked.draft, participants: NotesPipeline.participants(of: utterances), labels: labels,
+                durationMs: lengthMs)
             return result(.ok, markdown: markdown, dropped: checked.report.dropped, parts: parts.count)
         } catch {
             await generator.release()

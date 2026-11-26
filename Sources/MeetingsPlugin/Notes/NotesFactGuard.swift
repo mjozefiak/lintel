@@ -32,18 +32,23 @@ struct NotesFactGuard: Sendable {
         var shapeStripped = 0
         /// Lines and items cut because of a limit (not counted as dropped).
         var cutToLimit = 0
+        /// Topics whose name the guard refused; their points moved to "Other". Not counted in `dropped`.
+        var topicNameRefused = 0
     }
 
-    static let maxDecisions = 7
-    static let maxTasks = 10
-    static let maxOpen = 5
-    static let maxTopics = 5
-    static let maxPointsPerTopic = 4
+    static let maxDecisions = 10
+    static let maxTasks = 15
+    static let maxOpen = NotesLayout.maxOpenQuestions
+    static let maxPointsPerTopic = NotesLayout.maxPointsPerTopic
     static let maxLineWords = 25
-    static let maxSummarySentences = 4
+    static let maxSummarySentences = NotesLayout.maxIntroSentences
+    static let maxSummaryWords = NotesLayout.maxIntroWords
 
     private let material: Material
     private let durationMs: Int
+
+    /// The most topics the notes of this meeting show (`NotesLayout.maxTopics`); the closing "Other" is extra.
+    var maxTopics: Int { NotesLayout.maxTopics(durationMs: durationMs) }
 
     /// `durationMs` is the length of the meeting; without it the last utterance plus one minute.
     init(utterances: [NotesUtterance], durationMs: Int? = nil) {
@@ -78,17 +83,31 @@ struct NotesFactGuard: Sendable {
             }
             result.tasks.append(.init(timeMs: time(task.timeMs, &report), person: person, due: due, text: text))
         }
+        var refusedPoints: [String] = []
         for topic in draft.topics {
             var name = topic.name
+            var refused = false
             if let given = name {
-                name = vet(given, cap: false, &report)
+                // A refused name is not a dropped line: its points are kept under "Other".
+                var scratch = Report()
+                name = vet(given, cap: false, &scratch)
+                if name == nil {
+                    refused = true
+                    report.topicNameRefused += 1
+                } else {
+                    report.shapeStripped += scratch.shapeStripped
+                }
             }
             var points: [String] = []
             for point in topic.points {
                 if let kept = vet(point, &report) { points.append(kept) }
             }
             guard !points.isEmpty else { continue }
-            result.topics.append(.init(name: name, points: points))
+            if refused {
+                refusedPoints.append(contentsOf: points)
+            } else {
+                result.topics.append(.init(name: name, points: points, isOther: topic.isOther))
+            }
         }
         for text in draft.open {
             if let kept = vet(text, &report) { result.open.append(kept) }
@@ -102,10 +121,14 @@ struct NotesFactGuard: Sendable {
         result.decisions = limited(result.decisions, Self.maxDecisions)
         result.tasks = limited(result.tasks, Self.maxTasks)
         result.open = limited(result.open, Self.maxOpen)
-        result.topics = limited(result.topics, Self.maxTopics).map { topic in
+        result.topics = limited(result.topics, maxTopics).map { topic in
             var topic = topic
             topic.points = limited(topic.points, Self.maxPointsPerTopic)
             return topic
+        }
+        if !refusedPoints.isEmpty {
+            result.topics.append(
+                .init(name: nil, points: limited(refusedPoints, Self.maxPointsPerTopic), isOther: true))
         }
         return (result, report)
     }
@@ -156,8 +179,23 @@ struct NotesFactGuard: Sendable {
             }
         }
         if flat.changed, !kept.isEmpty { report.shapeStripped += 1 }
-        if kept.count > Self.maxSummarySentences { report.cutToLimit += kept.count - Self.maxSummarySentences }
-        let text = kept.prefix(Self.maxSummarySentences).joined(separator: " ")
+        // At most three sentences and 70 words: a prefix of whole sentences that fits the limits.
+        var shown: [String] = []
+        var words = 0
+        for sentence in kept {
+            let count = sentence.split(whereSeparator: \.isWhitespace).count
+            // The intro is a prefix of whole sentences: the first one that does not fit ends it, so a later sentence
+            // never follows a skipped one without the sentence it refers to (and nothing is cut in the middle).
+            if shown.count >= Self.maxSummarySentences || count > Self.maxSummaryWords
+                || words + count > Self.maxSummaryWords
+            {
+                report.cutToLimit += 1
+                break
+            }
+            shown.append(sentence)
+            words += count
+        }
+        let text = shown.joined(separator: " ")
         return text.isEmpty ? nil : text
     }
 

@@ -12,7 +12,7 @@ typealias NotesTraceSink = @Sendable (NotesTraceEvent) -> Void
 /// Privacy: an event holds only what the code assigns or counts: chunk ids (`c1`, `c1.2`), point ids (`p12`,
 /// assigned by the code, and only of points the code made), kinds, counts, utterance times in milliseconds,
 /// token estimates and limits, flags and enum reasons. Never transcript text, a quote, a point's text, a
-/// person, a due date, a speaker, the summary or the notes, and never an id the model wrote that is not one of
+/// person, a due date, a speaker or the notes, and never an id the model wrote that is not one of
 /// the points (those are only counted).
 enum NotesTrace {
     /// Bumped when an event or a field changes meaning or goes away (adding one does not). 2: the verified
@@ -27,8 +27,16 @@ enum NotesTrace {
     /// `NotesGuard.RepairReason` are gone; the reasons are `NotesGuard.DropReason`s), the summary paragraph is
     /// never composed (`NotesTraceSummary.sourceIDs` is always empty, `Route.composedSummary` is not produced),
     /// and the findings are chosen by REDUCE with a limit (`Route.listedByCode` is not produced, `Route.reduce`
-    /// is used; `Loss.notChosen`, `Loss.overLimit` are new).
-    static let schemaVersion = 5
+    /// is used; `Loss.notChosen`, `Loss.overLimit` are new). 6 (spec `2026-11-25-meeting-notes-structure`, F0):
+    /// `NotesTraceVerification.details` splits `unsupportedDetail` and `quoteNotInTranscript` by rule (a
+    /// measurement, nothing changes in the notes), and the fields of later phases are reserved and zero until
+    /// their phase: `NotesTraceVerification.reanchored`, `NotesTraceReduce.layout` (topics, points per topic,
+    /// `topicNameRefused`, `notChosen`, `cutByLimit`) and `started.rulesVersion` (`NotesGuard.rulesVersion`). 7 (prompt 7 without an intro, owner decision 2026-11-26): the built-in
+    /// track writes no intro, so the `summary` event (`NotesTraceSummary`), the `summaryMerge` request stage,
+    /// `NotesTraceReduce.summaryMergeRequests`, `.summaryMergesGivenUp` and `.summaryReplaced` are gone, and
+    /// `Route.modelSummary` and `Loss.summaryNotShown` are no longer produced (they stay so an older trace can be
+    /// read).
+    static let schemaVersion = 7
 
     /// The points of `verified` that the deduplication took out, in their order.
     static func removedIDs(from verified: [NotesPoint], kept: [NotesPoint]) -> [String] {
@@ -87,18 +95,19 @@ enum NotesTrace {
 /// One step of the notes, in the order the pipeline takes them. A run that throws (cancelled, or the model
 /// could not be had) ends without `finished`.
 enum NotesTraceEvent: Equatable, Sendable, Codable {
-    case started(schemaVersion: Int, promptVersion: Int, utterances: Int, chunks: Int)
+    case started(
+        schemaVersion: Int, promptVersion: Int, utterances: Int, chunks: Int,
+        rulesVersion: String = NotesGuard.rulesVersion)
     /// One MAP request of a chunk or of a half of one (a split chunk is followed by its halves).
     case mapChunk(NotesTraceChunk)
     /// After `NotesGuard.verifyPoints`.
     case verified(NotesTraceVerification)
     /// After `NotesPipeline.deduplicated`: the ids it took out, and the ids that go on, in time order.
     case deduplicated(removedIDs: [String], keptIDs: [String])
-    /// One REDUCE request (sections) or summary merge request.
+    /// One REDUCE request (sections) or topic merge request.
     case reduceRequest(NotesTraceReduceRequest)
     /// The whole of REDUCE and of `NotesGuard.verifyReduce`.
     case reduce(NotesTraceReduce)
-    case summary(NotesTraceSummary)
     /// The fate of one verified point, in time order.
     case point(NotesTracePoint)
     case finished(status: NotesResult.Status, verified: Int, rendered: Int, notRendered: Int)
@@ -193,6 +202,11 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
     var verified: NotesTraceKinds
     var dropped: Int
     var reasons: [NotesGuard.DropReason: Int]
+    /// `reasons`, one level down: the rule behind `unsupportedDetail` and the kind of miss behind
+    /// `quoteNotInTranscript` (schema 6; empty in older traces).
+    var details: [NotesGuard.DropDetail: Int] = [:]
+    /// Quotes the guard anchored to a shorter stretch of the transcript (reserved, always 0 until the S1 phase).
+    var reanchored = 0
     var downgraded: Int
     /// Tasks whose person is the speaker, given by the guard (a count; empty trace field reads as 0).
     var ownerFromSpeaker = 0
@@ -201,7 +215,7 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
     var verifier: NotesTraceVerifier?
 
     private enum CodingKeys: String, CodingKey {
-        case proposed, verified, dropped, reasons, downgraded, ownerFromSpeaker, verifier
+        case proposed, verified, dropped, reasons, details, reanchored, downgraded, ownerFromSpeaker, verifier
     }
 
     /// `reasons` is written as an object keyed by the reason's raw value (a dictionary keyed
@@ -213,6 +227,11 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
         dropped = try container.decode(Int.self, forKey: .dropped)
         reasons = try Self.decodeCounts(
             NotesGuard.DropReason.self, forKey: .reasons, in: container, unknown: "Unknown drop reason")
+        details =
+            container.contains(.details)
+            ? try Self.decodeCounts(
+                NotesGuard.DropDetail.self, forKey: .details, in: container, unknown: "Unknown drop detail") : [:]
+        reanchored = try container.decodeIfPresent(Int.self, forKey: .reanchored) ?? 0
         downgraded = try container.decode(Int.self, forKey: .downgraded)
         ownerFromSpeaker = try container.decodeIfPresent(Int.self, forKey: .ownerFromSpeaker) ?? 0
         verifier = try container.decodeIfPresent(NotesTraceVerifier.self, forKey: .verifier)
@@ -239,6 +258,9 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
         try container.encode(dropped, forKey: .dropped)
         try container.encode(
             Dictionary(uniqueKeysWithValues: reasons.map { ($0.key.rawValue, $0.value) }), forKey: .reasons)
+        try container.encode(
+            Dictionary(uniqueKeysWithValues: details.map { ($0.key.rawValue, $0.value) }), forKey: .details)
+        try container.encode(reanchored, forKey: .reanchored)
         try container.encode(downgraded, forKey: .downgraded)
         try container.encode(ownerFromSpeaker, forKey: .ownerFromSpeaker)
         try container.encodeIfPresent(verifier, forKey: .verifier)
@@ -250,6 +272,7 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
         verified = NotesTraceKinds(verdict.verified)
         dropped = verdict.dropped
         reasons = verdict.reasons
+        details = verdict.details
         downgraded = verdict.downgraded
         ownerFromSpeaker = verdict.ownerFromSpeaker
     }
@@ -277,19 +300,23 @@ struct NotesTraceVerifier: Equatable, Sendable, Codable {
 }
 
 struct NotesTraceReduceRequest: Equatable, Sendable, Codable {
-    enum Stage: String, Sendable, Codable { case sections, summaryMerge }
+    enum Stage: String, Sendable, Codable {
+        case sections
+        /// The merge of the topics of several batches (prompt 7); `pointIDs` are the points of the topics sent.
+        case topics
+    }
     enum Outcome: String, Sendable, Codable {
         case value
         /// The prompt did not fit; the points went on in two batches.
         case split
         /// The request failed; the batch's points went into the sections in code order (`reduceFailed`).
         case codeOrder
-        /// A summary merge failed; the paragraph is composed from the points (`reduceFailed`).
+        /// A topic merge failed; the findings became one topic without a name, in code order (`reduceFailed`).
         case failed
     }
 
     var stage: Stage
-    /// Points (sections) or partial summaries (merge) in the request.
+    /// Points (sections) or topics (merge) in the request.
     var inputs: Int
     /// The points of a sections request.
     var pointIDs: [String]
@@ -301,9 +328,6 @@ struct NotesTraceReduce: Equatable, Sendable, Codable {
     /// Batches of the first level (1 when the points fit one request).
     var batches = 0
     var sectionRequests = 0
-    var summaryMergeRequests = 0
-    /// Summary merges given up without a request (two partial summaries did not fit together).
-    var summaryMergesGivenUp = 0
     var codeOrderBatches = 0
     /// Generation requests sent by REDUCE and the merges, and the answers of them cut off by the limit.
     var generationRequests = 0
@@ -323,22 +347,26 @@ struct NotesTraceReduce: Equatable, Sendable, Codable {
     /// Points left out and not added back because a near-duplicate is in their section (the key points
     /// included).
     var nearDuplicatesSkipped = 0
-    /// The findings shown under "Topics discussed".
+    /// The findings shown (since prompt 7, the points of every topic shown).
     var keyPoints = 0
-    var summaryReplaced = false
+    /// The topic layout (schema 6; zeros before prompt 7); nil in older traces.
+    var layout: NotesTraceLayout? = NotesTraceLayout()
 }
 
-struct NotesTraceSummary: Equatable, Sendable, Codable {
-    var origin: NotesGuard.ReduceAudit.SummaryOrigin
-    /// The verdict has a paragraph, and the composer shows it.
-    var present: Bool
-    var shown: Bool
-    /// Always empty since schema 5: the paragraph is never composed from points.
-    var sourceIDs: [String]
-    var sourceStartMs: Int?
-    var sourceEndMs: Int?
-    /// Why the model's paragraph was refused (a rule, never text); nil for older traces and for no refusal.
-    var refusal: NotesGuard.SummaryRefusal?
+/// Counts of the topic layout of the notes (spec `2026-11-25-meeting-notes-structure`). Reserved in schema 6 and
+/// written since prompt 7; numbers only, never a topic name.
+struct NotesTraceLayout: Equatable, Sendable, Codable {
+    /// Topics shown with a heading ("Other" included; the list of a short meeting has none).
+    var topics = 0
+    /// Points shown under each topic, in order (the headingless list of a short meeting included).
+    var pointsPerTopic: [Int] = []
+    /// Topic names the fact check refused (their points went to "Other").
+    var topicNameRefused = 0
+    /// Verified `SUM` points REDUCE assigned to no topic.
+    var notChosen = 0
+    /// Verified `SUM` points REDUCE put under a topic and the limits cut: the number of topics, the points per topic,
+    /// the size of "Other".
+    var cutByLimit = 0
 }
 
 struct NotesTracePoint: Equatable, Sendable, Codable {
@@ -371,8 +399,8 @@ struct NotesTracePoint: Equatable, Sendable, Codable {
         case backfilled
         /// Schema 4 and older: a summary point whose first sentence is in the paragraph composed by the code.
         case composedSummary
-        /// A summary point whose whole text is a sentence of the model's (or salvaged) paragraph, so it is not
-        /// listed again among the key points.
+        /// Schema 6 and older: a summary point whose whole text is a sentence of the model's (or salvaged)
+        /// paragraph, so it was not listed again among the key points.
         case modelSummary
         /// Schema 4 and older: a summary point the code listed among the key points.
         case listedByCode
@@ -385,15 +413,15 @@ struct NotesTracePoint: Equatable, Sendable, Codable {
         /// Schema 1 only: a summary point that is not among the first four sources of the composed paragraph.
         /// Not produced since schema 2, where the point is a key point.
         case summaryKindNotInComposedParagraph
-        /// A source of the composed paragraph, but the composer shows no paragraph.
+        /// Schema 6 and older: a summary point that is a sentence of the paragraph, but the composer showed none.
         case summaryNotShown
         /// REDUCE left it out (or put it in another section) and the guard did not add it back because this
         /// point, of the same kind, is in its section and near-duplicates it (`NotesGuard.nearDuplicate`).
         case nearDuplicateInSection(of: String)
         /// A summary point REDUCE did not choose as a topic discussed (nothing adds it back).
         case notChosen
-        /// A finding REDUCE chose that is not shown: it is a question, or the limit of
-        /// `NotesGuard.maxKeyPoints` (or, for an open question, `NotesGuard.maxQuestions`) was reached.
+        /// A finding REDUCE chose that is not shown: it is a question, or a limit of `NotesLayout` (topics, points
+        /// per topic, "Other"; for an open question, `NotesGuard.maxQuestions`) was reached.
         case overLimit
         /// The trace cannot tell from the guard's audit; the balance counts it apart.
         case unexplained
@@ -446,7 +474,8 @@ final class NotesTraceRecorder: Sendable {
         state.withLock { state in
             switch stage {
             case .sections: state.reduce.sectionRequests += 1
-            case .summaryMerge: state.reduce.summaryMergeRequests += 1
+            // Counted by its `reduceRequest` event and in `generationRequests`; the reduce event has no field for it.
+            case .topics: break
             }
             state.reduce.generationRequests += attempts.requests
             state.reduce.truncatedAnswers += attempts.truncated
@@ -461,15 +490,13 @@ final class NotesTraceRecorder: Sendable {
                     stage: stage, inputs: inputs, pointIDs: pointIDs, attempts: attempts, outcome: outcome)))
     }
 
-    func summaryMergeGivenUp() {
-        state.withLock { $0.reduce.summaryMergesGivenUp += 1 }
-    }
-
-    /// The `reduce`, `summary` and `point` events, once the structure is verified.
+    /// The `reduce` and `point` events, once the structure is verified.
+    /// `shownKeyPoints` are the topics as the composer shows them (`NotesComposer.shownKeyPoints`).
     func reduced(
         points: [NotesPoint], proposed: [NotesPoint], verdict: NotesGuard.ReduceVerdict,
-        audit: NotesGuard.ReduceAudit, reduceFailed: Bool, summaryShown: Bool
+        audit: NotesGuard.ReduceAudit, shownKeyPoints: [NotesGuard.ReduceVerdict.Topic], reduceFailed: Bool
     ) {
+        let shownIDs = Set(shownKeyPoints.flatMap(\.points).map(\.id))
         let (reduce, codeOrderIDs) = state.withLock { state -> (NotesTraceReduce, Set<String>) in
             state.reduce.reduceFailed = reduceFailed
             state.reduce.decisions = verdict.decisions.count
@@ -481,22 +508,17 @@ final class NotesTraceRecorder: Sendable {
             state.reduce.repeatedIDs = audit.repeatedIDs
             state.reduce.backfilled = verdict.backfilled
             state.reduce.nearDuplicatesSkipped = audit.nearDuplicateOf.count
-            state.reduce.keyPoints = verdict.keyPoints.count
-            state.reduce.summaryReplaced = verdict.summaryReplaced
+            state.reduce.keyPoints = shownIDs.count
+            state.reduce.layout = Self.layout(
+                points: points, verdict: verdict, audit: audit, shown: shownKeyPoints, codeOrderIDs: state.codeOrderIDs)
             return (state.reduce, state.codeOrderIDs)
         }
         emit(.reduce(reduce))
 
-        emit(
-            .summary(
-                NotesTraceSummary(
-                    origin: audit.summaryOrigin, present: verdict.summary != nil, shown: summaryShown,
-                    sourceIDs: [], sourceStartMs: nil, sourceEndMs: nil, refusal: audit.summaryRefusal)))
-
         let proposedKinds = Dictionary(proposed.map { ($0.id, $0.kind) }, uniquingKeysWith: { first, _ in first })
         for point in points {
             let fate = Self.fate(
-                of: point, verdict: verdict, audit: audit, codeOrderIDs: codeOrderIDs, summaryShown: summaryShown)
+                of: point, verdict: verdict, audit: audit, shownIDs: shownIDs, codeOrderIDs: codeOrderIDs)
             state.withLock { state in
                 if case .rendered = fate { state.rendered += 1 } else { state.notRendered += 1 }
             }
@@ -517,20 +539,41 @@ final class NotesTraceRecorder: Sendable {
                 notRendered: notRendered))
     }
 
-    /// Read from the verdict and the guard's audit: the composer shows every point of `keyPoints`, `decisions`,
-    /// `tasks` and `questions` as a bullet and nothing else, and the paragraph when `NotesComposer.shownSummary`
-    /// has one.
+    /// The counts of the topic layout: the topics as shown, the refused names and the findings REDUCE did not
+    /// choose or the limits cut.
+    static func layout(
+        points: [NotesPoint], verdict: NotesGuard.ReduceVerdict, audit: NotesGuard.ReduceAudit,
+        shown: [NotesGuard.ReduceVerdict.Topic], codeOrderIDs: Set<String>
+    ) -> NotesTraceLayout {
+        var layout = NotesTraceLayout()
+        layout.topics = shown.filter { $0.name != nil || $0.isOther }.count
+        layout.pointsPerTopic = shown.map(\.points.count)
+        layout.topicNameRefused = audit.topicNameRefused
+        let shownIDs = Set(shown.flatMap(\.points).map(\.id))
+        for point in points where point.kind == .summary {
+            let outcome = Self.fate(
+                of: point, verdict: verdict, audit: audit, shownIDs: shownIDs, codeOrderIDs: codeOrderIDs)
+            switch outcome {
+            case .notRendered(.notChosen): layout.notChosen += 1
+            case .notRendered(.overLimit) where !point.text.hasSuffix("?"): layout.cutByLimit += 1
+            default: break
+            }
+        }
+        return layout
+    }
+
+    /// Read from the verdict, the guard's audit and the topics as shown: the composer shows every point of
+    /// `shownIDs`, `decisions`, `tasks` and `questions` as a bullet and nothing else.
     static func fate(
         of point: NotesPoint, verdict: NotesGuard.ReduceVerdict, audit: NotesGuard.ReduceAudit,
-        codeOrderIDs: Set<String>, summaryShown: Bool
+        shownIDs: Set<String>, codeOrderIDs: Set<String>
     ) -> NotesTracePoint.Fate {
         guard let section = NotesTracePoint.Section(kind: point.kind) else {
-            if verdict.keyPoints.contains(where: { $0.id == point.id }) {
+            if shownIDs.contains(point.id) {
                 return .rendered(.keyPoints, via: codeOrderIDs.contains(point.id) ? .codeOrder : .reduce)
             }
-            if audit.inModelParagraph.contains(point.id) {
-                return summaryShown ? .rendered(.summary, via: .modelSummary) : .notRendered(.summaryNotShown)
-            }
+            // Under a topic in the verdict but not shown: the arrangement's limit of "Other".
+            if verdict.keyPoints.contains(where: { $0.id == point.id }) { return .notRendered(.overLimit) }
             if let other = audit.nearDuplicateOf[point.id] { return .notRendered(.nearDuplicateInSection(of: other)) }
             if audit.findingsOverLimit.contains(point.id) { return .notRendered(.overLimit) }
             return .notRendered(.notChosen)
@@ -556,4 +599,3 @@ final class NotesTraceRecorder: Sendable {
 extension NotesPointKind: Codable {}
 extension NotesResult.Status: Codable {}
 extension NotesGuard.DropReason: Codable {}
-extension NotesGuard.ReduceAudit.SummaryOrigin: Codable {}

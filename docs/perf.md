@@ -471,3 +471,19 @@ The budget is the time from a key press to the updated line on screen at 50 000 
   included), measuring key-down to the next display with a signpost around `keyDown`. Only this number is entered
   in the table above. ADR 0008 addendum 0.1 measured the TextKit 2 layout and display side at p99 1.5 ms in a
   headless window; that run did not include the event path, the compositor or other hardware.
+
+## Design gallery (spec `2026-11-23-swiftui-design-gallery`, phase 1)
+
+DEBUG only; none of it is in a release build. The budgets protect the CI minutes, not the product.
+
+| Budget | Value | Measured | How |
+|---|---|---|---|
+| One state in one variant (window, `NSHostingView`, `cacheDisplay`, settle) | ≈ 50–150 ms (spec estimate) | ≈ 96 ms on an M4 Max (Form with Toggle, TextField and Picker, 960×520 px: 20 renders, 1.92 s counted while each held the render gate) | `swift test --filter GalleryRendererTests`, line `GALLERY-PERF` |
+| Determinism: the same state 20 times in one process, and in 3 separate processes | 0% differing pixels | **0%**: one SHA-256 for all 20 renders and the same one in 3 processes (and every pilot picture drawn twice in another order is exactly the same: `GalleryScenesTests.statesAreIndependent`) | `GalleryRendererTests.renderIsDeterministic`, `LINTEL_GALLERY_DIGEST_FILE=<file>` three times |
+| CI step `Gallery snapshots` (`make-app.sh` + compare `en` 50 pictures + `pl` 25 pictures, through the app bundle; `continue-on-error`, the job fails in a last step) | spec: ≤ 90 s, limit 4 min through the watchdog; **this PR: step limit 8 min, no watchdog (declared deviation)** | **122 s** on the runner (run 45719671197, build cache warm): `make-app.sh` 20 s, `en` 64 s (about 1.3 s a picture, 50 including the compare), `pl` 37 s; with a cold cache `make-app.sh` took 228–332 s (the throwaway proof runs, no cache), total step 4 min 16 s. The same run's `swift test` step took 7 m 54 s against 7 m 07 s on `main` (the scene tests draw 2 × 25 states) | the step prints `make-app` and total seconds |
+| Golden images | ≤ 25 MB per folder (Q5) | enforced by `GoldenBudgetTests` | the size of `Tests/<Plugin>Tests/Gallery/Goldens/` |
+
+The renderer draws every bitmap itself at exactly 2 pixels per point (`GalleryRenderer.scale`) and records the scale in the
+fingerprint, so the picture does not depend on the display of the machine (a CI VM can report a backing scale of 1).
+Renderer fingerprint changes (macOS build, Xcode build) are expected a few times a year; if more often than once a month,
+pin the runner image.

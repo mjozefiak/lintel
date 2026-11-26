@@ -2,8 +2,8 @@ import Foundation
 import LintelSpeech
 import Observation
 
-/// What the "Formatting" section of the Dictation pane shows and does: the mode, the servers found on this Mac,
-/// the model to use, and a "Try it" button. Nothing here leaves the Mac: every address goes through
+/// What the "Formatting" section of the Dictation pane shows and does: how much to tidy, the servers found on this
+/// Mac, the model to use, and a "Try it" button. Nothing here leaves the Mac: every address goes through
 /// `LoopbackPolicy`.
 @MainActor @Observable
 final class FormattingSettingsModel {
@@ -13,13 +13,39 @@ final class FormattingSettingsModel {
         case result(original: String, text: String, cleaned: Bool)
     }
 
+    /// The values of the popup. Full comes with its own phase; a stored `full` is shown, and runs, as Standard.
+    enum TidyChoice: String, CaseIterable, Sendable {
+        case off, light, standard
+
+        init(_ settings: DictationSettings) {
+            switch settings.effectiveLevel {
+            case nil: self = .off
+            case .light: self = .light
+            case .standard, .full: self = .standard
+            }
+        }
+    }
+
     /// The text "Try it" cleans up.
     static let sample = "yyy no więc jutro mamy spotkanie o dziesiątej nie to znaczy o jedenastej w biurze"
 
-    var mode: DictationSettings.Mode {
+    /// "Tidy up my text": one popup over two keys. Off is `mode = raw` (the stored level stays, so turning it back on
+    /// returns to it); Light and Standard are `mode = cleanup` plus `cleanupLevel`.
+    var choice: TidyChoice {
         didSet {
-            settings.setMode(mode)
-            if mode == .cleanup { Task { await refresh() } }
+            guard choice != oldValue else { return }
+            switch choice {
+            case .off:
+                settings.setMode(.raw)
+            case .light:
+                settings.setCleanupLevel(.light)
+                settings.setMode(.cleanup)
+            case .standard:
+                settings.setCleanupLevel(.standard)
+                settings.setMode(.cleanup)
+            }
+            tryState = .idle
+            if usesModel { Task { await refresh() } }
         }
     }
     private(set) var endpoints: [LLMEndpoint] = []
@@ -70,13 +96,17 @@ final class FormattingSettingsModel {
         let chosen = settings.builtInLLMModel
         builtInModel = builtInModels.contains(chosen) ? chosen : (builtInModels.first ?? chosen)
         source = llmModels == nil ? .server : settings.llmSource
-        mode = settings.mode
+        choice = TidyChoice(settings)
         address = settings.llmEndpoint?.absoluteString ?? ""
         selectedEndpoint = settings.llmEndpoint
         selectedModel = settings.llmModel
     }
 
-    var isCleanupOn: Bool { mode == .cleanup }
+    /// Whether anything is tidied (Light or Standard).
+    var isCleanupOn: Bool { choice != .off }
+
+    /// Whether a language model (the built-in one or a server) does the tidying: only Standard. Light needs none.
+    var usesModel: Bool { choice == .standard }
 
     /// The models of the selected server, from the last probe.
     var models: [String] {
@@ -93,7 +123,7 @@ final class FormattingSettingsModel {
 
     /// Looks for servers again (the pane calls it when it appears and when the mode is switched on).
     func refresh() async {
-        guard isCleanupOn else { return }
+        guard usesModel else { return }
         await refreshBuiltIn()
         guard !isBuiltIn else { return }
         isProbing = true

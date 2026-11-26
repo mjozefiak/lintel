@@ -19,14 +19,14 @@ struct NotesSettingsRig {
 
     init(
         settings: [String: SettingValue] = [:], physicalMemory: UInt64 = 16 * NotesServiceRig.gibibyte,
-        handler: @escaping ScriptedLLM.Handler = NotesFake.standard
+        handler: @escaping ScriptedLLM.Handler = NotesFake.standard, availableSpace: Int = .max
     ) throws {
         service = try NotesServiceRig(settings: settings, physicalMemory: physicalMemory, handler: handler)
         directory = try TemporaryDirectory()
         downloader = InstantDownloader(data: ["Qwen3-4B-Instruct-2507-Q4_K_M.gguf": Data("not the model".utf8)])
         manager = ModelManager(
             directory: directory.url.appending(path: "llm", directoryHint: .isDirectory), downloader: downloader,
-            availableSpace: { _ in .max })
+            availableSpace: { _ in availableSpace })
         model = NotesSettingsModel(
             settings: service.settings, service: service.service, manager: manager, lease: service.lease)
     }
@@ -51,19 +51,21 @@ struct NotesSettingsRig {
 
 @MainActor
 @Suite struct NotesSettingsTests {
-    @Test func theSwitchIsOffAndWrittenOnlyWhenTheUserFlipsIt() async throws {
+    /// On by default since #252; the value is written only when the user flips the switch.
+    @Test func theSwitchIsOnByDefaultAndWrittenOnlyWhenTheUserFlipsIt() async throws {
         let rig = try NotesSettingsRig()
         await rig.model.refresh()
-        #expect(!rig.model.enabled)
+        #expect(rig.model.enabled)
+        #expect(rig.service.service.board.snapshot.enabled)
         #expect(rig.service.harness.settings.value(forKey: "plugins.meetings.notesEnabled") == nil)
         #expect(rig.service.harness.settings.value(forKey: "plugins.meetings.builtInLLMModel") == nil)
 
-        rig.model.enabled = true
-        #expect(rig.service.harness.settings.value(forKey: "plugins.meetings.notesEnabled") == .bool(true))
-        #expect(
-            await rig.service.wait("the board to show the switch on") { rig.service.service.board.snapshot.enabled })
         rig.model.enabled = false
         #expect(rig.service.harness.settings.value(forKey: "plugins.meetings.notesEnabled") == .bool(false))
+        #expect(
+            await rig.service.wait("the board to show the switch off") { !rig.service.service.board.snapshot.enabled })
+        rig.model.enabled = true
+        #expect(rig.service.harness.settings.value(forKey: "plugins.meetings.notesEnabled") == .bool(true))
     }
 
     @Test func theCardOffersTheModelsThatFitThisMac() async throws {

@@ -20,12 +20,15 @@ struct NotesRecord: Equatable, Sendable {
 /// changes nothing. The transcript is never touched here.
 extension MeetingsStore {
     /// `ready` → notes `running`. Returns the status the notes had before (to put back when the run is
-    /// cancelled), or `nil` when the meeting is gone, is not `ready`, or its notes already run.
+    /// cancelled), or `nil` when the meeting is gone, is not `ready`, is in Recently deleted (nothing of it is
+    /// sent to a provider) or its notes already run.
     func beginNotes(_ id: Int64) throws -> NotesStatus? {
         try write { db in
             guard
                 let raw = try String.fetchOne(
-                    db, sql: "SELECT notes_status FROM meeting WHERE id = ? AND status = 'ready'", arguments: [id]),
+                    db,
+                    sql: "SELECT notes_status FROM meeting WHERE id = ? AND status = 'ready' AND deleted_at IS NULL",
+                    arguments: [id]),
                 let previous = NotesStatus(rawValue: raw), previous != .running
             else { return nil }
             try db.execute(
@@ -106,6 +109,41 @@ extension MeetingsStore {
                 changed += db.changesCount
             }
             return changed
+        }
+    }
+
+    /// Marks a `ready` meeting as waiting for the notes model (`notes_awaiting_model`, #295), so the wait survives a
+    /// restart. The notes themselves are not touched.
+    func markNotesAwaitingModel(_ id: Int64) throws {
+        try write { db in
+            try db.execute(
+                sql: "UPDATE meeting SET notes_awaiting_model = 1 WHERE id = ? AND status = 'ready'", arguments: [id])
+        }
+    }
+
+    /// Ends the wait of one meeting, or of every meeting when `id` is `nil`.
+    func clearNotesAwaitingModel(_ id: Int64? = nil) throws {
+        try write { db in
+            if let id {
+                try db.execute(
+                    sql: "UPDATE meeting SET notes_awaiting_model = 0 WHERE id = ? AND notes_awaiting_model = 1",
+                    arguments: [id])
+            } else {
+                try db.execute(sql: "UPDATE meeting SET notes_awaiting_model = 0 WHERE notes_awaiting_model = 1")
+            }
+        }
+    }
+
+    /// The `ready` meetings that wait for the notes model, oldest first.
+    func meetingsAwaitingNotesModel() throws -> [Int64] {
+        try read { db in
+            try Int64.fetchAll(
+                db,
+                sql: """
+                    SELECT id FROM meeting
+                    WHERE notes_awaiting_model = 1 AND status = 'ready' AND deleted_at IS NULL
+                    ORDER BY started_at, id
+                    """)
         }
     }
 

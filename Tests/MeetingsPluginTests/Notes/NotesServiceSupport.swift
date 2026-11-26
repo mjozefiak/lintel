@@ -69,6 +69,8 @@ final class NotesServiceRig {
     let llm: ScriptedLLM
     let lease = LLMLease(sleep: { _ in try await Task.sleep(for: .seconds(3600)) })
     let file = Shared<URL?>(URL(filePath: "/models/llm/notes-test.gguf"))
+    /// How many times the service looked for the model file (`Dependencies.modelFile`).
+    let modelLookups = Shared(0)
     /// The packages `openModels` was called with.
     let modelsOpened = Shared<[String?]>([])
     let changes = Shared(0)
@@ -76,6 +78,7 @@ final class NotesServiceRig {
     let bell = ChangeBell()
     let fixedNow = Date(timeIntervalSince1970: 1_800_000_000)
     private(set) var service: NotesService!
+    private let dependencies: NotesService.Dependencies
 
     var store: MeetingsStore { library.store! }
 
@@ -86,7 +89,11 @@ final class NotesServiceRig {
         runtime custom: (any LLMRuntime)? = nil, shutdownLimit: Duration = .milliseconds(200),
         configure: @escaping @Sendable (inout NotesPipeline.Configuration) -> Void = { _ in },
         providerRunner: ProviderRunner? = nil,
-        configureWhole: @escaping @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in }
+        configureWhole: @escaping @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in },
+        modelWatchInterval: Duration = .seconds(15),
+        markAwaiting: @escaping @Sendable (MeetingsStore, Int64) async -> Void = { store, id in
+            await AwaitingMarker.mark(store, id)
+        }
     ) throws {
         harness = try MeetingsHarness(settings: initial)
         library = harness.library()
@@ -95,24 +102,30 @@ final class NotesServiceRig {
         library.open()
         let llm = llm
         let file = file
+        let lookups = modelLookups
         let opened = modelsOpened
         let changes = changes
         let bell = bell
         let now = fixedNow
-        service = NotesService(
-            NotesService.Dependencies(
-                library: library, settings: settings, lease: lease, modelFile: { _ in file.get() },
-                makeRuntime: { custom ?? llm },
-                configure: { configuration in
-                    configuration.busyPoll = .milliseconds(10)
-                    configure(&configuration)
-                }, providerRunner: providerRunner, configureWhole: configureWhole, now: { now },
-                shutdownLimit: shutdownLimit,
-                openModels: { id in opened.update { $0.append(id) } },
-                changed: {
-                    changes.update { $0 += 1 }
-                    bell.ring()
-                }))
+        dependencies = NotesService.Dependencies(
+            library: library, settings: settings, lease: lease,
+            modelFile: { _ in
+                lookups.update { $0 += 1 }
+                return file.get()
+            },
+            makeRuntime: { custom ?? llm },
+            configure: { configuration in
+                configuration.busyPoll = .milliseconds(10)
+                configure(&configuration)
+            }, providerRunner: providerRunner, configureWhole: configureWhole,
+            markAwaiting: markAwaiting, now: { now },
+            shutdownLimit: shutdownLimit, modelWatchInterval: modelWatchInterval,
+            openModels: { id in opened.update { $0.append(id) } },
+            changed: {
+                changes.update { $0 += 1 }
+                bell.ring()
+            })
+        service = NotesService(dependencies)
         library.onMeetingReady = { [service] id in service?.meetingBecameReady(id) }
         library.onWillClose = { [service] in service?.cancelJobs() }
     }
@@ -163,6 +176,16 @@ final class NotesServiceRig {
     }
 
     func start() async { await service.start() }
+
+    /// A quit and a launch: the running service shuts down and a new one starts over the same open library, with
+    /// the same settings and model lookup (the board and the queue begin empty, as in a new process).
+    func restart() async {
+        await service.shutDown()
+        service = NotesService(dependencies)
+        library.onMeetingReady = { [service] id in service?.meetingBecameReady(id) }
+        library.onWillClose = { [service] in service?.cancelJobs() }
+        await service.start()
+    }
 
     /// Until `condition` holds, looked at again after every change the service reports; 60 s guard, the `Issue`
     /// lands on the caller's line.

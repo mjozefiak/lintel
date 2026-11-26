@@ -92,6 +92,19 @@ import Testing
         #expect(NotesParser.parseMap("DEC | 00:10 | \"\(text)\" | Tekst.") == .malformed)
     }
 
+    @Test func aParagraphTheModelWritesAnywayIsIgnored() throws {
+        let output = try #require(
+            NotesParser.parseReduce(
+                """
+                INTRO: Omówiono budżet.
+                Zatwierdzono go bez zmian.
+                TOPIC: Budżet | p5, p6
+                DECISIONS: p1
+                """))
+        #expect(output.topics == [.init(name: "Budżet", ids: ["p5", "p6"])])
+        #expect(output.decisions == ["p1"])
+    }
+
     @Test func theReduceStructureIsRead() throws {
         let output = try #require(
             NotesParser.parseReduce(
@@ -102,7 +115,7 @@ import Testing
                 TASKS: p2 p4,
                 QUESTIONS: -
                 """))
-        #expect(output.summary == "Omówiono budżet. Zatwierdzono go bez zmian.")
+        #expect(output.topics.isEmpty)
         #expect(output.decisions == ["p1", "p3"])
         #expect(output.tasks == ["p2", "p4"])
         #expect(output.questions.isEmpty)
@@ -121,7 +134,6 @@ import Testing
                 Uczestnicy: Anna, Marek
                 ```
                 """))
-        #expect(output.summary == "Krótko.")
         #expect(output.decisions == ["p2", "p77"])
         #expect(output.tasks == ["p3"])
         #expect(output.questions == ["p5"])
@@ -130,6 +142,8 @@ import Testing
     @Test func aReduceAnswerWithoutAnyKeyIsMalformed() {
         #expect(NotesParser.parseReduce("Oto struktura notatek: wszystko jest w porządku.") == nil)
         #expect(NotesParser.parseReduce("") == nil)
-        #expect(NotesParser.parseSummary("SUMMARY: Jedno zdanie.") == "Jedno zdanie.")
+        // Only a paragraph is nothing to use: the request is tried again.
+        #expect(NotesParser.parseReduce("INTRO: Jedno zdanie.") == nil)
+        #expect(NotesParser.parseReduce("SUMMARY: Jedno zdanie.") == nil)
     }
 }

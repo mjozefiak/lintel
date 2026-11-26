@@ -40,6 +40,9 @@ struct DictationEntry: Sendable, Equatable, Identifiable {
     var formatterModel: String?
     var targetBundleID: String?
     var pasteResult: PasteResult
+    /// When the entry moved to Recently deleted (`deleted_at`); `nil` for a live one. Only the rows read for
+    /// Recently deleted carry it.
+    var deletedAt: Date?
 
     /// What Return pastes: the cleaned text when there is one.
     var bestText: String { formattedText ?? rawText }
@@ -119,6 +122,17 @@ final class DictationStore: Sendable {
                 table.column("raw_text")
                 table.column("formatted_text")
             }
+        }
+        // Recently deleted (notes explorer spec, Data Model): `deleted_at` is Unix seconds in whole microseconds,
+        // NULL = live. A trashed entry keeps its row and its full-text entry until the purge; every read the user
+        // sees filters it out. Registered after every migration already released, never between them.
+        migrator.registerMigration("v2-trash") { db in
+            try db.execute(
+                sql: """
+                    ALTER TABLE dictation_entry ADD COLUMN deleted_at REAL;
+                    CREATE INDEX dictation_entry_deleted ON dictation_entry(deleted_at) WHERE deleted_at IS NOT NULL;
+                    """
+            )
         }
         return migrator
     }

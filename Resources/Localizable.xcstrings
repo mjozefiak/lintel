@@ -163,6 +163,24 @@
         }
       }
     },
+    "The launcher is off" : {
+      "comment" : "Settings → General banner: no plugin searches",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The launcher is off"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wyszukiwarka jest wyłączona"
+          }
+        }
+      }
+    },
     "Toggle Raw Markdown" : {
       "comment" : "Notes menu: switches the editor between Formatted and Raw",
       "extractionState" : "manual",
@@ -195,6 +213,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Naciśnij %@ ponownie, aby usunąć"
+          }
+        }
+      }
+    },
+    "Turn on Apps, Files or Window Management in Features to use the shortcut." : {
+      "comment" : "Settings → General banner detail: the main shortcut works once a search add-on is on",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on Apps, Files or Window Management in Features to use the shortcut."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włącz Aplikacje, Pliki lub Zarządzanie oknami w Funkcjach, aby używać skrótu."
           }
         }
       }
@@ -1369,24 +1405,6 @@
         }
       }
     },
-    "Built-in model fixes punctuation and filler words." : {
-      "comment" : "Settings → Dictation: help under Clean up text",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Built-in model fixes punctuation and filler words."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wbudowany model poprawia interpunkcję i wtręty."
-          }
-        }
-      }
-    },
     "Cancel" : {
       "comment" : "Button that cancels the model download",
       "extractionState" : "manual",
@@ -1527,24 +1545,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wybierz folder z plikami modelu mowy."
-          }
-        }
-      }
-    },
-    "Clean up text" : {
-      "comment" : "Settings → Dictation: switch that formats the text",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clean up text"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Poprawiaj tekst"
           }
         }
       }
@@ -3727,24 +3727,6 @@
         }
       }
     },
-    "Notes are on, but their model is not downloaded." : {
-      "comment" : "Meeting window banner when the notes model is missing",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notes are on, but their model is not downloaded."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notatki są włączone, ale ich model nie jest pobrany."
-          }
-        }
-      }
-    },
     "Notes model needed" : {
       "comment" : "Meeting library badge: notes are on but the model is missing",
       "extractionState" : "manual",
@@ -3831,24 +3813,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Otwórz jej panel, aby spróbować ponownie. Nic nie zostało usunięte."
-          }
-        }
-      }
-    },
-    "Optional: let a model on this Mac write notes after each meeting. It is a large download that starts only when you press the button." : {
-      "comment" : "Meetings onboarding step about the notes model",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Optional: let a model on this Mac write notes after each meeting. It is a large download that starts only when you press the button."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opcjonalnie: pozwól modelowi na tym Macu pisać notatki po każdym spotkaniu. To duże pobranie, które zaczyna się dopiero po naciśnięciu przycisku."
           }
         }
       }
@@ -4033,20 +3997,20 @@
         }
       }
     },
-    "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac." : {
+    "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings." : {
       "comment" : "Welcome screen: text of the first page",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search apps and files, paste from history, dictate, keep meeting notes. All on this Mac."
+            "value" : "Dictate anywhere and keep notes of your meetings, all on this Mac. Search, clipboard history and more wait in Settings."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Szukaj aplikacji i plików, wklejaj z historii, dyktuj, miej notatki ze spotkań. Wszystko na tym Macu."
+            "value" : "Dyktuj w dowolnej aplikacji i miej notatki ze spotkań, wszystko na tym Macu. Wyszukiwanie, historię schowka i inne dodatki włączysz w Ustawieniach."
           }
         }
       }
@@ -7651,24 +7615,6 @@
         }
       }
     },
-    "Your server on this Mac fixes punctuation and filler words." : {
-      "comment" : "Settings → Dictation: help under Clean up text when the user's server formats",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your server on this Mac fixes punctuation and filler words."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Twój serwer na tym Macu poprawia interpunkcję i wtręty."
-          }
-        }
-      }
-    },
     "You’re set" : {
       "comment" : "Welcome screen: title of the final page",
       "extractionState" : "manual",
@@ -10257,6 +10203,114 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mikrofon odłączony"
+          }
+        }
+      }
+    },
+    "“%@” unavailable – using “%@”" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholders are device names",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” unavailable – using “%@”"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%1$@” niedostępny – używam „%2$@”"
+          }
+        }
+      }
+    },
+    "“%@” unavailable – using the system input" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholder is its name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” unavailable – using the system input"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@” niedostępny – używam wejścia systemowego"
+          }
+        }
+      }
+    },
+    "Chosen microphone unavailable – using “%@”" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged, the placeholder is the name of the input used",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chosen microphone unavailable – using “%@”"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybrany mikrofon niedostępny – używam „%@”"
+          }
+        }
+      }
+    },
+    "Chosen microphone unavailable – using the system input" : {
+      "comment" : "HUD notice, one line: the chosen microphone is unplugged",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chosen microphone unavailable – using the system input"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybrany mikrofon niedostępny – używam wejścia systemowego"
+          }
+        }
+      }
+    },
+    "Your microphone is not being recorded" : {
+      "comment" : "Meeting HUD notice when the microphone could not be started, only the system audio is recorded",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your microphone is not being recorded"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twój mikrofon nie jest nagrywany"
+          }
+        }
+      }
+    },
+    "Trying the microphone again…" : {
+      "comment" : "Meeting HUD notice while the microphone is being started again after 'Try again'",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trying the microphone again…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponawiam próbę z mikrofonem…"
           }
         }
       }
@@ -27177,6 +27231,402 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sprawdź aktualizacje…"
+          }
+        }
+      }
+    },
+    "Notes on this Mac: Lintel writes your meeting notes here, without the internet." : {
+      "comment" : "Meetings onboarding step about the notes model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes on this Mac: Lintel writes your meeting notes here, without the internet."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki na tym Macu: Lintel pisze notatki ze spotkań tutaj, bez internetu."
+          }
+        }
+      }
+    },
+    "You can record now. Notes are written once the model is on this Mac." : {
+      "comment" : "Meetings onboarding: notes wait for the notes model, recording does not",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can record now. Notes are written once the model is on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Możesz już nagrywać. Notatki powstaną, gdy model będzie na tym Macu."
+          }
+        }
+      }
+    },
+    "Not enough free space. The notes model needs %@, and %@ is free." : {
+      "comment" : "Meetings onboarding: the disk is too full for the notes model; needed and free space",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough free space. The notes model needs %@, and %@ is free."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Za mało miejsca na dysku. Model notatek potrzebuje %1$@, a wolne jest tylko %2$@."
+          }
+        }
+      }
+    },
+    "Continue Download (%@ left)" : {
+      "comment" : "Meetings onboarding: resumes a notes model download that stopped part of the way",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue Download (%@ left)"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wznów pobieranie (zostało %@)"
+          }
+        }
+      }
+    },
+    "Notes will be written once the notes model is on this Mac." : {
+      "comment" : "Meeting window banner when the notes model is missing",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes will be written once the notes model is on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki powstaną, gdy model notatek będzie na tym Macu."
+          }
+        }
+      }
+    },
+    "Tidy up my text" : {
+      "comment" : "Settings → Dictation: the popup that says how much Lintel tidies the text",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidy up my text"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Porządkuj mój tekst"
+          }
+        }
+      }
+    },
+    "Off" : {
+      "comment" : "Settings → Dictation, Tidy up my text: the text is pasted as spoken",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wyłączone"
+          }
+        }
+      }
+    },
+    "Light" : {
+      "comment" : "Settings → Dictation, Tidy up my text: only filler words are removed",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lekkie"
+          }
+        }
+      }
+    },
+    "Standard" : {
+      "comment" : "Settings → Dictation, Tidy up my text: corrections and lists",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standard"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standardowe"
+          }
+        }
+      }
+    },
+    "Pastes exactly what you said." : {
+      "comment" : "Settings → Dictation: help under Tidy up my text when it is off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pastes exactly what you said."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wkleja dokładnie to, co powiesz."
+          }
+        }
+      }
+    },
+    "Removes “um” and “uh”. Never changes your words." : {
+      "comment" : "Settings → Dictation: help under Tidy up my text at the Light level",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Removes “um” and “uh”. Never changes your words."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usuwa „yyy” i „eee”. Nigdy nie zmienia twoich słów."
+          }
+        }
+      }
+    },
+    "Also keeps only your corrections and turns spoken lists into lists." : {
+      "comment" : "Settings → Dictation: help under Tidy up my text at the Standard level",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Also keeps only your corrections and turns spoken lists into lists."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zostawia tylko twoje poprawki i zamienia wyliczenia na listy."
+          }
+        }
+      }
+    },
+    "Um, so the meeting is on Tuesday." : {
+      "comment" : "Settings → Dictation: invented sentence as dictated, Light example",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um, so the meeting is on Tuesday."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yyy, spotkanie jest we wtorek."
+          }
+        }
+      }
+    },
+    "So the meeting is on Tuesday." : {
+      "comment" : "Settings → Dictation: the Light example after tidying",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So the meeting is on Tuesday."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotkanie jest we wtorek."
+          }
+        }
+      }
+    },
+    "The meeting is on Tuesday, sorry, Wednesday." : {
+      "comment" : "Settings → Dictation: invented sentence as dictated, Standard example",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The meeting is on Tuesday, sorry, Wednesday."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotkanie jest we wtorek, a właściwie w środę."
+          }
+        }
+      }
+    },
+    "The meeting is on Wednesday." : {
+      "comment" : "Settings → Dictation: the Standard example after tidying",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The meeting is on Wednesday."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotkanie jest w środę."
+          }
+        }
+      }
+    },
+    "Example: %@ becomes %@" : {
+      "comment" : "Settings → Dictation: VoiceOver text of the example under Tidy up my text",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Example: %@ becomes %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przykład: %@ zmienia się w %@"
+          }
+        }
+      }
+    },
+    "Dictating" : {
+      "comment" : "Spoken name of the turning ring while the user dictates",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictating"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie trwa"
+          }
+        }
+      }
+    },
+    "Recording, needs attention" : {
+      "comment" : "Spoken name of the turning ring with the amber dot",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording, needs attention"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nagrywanie, wymaga uwagi"
+          }
+        }
+      }
+    },
+    "Working, %lld percent" : {
+      "comment" : "Spoken name of the closing ring with a progress, e.g. 60 percent",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Working, %lld percent"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "W toku, %lld procent"
+          }
+        }
+      }
+    },
+    "Something went wrong" : {
+      "comment" : "Spoken name of the open ring in the error colour",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something went wrong"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coś poszło nie tak"
+          }
+        }
+      }
+    },
+    "Dictating, needs attention" : {
+      "comment" : "Spoken name of the turning ring of a dictation with the amber dot",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictating, needs attention"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie, wymaga uwagi"
           }
         }
       }

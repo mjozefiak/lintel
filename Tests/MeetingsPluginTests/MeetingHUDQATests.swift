@@ -23,8 +23,18 @@ import Testing
         #expect(problems.count == 12)
         var notices: [MeetingHUDState.Notice] = []
         for case .recording(let recording) in states { if let notice = recording.notice { notices.append(notice) } }
-        #expect(notices.count == 10)
+        #expect(notices.count == 13)
         for state in states { #expect(!state.title.isEmpty) }
+    }
+
+    @Test func theSuggestionPillCanBeDrawnWithAFixtureAppName() {
+        #expect(
+            MeetingHUDQA.suggestion(named: "suggestion-meeting")
+                == .meeting(bundleID: "com.google.Chrome", appName: "Google Chrome"))
+        #expect(MeetingHUDQA.suggestion(named: "suggestion-end-recording") == .endRecording(appName: "Google Chrome"))
+        #expect(MeetingHUDQA.suggestion(named: "recording") == nil)
+        // A name belongs to one list only.
+        for name in MeetingHUDQA.suggestions.map(\.name) { #expect(MeetingHUDQA.state(named: name) == nil) }
     }
 
     @Test func thePanelHasTheIdentifierTheShellLooksFor() {

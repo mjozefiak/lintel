@@ -15,12 +15,30 @@ import Testing
 /// Optional: `_NAME`, `_ENGINE` (`parakeet-ultra` | `whisper-large-v3-turbo`), `_LANGUAGE` (`pl` | `en`; Whisper
 /// pins it, Parakeet gets it as a script hint, like the app), `_PARAKEET_HINT` (`0`: Parakeet without the hint, the
 /// behaviour before issue #132), `_CODE_VERSION`, `_NOTES_MODEL` (a .gguf), `_DUMP_REJECTIONS` (`1`: also write
-/// `<name>.notes-rejections.json` with the text of every refused point; the only file that holds notes text
-/// besides the result), `_DIARIZATION_FOLDER`, `_SPEAKER_NAMES` (a JSON of oracle names that replace "Mówca N" after diarization), `_ALLOW_DEBUG`. The WAV must be
+/// `<name>.notes-rejections.json` with the text of every refused point, and with `_NOTES_PIPELINE=whole` also
+/// `<name>.notes-whole.json` with the answers and the lines the fact guard removed; the only files that hold notes
+/// text besides the result), `_TRACK` (`system`: feed the WAV as the system audio, like a remote speaker, with no
+/// microphone; default `mic`), the segmentation knobs of issue #135 (`_PRE_ROLL_MS`, `_POST_ROLL_MS`, `_VAD_ENTRY`,
+/// `_VAD_EXIT_OFFSET`, `_VAD_MIN_SILENCE`, `_VAD_PADDING`; unset = the app's values; the run writes its counters
+/// under `capture` in the result), `_DIARIZATION_FOLDER`, `_SPEAKER_NAMES` (a JSON of oracle names that replace "Mówca N" after diarization), `_ALLOW_DEBUG`. The WAV must be
 /// 16 kHz mono. The transcript goes only into the JSON; the test prints numbers, never text.
+///
+/// **Replay.** `LINTEL_MEETING_EVAL_TRANSCRIPT=<result.json>` (an `EvalResult` an earlier run wrote) replaces
+/// `_AUDIO`: no recognition and no diarization, the saved `asr.segments` (with speakers) go straight into the
+/// notes, so variants differ only in the notes code. `_CODE_VERSION` is the code of THIS run; the result's
+/// `config.transcriptSource` names the replayed file.
+///
+/// **Provider track.** `LINTEL_MEETING_EVAL_NOTES_PIPELINE=whole` runs `WholeNotesPipeline` (the provider track)
+/// instead of the quote track: with the Claude Code CLI (`_PROVIDER_MODEL`, default `sonnet`; the child gets only
+/// `HOME`, `USER`, `LANG` and `CLAUDE_CONFIG_DIR`, so unset `CLAUDE_CONFIG_DIR` for the default account), or with
+/// a `llama-server` on the loopback (`_LLAMA_URL`, `_LLAMA_BUDGET` input tokens, default 24000; variant W).
+/// `_GENERATIONS` (default 1) repeats it; the first one is the result, the others are written beside it.
+/// Both tracks write the notes as `<name>.notes.md` (`<name>.gN.notes.md` for generation N > 1).
 @Suite(
     .serialized,
-    .enabled(if: ProcessInfo.processInfo.environment["LINTEL_MEETING_EVAL_AUDIO"] != nil))
+    .enabled(
+        if: ProcessInfo.processInfo.environment["LINTEL_MEETING_EVAL_AUDIO"] != nil
+            || ProcessInfo.processInfo.environment["LINTEL_MEETING_EVAL_TRANSCRIPT"] != nil))
 struct MeetingEvalTests {
     private static let environment = ProcessInfo.processInfo.environment
 
@@ -43,131 +61,179 @@ struct MeetingEvalTests {
             return
         }
         #endif
-        let audioURL = URL(filePath: try #require(Self.value("AUDIO")))
+        let transcriptURL = Self.value("TRANSCRIPT").map { URL(filePath: $0) }
         let outDirectory = URL(filePath: try #require(Self.value("OUT")), directoryHint: .isDirectory)
-        let name = Self.value("NAME") ?? audioURL.deletingPathExtension().lastPathComponent
-        let engineID = Self.value("ENGINE") ?? "parakeet-ultra"
-        let language = Self.value("LANGUAGE") ?? "pl"
-        let speechFolder = URL(filePath: try #require(Self.value("SPEECH_FOLDER")), directoryHint: .isDirectory)
         let codeVersion = Self.value("CODE_VERSION") ?? "unknown"
-
-        let engine: any SpeechEngine
-        switch engineID {
-        case "parakeet-ultra":
-            let hint: String? = Self.value("PARAKEET_HINT") == "0" ? nil : language
-            engine = ParakeetEngine(language: { hint })
-        case "whisper-large-v3-turbo": engine = WhisperKitEngine(language: { language })
-        default:
-            Issue.record("Unknown engine \(engineID)")
-            return
-        }
-
-        let samples = try WAVFile.samples(from: Data(contentsOf: audioURL))
-        let audioSeconds = Double(samples.count) / Double(AudioFormat.sampleRate)
-        let source = try WAVFileAudioSource(url: audioURL)
-
-        // Store and spool live in a temporary folder that is removed at the end; the audio never exists
-        // outside the encrypted spool in it.
-        let directory = try TemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory.url) }
-        let plugin = directory.url.appending(path: "meetings")
-        let keys = try testKeys()
-        let store = try MeetingsStore.open(in: plugin, keys: keys)
-        let vadFolder = speechFolder.appending(path: ModelCatalog.sileroVADPath)
-
-        let session = MeetingSession(
-            store: store, keys: keys, spool: SpoolStorage(pluginDirectory: plugin), mic: source, system: nil,
-            makeVAD: { LazyVAD(modelFolder: vadFolder) }, engine: engine, modelID: engineID,
-            modelFolder: speechFolder, lease: SpeechEngineLease(), sleepAssertion: RecordingSleepAssertion(),
-            gate: MeetingSessionGate())
-
-        let sampler = FootprintSampler()
-        sampler.start()
+        var result: EvalResult
+        var rows: [EvalResult.Segment]
+        let name: String
         let clock = ContinuousClock()
-        let began = clock.now
-        _ = try await session.start()
-        let outcome = await session.finish()
-        let processing = clock.now - began
-        let asrPeak = await sampler.stop()
-        let processingSeconds = Double(processing.components.seconds) + Double(processing.components.attoseconds) / 1e18
+        if let transcriptURL {
+            // Replay: the transcript of an earlier run, no recognition.
+            let saved = try JSONDecoder().decode(EvalResult.self, from: Data(contentsOf: transcriptURL))
+            name = Self.value("NAME") ?? saved.recording
+            result = saved
+            result.recording = name
+            result.notes = nil
+            result.config.codeVersion = codeVersion
+            result.config.transcriptSource = transcriptURL.lastPathComponent
+            rows = saved.asr.segments
+            print(
+                "MEETING-EVAL replay name=\(name) segments=\(rows.count) audioSeconds=\(Self.ms(saved.audioSeconds))"
+                    + " source=\(transcriptURL.lastPathComponent)")
+        } else {
+            let audioURL = URL(filePath: try #require(Self.value("AUDIO")))
+            name = Self.value("NAME") ?? audioURL.deletingPathExtension().lastPathComponent
+            let engineID = Self.value("ENGINE") ?? "parakeet-ultra"
+            let language = Self.value("LANGUAGE") ?? "pl"
+            let speechFolder = URL(filePath: try #require(Self.value("SPEECH_FOLDER")), directoryHint: .isDirectory)
 
-        #expect(outcome.result == .ready, "The meeting did not end ready")
-        let id = try #require(outcome.meetingID)
-        let fetched: [(id: Int64, segment: EvalResult.Segment)] = try store.read { db in
-            try Row.fetchAll(
-                db,
-                sql:
-                    "SELECT id, channel, start_ms, end_ms, text FROM meeting_segment WHERE meeting_id = ? ORDER BY start_ms, id",
-                arguments: [id]
-            ).map {
-                (
-                    id: $0["id"],
-                    segment: EvalResult.Segment(
-                        track: $0["channel"], startMs: $0["start_ms"], endMs: $0["end_ms"], text: $0["text"])
+            let engine: any SpeechEngine
+            switch engineID {
+            case "parakeet-ultra":
+                let hint: String? = Self.value("PARAKEET_HINT") == "0" ? nil : language
+                engine = ParakeetEngine(language: { hint })
+            case "whisper-large-v3-turbo": engine = WhisperKitEngine(language: { language })
+            default:
+                Issue.record("Unknown engine \(engineID)")
+                return
+            }
+
+            let samples = try WAVFile.samples(from: Data(contentsOf: audioURL))
+            let audioSeconds = Double(samples.count) / Double(AudioFormat.sampleRate)
+            let source = try WAVFileAudioSource(url: audioURL)
+            let asSystem = Self.value("TRACK") == "system"
+            var limits = MeetingSessionLimits()
+            if let value = Self.value("PRE_ROLL_MS").flatMap(Int.init) { limits.segmentPreRoll = .milliseconds(value) }
+            if let value = Self.value("POST_ROLL_MS").flatMap(Int.init) {
+                limits.segmentPostRoll = .milliseconds(value)
+            }
+            var chosen = MeetingVAD.tuning
+            if let value = Self.value("VAD_ENTRY").flatMap(Float.init) { chosen.entryThreshold = value }
+            if let value = Self.value("VAD_EXIT_OFFSET").flatMap(Float.init) { chosen.exitOffset = value }
+            if let value = Self.value("VAD_MIN_SILENCE").flatMap(Double.init) { chosen.minSilence = value }
+            if let value = Self.value("VAD_PADDING").flatMap(Double.init) { chosen.padding = value }
+            let tuning = chosen
+            limits.vadEntryThreshold = tuning.entryThreshold
+            let counters = Mutex<CaptureCounters?>(nil)
+
+            // Store and spool live in a temporary folder that is removed at the end; the audio never exists
+            // outside the encrypted spool in it.
+            let directory = try TemporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: directory.url) }
+            let plugin = directory.url.appending(path: "meetings")
+            let keys = try testKeys()
+            let store = try MeetingsStore.open(in: plugin, keys: keys)
+            let vadFolder = speechFolder.appending(path: ModelCatalog.sileroVADPath)
+
+            let session = MeetingSession(
+                store: store, keys: keys, spool: SpoolStorage(pluginDirectory: plugin),
+                mic: asSystem ? UnavailableAudioInput() : source, system: asSystem ? source : nil,
+                makeVAD: { LazyVAD(modelFolder: vadFolder, tuning: tuning, recordsProbabilities: true) },
+                engine: engine, modelID: engineID, modelFolder: speechFolder, lease: SpeechEngineLease(),
+                sleepAssertion: RecordingSleepAssertion(), gate: MeetingSessionGate(), limits: limits,
+                recordCounters: { value in counters.withLock { $0 = value } }, retriesMicrophone: !asSystem)
+
+            let sampler = FootprintSampler()
+            sampler.start()
+            let began = clock.now
+            _ = try await session.start()
+            let outcome = await session.finish()
+            let processing = clock.now - began
+            let asrPeak = await sampler.stop()
+            let processingSeconds =
+                Double(processing.components.seconds) + Double(processing.components.attoseconds) / 1e18
+
+            #expect(outcome.result == .ready, "The meeting did not end ready")
+            let id = try #require(outcome.meetingID)
+            let fetched: [(id: Int64, segment: EvalResult.Segment)] = try store.read { db in
+                try Row.fetchAll(
+                    db,
+                    sql:
+                        "SELECT id, channel, start_ms, end_ms, text FROM meeting_segment WHERE meeting_id = ? ORDER BY start_ms, id",
+                    arguments: [id]
+                ).map {
+                    (
+                        id: $0["id"],
+                        segment: EvalResult.Segment(
+                            track: $0["channel"], startMs: $0["start_ms"], endMs: $0["end_ms"], text: $0["text"])
+                    )
+                }
+            }
+            let segmentIDs = fetched.map(\.id)
+            rows = fetched.map(\.segment)
+            // `replayedSegments` counts the segments that waited in the spool (backlog or background queue) and were
+            // transcribed after the meeting; `unfinishedSegments` are the ones still not transcribed.
+            let deferred = outcome.replayedSegments + outcome.unfinishedSegments
+
+            let asr = EvalResult.ASR(
+                processingSeconds: processingSeconds, rtf: processingSeconds / audioSeconds, peakFootprintMB: asrPeak,
+                deferredSegments: deferred, segments: rows)
+            result = EvalResult(
+                recording: name, audioSeconds: audioSeconds,
+                config: .init(engine: engineID, language: language, codeVersion: codeVersion), asr: asr)
+            result.capture = counters.withLock { $0 }
+            if let capture = result.capture {
+                let c = capture[asSystem ? .system : .mic]
+                print(
+                    "MEETING-EVAL capture track=\(asSystem ? "system" : "mic") sent=\(c.segmentsSent) text=\(c.textResults)"
+                        + " empty=\(c.emptyResults) hardCuts=\(c.hardCuts) short=\(c.shortSegments)"
+                        + " nearMissChunks=\(c.segmentingStats.nearMissChunks) padMs=\(c.segmentingStats.paddedSamples / 16)"
                 )
             }
-        }
-        let segmentIDs = fetched.map(\.id)
-        var rows = fetched.map(\.segment)
-        // `replayedSegments` counts the segments that waited in the spool (backlog or background queue) and were
-        // transcribed after the meeting; `unfinishedSegments` are the ones still not transcribed.
-        let deferred = outcome.replayedSegments + outcome.unfinishedSegments
+            print(
+                "MEETING-EVAL asr name=\(name) audioSeconds=\(Self.ms(audioSeconds)) seconds=\(Self.ms(processingSeconds))"
+                    + " rtf=\(String(format: "%.3f", asr.rtf)) peakMB=\(Self.ms(asrPeak)) segments=\(rows.count)"
+                    + " deferred=\(deferred)")
 
-        let asr = EvalResult.ASR(
-            processingSeconds: processingSeconds, rtf: processingSeconds / audioSeconds, peakFootprintMB: asrPeak,
-            deferredSegments: deferred, segments: rows)
-        var result = EvalResult(
-            recording: name, audioSeconds: audioSeconds,
-            config: .init(engine: engineID, language: language, codeVersion: codeVersion), asr: asr)
-        print(
-            "MEETING-EVAL asr name=\(name) audioSeconds=\(Self.ms(audioSeconds)) seconds=\(Self.ms(processingSeconds))"
-                + " rtf=\(String(format: "%.3f", asr.rtf)) peakMB=\(Self.ms(asrPeak)) segments=\(rows.count)"
-                + " deferred=\(deferred)")
-
-        if let folder = Self.value("DIARIZATION_FOLDER") {
-            let diarizer = FluidDiarizer(modelFolder: URL(filePath: folder, directoryHint: .isDirectory))
-            let footprint = FootprintSampler()
-            footprint.start()
-            let started = clock.now
-            let spans = try await diarizer.diarize(EvalArraySource(samples), maximumSamples: samples.count)
-            let elapsed = clock.now - started
-            await diarizer.release()
-            let peak = await footprint.stop()
-            let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-            let speakers = Set(spans.map(\.cluster)).count
-            result.diarization = .init(seconds: seconds, peakFootprintMB: peak, speakers: speakers)
-            // The same assignment the app makes after a meeting (`MeetingFinalizer`): labels "Ja", "Inni", "Mówca N".
-            let refs = zip(segmentIDs, rows).map { id, row in
-                SegmentRef(
-                    id: id, channel: AudioChannel(rawValue: row.track) ?? .mic, startMs: row.startMs,
-                    endMs: row.endMs)
-            }
-            let plan = SpeakerAssigner.diarized(segments: refs, spans: [.mic: spans])
-            for (index, id) in segmentIDs.enumerated() {
-                if let speaker = plan.assignments[id], plan.speakers.indices.contains(speaker) {
-                    rows[index].speaker = plan.speakers[speaker].label
+            if let folder = Self.value("DIARIZATION_FOLDER") {
+                let diarizer = FluidDiarizer(modelFolder: URL(filePath: folder, directoryHint: .isDirectory))
+                let footprint = FootprintSampler()
+                footprint.start()
+                let started = clock.now
+                let spans = try await diarizer.diarize(EvalArraySource(samples), maximumSamples: samples.count)
+                let elapsed = clock.now - started
+                await diarizer.release()
+                let peak = await footprint.stop()
+                let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+                let speakers = Set(spans.map(\.cluster)).count
+                result.diarization = .init(seconds: seconds, peakFootprintMB: peak, speakers: speakers)
+                // The same assignment the app makes after a meeting (`MeetingFinalizer`): labels "Ja", "Inni", "Mówca N".
+                let refs = zip(segmentIDs, rows).map { id, row in
+                    SegmentRef(
+                        id: id, channel: AudioChannel(rawValue: row.track) ?? .mic, startMs: row.startMs,
+                        endMs: row.endMs)
                 }
-            }
-            // Experiment only: replace "Mówca N" with oracle names (JSON `{"Mówca N": {"name": ...}}`). The names are
-            // text, so they reach the notes pipeline input and nothing else (no trace, no printed output).
-            if let path = Self.value("SPEAKER_NAMES") {
-                let mapping = try JSONDecoder().decode(
-                    [String: OracleSpeakerName].self, from: Data(contentsOf: URL(filePath: path)))
-                var replaced = 0
-                for index in rows.indices {
-                    if let label = rows[index].speaker, let name = mapping[label]?.name, !name.isEmpty {
-                        rows[index].speaker = name
-                        replaced += 1
+                let plan = SpeakerAssigner.diarized(segments: refs, spans: [.mic: spans])
+                for (index, id) in segmentIDs.enumerated() {
+                    if let speaker = plan.assignments[id], plan.speakers.indices.contains(speaker) {
+                        rows[index].speaker = plan.speakers[speaker].label
                     }
                 }
-                print("MEETING-EVAL speaker-names replaced=\(replaced)")
+                // Experiment only: replace "Mówca N" with oracle names (JSON `{"Mówca N": {"name": ...}}`). The names are
+                // text, so they reach the notes pipeline input and nothing else (no trace, no printed output).
+                if let path = Self.value("SPEAKER_NAMES") {
+                    let mapping = try JSONDecoder().decode(
+                        [String: OracleSpeakerName].self, from: Data(contentsOf: URL(filePath: path)))
+                    var replaced = 0
+                    for index in rows.indices {
+                        if let label = rows[index].speaker, let name = mapping[label]?.name, !name.isEmpty {
+                            rows[index].speaker = name
+                            replaced += 1
+                        }
+                    }
+                    print("MEETING-EVAL speaker-names replaced=\(replaced)")
+                }
+                result.asr.segments = rows
+                print(
+                    "MEETING-EVAL diarization seconds=\(Self.ms(seconds)) peakMB=\(Self.ms(peak)) speakers=\(speakers)")
             }
-            result.asr.segments = rows
-            print(
-                "MEETING-EVAL diarization seconds=\(Self.ms(seconds)) peakMB=\(Self.ms(peak)) speakers=\(speakers)")
+
         }
 
-        if let model = Self.value("NOTES_MODEL") {
+        if Self.value("NOTES_PIPELINE") == "whole" {
+            try await WholeNotesEval.run(result: &result, rows: rows, name: name, to: outDirectory)
+        } else if let model = Self.value("NOTES_MODEL") {
             let modelURL = URL(filePath: model)
             var configuration = NotesPipeline.Configuration()
             configuration.chunkTokens = MeetingsSettings.defaultNotesChunkTokens
@@ -190,7 +256,9 @@ struct MeetingEvalTests {
             let started = clock.now
             let notes: NotesResult
             do {
-                notes = try await pipeline.run(utterances: utterances)
+                // The length of the recording, as the app passes the meeting's length (the topic limit).
+                notes = try await pipeline.run(
+                    utterances: utterances, durationMs: Int((result.audioSeconds * 1000).rounded()))
             } catch {
                 await Self.unloadAndWait(runtime)
                 throw error
@@ -206,6 +274,7 @@ struct MeetingEvalTests {
                 status: notes.status.rawValue, chunkCount: notes.chunkCount, verifiedPoints: notes.verifiedPointCount,
                 dropped: notes.droppedCount, failedChunks: notes.failedChunks.count, reduceFailed: notes.reduceFailed,
                 markdown: notes.markdown ?? "")
+            try EvalResultWriter.writeNotes(notes.markdown ?? "", named: name, generation: 1, to: outDirectory)
             let events = traceEvents.withLock { $0 }
             let balance = NotesTrace.balance(of: events)
             let traceURL = try EvalResultWriter.write(NotesTraceFile(recording: name, events: events), to: outDirectory)

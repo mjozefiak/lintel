@@ -1,15 +1,18 @@
 import Foundation
 import LintelCore
 
-/// Writes the notes. The Markdown is composed here from verified points. What is guaranteed:
-/// - the headings, labels, participants and the person and due-date wording are the code's own;
+/// Writes the notes of the built-in track. The verified structure (`NotesGuard.ReduceVerdict`) is mapped onto a
+/// `NotesLayout` and `NotesLayoutComposer` renders it, so the order of the sections, the headings, the
+/// short-meeting rule and the clean-up of the text are the ones of every other track. What is guaranteed:
+/// - the headings of the sections, the participants and the person and due-date wording are the code's own;
 /// - every bullet is a verified point's text (checked against its quote; a point that failed is not shown), without
-///   a time; a task is a checklist item with its owner and due date; the order of the sections is Summary,
-///   Decisions, Action items, Topics discussed (the findings REDUCE chose, `NotesGuard.ReduceVerdict.keyPoints`),
-///   Open questions, Participants;
-/// - the summary paragraph is the model's paragraph, which is the one piece of free model wording that can
-///   appear, and only after `NotesGuard.summaryIsFaithful` found no name, number, date or negation in it that the
-///   verified material lacks (a paraphrase is possible); it is never composed from points or quotes;
+///   a time; a next step is a checklist item with its owner and due date when they were said; the order is the
+///   topics, Decisions made, Next steps, Open questions, Participants (no intro: the model writes none, owner
+///   decision 2026-11-26);
+/// - the topic names are the only free model wording, and only after `NotesGuard` found no name, number, date or
+///   negation in them that the verified material lacks (a paraphrase is possible); they are never composed from
+///   points or quotes. Findings without a name (the old `FINDINGS` list, or the code's order when
+///   REDUCE failed) get the code's heading `Labels.keyPoints`;
 /// - everything goes through `NotesMarkdown`, the same allow-list renderer the export uses, so no image, link,
 ///   HTML or network resource can appear, and a leading `#`, `-` or `1.` of the paragraph cannot become a
 ///   heading or a list.
@@ -19,7 +22,6 @@ import LintelCore
 /// opened or sent.
 enum NotesComposer {
     struct Labels: Sendable, Equatable {
-        var summary: String
         var keyPoints: String
         var decisions: String
         var tasks: String
@@ -28,15 +30,21 @@ enum NotesComposer {
         var person: String
         var due: String
         var nothing: String
+        /// The headings of the topic layout (`NotesLayout`, spec `2026-11-25-meeting-notes-structure`).
+        var decisionsMade: String
+        var nextSteps: String
+        var otherTopic: String
 
         static let polish = Labels(
-            summary: "Podsumowanie", keyPoints: "Omówione tematy", decisions: "Decyzje", tasks: "Zadania",
-            questions: "Otwarte kwestie", participants: "Uczestnicy", person: "osoba", due: "termin",
-            nothing: "W nagraniu nie znaleziono decyzji, zadań ani otwartych kwestii.")
+            keyPoints: "Omówione tematy", decisions: "Decyzje", tasks: "Zadania", questions: "Otwarte kwestie",
+            participants: "Uczestnicy", person: "osoba", due: "termin",
+            nothing: "W nagraniu nie znaleziono decyzji, zadań ani otwartych kwestii.",
+            decisionsMade: "Podjęte decyzje", nextSteps: "Następne kroki", otherTopic: "Inne")
         static let english = Labels(
-            summary: "Summary", keyPoints: "Topics discussed", decisions: "Decisions", tasks: "Action items",
-            questions: "Open questions", participants: "Participants", person: "owner", due: "due",
-            nothing: "No decisions, action items or open questions were found in the recording.")
+            keyPoints: "Topics discussed", decisions: "Decisions", tasks: "Action items", questions: "Open questions",
+            participants: "Participants", person: "owner", due: "due",
+            nothing: "No decisions, action items or open questions were found in the recording.",
+            decisionsMade: "Decisions", nextSteps: "Next steps", otherTopic: "Other")
 
         /// Labels in the language of the transcript; `fallback` when the text does not tell.
         static func forLanguage(_ language: NotesLanguage, fallback: NotesLanguage = .english) -> Labels {
@@ -47,65 +55,75 @@ enum NotesComposer {
         }
     }
 
+    /// `durationMs` is the length of the meeting (the short-meeting rule of `NotesLayout`).
     static func markdown(
-        verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels
+        verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels, durationMs: Int? = nil
     ) -> String {
-        var lines: [String] = []
-        func heading(_ title: String) {
-            if !lines.isEmpty { lines.append("") }
-            lines.append("## " + title)
-            lines.append("")
-        }
-        func bullets(_ items: [String], checklist: Bool = false) {
-            lines.append(contentsOf: items.map { (checklist ? "- [ ] " : "- ") + $0 })
-        }
-
-        if let summary = shownSummary(of: verdict) {
-            heading(labels.summary)
-            lines.append(summary)
-        }
-        if !verdict.decisions.isEmpty {
-            heading(labels.decisions)
-            bullets(verdict.decisions.map { item($0, labels: labels) })
-        }
-        if !verdict.tasks.isEmpty {
-            heading(labels.tasks)
-            bullets(verdict.tasks.map { item($0, labels: labels) }, checklist: true)
-        }
-        if !verdict.keyPoints.isEmpty {
-            heading(labels.keyPoints)
-            bullets(verdict.keyPoints.map { item($0, labels: labels) })
-        }
-        if !verdict.questions.isEmpty {
-            heading(labels.questions)
-            bullets(verdict.questions.map { item($0, labels: labels) })
-        }
-        if lines.isEmpty { lines.append(labels.nothing) }
-        let names = participants.map(flat).filter { !$0.isEmpty && !NotesGuard.isGenericLabel($0) }
-        if !names.isEmpty {
-            heading(labels.participants)
-            lines.append(inertParagraph(names.joined(separator: ", ")))
-        }
-        return NotesMarkdown.render(lines.joined(separator: "\n"))
+        NotesLayoutComposer.markdown(
+            layout: layout(of: verdict, participants: participants, labels: labels, durationMs: durationMs),
+            durationMs: durationMs, labels: labels)
     }
 
-    /// The paragraph `markdown` shows under the summary heading; `nil` when it shows none.
-    static func shownSummary(of verdict: NotesGuard.ReduceVerdict) -> String? {
-        guard let summary = verdict.summary.map({ inertParagraph(flat($0)) }), !summary.isEmpty else { return nil }
-        return summary
+    /// The layout with the topics `shownKeyPoints` gives, so the Markdown shows exactly those points.
+    static func layout(
+        of verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels, durationMs: Int? = nil
+    ) -> NotesLayout {
+        var layout = unarranged(verdict, participants: participants, labels: labels)
+        layout.topics = shownKeyPoints(of: verdict, labels: labels, durationMs: durationMs).map {
+            .init(name: $0.name, points: $0.points.map(\.text), isOther: $0.isOther)
+        }
+        return layout
     }
 
-    /// The point's text and, for a task, its owner and due date, on one line. No time: the notes are a summary and
-    /// the times stay in the transcript.
-    private static func item(_ point: NotesPoint, labels: Labels) -> String {
-        var line = withoutTime(withoutCheckbox(flat(point.text)))
-        if point.kind == .task {
-            var details: [String] = []
-            if let person = point.person.map(flat), !person.isEmpty { details.append("\(labels.person): \(person)") }
-            if let due = point.due.map(flat), !due.isEmpty { details.append("\(labels.due): \(due)") }
-            if !details.isEmpty { line += " — " + details.joined(separator: ", ") }
+    /// The topics with the verified points `markdown` shows, in the order it shows them (the arrangement of
+    /// `NotesLayout.shownTopics`: the short-meeting list, one-point topics joined into "Other").
+    static func shownKeyPoints(
+        of verdict: NotesGuard.ReduceVerdict, labels: Labels, durationMs: Int?
+    ) -> [NotesGuard.ReduceVerdict.Topic] {
+        let short = unarranged(verdict, participants: [], labels: labels).isShortMeeting(durationMs: durationMs)
+        return shown(verdict, labels: labels, short: short)
+    }
+
+    private static func unarranged(
+        _ verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels
+    ) -> NotesLayout {
+        NotesLayout(
+            intro: nil,
+            topics: named(verdict.topics, labels: labels).map {
+                .init(name: $0.name, points: $0.points.map(\.text), isOther: $0.isOther)
+            },
+            decisions: verdict.decisions.map(\.text),
+            nextSteps: verdict.tasks.map { .init(text: $0.text, person: $0.person, due: $0.due) },
+            openQuestions: verdict.questions.map(\.text), participants: participants)
+    }
+
+    private static func shown(
+        _ verdict: NotesGuard.ReduceVerdict, labels: Labels, short: Bool
+    ) -> [NotesGuard.ReduceVerdict.Topic] {
+        var topics = NotesLayout.arranged(
+            named(verdict.topics, labels: labels).map { (name: $0.name, isOther: $0.isOther, points: $0.points) },
+            short: short
+        )
+        .map { NotesGuard.ReduceVerdict.Topic(name: $0.name, points: $0.points, isOther: $0.isOther) }
+        // "Other" alone is not a topic layout (every named topic was refused or held one point): its points get
+        // the code's heading, like the findings without a name.
+        if topics.count == 1, topics[0].isOther {
+            topics[0].name = labels.keyPoints
+            topics[0].isOther = false
         }
-        return line
+        return topics
+    }
+
+    /// A topic without a name gets the code's heading, so a meeting that is not short has no list outside every
+    /// heading (issue #303).
+    private static func named(
+        _ topics: [NotesGuard.ReduceVerdict.Topic], labels: Labels
+    ) -> [NotesGuard.ReduceVerdict.Topic] {
+        topics.map { topic in
+            var topic = topic
+            if topic.name == nil, !topic.isOther { topic.name = labels.keyPoints }
+            return topic
+        }
     }
 
     /// The paragraph without a leading marker that the renderer would read as a heading, a list or a quote.
@@ -121,18 +139,6 @@ enum NotesComposer {
                 return String(trimmed)
             }
         }
-    }
-
-    /// A leading `[ ]` or `[x]` the model wrote: the checklist marker is the code's, only on tasks.
-    private static func withoutCheckbox(_ text: String) -> String {
-        var result = Substring(text)
-        while let match = result.prefixMatch(of: /\[[ xX]\][ ]*/) { result = result[match.range.upperBound...] }
-        return String(result)
-    }
-
-    /// A time the model left at the end of a point (`[10:15]`, `(10:15)`): the notes show no times.
-    private static func withoutTime(_ text: String) -> String {
-        text.replacing(/[ ]*[\[(]\d{1,2}(?::\d{2}){1,2}[\])][ ]*$/, with: "")
     }
 
     private static func flat(_ text: String) -> String {

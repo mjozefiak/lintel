@@ -62,7 +62,8 @@ func makeContext(
         path: "lintel-notes-tests-\(UUID().uuidString)", directoryHint: .isDirectory),
     settings: MemorySettings = MemorySettings(),
     keychain: any KeychainClient = CountingKeychain(),
-    noteSources: @escaping @MainActor @Sendable () -> [any NoteSource] = { [] }
+    noteSources: @escaping @MainActor @Sendable () -> [any NoteSource] = { [] },
+    clock: any Clock<Duration> = ContinuousClock()
 ) -> PluginContext {
     PluginContext(
         storageDirectory: storage,
@@ -74,7 +75,7 @@ func makeContext(
         events: NoEvents(),
         workspace: NoWorkspace(),
         permissions: NoPermissions(),
-        clock: ContinuousClock(),
+        clock: clock,
         noteSources: noteSources
     )
 }

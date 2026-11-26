@@ -12,6 +12,7 @@ struct MeetingsSettings: Sendable {
         static let speechModelFolder = "speechModelFolder"
         static let diarizationModelFolder = "diarizationModelFolder"
         static let inputDevice = "inputDevice"
+        static let inputDeviceName = "inputDeviceName"
         static let voiceProcessing = "voiceProcessing"
         static let systemAudio = "systemAudio"
         static let diarization = "diarization"
@@ -25,6 +26,11 @@ struct MeetingsSettings: Sendable {
         static let qaProviderScenario = "qaProviderScenario"
         static let qaAccountName = "qaAccountName"
         static let qaProviderBinary = "qaProviderBinary"
+        static let qaNotesDownload = "qaNotesDownload"
+        static let qaAudio = "qaAudio"
+        static let qaMicWAV = "qaMicWAV"
+        static let qaSystemWAV = "qaSystemWAV"
+        static let qaSpoolDirectory = "qaSpoolDir"
         static let notesChunkTokens = "notesChunkTokens"
         static let notesReduceInputTokens = "notesReduceInputTokens"
         static let suggestMeetings = "suggestMeetings"
@@ -87,7 +93,12 @@ struct MeetingsSettings: Sendable {
 
     // MARK: Notes
 
-    var notesEnabled: Bool { settings.bool(Key.notesEnabled, default: false) }
+    /// Automatic notes after each meeting, written by the built-in model on this Mac unless the user chose a provider.
+    /// On by default since issue #252 (owner decision 2026-11-24); an install from before keeps its old value `false`
+    /// (`NotesDefaultMigration` in `LintelApp` pins it). The model is never downloaded without a click.
+    static let defaultNotesEnabled = true
+
+    var notesEnabled: Bool { settings.bool(Key.notesEnabled, default: Self.defaultNotesEnabled) }
 
     /// The built-in notes model; the default one (the smallest) when none is chosen, the stored id left the
     /// catalog or the model no longer fits this Mac's memory.
@@ -250,8 +261,20 @@ struct MeetingsSettings: Sendable {
         }
     }
 
-    func setInputDevice(_ uid: String?) {
+    /// The chosen device's name as Settings showed it, kept so the message "Microphone … is unavailable" can name a
+    /// device that is unplugged; `nil` when the choice predates the name (the UID may still tell, for USB).
+    var inputDeviceName: String? {
+        guard let name = settings.string(Key.inputDeviceName), !name.isEmpty else { return nil }
+        return name
+    }
+
+    func setInputDevice(_ uid: String?, name: String? = nil) {
         if let uid { settings.set(uid, for: Key.inputDevice) } else { settings.removeValue(for: Key.inputDevice) }
+        if uid != nil, let name, !name.isEmpty {
+            settings.set(name, for: Key.inputDeviceName)
+        } else {
+            settings.removeValue(for: Key.inputDeviceName)
+        }
     }
 
     func setVoiceProcessing(_ value: Bool) { settings.set(value, for: Key.voiceProcessing) }
@@ -316,6 +339,37 @@ struct MeetingsSettings: Sendable {
         #endif
     }
 
+    /// DEBUG only: the settings of a `--qa` run's meeting audio, `nil` in every other run. `AppEnvironment.qa` always
+    /// sets `plugins.meetings.qaAudio` (a `--qa-setting` cannot turn it off), plus the WAV files and the spool folder
+    /// when `--qa-meeting-mic-wav`, `--qa-meeting-system-wav` and `--qa-meeting-spool-dir` are given. While it is set
+    /// the plugin never builds a real microphone, system-audio tap or tone player (`QAAudio`).
+    var qaAudio: QAAudioSettings? {
+        #if DEBUG
+        guard settings.bool(Key.qaAudio, default: false) else { return nil }
+        // An empty path means no file: `AppEnvironment.qaAudioSettings` writes one so an earlier run's path is not
+        // kept.
+        func path(_ key: String) -> String? { settings.string(key).flatMap { $0.isEmpty ? nil : $0 } }
+        return QAAudioSettings(
+            micWAV: path(Key.qaMicWAV).map { URL(filePath: $0) },
+            systemWAV: path(Key.qaSystemWAV).map { URL(filePath: $0) },
+            spoolDirectory: path(Key.qaSpoolDirectory).map { URL(filePath: $0, directoryHint: .isDirectory) }
+        )
+        #else
+        nil
+        #endif
+    }
+
+    /// DEBUG only (`--qa-setting plugins.meetings.qaNotesDownload=missing|partial|downloading|offline|noSpace|installed`):
+    /// the state the "Notes on this Mac" offer of the `meetings.setup` step shows, with nothing downloaded or read
+    /// from the disk (the free space of `noSpace` is invented). Release builds never read it.
+    var qaNotesDownload: NotesDownloadQAState? {
+        #if DEBUG
+        settings.string(Key.qaNotesDownload).flatMap(NotesDownloadQAState.init(rawValue:))
+        #else
+        nil
+        #endif
+    }
+
     /// DEBUG only (`--qa-setting plugins.meetings.qaProviderStatus=ready|notInstalled|notSignedIn|incompatibleVersion`):
     /// the state the provider's row and banner show, with no process started. Release builds never read it.
     var qaProviderStatus: ProviderStatus? {
@@ -331,6 +385,18 @@ struct MeetingsSettings: Sendable {
     func setRetentionDays(_ days: Int) { settings.set(max(0, days), for: Key.retentionDays) }
     func setKeepAudio(_ value: Bool) { settings.set(value, for: Key.keepAudio) }
     func setOrphanAudioDays(_ days: Int) { settings.set(days, for: Key.orphanAudioDays) }
+}
+
+/// What `MeetingsSettings.qaAudio` reads: the files a `--qa` run plays as the two tracks (`nil`: silence).
+struct QAAudioSettings: Sendable, Equatable {
+    var micWAV: URL?
+    var systemWAV: URL?
+    var spoolDirectory: URL?
+}
+
+/// The states `plugins.meetings.qaNotesDownload` (DEBUG only) can force on the "Notes on this Mac" offer.
+enum NotesDownloadQAState: String, Sendable {
+    case missing, partial, downloading, offline, noSpace, installed
 }
 
 /// The external provider and model that write the notes: the user's choice in settings, which is the consent.

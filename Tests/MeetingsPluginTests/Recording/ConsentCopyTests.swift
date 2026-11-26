@@ -94,7 +94,7 @@ import Testing
         #expect((row["c"] as Int64?) == nil)
         #expect(
             try queue.read { try migrator.appliedIdentifiers($0) } == [
-                "v1-meetings", "v2-consent", "v3-notes-provider",
+                "v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash",
             ])
     }
 

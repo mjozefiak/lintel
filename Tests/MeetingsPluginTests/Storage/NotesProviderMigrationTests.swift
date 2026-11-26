@@ -58,7 +58,7 @@ import Testing
         try migrator.migrate(queue)
         #expect(
             try queue.read { try migrator.appliedIdentifiers($0) }
-                == ["v1-meetings", "v2-consent", "v3-notes-provider"])
+                == ["v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash"])
         let row = try #require(
             try queue.read {
                 try Row.fetchOne(
@@ -95,7 +95,7 @@ import Testing
         try MeetingsStore.migrator.migrate(queue)
         #expect(
             try queue.read { try migrator.appliedIdentifiers($0) }
-                == ["v1-meetings", "v2-consent", "v3-notes-provider"])
+                == ["v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash"])
         let row = try #require(
             try queue.read {
                 try Row.fetchOne($0, sql: "SELECT notes_provider AS p, notes_provider_model AS m FROM meeting")

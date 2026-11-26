@@ -25,7 +25,9 @@ public final class SnapshotBackdropHostingView<Content: View>: NSHostingView<Con
         guard viewBounds.width > 0, viewBounds.height > 0,
             let context = NSGraphicsContext(bitmapImageRep: bitmap)
         else { return }
-        let scale = CGFloat(bitmap.pixelsWide) / viewBounds.width
+        // The context of a bitmap rep works in the rep's `size` (points), not in its pixels: a rep of 2x pixels
+        // and `size` equal to the view's bounds needs no scaling, one whose size is its pixels needs 2.
+        let scale = bitmap.size.width / viewBounds.width
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = context

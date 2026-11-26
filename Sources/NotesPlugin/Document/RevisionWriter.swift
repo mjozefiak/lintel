@@ -392,6 +392,9 @@ final class RevisionWriter: Sendable {
         let log: any NotesLogging
         var docID: Int64?
         var seed: SeedPlan?
+        /// The layer id, once known (the seed plan's, or the document's after the first reload): `mine` takes only
+        /// `human` revisions.
+        var layer: String?
         var needsReload = false
         var headID: Int64 = 0
         var headBody = ""
@@ -419,7 +422,15 @@ final class RevisionWriter: Sendable {
                 needsReload = true
             case .seed(let plan):
                 seed = plan
+                layer = plan.layerID
             }
+        }
+
+        /// My notes (`mine`) are the user's own: any other author is refused before anything is written.
+        private func requireAuthor(_ author: String) throws {
+            guard layer == NotesStore.mineLayer, author != NoteAuthor.human.rawValue else { return }
+            log.error(NotesLogEvent("write", code: NotesError.mineIsHumanOnly.code, key: keyForLog))
+            throw NotesError.mineIsHumanOnly
         }
 
         private var logKey: String?
@@ -441,6 +452,7 @@ final class RevisionWriter: Sendable {
             if let reason = store.blockedReason { throw reason }
             if docID == nil {
                 guard let plan = seed else { throw NotesError.guardRejected(rule: "seed") }
+                try requireAuthor(plan.snapshot.author.rawValue)
                 if let current = await sourceStartedAtMs?(), current != plan.startedAtMs {
                     // The recording was recreated since the editor rendered it: its text is not this note's.
                     log.error(NotesLogEvent("seed", code: "startedAtChanged", key: keyForLog))
@@ -465,6 +477,7 @@ final class RevisionWriter: Sendable {
                 throw NotesError.guardRejected(rule: "noDocument")
             }
             logKey = document.key.rawValue
+            layer = document.layer
             let chain = try store.revisions(of: docID)
             attribution = BlockAttribution(
                 chain: chain.filter { $0.state == .applied }.map { ($0.author, $0.body) })
@@ -551,6 +564,7 @@ final class RevisionWriter: Sendable {
 
         private func seedAndWrite(_ text: String, serial: Int) async throws -> Outcome {
             guard let plan = seed else { throw NotesError.guardRejected(rule: "seed") }
+            try requireAuthor(plan.snapshot.author.rawValue)
             let current = await sourceStartedAtMs?()
             if let existing = try store.liveDocument(key: plan.key, layer: plan.layerID) {
                 if let started = existing.sourceStartedAtMs, started != plan.startedAtMs {
@@ -642,6 +656,7 @@ final class RevisionWriter: Sendable {
             if let reason = store.blockedReason { throw reason }
             guard let docID else { throw NotesError.guardRejected(rule: "noDocument") }
             try reloadIfNeeded()
+            try requireAuthor(author)
             if let expectingHead, expectingHead != headID { throw NotesError.casConflict }
             if state == .applied {
                 return try storeApplied(author: author, body: body, summary: summary, metaJSON: metaJSON, blocks: nil)
@@ -662,6 +677,7 @@ final class RevisionWriter: Sendable {
             guard let proposal = try store.revision(id: proposalID), proposal.docID == docID,
                 proposal.state == .proposed
             else { throw NotesError.guardRejected(rule: "proposalTarget") }
+            try requireAuthor(proposal.author)
             let stored =
                 StoredBlocks.decode(proposal.blocksJSON)
                 ?? attribution.stored(body: proposal.body, author: proposal.author, previous: headBlocks)
@@ -727,6 +743,7 @@ final class RevisionWriter: Sendable {
                 return .versionOnly
             }
             let author = layer.author.rawValue
+            try requireAuthor(author)
             var sourceBlocks = BlockAttribution.seeded(layer: layer)
             let texts = MarkdownBlocks.split(layer.markdown)
             for index in sourceBlocks.blocks.indices where index < texts.count {

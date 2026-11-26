@@ -29,6 +29,23 @@ struct ProviderJobFailure: Equatable, Sendable {
     var startedAt: Date
 }
 
+/// The persisted side of `NotesBoard.Snapshot.awaitingModel` (`meeting.notes_awaiting_model`, #295), off the main
+/// actor. A database error only means the wait is not kept across a restart: it is logged nowhere with content and
+/// never stops the notes.
+enum AwaitingMarker {
+    @concurrent static func read(_ store: MeetingsStore) async -> [Int64] {
+        (try? store.meetingsAwaitingNotesModel()) ?? []
+    }
+
+    @concurrent static func mark(_ store: MeetingsStore, _ id: Int64) async {
+        try? store.markNotesAwaitingModel(id)
+    }
+
+    @concurrent static func clear(_ store: MeetingsStore, _ id: Int64? = nil) async {
+        try? store.clearNotesAwaitingModel(id)
+    }
+}
+
 /// What the library list, its actions and the meeting windows may read from any thread: whether notes are on,
 /// whether their model is missing, and what each running job does. Written by `NotesService` on the main actor.
 final class NotesBoard: Sendable {
@@ -38,9 +55,10 @@ final class NotesBoard: Sendable {
         var modelMissing = false
         var phases: [Int64: NotesJobPhase] = [:]
         /// Meetings that became `ready` in this session while notes were on and the model was missing. Only they
-        /// show "Notes model needed": older meetings and meetings recorded while notes were off show nothing,
-        /// and nothing is written for them when the model arrives ("Regenerate" does it on request). In memory:
-        /// a restart forgets the badge.
+        /// show "Notes model needed": older meetings and meetings recorded while notes were off show nothing. When
+        /// the built-in model arrives (and no provider is chosen) they are queued and get their notes; notes switched
+        /// off or a chosen provider end the wait. Also kept in `meeting.notes_awaiting_model` and read back when the
+        /// service starts, so a restart (quit, crash, update) does not lose the wait (#295).
         var awaitingModel: Set<Int64> = []
         /// How the last job of the chosen provider ended when it did not write notes (Settings → Meetings shows it
         /// with "Try Again" and "Write on This Mac"). In memory: a restart forgets it. Cleared by the next job of that
@@ -86,12 +104,14 @@ final class NotesBoard: Sendable {
 ///   transcript is never written. A cancelled job (the plugin is switched off, the app quits) puts the status
 ///   back as it was and writes nothing else; the one documented partial result is the pipeline's own `partial`.
 /// - The model must be downloaded already; nothing is fetched here. A missing model leaves the notes as they
-///   were and the board says so (the library offers "Download Notes Model").
+///   were and the board says so (the library offers "Download Notes Model"). While a meeting of this session waits
+///   for the model, its file is looked for every `modelWatchInterval`, so a download from any screen (the setup
+///   step, Settings, Models) writes the waiting notes without a restart.
 /// - A crash while `running` is settled at the next open (`NotesRecovery`).
 ///
 /// The transcript and the notes never reach a log: only counts and statuses do.
 @MainActor
-final class NotesService {
+final class NotesService: ProviderNotesControl {
     struct Dependencies {
         var library: MeetingsLibrary
         var settings: MeetingsSettings
@@ -106,10 +126,17 @@ final class NotesService {
         var providerRunner: ProviderRunner?
         /// Tests shorten the whole-transcript track's limits.
         var configureWhole: @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in }
+        /// Writes `meeting.notes_awaiting_model` (#295). Tests hold it to let the model arrive while the wait is
+        /// being saved (#308).
+        var markAwaiting: @Sendable (MeetingsStore, Int64) async -> Void = { store, id in
+            await AwaitingMarker.mark(store, id)
+        }
         var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
         var now: @Sendable () -> Date = { Date() }
         /// How long `shutDown` waits for a job that does not stop (a model load cannot be cancelled).
         var shutdownLimit: Duration = .seconds(5)
+        /// How often the model file is looked for while a meeting waits for it (a few file sizes are read).
+        var modelWatchInterval: Duration = .seconds(15)
         /// `PluginContext.openModels`: a "Regenerate" without the notes model leads to its download.
         var openModels: @MainActor (_ packageID: String?) -> Void = { _ in }
         var changed: @Sendable () -> Void = {}
@@ -133,11 +160,17 @@ final class NotesService {
     private var current: Job?
     private var worker: Task<Void, Never>?
     private var jobTask: Task<Void, Never>?
+    /// Looks for the model while a meeting waits for it (`watchForModel`).
+    private var modelWatch: Task<Void, Never>?
     /// The provider choice the running job started with (`nil` for a built-in job).
     private var runningSelection: NotesProviderSelection?
     /// Meetings whose notes must be written again right after the running job (a regenerate request, or a rename
     /// that made the finished notes `stale`).
     private var rerun: Set<Int64> = []
+    /// Meetings that were waiting for the notes model when it arrived while they were the running job (#308): the
+    /// job is written again right after this one as an automatic job, so a wait that ended while it was being saved
+    /// is not lost. Not a request: the re-run obeys the notes switch and the provider choice.
+    private var rerunAutomatic: Set<Int64> = []
     /// Bumped by `shutDown`: a job that did not stop in time must not touch the state of a later start.
     private var epoch = 0
     private var accepting = false
@@ -152,7 +185,21 @@ final class NotesService {
     func start() async {
         accepting = true
         deps.providerRunner?.sweepStaleWorkspaces()
+        await restoreAwaiting()
         await refreshAvailability()
+        if !board.snapshot.awaitingModel.isEmpty { watchForModel() }
+    }
+
+    /// #295: the meetings that were waiting for the notes model when the app last ran wait again. Read before
+    /// `refreshAvailability`, which queues them at once when the model is already on this Mac and ends the wait when
+    /// notes are off or a provider is chosen.
+    private func restoreAwaiting() async {
+        guard deps.settings.notesEnabled, deps.settings.notesProviderSelection == nil,
+            let store = deps.library.store
+        else { return }
+        let ids = await AwaitingMarker.read(store)
+        guard !ids.isEmpty else { return }
+        board.update { $0.awaitingModel.formUnion(ids) }
     }
 
     /// The plugin is switched off or the app quits: queued jobs are dropped, the running one is cancelled and
@@ -163,7 +210,10 @@ final class NotesService {
         accepting = false
         queue = []
         rerun = []
+        rerunAutomatic = []
         epoch += 1
+        modelWatch?.cancel()
+        modelWatch = nil
         jobTask?.cancel()
         worker?.cancel()
         let worker = worker
@@ -189,6 +239,7 @@ final class NotesService {
             deps.changed()
         }
         rerun = []
+        rerunAutomatic = []
         jobTask?.cancel()
     }
 
@@ -210,16 +261,61 @@ final class NotesService {
 
     /// Re-reads the notes switch and whether the chosen model is downloaded (Settings calls it after a
     /// download, a removal or a change of the switch or the model).
+    /// A built-in model that arrived queues the meetings that waited for it (notes on, no provider chosen). Notes
+    /// switched off or a chosen provider end the wait: those meetings are no longer written by themselves (as when a
+    /// provider job runs), so the model watch stops at its next look.
     func refreshAvailability() async {
         let enabled = deps.settings.notesEnabled
         // A chosen provider writes the notes, so the built-in model is not missing.
-        var installed = deps.settings.notesProviderSelection != nil
+        let provider = deps.settings.notesProviderSelection != nil
+        var installed = provider
         if !installed { installed = await deps.modelFile(deps.settings.builtInLLMModel) != nil }
+        // Read again after the wait: the switch or the provider may have changed meanwhile.
+        let waits = deps.settings.notesEnabled && deps.settings.notesProviderSelection == nil
+        var arrived: [Int64] = []
         let changed = board.update {
             $0.enabled = enabled
             $0.modelMissing = !installed
+            if !waits {
+                $0.awaitingModel = []
+            } else if installed, enabled, !provider {
+                arrived = $0.awaitingModel.sorted()
+                $0.awaitingModel = []
+            }
         }
         if changed { deps.changed() }
+        // The wait is over for good (notes off, or a provider writes them): forget it on disk too.
+        if !waits, let store = deps.library.store { await AwaitingMarker.clear(store) }
+        queueArrivals(arrived)
+    }
+
+    /// The meetings that waited for the model get their notes, oldest first, as automatic jobs (so the switch is
+    /// read again when each one runs).
+    private func queueArrivals(_ ids: [Int64]) {
+        guard !ids.isEmpty else { return }
+        deps.logger.notice("Notes model arrived: \(ids.count, privacy: .public) meetings queued")
+        for id in ids { enqueueArrival(Job(meetingID: id, requested: false)) }
+    }
+
+    /// While a meeting of this session waits for the model, looks for its file every `modelWatchInterval`; ends when
+    /// nothing waits any more, or at `shutDown`.
+    private func watchForModel() {
+        guard modelWatch == nil, accepting else { return }
+        let epoch = epoch
+        let interval = deps.modelWatchInterval
+        let sleep = deps.sleep
+        modelWatch = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await sleep(interval) } catch { return }
+                guard let self, epoch == self.epoch else { return }
+                await self.refreshAvailability()
+                guard epoch == self.epoch else { return }
+                if self.board.snapshot.awaitingModel.isEmpty {
+                    self.modelWatch = nil
+                    return
+                }
+            }
+        }
     }
 
     // MARK: Requests
@@ -267,6 +363,18 @@ final class NotesService {
         if worker == nil { worker = Task { await self.drain() } }
     }
 
+    /// A meeting whose notes waited for the model and whose model just arrived. When it is the running job (the
+    /// model came while that job was saving its wait, #308), the drop is not a duplicate: the job is written again
+    /// right after this one, and its wait stays on disk until then.
+    private func enqueueArrival(_ job: Job) {
+        guard accepting else { return }
+        if current?.meetingID == job.meetingID {
+            rerunAutomatic.insert(job.meetingID)
+            return
+        }
+        enqueue(job)
+    }
+
     private func drain() async {
         let epoch = epoch
         while !Task.isCancelled, epoch == self.epoch, !queue.isEmpty {
@@ -284,7 +392,13 @@ final class NotesService {
             current = nil
             board.update { $0.phases[job.meetingID] = nil }
             deps.changed()
-            if rerun.remove(job.meetingID) != nil { enqueue(Job(meetingID: job.meetingID, requested: true)) }
+            let requested = rerun.remove(job.meetingID) != nil
+            let automatic = rerunAutomatic.remove(job.meetingID) != nil
+            if requested {
+                enqueue(Job(meetingID: job.meetingID, requested: true))
+            } else if automatic {
+                enqueue(Job(meetingID: job.meetingID, requested: false))
+            }
         }
         if epoch == self.epoch { worker = nil }
     }
@@ -296,6 +410,18 @@ final class NotesService {
     // MARK: One job
 
     private func process(_ job: Job) async {
+        let epoch = epoch
+        await run(job)
+        // A wait that this job did not end again is not kept on disk. Not after `shutDown`: the board was emptied
+        // on purpose, the wait must survive the restart (#295). Not while this meeting is written again right after
+        // this job (the model arrived as the wait was being saved, #308): the re-run ends the wait.
+        guard epoch == self.epoch, !board.snapshot.awaitingModel.contains(job.meetingID),
+            !rerunAutomatic.contains(job.meetingID), let store = deps.library.store
+        else { return }
+        await AwaitingMarker.clear(store, job.meetingID)
+    }
+
+    private func run(_ job: Job) async {
         let id = job.meetingID
         guard let store = deps.library.store else { return }
         if !job.requested, !deps.settings.notesEnabled { return }
@@ -322,13 +448,22 @@ final class NotesService {
             }) {
                 deps.changed()
             }
+            if !job.requested { await deps.markAwaiting(store, id) }
             if job.requested { deps.openModels(model.id) }
+            if !board.snapshot.awaitingModel.isEmpty { watchForModel() }
             return
         }
+        var arrived: [Int64] = []
+        let enabled = deps.settings.notesEnabled && deps.settings.notesProviderSelection == nil
         board.update {
             $0.modelMissing = false
-            $0.awaitingModel = []
+            $0.awaitingModel.remove(id)
+            if enabled {
+                arrived = $0.awaitingModel.sorted()
+                $0.awaitingModel = []
+            }
         }
+        queueArrivals(arrived)
         guard let previous = try? store.beginNotes(id) else { return }
         setPhase(.queued, for: id)
 
@@ -343,7 +478,7 @@ final class NotesService {
         let outcome: Result<NotesResult, any Error>
         do {
             outcome = .success(
-                try await pipeline.run(utterances: utterances) { [weak self] event in
+                try await pipeline.run(utterances: utterances, durationMs: document.durationMs) { [weak self] event in
                     Task { @MainActor in self?.apply(event, to: id) }
                 })
         } catch {

@@ -10,6 +10,9 @@ extension NotesStore {
         migrator.registerMigration("v1-notes") { db in
             do { try createV1(db) } catch { throw NotesError.migrationFailed(step: "v1-notes") }
         }
+        migrator.registerMigration("v2-explorer") { db in
+            do { try createV2Explorer(db) } catch { throw NotesError.migrationFailed(step: "v2-explorer") }
+        }
         return migrator
     }
 
@@ -98,6 +101,54 @@ extension NotesStore {
                     INSERT INTO note_fts(rowid, title, body)
                         SELECT s.id, s.title, s.body FROM note_fts_source s
                         JOIN note_doc d ON d.id = s.id WHERE d.head_revision_id = new.id;
+                END;
+                """
+        )
+    }
+
+    /// `v2-explorer` (notes explorer spec, Data Model): Recently deleted and folders.
+    ///
+    /// - `note_doc.deleted_at` (Unix seconds, NULL = live; `TrashStamp`) is set on every layer document of a
+    ///   trashed note. `note_doc_live` stays as it is: a trashed overlay keeps its `(key, layer)` slot, so a
+    ///   restore puts it back.
+    /// - `note_folder` and `note_folder_entry` (one folder per note key; a cross-store key, never a foreign key).
+    /// - Trash leaves the search index: the view is recreated with `d.deleted_at IS NULL` (the folding SQL is the
+    ///   same frozen one), so the existing triggers never index a trashed document again, and `note_fts_trash`
+    ///   removes the row when `deleted_at` is set and puts it back from the view when it is cleared.
+    private static func createV2Explorer(_ db: Database) throws {
+        try db.execute(
+            sql: """
+                ALTER TABLE note_doc ADD COLUMN deleted_at REAL;
+                CREATE INDEX note_doc_deleted ON note_doc(deleted_at) WHERE deleted_at IS NOT NULL;
+                CREATE TABLE note_folder (
+                    id INTEGER PRIMARY KEY,
+                    uuid TEXT NOT NULL UNIQUE,
+                    name TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    sort REAL NOT NULL
+                );
+                CREATE TABLE note_folder_entry (
+                    key TEXT PRIMARY KEY,
+                    folder_id INTEGER NOT NULL REFERENCES note_folder(id) ON DELETE CASCADE,
+                    added_at REAL NOT NULL
+                );
+                CREATE INDEX note_folder_entry_on_folder_id ON note_folder_entry(folder_id);
+                """
+        )
+        let title = NotesFullTextFolding.frozenSQL("COALESCE(d.title_override, '')")
+        let body = NotesFullTextFolding.frozenSQL("r.body_markdown")
+        try db.execute(
+            sql: """
+                DROP VIEW note_fts_source;
+                CREATE VIEW note_fts_source AS
+                    SELECT d.id AS id, \(title) AS title, \(body) AS body
+                    FROM note_doc d JOIN note_revision r ON r.id = d.head_revision_id
+                    WHERE r.state = 'applied' AND d.deleted_at IS NULL;
+                CREATE TRIGGER note_fts_trash AFTER UPDATE OF deleted_at ON note_doc
+                WHEN old.deleted_at IS NOT new.deleted_at BEGIN
+                    DELETE FROM note_fts WHERE rowid = new.id;
+                    INSERT INTO note_fts(rowid, title, body)
+                        SELECT id, title, body FROM note_fts_source WHERE id = new.id;
                 END;
                 """
         )

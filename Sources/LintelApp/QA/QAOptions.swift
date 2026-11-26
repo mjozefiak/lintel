@@ -90,8 +90,9 @@ struct QAOptions: Equatable {
     /// microphone or any permission; `--qa-snapshot` then writes the HUD instead of the main window (`docs/qa.md`).
     var hud: QAHUDRequest?
     /// `--qa-meeting-mic-wav <path>` / `--qa-meeting-system-wav <path>`: 16 kHz mono WAV files played back as
-    /// the meeting's microphone and system tracks instead of real audio (meeting notes, step 1.5). Real
-    /// capture is never started in QA mode.
+    /// the meeting's microphone and system tracks (`AppEnvironment.qaAudioSettings`; a track without a file is
+    /// silence). Real capture is never started in QA mode: `AppEnvironment.qa` always switches the plugins to these
+    /// sources, and `RealAudioGuard` makes the real microphone, tap and tone player throw.
     var meetingMicWAV: URL?
     var meetingSystemWAV: URL?
     /// `--qa-meeting-spool-dir <path>`: folder for the encrypted spool of QA meetings instead of
@@ -134,6 +135,25 @@ struct QAOptions: Equatable {
     /// `--qa-updates beta` (and `pending`): the fake updater runs a `-beta.N` version, so the note shows.
     var updatesBeta = false
 
+    /// `--qa-gallery`: opens the design gallery window (every scene and state of the plugins, drawn by the real views over
+    /// fictional data; spec `2026-11-23-swiftui-design-gallery`) instead of the app's windows. With `--qa-snapshot` and
+    /// `--qa-quit-after` the window's content is written as a PNG. No plugin starts.
+    var showsGallery = false
+    /// `--qa-gallery-export <dir>`: draws the full matrix of every state (in the process's language) to
+    /// `<dir>/<scene>/<state>/<variant>.png` and quits. `--qa-gallery-scene <id>` limits it to one scene.
+    var galleryExport: URL?
+    var galleryScene: String?
+    /// `--qa-gallery-language en|pl`: the language the batch modes draw. It must be the language of the process, which
+    /// `-AppleLanguages "(pl)"` sets: texts are read from the process's language, not from the view.
+    var galleryLanguage: String?
+    /// `--qa-gallery-compare <dir>` / `--qa-gallery-record <dir>`: compares or writes the golden PNGs of the CI subset in
+    /// that language, with the gallery's renderer and diff, and quits (exit code 1 on a difference).
+    var galleryCompare: URL?
+    var galleryRecord: URL?
+
+    /// A gallery mode that draws and quits: no plugin or window of the app is started for it.
+    var runsGalleryBatch: Bool { galleryExport != nil || galleryCompare != nil || galleryRecord != nil }
+
     /// The file plugin's DEBUG-only fake home and its roots, which QA mode always sets
     /// (`AppEnvironment.qaFileIndexSettings`).
     /// The Windows plugin's DEBUG-only scripted files (`WindowsSettings.Key.qaScriptedFiles`), always on in QA mode.
@@ -145,6 +165,12 @@ struct QAOptions: Equatable {
     static let appsLiveActivityKey = "plugins.apps.qaLiveActivity"
     /// The Notes plugin's DEBUG-only fixtures key (`AppEnvironment.qaNotesSettings`).
     static let notesFixturesKey = "plugins.notes.qaFixtures"
+    /// The DEBUG-only keys that switch meetings and dictation to WAV files or silence (`AppEnvironment.qaAudioSettings`).
+    static let meetingsAudioKey = "plugins.meetings.qaAudio"
+    static let meetingsMicWAVKey = "plugins.meetings.qaMicWAV"
+    static let meetingsSystemWAVKey = "plugins.meetings.qaSystemWAV"
+    static let meetingsSpoolDirectoryKey = "plugins.meetings.qaSpoolDir"
+    static let dictationAudioKey = "plugins.dictation.qaAudio"
     static let meetingsAccountNameKey = "plugins.meetings.qaAccountName"
     static let meetingsProviderBinaryKey = "plugins.meetings.qaProviderBinary"
     /// Settings that `--qa-setting` reads as comma-separated lists.
@@ -213,6 +239,23 @@ struct QAOptions: Equatable {
                 guard let value = iterator.next() else { throw .missingValue(argument) }
                 guard let mode = MainWindowState.Mode(rawValue: value) else { throw .invalidValue(argument, value) }
                 options.windowMode = mode
+            case "--qa-gallery":
+                options.showsGallery = true
+            case "--qa-gallery-export":
+                options.galleryExport = URL(
+                    filePath: try Self.pathValue(argument, iterator.next()), directoryHint: .isDirectory)
+            case "--qa-gallery-compare":
+                options.galleryCompare = URL(
+                    filePath: try Self.pathValue(argument, iterator.next()), directoryHint: .isDirectory)
+            case "--qa-gallery-record":
+                options.galleryRecord = URL(
+                    filePath: try Self.pathValue(argument, iterator.next()), directoryHint: .isDirectory)
+            case "--qa-gallery-scene":
+                options.galleryScene = try Self.pathValue(argument, iterator.next())
+            case "--qa-gallery-language":
+                let value = try Self.pathValue(argument, iterator.next())
+                guard ["en", "pl"].contains(value) else { throw .invalidValue(argument, value) }
+                options.galleryLanguage = value
             case "--qa-onboarding":
                 options.showsOnboarding = true
             case "--qa-about":

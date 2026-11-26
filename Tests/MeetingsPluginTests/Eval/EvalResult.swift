@@ -12,6 +12,9 @@ struct EvalResult: Codable, Equatable, Sendable {
         var engine: String
         var language: String
         var codeVersion: String
+        /// Additive and optional: the file name of the result whose transcript a replay used
+        /// (`LINTEL_MEETING_EVAL_TRANSCRIPT`); absent for a run that recognised the audio itself.
+        var transcriptSource: String?
     }
 
     struct Segment: Codable, Equatable, Sendable {
@@ -77,9 +80,25 @@ struct EvalResult: Codable, Equatable, Sendable {
     var asr: ASR
     var diarization: Diarization?
     var notes: Notes?
+    /// Additive and optional: the capture counters of the run (numbers only), including the voice activity
+    /// detector statistics. Written only when the run had them.
+    var capture: CaptureCounters?
+    /// Additive and optional (spec 2026-11-25-meeting-speaker-names, step 0.1): the name each speaker label ended
+    /// with, for `scripts/meeting-eval/score.py` (`speakerNames`). Absent until the app names speakers (F1).
+    var speakerNames: [SpeakerName]?
+
+    /// One speaker label and the real name shown for it. `label` is the segment `speaker` label ("Ja", "Inni",
+    /// "Mówca N"), which is how the scorer joins names to words. `source`: default, self, user, platform, calendar,
+    /// transcript; `status`: confirmed, applied, suggested. Carries a name, so it never goes to logs or traces.
+    struct SpeakerName: Codable, Equatable, Sendable {
+        var label: String
+        var name: String
+        var source: String
+        var status: String
+    }
 
     private enum CodingKeys: String, CodingKey {
-        case schema, recording, audioSeconds, config, asr, diarization, notes
+        case schema, recording, audioSeconds, config, asr, diarization, notes, capture, speakerNames
     }
 
     init(
@@ -103,6 +122,8 @@ struct EvalResult: Codable, Equatable, Sendable {
         asr = try container.decode(ASR.self, forKey: .asr)
         diarization = try container.decodeIfPresent(Diarization.self, forKey: .diarization)
         notes = try container.decodeIfPresent(Notes.self, forKey: .notes)
+        capture = try container.decodeIfPresent(CaptureCounters.self, forKey: .capture)
+        speakerNames = try container.decodeIfPresent([SpeakerName].self, forKey: .speakerNames)
     }
 
     /// The optional sections are always written, as `null` when absent (the scorer reads the keys directly).
@@ -123,6 +144,8 @@ struct EvalResult: Codable, Equatable, Sendable {
         } else {
             try container.encodeNil(forKey: .notes)
         }
+        try container.encodeIfPresent(capture, forKey: .capture)
+        try container.encodeIfPresent(speakerNames, forKey: .speakerNames)
     }
 }
 
@@ -162,6 +185,23 @@ enum EvalResultWriter {
     @discardableResult
     static func write(_ trace: NotesTraceFile, to directory: URL) throws -> URL {
         try writeAtomically(try data(for: trace), named: "\(trace.recording).notes-trace.json", to: directory)
+    }
+
+    /// Writes `<directory>/<name>.notes.md` (`<name>.g<N>.notes.md` for a generation after the first) the same way.
+    @discardableResult
+    static func writeNotes(_ markdown: String, named name: String, generation: Int, to directory: URL) throws -> URL {
+        let file = generation <= 1 ? "\(name).notes.md" : "\(name).g\(generation).notes.md"
+        return try writeAtomically(Data(markdown.utf8), named: file, to: directory)
+    }
+
+    /// Writes `<directory>/<recording>.notes-whole.json` the same way.
+    @discardableResult
+    static func write(_ report: WholeNotesDropReport, to directory: URL) throws -> URL {
+        let file =
+            report.generation <= 1
+            ? "\(report.recording).notes-whole.json"
+            : "\(report.recording).g\(report.generation).notes-whole.json"
+        return try writeAtomically(try encoded(report), named: file, to: directory)
     }
 
     /// Writes `<directory>/<recording>.notes-rejections.json` the same way.

@@ -6,7 +6,18 @@ import LintelKit
 /// view draws. Advanced has no banner (prototype `set-advanced`); Models has its own (`ModelsPaneModel.banner`).
 enum ShellPaneBanners {
     /// General: "Ready · Press ⌘Space to open Lintel.", or attention when no main shortcut is set.
-    static func general(shortcut: String?) -> StatusDerivation.Banner {
+    static func general(shortcut: String?, launcherIsActive: Bool = true) -> StatusDerivation.Banner {
+        guard launcherIsActive else {
+            // No plugin searches, so the shortcut is not registered (owner decision 2026-11-24).
+            return StatusDerivation.Banner(
+                level: .neutral,
+                title: String(
+                    localized: "The launcher is off", comment: "Settings → General banner: no plugin searches"),
+                detail: String(
+                    localized: "Turn on Apps, Files or Window Management in Features to use the shortcut.",
+                    comment: "Settings → General banner detail: the main shortcut works once a search add-on is on"),
+                actions: [])
+        }
         guard let shortcut else {
             return StatusDerivation.Banner(
                 level: .attention,

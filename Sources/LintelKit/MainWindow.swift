@@ -4,6 +4,10 @@ import SwiftUI
 // Contract additions for the main window and the redesigned Settings (spec
 // `.ai/specs/2026-11-04-lintel-main-window.md`, ADR 0008). All of them are additive: every contribution that uses
 // them has an empty default, so a plugin written before them compiles unchanged.
+//
+// The notes explorer (spec `.ai/specs/2026-11-24-notes-explorer-main-window.md`, phase 1.1) adds the section's own
+// sidebar block (`WorkspaceSidebar`, `WorkspaceSection.sidebar`, default `nil`: one default row) and the route values
+// `showDictionary` and `showRecentlyDeleted` (`WorkspaceRoute`, no type change).
 
 /// A request to show one thing inside a workspace section, for example kind `openNote` with a note key.
 public struct WorkspaceRoute: Hashable, Sendable {
@@ -13,6 +17,54 @@ public struct WorkspaceRoute: Hashable, Sendable {
     public init(kind: String, id: String) {
         self.kind = kind
         self.id = id
+    }
+
+    /// The kinds the shell itself routes, besides a section's own. A section handles the kinds it knows and
+    /// answers `false` for the rest.
+    public enum Kind {
+        /// Shows a note in the Notes section; the id is a note key's raw value (`<plugin id>:<id>`).
+        public static let openNote = "openNote"
+        /// Shows the Dictionary page (Settings → Dictation's pointer row).
+        public static let showDictionary = "showDictionary"
+        /// Shows the Recently deleted view (the sidebar row and the Settings → Privacy & data pointer row).
+        public static let showRecentlyDeleted = "showRecentlyDeleted"
+    }
+
+    /// The route that opens the Dictionary page; the id is empty.
+    public static let showDictionary = WorkspaceRoute(kind: Kind.showDictionary, id: "")
+    /// The route that opens the Recently deleted view; the id is empty.
+    public static let showRecentlyDeleted = WorkspaceRoute(kind: Kind.showRecentlyDeleted, id: "")
+}
+
+/// What the shell tells a section's sidebar block each time it draws it.
+///
+/// A value, not an observable object: the shell calls `WorkspaceSidebar.makeView` from the body that reads the
+/// window's selection, so the block gets a fresh context on every render and `isSelected` is always current. A
+/// block that needs state of its own (which collection is highlighted) keeps it in its own `@Observable` model that
+/// the closure captures; the context only says whether the shell shows this section. New fields (a count, keyboard
+/// focus) can be added later without changing the `makeView` signature.
+public struct WorkspaceSidebarContext: Sendable {
+    /// `true` while the shell shows this section's page. A block turns its own highlight off when it is `false`
+    /// (the user opened another section's row, such as the Dictionary).
+    public let isSelected: Bool
+    /// Asks the shell to select this section, so a row of the block is a way into it.
+    public let activate: @MainActor @Sendable () -> Void
+
+    public init(isSelected: Bool, activate: @escaping @MainActor @Sendable () -> Void) {
+        self.isSelected = isSelected
+        self.activate = activate
+    }
+}
+
+/// The part of the main window's sidebar a section draws itself instead of one row (the notes explorer's
+/// collections, and later its folders). The shell stacks the active sections' blocks in `order` and draws one row
+/// with the section's `title` and `symbolName` for a section that contributes none (the Dictionary).
+public struct WorkspaceSidebar: Sendable {
+    /// The section's block, built from the context of this render (see `WorkspaceSidebarContext`).
+    public let makeView: @MainActor @Sendable (_ context: WorkspaceSidebarContext) -> AnyView
+
+    public init(makeView: @escaping @MainActor @Sendable (_ context: WorkspaceSidebarContext) -> AnyView) {
+        self.makeView = makeView
     }
 }
 
@@ -57,12 +109,16 @@ public struct WorkspaceSection: Identifiable, Sendable {
     public let handleClose: @MainActor @Sendable () -> Bool
     /// The section menu's items (new note, palette, hide content).
     public let menuItems: [CommandInfo]
+    /// The section's own block of the main window's sidebar; `nil` draws one row with `title` and `symbolName`.
+    /// Added with the notes explorer; defaults to `nil`.
+    public let sidebar: WorkspaceSidebar?
 
     public init(
         id: String,
         title: LocalizedStringResource,
         symbolName: String,
         order: Int,
+        sidebar: WorkspaceSidebar? = nil,
         makeView: @escaping @MainActor @Sendable () -> AnyView,
         handleRoute: @escaping @MainActor @Sendable (WorkspaceRoute) -> Bool = { _ in false },
         willHide: @escaping @MainActor @Sendable () async -> Void = {},
@@ -73,6 +129,7 @@ public struct WorkspaceSection: Identifiable, Sendable {
         self.title = title
         self.symbolName = symbolName
         self.order = order
+        self.sidebar = sidebar
         self.makeView = makeView
         self.handleRoute = handleRoute
         self.willHide = willHide

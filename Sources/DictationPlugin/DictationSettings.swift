@@ -11,9 +11,11 @@ struct DictationSettings: Sendable {
         static let speechLanguage = "speechLanguage"
         static let speechModelFolder = "speechModelFolder"
         static let inputDevice = "inputDevice"
+        static let inputDeviceName = "inputDeviceName"
         static let keepWarmMinutes = "keepWarmMinutes"
         static let restoreClipboard = "restoreClipboard"
         static let mode = "mode"
+        static let cleanupLevel = "cleanupLevel"
         static let llmEndpoint = "llmEndpoint"
         static let llmModel = "llmModel"
         static let llmSource = "llmSource"
@@ -35,6 +37,20 @@ struct DictationSettings: Sendable {
         case raw
         /// Cleaned up by the user's local language model ("Porządkuj").
         case cleanup
+    }
+
+    /// How much the cleanup changes (spec `2026-11-25-dictation-cleanup-levels`). `mode` stays the on/off switch
+    /// (`raw` = Off); the level only matters while `mode` is `cleanup`.
+    enum CleanupLevel: String, Sendable, CaseIterable {
+        /// Filler words out, nothing else: `LightCleaner`, no language model.
+        case light
+        /// Today's cleanup by a language model (`CleanupPrompt`).
+        case standard
+        /// Standard plus layout and light style edits (a later phase); read as Standard until it exists.
+        case full
+
+        /// Whether a language model does the work at this level.
+        var usesModel: Bool { self != .light }
     }
 
     /// Where the cleanup model runs.
@@ -82,6 +98,25 @@ struct DictationSettings: Sendable {
 
     var mode: Mode { settings.string(Key.mode).flatMap(Mode.init(rawValue:)) ?? .raw }
 
+    /// The stored level; a missing or unknown value reads as `standard`, which is what `mode = cleanup` did before
+    /// levels existed. Nothing is migrated.
+    var cleanupLevel: CleanupLevel {
+        settings.string(Key.cleanupLevel).flatMap(CleanupLevel.init(rawValue:)) ?? .standard
+    }
+
+    /// The level that runs now: `nil` while the cleanup is off. `full` is not offered yet (phase 2), so a stored
+    /// `full` (a newer build wrote it) runs as Standard.
+    var effectiveLevel: CleanupLevel? {
+        guard mode == .cleanup else { return nil }
+        switch cleanupLevel {
+        case .light: return .light
+        case .standard, .full: return .standard
+        }
+    }
+
+    /// Whether the cleanup needs a language model (server or built-in) right now.
+    var usesModel: Bool { effectiveLevel?.usesModel ?? false }
+
     /// The formatting server's address, always a loopback one (the setter refuses anything else).
     var llmEndpoint: URL? {
         settings.string(Key.llmEndpoint).flatMap { LoopbackPolicy.parse($0) }
@@ -119,6 +154,7 @@ struct DictationSettings: Sendable {
     func setMaximumEntries(_ count: Int) { settings.set(count, for: Key.maximumEntries) }
 
     func setMode(_ mode: Mode) { settings.set(mode.rawValue, for: Key.mode) }
+    func setCleanupLevel(_ level: CleanupLevel) { settings.set(level.rawValue, for: Key.cleanupLevel) }
     func setLLMModel(_ model: String?) {
         if let model, !model.isEmpty {
             settings.set(model, for: Key.llmModel)
@@ -147,8 +183,20 @@ struct DictationSettings: Sendable {
         }
     }
 
-    func setInputDevice(_ uid: String?) {
+    /// The chosen device's name as Settings showed it, kept so the message "Microphone … is unavailable" can name a
+    /// device that is unplugged; `nil` when the choice predates the name (the UID may still tell, for USB).
+    var inputDeviceName: String? {
+        guard let name = settings.string(Key.inputDeviceName), !name.isEmpty else { return nil }
+        return name
+    }
+
+    func setInputDevice(_ uid: String?, name: String? = nil) {
         if let uid { settings.set(uid, for: Key.inputDevice) } else { settings.removeValue(for: Key.inputDevice) }
+        if uid != nil, let name, !name.isEmpty {
+            settings.set(name, for: Key.inputDeviceName)
+        } else {
+            settings.removeValue(for: Key.inputDeviceName)
+        }
     }
 
     func setKeepWarmMinutes(_ minutes: Int) { settings.set(minutes, for: Key.keepWarmMinutes) }

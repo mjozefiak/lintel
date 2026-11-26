@@ -19,7 +19,8 @@ public final class MeetingsPlugin: LintelPlugin {
         displayName: LocalizedStringResource("Meetings", comment: "Plugin name of meeting transcription"),
         symbolName: "person.2.wave.2",
         order: 50,
-        defaultEnabled: false,
+        // The core since the owner decision of 2026-11-24: on for a new install.
+        defaultEnabled: true,
         settingsGroup: .voice,
         summary: LocalizedStringResource(
             "Record meetings, keep notes.", comment: "Settings → Features: what Meetings does")
@@ -76,9 +77,13 @@ public final class MeetingsPlugin: LintelPlugin {
     /// microphone or Core Audio (tests pass fakes).
     init(context: PluginContext, authorizer: (any MicrophoneAuthorizer)?, system: MeetingsSystem = .standard) {
         self.context = context
-        self.system = system
         let settings = MeetingsSettings(context.settings)
         self.settings = settings
+        #if DEBUG
+        // A `--qa` run's microphone permission, self-test and tracks are never the real ones (`QAAudio`).
+        let system = settings.qaAudio == nil ? system : system.forQAAudio()
+        #endif
+        self.system = system
         let runtime = MeetingsRuntime(context: context, settings: settings)
         self.runtime = runtime
         let resultsChanged = context.resultsChanged
@@ -93,7 +98,7 @@ public final class MeetingsPlugin: LintelPlugin {
         library = MeetingsLibrary(
             directory: context.storageDirectory, keychain: context.keychain, settings: settings,
             clock: context.clock,
-            spool: SpoolStorage(pluginDirectory: context.storageDirectory),
+            spool: Self.spoolStorage(context: context, settings: settings),
             makeResumer: { store, keys, spool in runtime.makeResumer(store: store, keys: keys, spool: spool) },
             logger: context.logger, changed: changed)
         let llmManager = ModelManagers.shared.manager(
@@ -121,7 +126,7 @@ public final class MeetingsPlugin: LintelPlugin {
             library: library, board: notes.board, hub: noteChanges,
             regenerate: { [weak notes] id in notes?.regenerate(id) },
             openNotesModel: { [openModels = context.openModels] in openModels(settings.builtInLLMModel.id) },
-            changed: changed)
+            changed: changed, retentionDays: { settings.retentionDays })
         ui = MeetingsUI(
             context: context, settings: settings, library: library, activity: activity,
             authorizer: authorizer ?? system.microphoneAuthorizer(), makeSelfTest: system.makeSelfTest, notes: notes,
@@ -134,6 +139,14 @@ public final class MeetingsPlugin: LintelPlugin {
         let suggestionRelay = suggestionRelay
         suggestionHUD = system.makeSuggestionHUD { suggestionRelay.detector?.perform($0) }
         wireSuggestionSettings()
+    }
+
+    /// The encrypted spool: in the plugin's folder, or the folder `--qa-meeting-spool-dir` names in a `--qa` run.
+    static func spoolStorage(context: PluginContext, settings: MeetingsSettings) -> SpoolStorage {
+        #if DEBUG
+        if let folder = settings.qaAudio?.spoolDirectory { return SpoolStorage(root: folder) }
+        #endif
+        return SpoolStorage(pluginDirectory: context.storageDirectory)
     }
 
     // MARK: Lifecycle

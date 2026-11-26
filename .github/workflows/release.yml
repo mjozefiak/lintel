@@ -52,6 +52,7 @@ on:
       - Resources/InfoPlist.xcstrings
       - Resources/THIRD_PARTY_NOTICES.txt
       - Resources/Assets.xcassets/**
+      - Resources/DMG/**
       - Resources/KeyboardShortcuts/**
       - scripts/**
       - .github/workflows/release.yml
@@ -140,10 +141,18 @@ jobs:
           sw_vers
 
       # A push to main is tested by ci.yml on the same commit; here it only checks that the app still packages.
+      # The test targets are compiled in their own step (issue #263): the 800 s watchdog below used to include a cold
+      # compile (about 9 min measured on the first run of this change) and sat at 765-801 s. Now it covers only running the tests, and a slow compile fails on
+      # this step's own timeout with its own name in the log. No test is dropped or filtered.
+      - name: Build tests
+        if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
+        timeout-minutes: 15
+        run: swift build --build-tests
+
       - name: Test
         if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
         timeout-minutes: 16
-        run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test
+        run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test --skip-build
 
       # A hung test run leaves stack samples and the names of the unfinished tests here (never test output).
       - name: Upload watchdog diagnostics
@@ -251,7 +260,7 @@ jobs:
           xcrun notarytool --version
           xcrun --find stapler
 
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: Lintel-app
           path: artifact-app
@@ -468,17 +477,17 @@ jobs:
         run: scripts/check-release-order.sh --github "$GITHUB_SHA" "$GITHUB_REF_NAME"
 
       # Lintel-dmg comes from the sign job (the notarized DMG and its checksum), release-notes from the build job.
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: Lintel-dmg
           path: dist
 
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-notes
           path: dist
 
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: Lintel-appcast
           path: appcast

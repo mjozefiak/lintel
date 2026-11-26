@@ -18,6 +18,52 @@ import Testing
         #expect(try QAOptions.parse(["--qa"])?.meetingMicWAV == nil)
     }
 
+    @Test func everyQARunSwitchesMeetingsAndDictationToFilesOrSilence() throws {
+        let plain = AppEnvironment.qaAudioSettings([:], options: try #require(try QAOptions.parse(["--qa"])))
+        #expect(plain[QAOptions.meetingsAudioKey] == .bool(true))
+        #expect(plain[QAOptions.dictationAudioKey] == .bool(true))
+        // Empty, not missing: with `--qa-persistent-settings` the file of an earlier run must not play again.
+        #expect(plain[QAOptions.meetingsMicWAVKey] == .string(""))
+        #expect(plain[QAOptions.meetingsSystemWAVKey] == .string(""))
+        #expect(plain[QAOptions.meetingsSpoolDirectoryKey] == .string(""))
+        // A `--qa-setting` cannot turn the switch off.
+        let forced = AppEnvironment.qaAudioSettings(
+            [QAOptions.meetingsAudioKey: .bool(false), QAOptions.dictationAudioKey: .bool(false)],
+            options: try #require(try QAOptions.parse(["--qa"])))
+        #expect(forced[QAOptions.meetingsAudioKey] == .bool(true))
+        #expect(forced[QAOptions.dictationAudioKey] == .bool(true))
+    }
+
+    @Test func theFlagsFilesAndSpoolFolderReachThePluginsSettings() throws {
+        let options = try #require(
+            try QAOptions.parse([
+                "--qa", "--qa-meeting-mic-wav", "/tmp/mic.wav", "--qa-meeting-system-wav", "/tmp/system.wav",
+                "--qa-meeting-spool-dir", "/tmp/spool",
+            ]))
+        let settings = AppEnvironment.qaAudioSettings([:], options: options)
+        #expect(settings[QAOptions.meetingsMicWAVKey] == .string("/tmp/mic.wav"))
+        #expect(settings[QAOptions.meetingsSystemWAVKey] == .string("/tmp/system.wav"))
+        #expect(settings[QAOptions.meetingsSpoolDirectoryKey] == .string("/tmp/spool"))
+    }
+
+    @Test func aPathOfAnEarlierRunIsClearedAndAQASettingKeepsItsValue() throws {
+        let options = try #require(try QAOptions.parse(["--qa"]))
+        // Persisted settings carry the earlier run's file; this run names none, so it is emptied (silence).
+        let cleared = AppEnvironment.qaAudioSettings([:], options: options)
+        #expect(cleared[QAOptions.meetingsMicWAVKey] == .string(""))
+        #expect(cleared[QAOptions.meetingsSystemWAVKey] == .string(""))
+        #expect(cleared[QAOptions.meetingsSpoolDirectoryKey] == .string(""))
+        // A `--qa-setting` of this run (it reaches the function in `settings`) stays when no flag is given.
+        let kept = AppEnvironment.qaAudioSettings(
+            [QAOptions.meetingsMicWAVKey: .string("/tmp/from-setting.wav")], options: options)
+        #expect(kept[QAOptions.meetingsMicWAVKey] == .string("/tmp/from-setting.wav"))
+        // The flag wins over the setting.
+        let flagged = try #require(try QAOptions.parse(["--qa", "--qa-meeting-mic-wav", "/tmp/flag.wav"]))
+        let both = AppEnvironment.qaAudioSettings(
+            [QAOptions.meetingsMicWAVKey: .string("/tmp/from-setting.wav")], options: flagged)
+        #expect(both[QAOptions.meetingsMicWAVKey] == .string("/tmp/flag.wav"))
+    }
+
     @Test func qaNotesTurnsOnTheFixturesKeyOnly() throws {
         #expect(try QAOptions.parse(["--qa-notes"])?.notesFixtures == true)
         #expect(try QAOptions.parse(["--qa"])?.notesFixtures == false)

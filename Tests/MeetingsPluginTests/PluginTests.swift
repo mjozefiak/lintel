@@ -6,10 +6,10 @@ import Testing
 
 @MainActor
 @Suite struct MeetingsPluginTests {
-    @Test func theManifestIsDisabledByDefaultAndComesAfterDictation() {
+    @Test func theManifestIsEnabledByDefaultAndComesAfterDictation() {
         let manifest = MeetingsPlugin.manifest
         #expect(manifest.id == "meetings")
-        #expect(manifest.defaultEnabled == false)
+        #expect(manifest.defaultEnabled)
         #expect(manifest.order > 40)
     }
 

@@ -6,6 +6,22 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ## [Unreleased]
 
+### Added
+
+- Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
+
+### Changed
+
+- Meeting notes now follow a topic layout: topics, decisions made and next steps. Notes written by a provider (Claude) start with a short intro; notes written by the model on this Mac, since notes prompt 7, have no intro, so the model never adds a sentence of its own about the meeting. They also show more of the points it checked (up to six per topic instead of ten in all). Notes written earlier stay as they are.
+- On a new install, Dictation and Meetings are on, and app search, file search and clipboard history are add-ons that you turn on in Settings → Features. If you used Lintel before this version, every switch stays as it was.
+- The welcome screen starts with dictation and meeting notes. It asks for the launcher shortcut only when app search, file search or window management is on; the shortcut stays in Settings → General and works only while one of them is on.
+- On a new install, Lintel writes notes after each meeting with the model on this Mac; nothing is sent anywhere. The welcome screen offers the notes model download (with its size, and with the space needed when the disk is too full). Until the model is downloaded, meetings are recorded and saved as before and say that their notes are written once the model is on this Mac; meetings recorded since Lintel started get their notes as soon as the download finishes. If you used Lintel before this version, the notes switch stays as it was.
+
+### Fixed
+
+- A meeting that was waiting for the notes model is no longer forgotten when Lintel restarts: it still says that its notes need the model, and it gets its notes when the model is downloaded.
+- A meeting that waits for the notes model no longer loses its notes when the model is downloaded while Lintel is saving that wait: they are written as soon as the download finishes.
+
 ## [0.1.0-beta.1] - 2026-11-22
 
 The first public beta.
