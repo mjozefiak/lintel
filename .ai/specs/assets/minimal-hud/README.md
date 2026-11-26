@@ -32,3 +32,7 @@ Open `index.html` in a browser (no server, no network). The header switches lang
 - Rendered from `file://` in headless Chrome for every combination of en/pl × S/M/XL × hover on/off, plus Reduce Motion and Increase Contrast; screenshots in `evidence/` (`en-m-*`, `pl-xl-hover-*`, `pl-s-reduce-motion-contrast-meeting`).
 - Measured in the page: no pill line truncates in any combination; widest normal pill 376 pt (M, pl) / 415 pt (XL, pl), widest hovered 442 pt (M, pl) / 489 pt (XL, pl).
 - Not done: an interactive keyboard and pointer walk through a browser provider (the Chrome DevTools session was in use by another agent) and a real phone-width check (headless Chrome does not render below 500 px). Query parameters (`?lang=pl&size=xl&hover=on&motion=on&contrast=on&only=<section>`) reproduce every screenshot.
+
+## Revision 2 (2026-11-26): owner decisions
+
+The owner decided OD-1 to OD-13 (spec, "Owner decisions"). Only two states of this sketch changed, as annotations, not a redraw: "First 8 s: consent reminder" now draws the plain recording pill (OD-6: the reminder is only in the meeting's window), and "Model loading / unavailable" has no hover line (OD-7: the app says it after the recording). The widths were measured again in headless Chrome: unchanged (widest normal 376 / 415 pt, widest hovered 442 / 489 pt, M / XL, pl). The `evidence/` images are from revision 1 and do not show these two states.
