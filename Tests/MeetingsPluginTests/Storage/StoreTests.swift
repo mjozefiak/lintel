@@ -19,7 +19,10 @@ private let day: TimeInterval = 86_400
         let names = try store.read { db in
             try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')")
         }
-        for name in ["meeting", "meeting_speaker", "meeting_segment", "meeting_fts", "meeting_notes_fts"] {
+        for name in [
+            "meeting", "meeting_speaker", "meeting_segment", "meeting_fts", "meeting_notes_fts",
+            "meeting_name_evidence",
+        ] {
             #expect(names.contains(name), "missing \(name)")
         }
         let triggers = try store.read { db in
@@ -44,14 +47,21 @@ private let day: TimeInterval = 86_400
         let speakerColumns = try store.read { db in
             try Row.fetchAll(db, sql: "PRAGMA table_info(meeting_speaker)").map { $0["name"] as String }
         }
-        #expect(speakerColumns == ["id", "meeting_id", "label", "is_self", "source_channel"])
+        #expect(
+            speakerColumns == [
+                "id", "meeting_id", "label", "is_self", "source_channel", "name_source", "name_status",
+                "suggested_name", "rejected_names",
+            ])
         let segmentColumns = try store.read { db in
             try Row.fetchAll(db, sql: "PRAGMA table_info(meeting_segment)").map { $0["name"] as String }
         }
         #expect(segmentColumns == ["id", "meeting_id", "channel", "start_ms", "end_ms", "speaker_id", "text"])
         let applied = try store.read { db in try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations") }
         #expect(
-            applied == ["v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash"])
+            applied == [
+                "v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash",
+                "v5-speaker-names",
+            ])
         #expect(try store.meetingCount() == 0)
 
         try store.insertMeeting(uuid: "a", startedAt: Date(), speechModelID: "parakeet-ultra")
@@ -122,7 +132,10 @@ private let day: TimeInterval = 86_400
         try migrator.migrate(queue)
         let applied = try queue.read { try migrator.appliedIdentifiers($0) }
         #expect(
-            applied == ["v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash"])
+            applied == [
+                "v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash",
+                "v5-speaker-names",
+            ])
         let counts = try queue.read { db in
             [
                 try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM meeting") ?? -1,

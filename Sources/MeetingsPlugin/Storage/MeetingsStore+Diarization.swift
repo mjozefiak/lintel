@@ -38,8 +38,14 @@ extension MeetingsStore {
             var ids: [Int64] = []
             for speaker in plan.speakers {
                 try db.execute(
-                    sql: "INSERT INTO meeting_speaker (meeting_id, label, is_self, source_channel) VALUES (?, ?, ?, ?)",
-                    arguments: [meetingID, speaker.label, speaker.isSelf, speaker.channel.rawValue])
+                    sql: """
+                        INSERT INTO meeting_speaker (meeting_id, label, is_self, source_channel, name_source)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                    arguments: [
+                        meetingID, speaker.label, speaker.isSelf, speaker.channel.rawValue,
+                        (speaker.isSelf ? NameSource.me : NameSource.default).rawValue,
+                    ])
                 ids.append(db.lastInsertedRowID)
             }
             for (segmentID, index) in plan.assignments where ids.indices.contains(index) {
@@ -81,9 +87,10 @@ extension MeetingsStore {
         }
     }
 
-    /// "To ja": makes this speaker the one `is_self` speaker of its meeting. A speaker still named by the
-    /// default ("Mówca N") becomes "Ja"; one the user renamed keeps its name. The speaker who was "Ja" before
-    /// loses the flag and, if still labelled "Ja", gets the lowest free "Mówca N". Notes that exist (or are being
+    /// "To ja": makes this speaker the one `is_self` speaker of its meeting (`name_source = self`, `confirmed`, the
+    /// suggestion cleared). A speaker still named by the default ("Mówca N") becomes "Ja"; one the user renamed
+    /// keeps its name. The speaker who was "Ja" before loses the flag and, if still labelled "Ja", gets the lowest
+    /// free "Mówca N" (`name_source = default`); one with another label keeps it as the user's (`user`). Notes that exist (or are being
     /// written) become `stale`, like after a rename. Returns false when the speaker does not exist **or when the meeting is in
     /// `channels` mode**: there the speakers are tracks ("Ja" / "Inni", or one neutral "Mówca 1"), not people,
     /// and moving the flag would break the track-to-label rule the banner promises. Renaming still works.
@@ -114,17 +121,33 @@ extension MeetingsStore {
                     let renamed = SpeakerLabels.numbered(number)
                     taken.insert(renamed)
                     try db.execute(
-                        sql: "UPDATE meeting_speaker SET is_self = 0, label = ? WHERE id = ?",
+                        sql: """
+                            UPDATE meeting_speaker
+                            SET is_self = 0, label = ?, name_source = 'default', name_status = 'confirmed',
+                                suggested_name = NULL
+                            WHERE id = ?
+                            """,
                         arguments: [renamed, oldID])
                 } else {
-                    try db.execute(sql: "UPDATE meeting_speaker SET is_self = 0 WHERE id = ?", arguments: [oldID])
+                    // The label is one the user gave (it is not the default "Ja"), so it stays theirs.
+                    try db.execute(
+                        sql: """
+                            UPDATE meeting_speaker
+                            SET is_self = 0, name_source = 'user', name_status = 'confirmed', suggested_name = NULL
+                            WHERE id = ?
+                            """,
+                        arguments: [oldID])
                 }
             }
             let isDefault =
                 label.hasPrefix(SpeakerLabels.numberedPrefix)
                 && Int(label.dropFirst(SpeakerLabels.numberedPrefix.count)) != nil
             try db.execute(
-                sql: "UPDATE meeting_speaker SET is_self = 1, label = ? WHERE id = ?",
+                sql: """
+                    UPDATE meeting_speaker
+                    SET is_self = 1, label = ?, name_source = 'self', name_status = 'confirmed', suggested_name = NULL
+                    WHERE id = ?
+                    """,
                 arguments: [isDefault ? SpeakerLabels.me : label, speakerID])
             try db.execute(
                 sql: """
