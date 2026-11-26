@@ -93,7 +93,10 @@ struct NotesGuard: Sendable {
 
     /// The version of the point rules, recorded in the trace and in `notes_prompt_version` once a rule changes
     /// (spec `2026-11-25-meeting-notes-structure`: `g1` after S1 and S2, `g2` after S3). `g0` is the rules before it.
-    static let rulesVersion = "g0"
+    /// `g1` (F3, S3): the drift of a summary point is measured against the whole literal quote, also its part
+    /// past the first sentence end (`Match.literalRange`). The anchoring and first-word rules of the spec's F2 are
+    /// not part of any shipped version.
+    static let rulesVersion = "g1"
 
     /// What `applyingVerifications` changed (counts only).
     struct VerifierEffect: Equatable, Sendable {
@@ -254,6 +257,13 @@ struct NotesGuard: Sendable {
         return nil
     }
 
+    /// The point as the guard keeps it (the transcript's quote, utterance and sentence) and whether its quote was
+    /// anchored (never, under these rules), or nil when it is refused (measurement only).
+    func kept(_ point: NotesPoint) -> (point: NotesPoint, reanchored: Bool)? {
+        if case .success(let outcome) = verify(point) { return (outcome.point, false) }
+        return nil
+    }
+
     /// The verdict after the semantic verifier, by point id. Pure. A missing entry, or one whose source is not
     /// `answered` (malformed, cut off, failed, cancelled), changes nothing (fail closed: a broken runtime never
     /// removes a point). A point answered `weaker` or `unsupported` is REMOVED (`verifierRejected`); its quote
@@ -299,6 +309,9 @@ struct NotesGuard: Sendable {
         /// How many leading quote words the range matches: all of them, or fewer when a literal quote ran on
         /// past a sentence end and only its first sentence was matched.
         var quoteCount: Int
+        /// All transcript words the literal quote stands on, one speaker's words in a row, also past the sentence
+        /// end where `range` is cut (rules `g1`, S3): the drift of a summary point is measured against these.
+        var literalRange: Range<Int>
     }
 
     /// The fewest quote words a match needs unless it is a whole utterance (`quoteTooShort`).
@@ -383,7 +396,12 @@ struct NotesGuard: Sendable {
         }
         // A summary point is a fact of the discussion in other words; when most of those words are not the
         // quote's, the sense may have been turned around without anything the checks above see.
-        if outcome.point.kind == .summary, Self.driftsFromQuote(outcome.point.text, quote: Array(words[match.range])) {
+        // The whole literal quote counts here (rules `g1`): a point that sums up a quote of two sentences is not
+        // measured against the first one only. Only words of the same speaker that stand in the transcript in a
+        // row, never an uncited neighbouring sentence.
+        if outcome.point.kind == .summary,
+            Self.driftsFromQuote(outcome.point.text, quote: Array(words[match.literalRange]))
+        {
             return .failure(Refusal(.driftedFromQuote))
         }
 
@@ -477,6 +495,7 @@ struct NotesGuard: Sendable {
         var bestDistance = Int.max
         for start in 0...(words.count - quote.count) where NotesText.wordsMatch(words[start], quote[0]) {
             guard var end = matchEnd(quote, index: 1, after: start, skips: skips, literal: skips == 0) else { continue }
+            let literalRange = start..<end
             var quoteCount = quote.count
             if skips > 0 {
                 // A match with gaps stays in one sentence.
@@ -497,7 +516,7 @@ struct NotesGuard: Sendable {
                 best = Match(
                     range: range,
                     wholeUtterance: quoteCount == quote.count && range.count == quote.count && isWhole(range),
-                    quoteCount: quoteCount)
+                    quoteCount: quoteCount, literalRange: literalRange)
             }
         }
         return best

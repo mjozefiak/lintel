@@ -19,7 +19,7 @@ import Testing
         let record = try rig.record(id)
         #expect(record.status == .ok)
         #expect(record.model == LLMModelCatalog.defaultModel.id)
-        #expect(record.promptVersion == String(NotesPrompt.version))
+        #expect(record.promptVersion == NotesPipeline.storedPromptVersion)
         #expect(record.droppedCount == 0)
         #expect(record.generatedAt == rig.fixedNow)
         let after = try rig.document(id)

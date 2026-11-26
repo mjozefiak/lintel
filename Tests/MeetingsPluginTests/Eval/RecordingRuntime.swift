@@ -63,6 +63,11 @@ struct NotesRejectionReport: Codable, Equatable {
         var quoteHasMowca: Bool
         var text: String
         var quote: String
+        /// For a verified point: the transcript's own text it rests on, its utterance and whether the quote was
+        /// anchored (rules `g1`), so a judge can check it with its context. Nil for a dropped point.
+        var excerpt: String?
+        var utterance: Int?
+        var reanchored: Bool?
     }
 
     struct Answer: Codable, Equatable {
@@ -102,11 +107,13 @@ struct NotesRejectionReport: Codable, Equatable {
             let points = parsed.map { point -> Point in
                 let outcome: String
                 var detail: String?
+                var kept: (point: NotesPoint, reanchored: Bool)?
                 if let refusal = guardrail.refusal(of: point) {
                     outcome = "dropped:\(refusal.reason.rawValue)"
                     detail = refusal.detail?.rawValue
                 } else {
                     outcome = "verified"
+                    kept = guardrail.kept(point)
                 }
                 return Point(
                     kind: point.kind.rawValue, outcome: outcome, detail: detail, textLength: point.text.count,
@@ -115,7 +122,8 @@ struct NotesRejectionReport: Codable, Equatable {
                     quoteLanguage: language(NotesLanguage.dominant(in: point.quote)),
                     textHasMowca: point.text.localizedCaseInsensitiveContains("Mówca"),
                     quoteHasMowca: point.quote.localizedCaseInsensitiveContains("Mówca"),
-                    text: point.text, quote: point.quote)
+                    text: point.text, quote: point.quote, excerpt: kept?.point.quote, utterance: kept?.point.utterance,
+                    reanchored: kept?.reanchored)
             }
             return Answer(
                 maxTokens: record.maxTokens, stoppedByTokenLimit: record.stoppedByTokenLimit, malformed: malformed,
