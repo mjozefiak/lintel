@@ -60,8 +60,8 @@ final class RecoveryRig {
 
     var pluginDirectory: URL { harness.pluginDirectory }
 
-    init(texts: [Int: String] = [:]) throws {
-        harness = try MeetingsHarness()
+    init(texts: [Int: String] = [:], settings: [String: SettingValue] = [:]) throws {
+        harness = try MeetingsHarness(settings: settings)
         engine = ScriptedEngine(texts: texts)
         keys = MeetingKeys(try MeetingKeyStore(keychain: harness.keychain).master.create())
         spool = SpoolStorage(pluginDirectory: harness.pluginDirectory)

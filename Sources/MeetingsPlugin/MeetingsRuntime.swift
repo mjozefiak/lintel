@@ -26,10 +26,29 @@ struct MeetingsRuntime: Sendable {
     var defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = { DefaultInputObserver.changes() }
     /// Whether the session starts the microphone again when it stops (off in a `--qa` run, whose track never ends).
     var retriesMicrophone = true
+    /// One engine per recording, fixed to the model the recording started with: a change in Settings during the
+    /// meeting applies to the next one. A test replaces it: the real engines load the model's weights.
+    var makeEngine: @Sendable (_ modelID: String) -> any SpeechEngine
+    /// The detector a resumed meeting scans its spool with, given the lookup of the folder it should load the
+    /// Silero model from (the speech model stored with the meeting). A test replaces it for the same reason.
+    var makeVAD: @Sendable (_ folder: @escaping @Sendable () async -> URL?) -> any VoiceActivityDetector = {
+        FolderResolvingVAD(folder: $0)
+    }
+    /// The lease every model goes through; the app shares one (`SpeechEngineLease.shared`).
+    var lease: SpeechEngineLease = .shared
 
     @MainActor
     init(context: PluginContext, settings: MeetingsSettings) {
         self.settings = settings
+        let settings = settings
+        makeEngine = { modelID in
+            SwitchingEngine(
+                engines: [
+                    ModelCatalog.parakeetUltra.id: ParakeetEngine(language: { settings.speechLanguage }),
+                    ModelCatalog.whisperLargeV3Turbo.id: WhisperKitEngine(language: { settings.speechLanguage }),
+                ],
+                selected: { modelID })
+        }
         logger = context.logger
         speechManager = ModelManagers.shared.manager(
             for: context.modelsDirectory.appending(path: MeetingsUI.speechDirectoryName, directoryHint: .isDirectory),
@@ -86,18 +105,6 @@ struct MeetingsRuntime: Sendable {
         storedModelID.isEmpty ? selected : ModelCatalog.package(id: storedModelID)
     }
 
-    /// One engine per recording, fixed to the model the recording started with: a change in Settings during
-    /// the meeting applies to the next one.
-    func makeEngine(modelID: String) -> any SpeechEngine {
-        let settings = settings
-        return SwitchingEngine(
-            engines: [
-                ModelCatalog.parakeetUltra.id: ParakeetEngine(language: { settings.speechLanguage }),
-                ModelCatalog.whisperLargeV3Turbo.id: WhisperKitEngine(language: { settings.speechLanguage }),
-            ],
-            selected: { modelID })
-    }
-
     // MARK: Session
 
     func makeFinalizer(store: MeetingsStore, keys: MeetingKeys, spool: SpoolStorage) -> MeetingFinalizer {
@@ -129,7 +136,7 @@ struct MeetingsRuntime: Sendable {
             store: request.store, keys: request.keys, spool: request.spool, mic: sources.microphone,
             system: sources.system,
             makeVAD: { LazyVAD(modelFolder: vadFolder, tuning: MeetingVAD.tuning, recordsProbabilities: true) },
-            engine: makeEngine(modelID: request.modelID),
+            engine: makeEngine(request.modelID),
             modelID: request.modelID, modelFolder: request.modelFolder, sleepAssertion: IOKitSleepAssertion(),
             gate: gate, beforeReady: finalizer.hook, sourceBundleID: request.sourceBundleID,
             keepAudio: { [settings] in settings.keepAudio },
@@ -158,12 +165,13 @@ struct MeetingsRuntime: Sendable {
         return MeetingResumer(
             store: store, keys: keys, spool: spool,
             makeVAD: { modelID in
-                FolderResolvingVAD(folder: { await runtime.speechLookup(for: modelID).folder })
+                runtime.makeVAD { await runtime.speechLookup(for: modelID).folder }
             },
             speech: { modelID in
                 guard case .ready(let id, let folder) = await runtime.speechLookup(for: modelID) else { return nil }
-                return ResumeSpeech(engine: runtime.makeEngine(modelID: id), modelID: id, folder: folder)
-            }, finalize: finalizer.hook, keepAudio: { [settings] in settings.keepAudio }, logger: logger)
+                return ResumeSpeech(engine: runtime.makeEngine(id), modelID: id, folder: folder)
+            }, lease: runtime.lease, finalize: finalizer.hook, keepAudio: { [settings] in settings.keepAudio },
+            logger: logger)
     }
 }
 
