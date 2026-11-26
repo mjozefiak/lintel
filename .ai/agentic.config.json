@@ -74,7 +74,7 @@
     "label": "automerge",
     "mode": "prepare-and-merge",
     "requireIndependentReview": false,
-    "defaultToHumanQa": false,
+    "defaultToHumanQa": true,
     "humanOnlyLabels": [
       "risk-high",
       "state:needs-decision"
