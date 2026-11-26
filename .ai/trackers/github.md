@@ -640,7 +640,7 @@ gh pr checkout {prNumber} --recurse-submodules=no
 gh pr review {prNumber} --approve --body "<body>"
 gh pr review {prNumber} --request-changes --body "<body>"
 ```
-GitHub rejects self-approval (reviewing your own PR); surface that instead of working around it.
+GitHub rejects self-approval (reviewing your own PR); apart from the self-authored case below, surface that instead of working around it.
 
 **Self-authored PRs (this repository).** The owner and the agents share one GitHub account, so every PR is self-authored and GitHub refuses both `--approve` and `--request-changes` on it. When the PR author equals `CURRENT_USER`, submit the same body as a comment review instead, with the verdict as its first line (`Verdict: APPROVED` or `Verdict: CHANGES REQUESTED`); that comment review is the review evidence `om-auto-merge-buddy` accepts on a self-authored PR (signal 1), and the pipeline label (`merge-queue` or `changes-requested`) carries the state. Never switch accounts to obtain a native approval; the ruleset "main" requires none.
 ```bash
