@@ -10,7 +10,9 @@ import SwiftUI
 /// the real models, with a fake notes service, fake probes and an in-memory settings store: nothing starts a process,
 /// reaches the Keychain, a model, the network or a file outside a temporary folder. The data is invented.
 extension MeetingsPlugin: GalleryProviding {
-    public static var galleryScenes: [GalleryScene] { [NotesProviderGallery.scene] }
+    public static var galleryScenes: [GalleryScene] {
+        [NotesProviderGallery.scene, SpeakersListGallery.scene, SpeakerNamesSettingsGallery.scene]
+    }
 }
 
 /// What one state of the pilot scene needs.
@@ -258,6 +260,112 @@ private struct NotesProviderGalleryPane: View {
                         groups: NotesWrittenByMenus.modelGroups(provider: rig.provider, notes: rig.notes),
                         selection: "sonnet", footer: nil, onSelect: { _ in }))
             },
+        ]
+    }
+}
+
+// MARK: - Speaker names (spec `2026-11-25-meeting-speaker-names`, step 1.6)
+
+/// The "Speakers" list of the meeting window in each state of the spec's UI/UX: the real `MeetingSpeakersList` over
+/// a value, as `MeetingWindowModel.speakerList` builds it. Fictional names only.
+@MainActor enum SpeakersListGallery {
+    static let width: CGFloat = 420
+    private static let window = GalleryPresentation.window(width: width)
+
+    static var scene: GalleryScene {
+        GalleryScene(id: "meetings.speakers", title: "Meeting window → Speakers", states: states)
+    }
+
+    private static func row(
+        _ id: Int64, _ name: String, isSelf: Bool = false, origin: String? = nil,
+        suggestion: MeetingSpeakersList.Suggestion? = nil
+    ) -> MeetingSpeakersList.Row {
+        MeetingSpeakersList.Row(
+            id: id, name: name, badge: MeetingWindowModel.badge(for: name), isSelf: isSelf, canMarkSelf: !isSelf,
+            origin: origin, suggestion: suggestion)
+    }
+
+    private static let anna = row(1, "Anna Kowalska", isSelf: true)
+    private static let bartek = row(2, "Bartek Nowak", origin: "Introduced themselves at 02:50")
+    private static let marek = MeetingSpeakersList.Suggestion(name: "Marek", heardAt: "03:12", segmentID: 7)
+
+    private static func list(_ id: String, _ summary: String, _ state: MeetingSpeakersList.State) -> GalleryState {
+        GalleryState(id: id, summary: summary, presentation: window) {
+            AnyView(
+                MeetingSpeakersList(state: state, actions: MeetingSpeakersList.Actions())
+                    .padding(16))
+        }
+    }
+
+    static var states: [GalleryState] {
+        [
+            list(
+                "no-names", "No names yet: the user's own speaker and the default labels, as today.",
+                .init(rows: [row(1, "Ja", isSelf: true), row(2, "Mówca 1"), row(3, "Mówca 2"), row(4, "Mówca 3")])),
+            list(
+                "all-named", "Every speaker has a name; an automatic one has no mark, only a tooltip.",
+                .init(rows: [anna, bartek, row(3, "Marek Wiśniewski"), row(4, "Ola Zielińska")])),
+            list(
+                "mixed-suggestion",
+                "Names and one suggestion: \"Marek?\" with the time it was heard, Yes and No (the mockup).",
+                .init(rows: [anna, bartek, row(3, "Mówca 2", suggestion: marek), row(4, "Mówca 3")])),
+            list(
+                "conflict",
+                "Two speakers may be Marek: neither gets the name, both show the suggestion.",
+                .init(rows: [
+                    anna, row(2, "Mówca 1", suggestion: .init(name: "Marek", heardAt: "01:05", segmentID: 3)),
+                    row(3, "Mówca 2", suggestion: marek),
+                ])),
+            list(
+                "editing", "A click on a name: the field, Return saves, Escape cancels.",
+                .init(
+                    rows: [anna, bartek, row(3, "Mówca 2", suggestion: marek), row(4, "Mówca 3")],
+                    edit: .init(speakerID: 4, draft: "Ola"))),
+            list(
+                "merge-offer",
+                "A name another speaker has: one line asking to merge, with Merge, Keep Separate and Cancel.",
+                .init(
+                    rows: [anna, bartek, row(3, "Mówca 2"), row(4, "Mówca 3")],
+                    mergeOffer: .init(speakerID: 4, targetID: 2, name: "Bartek Nowak", origin: .rename))),
+        ]
+    }
+}
+
+/// Settings → Meetings → Speaker names: "Your name" and "From the conversation", with notes on and off.
+@MainActor @Observable final class GallerySpeakerNames: SpeakerNamesSettings {
+    var selfName = "Anna Kowalska"
+    var selfNameError: MeetingsSettings.SelfNameError?
+    var suggestedSelfName: String?
+    var namesFromConversation = true
+    var notesEnabledForNames: Bool
+
+    init(notesEnabled: Bool) { notesEnabledForNames = notesEnabled }
+
+    func saveSelfName(_ text: String) -> Bool {
+        selfName = text
+        return true
+    }
+}
+
+@MainActor enum SpeakerNamesSettingsGallery {
+    private static let window = GalleryPresentation.window(width: SettingsLayout.mainColumnWidth)
+
+    static var scene: GalleryScene {
+        GalleryScene(id: "meetings.speaker-names", title: "Settings → Meetings → Speaker names", states: states)
+    }
+
+    private static func pane(_ id: String, _ summary: String, notesEnabled: Bool) -> GalleryState {
+        GalleryState(id: id, summary: summary, presentation: window) {
+            AnyView(SettingsPane { SpeakerNamesSection(model: GallerySpeakerNames(notesEnabled: notesEnabled)) })
+        }
+    }
+
+    static var states: [GalleryState] {
+        [
+            pane("notes-on", "Notes are on: From the conversation is on, with its help line.", notesEnabled: true),
+            pane(
+                "notes-off", "Notes are off: the switch is inactive with one line saying it needs notes.",
+                notesEnabled: false),
         ]
     }
 }

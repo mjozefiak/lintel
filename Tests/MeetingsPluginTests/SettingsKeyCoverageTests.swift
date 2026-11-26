@@ -24,6 +24,7 @@ import Testing
         "retentionDays": "setRetentionDays",
         "keepAudio": "setKeepAudio",
         "selfName": "setSelfName",
+        "namesFromConversation": "setNamesFromConversation",
         "notesProvider": "setNotesProvider(",
         "notesProviderModel": "setNotesProvider(",
         "notesProviderBinary": "setNotesProviderBinary(",
@@ -47,7 +48,6 @@ import Testing
         "notesReduceInputTokens": "tuning key set with defaults only; no pane control by design",
         "orphanAudioDays": "tuning key set with defaults only; no pane control by design",
         "keptAudioDays": "tuning key set with defaults only; the switch's help names the days (owner decision M-Q3)",
-        "namesFromConversation": "the switch arrives with the speaker names UI (spec meeting-speaker-names, step 1.6)",
     ]
 
     /// The pane view and model sources, relative to the repository root.
@@ -91,6 +91,7 @@ import Testing
                 "retentionDays": "model.selectRetention(",
                 "keepAudio": "$model.keepAudio",
                 "selfName": "model.saveSelfName(",
+                "namesFromConversation": "model.namesFromConversation = ",
                 "notesProvider": "provider.choose(",
                 "notesProviderModel": "provider.chooseModel(",
                 "notesProviderBinary": "settings.setNotesProviderBinary(",

@@ -8425,42 +8425,6 @@
         }
       }
     },
-    "Rename this speaker, then press Return" : {
-      "comment" : "Hint of a speaker name field",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rename this speaker, then press Return"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zmień nazwę tego mówcy i naciśnij Return"
-          }
-        }
-      }
-    },
-    "Renaming a speaker changes the name in the transcript at once. Notes already written change after you regenerate them." : {
-      "comment" : "Meeting window: hint under the speaker list",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Renaming a speaker changes the name in the transcript at once. Notes already written change after you regenerate them."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zmiana nazwy mówcy od razu zmienia ją w transkrypcie. Napisane już notatki zmienią się po ich ponownym wygenerowaniu."
-          }
-        }
-      }
-    },
     "Save" : {
       "comment" : "Button of the Markdown save panel",
       "extractionState" : "manual",
@@ -8888,7 +8852,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "To ja"
+            "value" : "Ja"
           }
         }
       }
@@ -27627,6 +27591,402 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dyktowanie, wymaga uwagi"
+          }
+        }
+      }
+    },
+    "Rename this speaker" : {
+      "comment" : "Meeting window: hint of a speaker's name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename this speaker"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zmień nazwę tego mówcy"
+          }
+        }
+      }
+    },
+    "Type the name, then press Return. Escape cancels." : {
+      "comment" : "Meeting window: hint of the speaker name field",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type the name, then press Return. Escape cancels."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wpisz imię i naciśnij Return. Esc anuluje."
+          }
+        }
+      }
+    },
+    "%@?" : {
+      "comment" : "Meeting window: a suggested speaker name; the name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@?"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@?"
+          }
+        }
+      }
+    },
+    "heard at %@" : {
+      "comment" : "Meeting window: link to where a name was heard; the time",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "heard at %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "usłyszane w %@"
+          }
+        }
+      }
+    },
+    "Shows where the name was heard" : {
+      "comment" : "Meeting window: hint of the heard-at link",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows where the name was heard"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokazuje, gdzie padło imię"
+          }
+        }
+      }
+    },
+    "Yes" : {
+      "comment" : "Meeting window: confirms a suggested speaker name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tak"
+          }
+        }
+      }
+    },
+    "No" : {
+      "comment" : "Meeting window: rejects a suggested speaker name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie"
+          }
+        }
+      }
+    },
+    "Confirm" : {
+      "comment" : "Meeting window: accessibility label of Yes on a suggestion",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Potwierdź"
+          }
+        }
+      }
+    },
+    "Reject" : {
+      "comment" : "Meeting window: accessibility label of No on a suggestion",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reject"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Odrzuć"
+          }
+        }
+      }
+    },
+    "Name suggestion: %@. Confirm or Reject" : {
+      "comment" : "Meeting window: VoiceOver label of a suggested speaker name; the name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name suggestion: %@. Confirm or Reject"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podpowiedź imienia: %@. Potwierdź lub odrzuć"
+          }
+        }
+      }
+    },
+    "%@ is already in this meeting. Merge?" : {
+      "comment" : "Meeting window: a typed name belongs to another speaker; the name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is already in this meeting. Merge?"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ już jest w tym spotkaniu. Połączyć?"
+          }
+        }
+      }
+    },
+    "Merge (speakers)" : {
+      "comment" : "Meeting window: merges two speakers into one",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merge"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Połącz"
+          }
+        }
+      }
+    },
+    "Both speakers become one person" : {
+      "comment" : "Meeting window: hint of Merge",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Both speakers become one person"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Łączy obie pozycje w jedną osobę"
+          }
+        }
+      }
+    },
+    "Keep Separate" : {
+      "comment" : "Meeting window: keeps two speakers with the same name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Separate"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zostaw osobno"
+          }
+        }
+      }
+    },
+    "Two people with the same name" : {
+      "comment" : "Meeting window: hint of Keep Separate",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Two people with the same name"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dwie osoby o tym samym imieniu"
+          }
+        }
+      }
+    },
+    "Introduced themselves at %@" : {
+      "comment" : "Meeting window: tooltip of a name the person said themselves; the time in the recording",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Introduced themselves at %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przedstawienie się w %@"
+          }
+        }
+      }
+    },
+    "Announced at %@" : {
+      "comment" : "Meeting window: tooltip of a name someone announced; the time in the recording",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Announced at %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zapowiedź w %@"
+          }
+        }
+      }
+    },
+    "Called by name at %@" : {
+      "comment" : "Meeting window: tooltip of a name someone called the person by; the time in the recording",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Called by name at %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zwrot po imieniu w %@"
+          }
+        }
+      }
+    },
+    "Speaker names" : {
+      "comment" : "Settings → Meetings section title: the owner's name and where names come from",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaker names"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imiona rozmówców"
+          }
+        }
+      }
+    },
+    "From the conversation" : {
+      "comment" : "Settings → Meetings switch: names said in the meeting",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From the conversation"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Z rozmowy"
+          }
+        }
+      }
+    },
+    "A name someone says in the meeting goes into the transcript and notes." : {
+      "comment" : "Settings → Meetings: help under From the conversation",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A name someone says in the meeting goes into the transcript and notes."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imię, które ktoś poda w rozmowie, trafi do transkrypcji i notatek."
+          }
+        }
+      }
+    },
+    "Works when notes are on." : {
+      "comment" : "Settings → Meetings: why From the conversation is inactive",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Works when notes are on."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Działa, gdy notatki są włączone."
           }
         }
       }

@@ -22,6 +22,13 @@ final class MeetingsSettingsModel {
     var consentReminder: Bool {
         didSet { settings.setConsentReminder(consentReminder) }
     }
+    /// "From the conversation": names said in the meeting name the speakers. Written only when the user flips it.
+    var namesFromConversation: Bool {
+        didSet {
+            guard namesFromConversation != oldValue else { return }
+            settings.setNamesFromConversation(namesFromConversation)
+        }
+    }
     /// Keep the encrypted recording for `keptAudioDays` after the transcript is ready. Off by default. Turning it
     /// off keeps what is already kept (it ages out or is deleted by hand); the pane says so.
     var keepAudio: Bool {
@@ -121,6 +128,7 @@ final class MeetingsSettingsModel {
         retentionDays = settings.retentionDays
         keepAudio = settings.keepAudio
         selfName = settings.selfName
+        namesFromConversation = settings.namesFromConversation
         suggestMeetings = settings.suggestMeetings
         reloadSuggestionLists()
         speech.onLocationChange = { [weak self] in self?.onStatusChange?() }
@@ -399,4 +407,9 @@ struct MeetingsSetupProgress: Equatable {
     }
 
     var isComplete: Bool { Part.allCases.allSatisfy(isDone) }
+}
+
+extension MeetingsSettingsModel: SpeakerNamesSettings {
+    /// Names from the conversation are found by the model that writes the notes, so they work only with notes on.
+    var notesEnabledForNames: Bool { notes.enabled }
 }

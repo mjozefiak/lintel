@@ -104,7 +104,8 @@ struct MeetingsSettings: Sendable {
     /// Names said in the conversation become speaker names (spec `2026-11-25-meeting-speaker-names`, owner decision
     /// Q5): on by default. It works only together with `notesEnabled` (the pass uses the notes' own writer, and
     /// without notes no model is loaded just for names), so it never widens what the notes switch allows to leave
-    /// the Mac. No pane control yet (step 1.6).
+    /// the Mac. Settings → Meetings → Speaker names → "From the conversation" (step 1.6), inactive while notes
+    /// are off.
     static let defaultNamesFromConversation = true
 
     var namesFromConversation: Bool {
