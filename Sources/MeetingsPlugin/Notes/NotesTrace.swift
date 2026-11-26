@@ -311,7 +311,7 @@ struct NotesTraceReduceRequest: Equatable, Sendable, Codable {
         case split
         /// The request failed; the batch's points went into the sections in code order (`reduceFailed`).
         case codeOrder
-        /// A topic merge failed; the batches' topics stay as they are (`reduceFailed`).
+        /// A topic merge failed; the findings became one topic without a name, in code order (`reduceFailed`).
         case failed
     }
 

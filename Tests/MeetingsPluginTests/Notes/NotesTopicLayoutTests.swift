@@ -389,6 +389,62 @@ import Testing
         #expect(log.balance.isBalanced)
     }
 
+    /// The spec's fallback (`codeOrder`): when the request that merges the batches' topics fails, the findings are
+    /// one topic without a name, in time order — never the batches' topics, whose names would let the first batches
+    /// use up `maxTopics` and cut the meeting's end.
+    @Test func aFailedTopicMergeGivesTheFindingsOneTopicWithoutANameInTimeOrder() async throws {
+        let log = NotesTraceLog()
+        let rig = NotesRig { _, messages, _ in
+            if NotesFake.isMap(messages) { return .done(Self.mapAll(messages)) }
+            if NotesFake.isTopics(messages) { throw NotesFake.Failure() }
+            if NotesFake.isReduce(messages) { return .done(NotesFake.reduceAnswer(messages)) }
+            return .done(NotesFake.answer(messages))
+        }
+        var configuration = NotesPipeline.Configuration()
+        configuration.reduceInputTokens = 60
+        let pipeline = NotesPipeline(
+            model: rig.model, configuration: configuration, trace: { log.add($0) }, verifier: nil)
+        let result = try await pipeline.run(utterances: Self.utterances(), durationMs: 30 * 60_000)
+        let markdown = try #require(result.markdown)
+        #expect(log.reduce?.batches ?? 0 > 1)
+        let merge = try #require(log.requests.first { $0.stage == .topics })
+        #expect(merge.outcome == .failed && merge.attempts.requests == 2)
+        #expect(log.reduce?.reduceFailed == true)
+        // One heading only: the code's for a topic without a name, not the batches' topic names.
+        let headings = markdown.split(separator: "\n").filter { $0.hasPrefix("### ") && $0 != "### Uczestnicy" }
+        #expect(headings == ["### Omówione tematy"])
+        #expect(log.reduce?.layout?.topics == 1)
+        // In time order, at most a topic's worth of them.
+        let numbers = result.keyPoints.compactMap { Int($0.id.dropFirst()) }
+        #expect(numbers.count == NotesLayout.maxPointsPerTopic && numbers == numbers.sorted())
+        #expect(result.status == .partial)
+        #expect(log.balance.isBalanced)
+    }
+
+    /// The names do not fit the merge's budget, so there is nothing to ask: the same fallback as a failed request.
+    @Test func topicsThatDoNotFitTheMergeBudgetFallBackWithoutARequest() async throws {
+        let log = NotesTraceLog()
+        let rig = NotesRig { _, messages, _ in
+            if NotesFake.isMap(messages) { return .done(Self.mapAll(messages)) }
+            if NotesFake.isReduce(messages) { return .done(NotesFake.reduceAnswer(messages)) }
+            return .done(NotesFake.answer(messages))
+        }
+        var configuration = NotesPipeline.Configuration()
+        configuration.reduceInputTokens = 1
+        let pipeline = NotesPipeline(
+            model: rig.model, configuration: configuration, trace: { log.add($0) }, verifier: nil)
+        let result = try await pipeline.run(utterances: Self.utterances(), durationMs: 30 * 60_000)
+        let markdown = try #require(result.markdown)
+        #expect(!rig.llm.calls.contains { NotesFake.isTopics($0.messages) })
+        let merge = try #require(log.requests.first { $0.stage == .topics })
+        #expect(merge.outcome == .failed && merge.attempts.requests == 0)
+        #expect(log.reduce?.reduceFailed == true)
+        let headings = markdown.split(separator: "\n").filter { $0.hasPrefix("### ") && $0 != "### Uczestnicy" }
+        #expect(headings == ["### Omówione tematy"])
+        #expect(result.keyPoints.count == NotesLayout.maxPointsPerTopic)
+        #expect(result.status == .partial)
+    }
+
     @Test func anAnswerInTheOldFormatStillMakesNotesWithTheCodesHeading() async throws {
         let rig = NotesRig { _, messages, _ in
             if NotesFake.isMap(messages) { return .done(Self.mapAll(messages)) }
@@ -408,7 +464,7 @@ import Testing
         let reduce = try #require(rig.llm.calls.first { NotesFake.isReduce($0.messages) })
         #expect(reduce.messages.first?.content == NotesPrompt.reduceSystem(maxTopics: 9))
         let rig2 = NotesRig(NotesFake.standard)
-        // A length that is not saved (0) falls back to the transcript: about half an hour, five topics.
+        // A length that is not saved (0) falls back to the transcript: about half an hour, four topics.
         _ = try await rig2.pipeline().run(utterances: Self.utterances(), durationMs: 0)
         let fallback = try #require(rig2.llm.calls.first { NotesFake.isReduce($0.messages) })
         #expect(fallback.messages.first?.content == NotesPrompt.reduceSystem(maxTopics: 4))

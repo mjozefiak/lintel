@@ -433,38 +433,49 @@ struct NotesPipeline: Sendable {
         // The guard keeps the first `maxQuestions` in this order, so the batches take turns: one that comes first
         // in the meeting must not use up the whole limit.
         merged.output.questions = Self.interleaved(questions)
-        merged.output.topics = try await mergeTopics(topics, maxTopics: maxTopics, lease: lease, recorder: recorder)
+        let joined = try await mergeTopics(
+            topics, points: batches.flatMap { $0 }, maxTopics: maxTopics, lease: lease, recorder: recorder)
+        merged.output.topics = joined.topics
+        merged.failed = merged.failed || joined.failed
         return merged
     }
 
     /// The topics of several batches as one list: the model joins the ones about the same subject (it sees only
     /// their names and gives back the batches' topic ids, `NotesPrompt.topicsMessages`), and the code puts the
     /// points of the joined topics together in their order. A batch topic the model left out follows at the end,
-    /// so nothing REDUCE chose is lost here (the guard's limits cut the rest). When the request fails or does not
-    /// fit, the batches' topics stay as they are, in order. Topics without a name are not sent and stay in place.
+    /// so nothing REDUCE chose is lost here (the guard's limits cut the rest). Topics without a name are not sent
+    /// and stay in place. When the request fails or does not fit, the notes fall back to `codeOrder`: the findings
+    /// as one topic without a name, in time order (spec `2026-11-25-meeting-notes-structure`), never the batches'
+    /// topics with their names, which would let the first batches use up `maxTopics` and drop the meeting's end.
     private func mergeTopics(
-        _ topics: [NotesReduceOutput.Topic], maxTopics: Int, lease: NotesLease, recorder: NotesTraceRecorder?
-    ) async throws -> [NotesReduceOutput.Topic] {
+        _ topics: [NotesReduceOutput.Topic], points: [NotesPoint], maxTopics: Int, lease: NotesLease,
+        recorder: NotesTraceRecorder?
+    ) async throws -> (topics: [NotesReduceOutput.Topic], failed: Bool) {
         let named = topics.filter { $0.name != nil }
-        guard named.count > 1 else { return topics }
+        guard named.count > 1 else { return (topics, false) }
         let names = named.map { NotesGuard.topicName($0.name ?? "") }
         let size = names.reduce(0) { $0 + NotesText.estimateTokens($1, fallback: .unknown) + 4 }
-        guard size <= configuration.reduceInputTokens else { return topics }
+        let pointIDs = named.flatMap(\.ids)
+        guard size <= configuration.reduceInputTokens else {
+            recorder?.reduceRequest(
+                stage: .topics, inputs: named.count, pointIDs: pointIDs, attempts: NotesTraceAttempts(),
+                outcome: .failed)
+            return (Self.codeOrder(points).topics, true)
+        }
         var attempts = NotesTraceAttempts()
         let completion = try await complete(
             lease, maxTokens: configuration.reduceMaxTokens, timeout: configuration.reduceTimeout,
             messages: { NotesPrompt.topicsMessages(names: names, maxTopics: maxTopics, reminder: $0) },
             parse: { NotesParser.parseTopicMerge($0) }, attempts: &attempts)
         let tried = attempts
-        let pointIDs = named.flatMap(\.ids)
         guard case .value(let merged) = completion else {
             recorder?.reduceRequest(
                 stage: .topics, inputs: named.count, pointIDs: pointIDs, attempts: tried, outcome: .failed)
-            return topics
+            return (Self.codeOrder(points).topics, true)
         }
         recorder?.reduceRequest(
             stage: .topics, inputs: named.count, pointIDs: pointIDs, attempts: tried, outcome: .value)
-        return Self.joinedTopics(merged, batchTopics: topics)
+        return (Self.joinedTopics(merged, batchTopics: topics), false)
     }
 
     /// The merge's topics with the point ids of the batch topics they name (`t1` is the first named batch topic),
