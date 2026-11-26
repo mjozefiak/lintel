@@ -23,6 +23,7 @@ import os
             case .finishing: "finishing"
             case .pasted: "pasted"
             case .pastedUnformatted(let all): "pastedUnformatted:\(all)"
+            case .pastedAsSpoken(let notice): "pastedAsSpoken:\(notice.kind)"
             case .copied: "copied"
             case .problem(let problem): "problem:\(problem)"
             case .allowMicrophone: "allow"
@@ -577,6 +578,9 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
             .problem(.noMicrophone), .problem(.nothingHeard), .problem(.nothingToPaste),
             .problem(.speechModelBusy),
             .pastedUnformatted(all: true), .pastedUnformatted(all: false),
+            .pastedAsSpoken(.init(.tooSlow, name: "Claude")), .pastedAsSpoken(.init(.notSignedIn, name: "Claude")),
+            .pastedAsSpoken(.init(.rateLimited, name: "Claude")), .pastedAsSpoken(.init(.network, name: "Claude")),
+            .pastedAsSpoken(.init(.unavailable, name: "Claude")),
         ]
         for state in states {
             #expect(!state.title.isEmpty)
@@ -596,6 +600,32 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(HUDState.recording(.init(secondsLeft: 30)).announcement == nil)
         #expect(HUDState.finishing.announcement != nil)
         #expect(HUDState.pasted.announcement == HUDState.pasted.title)
+    }
+
+    @Test func aProviderNoticeIsOneLineNamesTheCompanyAndOffersNothing() {
+        let notices: [HUDState.ProviderNotice.Kind] = [.tooSlow, .notSignedIn, .rateLimited, .network, .unavailable]
+        var titles = Set<String>()
+        for kind in notices {
+            let state = HUDState.pastedAsSpoken(.init(kind, name: "Claude"))
+            #expect(state.title.contains("Claude"))
+            #expect(!state.title.contains("\n"))
+            #expect(state.announcement == state.title)
+            #expect(!state.offersCancel)
+            #expect(state.hidesAfter != nil)
+            titles.insert(state.title)
+        }
+        #expect(titles.count == notices.count)
+    }
+
+    @Test func onlyTheProvidersReasonsMakeANotice() {
+        let name = "Claude"
+        #expect(HUDState.ProviderNotice(reason: .tooSlow, name: name)?.kind == .tooSlow)
+        #expect(HUDState.ProviderNotice(reason: .provider(.notSignedIn), name: name)?.kind == .notSignedIn)
+        #expect(HUDState.ProviderNotice(reason: .provider(.rateLimited), name: name)?.kind == .rateLimited)
+        #expect(HUDState.ProviderNotice(reason: .provider(.network), name: name)?.kind == .network)
+        #expect(HUDState.ProviderNotice(reason: .provider(.unavailable), name: name)?.kind == .unavailable)
+        #expect(HUDState.ProviderNotice(reason: .rejected(.tooShort), name: name) == nil)
+        #expect(HUDState.ProviderNotice(reason: .unreachable, name: name) == nil)
     }
 
     @Test func theCountdownReplacesTheCancelHint() {
