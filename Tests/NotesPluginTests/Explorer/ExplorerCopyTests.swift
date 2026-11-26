@@ -3,7 +3,7 @@ import Testing
 
 /// C5 (no jargon) and C6 (help of at most 15 words, decided per sentence) of the foolproof checklist, over the
 /// strings the explorer and its preview own (their catalog comments start with "Explorer", "Preview" or
-/// "Sidebar and list"), in English and in Polish.
+/// "Sidebar and list"), in English and in Polish, except the older "Explorer: state line" strings.
 @Suite("Explorer: copy rules (C5, C6)")
 struct ExplorerCopyTests {
     private struct Entry {
@@ -28,6 +28,9 @@ struct ExplorerCopyTests {
         for (key, value) in strings {
             let comment = value["comment"] as? String ?? ""
             guard ["Explorer", "Preview", "Sidebar and list"].contains(where: comment.hasPrefix) else { continue }
+            // The older state lines (`NoteRowPresentation.stateText`) are not new copy: the explorer's rows say their
+            // own words (`ExplorerRowText.state`), which this test does cover.
+            if comment.hasPrefix("Explorer: state line") { continue }
             let localizations = value["localizations"] as? [String: [String: Any]] ?? [:]
             func text(_ language: String) -> String? {
                 (localizations[language]?["stringUnit"] as? [String: Any])?["value"] as? String

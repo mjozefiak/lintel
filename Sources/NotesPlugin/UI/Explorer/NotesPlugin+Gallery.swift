@@ -90,18 +90,22 @@ private struct GalleryPasteboard: PasteboardClient {
     @MainActor func types() -> [String] { [] }
 }
 
-/// The list and the preview side by side, the way the section draws them, without the status bar.
+/// One of the two views over one model: the list column or the preview. They are drawn apart (the pictures stay
+/// inside the golden budget); the live window shows them side by side.
 private struct NotesExplorerGalleryHost: View {
+    enum Part { case list, preview }
+
     let model: NotesWorkspaceModel
     let scenario: NotesExplorerGalleryCase
+    let part: Part
 
     var body: some View {
-        HStack(spacing: 0) {
-            NoteListView(model: model, width: 300)
-            LintelDivider(axis: .vertical)
-            NotePreviewView(model: model)
+        Group {
+            switch part {
+            case .list: NoteListView(model: model, width: 320)
+            case .preview: NotePreviewView(model: model)
+            }
         }
-        .frame(height: 620)
         .background(LintelBrand.windowBackground)
         .task {
             model.prepareCollection(scenario.collection)
@@ -141,13 +145,15 @@ private struct NotesSidebarGalleryHost: View {
 }
 
 @MainActor enum NotesExplorerGallery {
-    private static let window = GalleryPresentation.window(width: 980, height: 620)
+    private static let listWindow = GalleryPresentation.window(width: 320, height: 620)
+    private static let previewWindow = GalleryPresentation.window(width: 560, height: 560)
 
     private static func state(
-        _ id: String, _ summary: String, _ scenario: NotesExplorerGalleryCase
+        _ id: String, _ summary: String, _ scenario: NotesExplorerGalleryCase,
+        part: NotesExplorerGalleryHost.Part = .list
     ) -> GalleryState {
-        GalleryState(id: id, summary: summary, presentation: window) {
-            AnyView(NotesExplorerGalleryHost(model: galleryModel(scenario), scenario: scenario))
+        GalleryState(id: id, summary: summary, presentation: part == .list ? listWindow : previewWindow) {
+            AnyView(NotesExplorerGalleryHost(model: galleryModel(scenario), scenario: scenario, part: part))
         }
     }
 
@@ -207,33 +213,37 @@ private struct NotesSidebarGalleryHost: View {
             id: "notes.preview", title: "Notes → Explorer: the preview",
             states: [
                 state(
+                    "nothing-selected",
+                    "No note to show yet: one sentence asks to choose a note.",
+                    NotesExplorerGalleryCase(sources: .empty), part: .preview),
+                state(
                     "meeting-notes",
                     "A meeting's notes with the tabs Notes, My notes and Transcript and the footer that says who wrote them.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.summaryID)),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.summaryID), part: .preview),
                 state(
                     "meeting-transcript",
                     "The Transcript tab: speakers and times, the text read-only.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, layer: "transcript")),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, layer: "transcript"), part: .preview),
                 state(
                     "dictation",
                     "A dictation: its cleaned text, no tabs.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.dictationID)),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.dictationID), part: .preview),
                 state(
                     "writing",
                     "The notes are being written: the working ring and one sentence.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.writingID)),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.writingID), part: .preview),
                 state(
                     "needs-model",
                     "The notes wait for a model: one sentence and Download.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.needsModelID)),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.needsModelID), part: .preview),
                 state(
                     "failed-with-retry",
                     "The notes failed and a recorder can write them again: the transcript stays, Try Again.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID, canRetry: true)),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID, canRetry: true), part: .preview),
                 state(
                     "failed-no-retry",
                     "The notes failed and Meetings is off: no button, the sentence says the transcript can be read.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID)),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID), part: .preview),
             ])
     }
 
