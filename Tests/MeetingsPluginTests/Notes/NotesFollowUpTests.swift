@@ -28,7 +28,7 @@ import Testing
     @Test func theFallbackSpreadsTopicsOverTheWholeMeetingInTimeOrder() {
         let points = (0..<30).map { Self.point("p\($0 + 1)", .summary, at: $0 * 60) }
         let output = NotesPipeline.codeOrder(points)
-        #expect(output.keyPoints.count == NotesGuard.maxKeyPoints)
+        #expect(output.keyPoints.count == NotesLayout.maxPointsPerTopic)
         let times = output.keyPoints.compactMap { id in points.first { $0.id == id }?.timeMs }
         #expect(times == times.sorted())
         #expect(times.first == 0)
@@ -61,7 +61,6 @@ import Testing
         #expect(output.questions.count == NotesGuard.maxQuestions)
         #expect(output.questions.contains("q11"))
         #expect(output.decisions == ["d1"] && output.tasks == ["t1"])
-        #expect(output.summary == nil)
     }
 
     @Test func aReduceThatFailsLeavesTopicsFromTheMiddleOfTheMeeting() async throws {
@@ -82,7 +81,7 @@ import Testing
         let result = try await rig.pipeline().run(utterances: utterances)
         #expect(result.status == .partial)
         let numbers = (result.markdown ?? "").matches(of: /Subject alpha(\d+)\s/).compactMap { Int($0.output.1) }
-        #expect(numbers.count == NotesGuard.maxKeyPoints)
+        #expect(numbers.count == NotesLayout.maxPointsPerTopic)
         #expect(numbers.contains { $0 >= 10 && $0 < 20 }, "the middle of the meeting is missing")
         #expect(numbers.contains { $0 >= 20 })
     }
@@ -93,12 +92,12 @@ import Testing
         let seen = Mutex2()
         let rig = NotesRig { call, messages, _ in
             if NotesFake.isMap(messages) { return .done(NotesFake.mapAnswer(messages)) }
-            guard NotesFake.isReduce(messages) else { return .done("SUMMARY: x") }
+            guard NotesFake.isReduce(messages) else { return .done("NONE") }
             seen.add(NotesFake.lastUser(messages))
             if NotesFake.lastUser(messages).contains(NotesPrompt.formatReminder) {
-                return .done(NotesFake.reduceAnswer(messages, summary: "Spotkanie dotyczyło zatwierdzania punktów."))
+                return .done(NotesFake.reduceAnswer(messages))
             }
-            return .cutOff("SUMMARY: loop\nDECISIONS: p1, p1, p1, p1")
+            return .cutOff("INTRO: loop\nDECISIONS: p1, p1, p1, p1")
         }
         let result = try await rig.pipeline().run(utterances: decisionLines(count: 3))
         #expect(result.status == .ok)
@@ -250,12 +249,12 @@ import Testing
         let seen = Mutex2()
         let rig = NotesRig(contextLength: 2000) { _, messages, _ in
             if NotesFake.isMap(messages) { return .done(NotesFake.mapAnswer(messages)) }
-            guard NotesFake.isReduce(messages) else { return .done("SUMMARY: x") }
+            guard NotesFake.isReduce(messages) else { return .done("NONE") }
             seen.add(NotesFake.lastUser(messages))
             if NotesFake.lastUser(messages).contains(NotesPrompt.formatReminder) {
-                return .done(NotesFake.reduceAnswer(messages, summary: "Spotkanie dotyczyło zatwierdzania punktów."))
+                return .done(NotesFake.reduceAnswer(messages))
             }
-            return .cutOff("SUMMARY: loop")
+            return .cutOff("INTRO: loop")
         }
         let result = try await rig.pipeline().run(utterances: decisionLines(count: 3))
         #expect(!result.reduceFailed)
@@ -294,7 +293,7 @@ import Testing
         #expect(english.contains("a reader can understand alone"))
         #expect(english.contains("only with its verdict"))
         #expect(NotesPrompt.mapSystem(language: .polish).contains("to samo zadanie wpisujesz raz"))
-        #expect(NotesPrompt.reduceSystem.contains("whole meeting"))
+        #expect(NotesPrompt.reduceSystem(maxTopics: 6).contains("Cover the whole meeting"))
     }
 }
 

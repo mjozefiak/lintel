@@ -75,7 +75,7 @@ Benchmark ma dziś tylko liczniki śladu i długości notatek. Ocen sędziego Fa
    Bez czasów, bez oznaczeń autora (decyzja właściciela 2026-11-19). Etykiety sekcji należą do kodu (`NotesComposer.Labels`, PL/EN według dominującego języka transkryptu), nazwy tematów i treść pisze model w języku spotkania.
 2. **Reguły długości zależne od spotkania**, liczone w kodzie: `maxTopics = min(10, max(2, minuty / 6))` (24 min → 4, 38 min → 6, 55 min → 9, ≥ 60 min → 10). Cel 4–10 tematów dotyczy spotkań od ok. 20 minut. Kod pilnuje tylko górnej granicy; dolnej nie wymusza, nie dopycha tematów ani punktów. **Krótkie spotkanie** (< 10 min albo < 6 punktów do pokazania): wstęp + jedna lista punktów bez nagłówków tematów + decyzje i następne kroki, gdy są. Temat z jednym punktem łączy się w końcowy temat „Inne” (EN „Other”), który też ma najwyżej 6 punktów.
 3. **Tor dostawcy:** prompt `whole2` w nowym formacie (`INTRO:`, `TOPIC:`, `POINT |`, `DECISION |`, `TASK |`, `OPEN |`) z liczbą tematów podaną przez kod; nowe limity w `NotesFactGuard`; `NotesDraftComposer` przechodzi na `NotesLayout`. Sprawdzanie faktów bez zmian.
-4. **Tor wbudowany, układ:** REDUCE w wersji 7 zwraca `INTRO:` i linie `TOPIC: nazwa | id, id, …` zamiast jednej listy `FINDINGS`; limit 10 punktów znika (zostaje `maxTopics` × 6); nazwa tematu przechodzi kontrolę faktów jak zdanie wstępu (bez obcych imion, liczb, dat, w języku spotkania, do 8 słów), a odrzucona nazwa przenosi punkty do tematu „Inne”.
+4. **Tor wbudowany, układ:** REDUCE w wersji 7 zwraca linie `TOPIC: nazwa | id, id, …` zamiast jednej listy `FINDINGS`, **bez wstępu** (decyzja właściciela 2026-11-26: wstęp pisany przez model dał jedyne nowe potwierdzone zmyślenie, ES2014c; wstęp zostaje tylko na torze dostawcy; linia `INTRO:` w odpowiedzi jest ignorowana); limit 10 punktów znika (zostaje `maxTopics` × 6); nazwa tematu przechodzi kontrolę faktów jak zdanie (bez obcych imion, liczb, dat, w języku spotkania, do 8 słów), a odrzucona nazwa przenosi punkty do tematu „Inne”.
 5. **Tor wbudowany, strażnik**, trzy zmiany, każda w osobnej fazie i z pomiarem:
    - **(S1) kotwiczenie cytatu:** gdy dopasowanie dosłowne i z przerwami zawiodą, strażnik szuka **najkrótszego fragmentu jednego zdania tego samego mówcy**, który zawiera w tej samej kolejności co najmniej 80% słów treści cytatu (zaokrąglone w górę, co najmniej 3 słowa; słowa funkcyjne z `notContentWords` się nie liczą), nie dłuższego niż cytat + 3 słowa, w odległości ≤ 60 s od czasu podanego przez model. Ten fragment (nie całe zdanie ASR) staje się cytatem punktu i wszystkie dalsze sprawdzenia (szczegóły, negacja, dryf, osoba, termin) działają na nim. Nigdy przez granicę mówcy, nigdy z dwóch zdań (`NotesGuardSentenceCrossingTests` bez zmian).
    - **(S2) zwykłe słowo z wielkiej litery na początku punktu:** pierwsze słowo tekstu punktu `SUM` nie daje `unsupportedSentenceStart`, gdy w transkrypcie występuje pisane małą literą poza początkiem zdania **i** nigdy nie stoi z wielkiej litery w środku zdania, nie jest częścią etykiety mówcy ani kandydatem na imię (`nameCandidates`). Decyzje i zadania bez zmian (nie mają za sobą sprawdzenia dryfu). Liczby, daty, dni, miesiące i nazwy własne nadal muszą być w wypowiedzi cytatu albo w nazwie mówcy. Jeśli F0 pokaże, że podpowód `unsupportedSentenceStart` jest mały, S2 wypada z F2 (cel się nie zmienia).
@@ -96,7 +96,7 @@ Moduł: `Sources/MeetingsPlugin/Notes/`. Bez zmian w `LintelKit`, `LintelCore`, 
 
 ```mermaid
 flowchart LR
-  T[Transkrypt + mówcy] --> M["MAP (istnieje)"] --> G["NotesGuard (zmiany S1–S3)"] --> R["REDUCE v7: INTRO + TOPIC (zmiana)"] --> L
+  T[Transkrypt + mówcy] --> M["MAP (istnieje)"] --> G["NotesGuard (zmiany S1–S3)"] --> R["REDUCE v7: TOPIC, bez wstępu (zmiana)"] --> L
   T --> W["WholeNotesPipeline, prompt whole2 (zmiana)"] --> F["NotesFactGuard (nowe limity)"] --> L
   L["NotesLayout + kompozytor (nowe)"] --> MD["NotesMarkdown.render (istnieje)"] --> DB[(notes_markdown)]
 ```
@@ -111,7 +111,7 @@ Wniosek z diagramu: oba tory kończą się w jednym nowym typie `NotesLayout`, w
 | `NotesComposer`, `NotesDraftComposer` | istnieją | mapują `ReduceVerdict` / `NotesDraft` na `NotesLayout`; własne składanie Markdownu znika. |
 | `WholeNotesPrompt` | `whole1` | `whole2`: format z `INTRO:`, liczba tematów i punktów w prompcie, nowy syntetyczny przykład. Nowe pliki golden `whole-notes-prompt-v2.txt` i `provider-prompt-cli1-whole2.txt` (stare zostają). |
 | `NotesFactGuard` | istnieje | `maxTopics` z `NotesLayout`, `maxPointsPerTopic = 6`, `maxDecisions = 10`, `maxTasks = 15`, `maxSummarySentences = 3`; nazwa tematu sprawdzana ściśle jak dziś (nie łagodnym trybem tytułu `lenientNames`), wstęp jak dziś podsumowanie; odrzucona nazwa tematu przenosi punkty do „Inne” i nie liczy się do `notes_dropped_count` (licznik `topicNameRefused`). |
-| `NotesPrompt` | v6 | v7: REDUCE zwraca `INTRO:`, `TOPIC: nazwa | ids`, `DECISIONS:`, `TASKS:`, `QUESTIONS:`. MAP bez zmian treści (wersja rośnie razem z REDUCE). Nowy plik golden. |
+| `NotesPrompt` | v6 | v7: REDUCE zwraca `TOPIC: nazwa | ids`, `DECISIONS:`, `TASKS:`, `QUESTIONS:`. MAP bez zmian treści (wersja rośnie razem z REDUCE). Nowy plik golden. |
 | `NotesParser` / `NotesReduceOutput` | istnieją | `topics: [(name: String, ids: [String])]` zamiast `keyPoints`; stara forma `FINDINGS:` nadal parsowana (odporność na model), mapowana na jeden temat bez nazwy. |
 | `NotesGuard` | istnieje | S1 (`find` z kotwiczeniem do najkrótszego fragmentu), S2 (słowa pisane w transkrypcie tylko małą literą), S3 (`driftsFromQuote` na całym dosłownym cytacie), `rulesVersion`; `verifyReduce` sprawdza nazwę tematu względem słownika punktów **tego** tematu; `maxKeyPoints` zastępuje limit z `NotesLayout`; `maxSummaryWords` 160 → 70 i najwyżej 3 zdania (dłuższy wstęp: zostają zdania, które przechodzą, do limitu, jak dziś przy ocalaniu). |
 | `NotesTrace` | `schemaVersion` 5 | 6 (cały zestaw zarezerwowany w F0, pola zerowe do czasu swojej fazy, bo dekoder odrzuca nieznane klucze): podpowody `unsupportedDetail` (`unsupportedNumber`, `unsupportedCalendarWord`, `unsupportedCapitalised`, `unsupportedSentenceStart`) i `quoteNotInTranscript`, `reanchored`, `rulesVersion`, `topicNameRefused`, liczba tematów i punktów na temat, punkty `SUM` bez tematu (`notChosen`) i ucięte limitem. Tylko liczby. |
@@ -202,7 +202,7 @@ Zbiór B jest informacyjny (2 spotkania to za mało na bramkę): cel to `overall
 ## 📝 Risks & Impact Review
 
 - **Wierność (najważniejsze ryzyko):** S1–S3 przepuszczają więcej tekstu modelu. Ograniczenia: każda zmiana w osobnej fazie, istniejące testy regresji (`NotesDriftTests`, `NotesGuardSentenceCrossingTests`, `NotesGuardHardeningTests`, `NotesRegressionTests`) zostają bez osłabiania oczekiwań, reguła zatrzymania, audyt F0. Zmiana oczekiwania w tych testach wraca do właściciela (zasada z pamięci projektu o testach osłabionych).
-- **Zachowanie widoczne dla użytkownika (BACKWARD_COMPATIBILITY §5):** `NotesPrompt.version` 6 → 7 i `WholeNotesPrompt.version` `whole1` → `whole2`, nowe pliki golden, wpis w release notes: *Meeting notes now follow a topic layout: a short intro, topics, decisions made and next steps.* Stare notatki bez zmian. Wycofanie: przywrócenie poprzedniej wersji promptu i kompozytora (kod), bez migracji danych.
+- **Zachowanie widoczne dla użytkownika (BACKWARD_COMPATIBILITY §5):** `NotesPrompt.version` 6 → 7 i `WholeNotesPrompt.version` `whole1` → `whole2`, nowe pliki golden, wpis w release notes: *Meeting notes now follow a topic layout: topics, decisions made and next steps* (tor wbudowany bez wstępu, dostawca ze wstępem). Stare notatki bez zmian. Wycofanie: przywrócenie poprzedniej wersji promptu i kompozytora (kod), bez migracji danych.
 - **Zgodność narzędzi:** `NotesTrace.schemaVersion` 5 → 6, wszystkie nowe pola zarezerwowane w F0 (dekoder odrzuca nieznane klucze); narzędzia benchmarku muszą znać 6 (zmiana w F0).
 - **Zmiany strażnika bez zmiany promptu** też zmieniają notatki: wersja reguł `g1`/`g2` w `notes_prompt_version` i wpis w release notes, jak przy wersji promptu.
 - **Kontrakty:** brak zmian w `LintelKit`, ustawieniach, bazie. Etykiety sekcji to tekst UI w kodzie pluginu (jak dziś), nie klucze `Localizable.xcstrings`.
@@ -220,6 +220,7 @@ Zbiór B jest informacyjny (2 spotkania to za mało na bramkę): cel to `overall
 | OD4 | Dostawca Claude włączony | właściciel 2026-11-19 |
 | OD5 | Wzorzec czytelności: Wispr Flow; zrzuty ekranu i szablony (Granola) to osobne specy | właściciel 2026-11-25 (brief S2) |
 | OD6 | Wierność ponad pokrycie: zero zmyśleń | brief S2 |
+| OD7 | Tor wbudowany bez wstępu pisanego przez model (wstęp może wrócić tylko z własną kontrolą faktów); tor dostawcy ze wstępem | właściciel 2026-11-26 (#325) |
 
 ## Resolved assumptions (autonomous defaults)
 
@@ -295,7 +296,7 @@ Dwie niezależne ścieżki: układ (F1 → F4; F4 zależy tylko od F1, czyli od 
 
 ### F4 — układ toru wbudowanego
 
-1. **`NotesPrompt` v7:** REDUCE z `INTRO:` i `TOPIC: nazwa | ids` (liczba tematów od kodu); MAP bez zmian treści. Testy: nowe golden `notes-prompt-v7-{en,pl,unknown}.txt` (jak dziś `v6`); `NotesPromptTests`.
+1. **`NotesPrompt` v7:** REDUCE z `TOPIC: nazwa | ids` (liczba tematów od kodu), bez `INTRO:`; MAP bez zmian treści. Testy: nowe golden `notes-prompt-v7-{en,pl,unknown}.txt` (jak dziś `v6`); `NotesPromptTests`.
 2. **Parser i `verifyReduce`:** tematy, identyfikator tylko w jednym temacie, tylko `SUM`, nazwa tematu przez kontrolę faktów i języka, odrzucona nazwa → „Inne”, stary `FINDINGS:` → jeden temat bez nazwy; limit `maxTopics × 6` zamiast `maxKeyPoints`. Testy: `NotesGuardTests`, `NotesParserTests`, `NotesSummaryRefusalTests` z nowymi przypadkami.
 3. **`NotesComposer` → `NotesLayout`**; ślad: liczba tematów, punktów na temat, `topicNameRefused`. Testy: `NotesPresentationTests`, `NotesTraceTests`, `NotesChecklistTests` (następne kroki nadal przełączalne).
 4. **Pomiar `B4`** + ręczne QA ze zrzutami (jak F1). Release note.
