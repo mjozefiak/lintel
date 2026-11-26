@@ -1,20 +1,21 @@
-# lintel-actions: post-meeting actions (prototype, iteration 1, 2026-11-26)
+# lintel-actions: post-meeting actions (prototype, iteration 2, 2026-11-26)
 
 Clickable HTML prototype for the owner's vision of 2026-11-26: after a meeting you get **ready-to-run actions**, not a to-do list. The email is already written, the meeting is already set up, the Jira ticket is already filled in. You check each one and approve it with one click, all in one place. **Nothing here is decided until the owner picks it** (owner rule 2026-11-19: no default is accepted for actions or chat). This is design only, with no Swift code and no spec. The spec comes after the owner accepts the prototype and after the detection-quality spike (brainstorm decision 9).
 
 - Open: `cd .ai/prototypes/lintel-actions && python3 -m http.server 8771 --bind 127.0.0.1`, then `http://127.0.0.1:8771/index.html`. Opening `index.html` directly also works.
 - Built on the accepted direction sketch `.ai/prototypes/lintel-direction` (owner decisions 2026-11-24: notes explorer as the main view, the working ring, warm neutrals, Verdigris only on the primary button, the selection and live state, neutral links, Notes · My notes · Transcript tabs) and on spec #255 (`.ai/specs/2026-11-24-notes-explorer-main-window.md`). The tokens and primitives are copied unchanged from `lintel-direction/lintel.html`.
-- Toolbar (not part of the design): screen, **Where (Q3)** layout variant, state, **Mail route** (Q1, decided), theme, language (EN/PL), text size (M/L/XL).
-- Query: `?screen=note|inbox|apps|after&layout=tab|inline|inbox&state=ready|finding|none|done|errors|offline|graduate&mail=acct|mcp|nomail&theme=light|dark&lang=en|pl&ts=m|l|xl&sel=a1..a5|s1|s2&chrome=0`.
+- Toolbar (not part of the design): screen, state, **Account** (Google/Microsoft, connector (MCP), no account; Q1 and Q2 decided), theme, language (EN/PL), text size (M/L/XL), Reset.
+- Query: `?screen=note|inbox|apps|after&tab=notes|actions|mine|transcript&pop=a1..a5&state=ready|finding|none|done|errors|offline|graduate&mail=acct|mcp|nomail&theme=light|dark&lang=en|pl&ts=m|l|xl&sel=a1..a5|s1|s2&chrome=0`.
 - All names, addresses, companies and data are fictional (`*.example`).
 
 ## What you can click
 
+- **Meeting note → Notes tab** (Q4): the meeting always opens on Notes. A task that has an action shows a small icon (mail, calendar, ticket, or a check when done, amber while it needs you). Pointing at the task for about half a second, or focusing it with Tab, opens a card with the action's details and **Show in Actions**. Esc closes it.
 - **Meeting note → Actions tab**: five actions from "Client call: Nordlys Energy". Click a row to open its card. The fields are editable in place. **Send** starts a 10-second countdown with **Undo**. "Add to Calendar" and "Create in Jira" finish at once and show Undo for 6 seconds. **Dismiss** greys the row out and offers Restore. **Show in Transcript** jumps to the sentence the action came from. ⌘↩ approves and ⌘⌫ dismisses the open card. After each approval the next card that needs you opens.
 - **Other speaker** (a4): Ingrid said an email address. The card says who asked, leaves **To** empty, and Send asks you to add the recipient.
 - **Unsure speaker** (a5): two people were on the same microphone. The card asks "Who will do it?" (You, Marek Lis, or No one, dismiss). The assignee fills in from the answer.
 - **States**: Finding (ring closing and placeholder rows), None found, All done (results with "Open in Jira / Calendar / Gmail" links), Errors (no internet for mail, Jira needs a component), Not connected (Jira not connected, Google sign-in expired; the draft stays), Ask less (the offer to stop asking for events just for you, shown on Weekly sales sync).
-- **Actions inbox** (layout C): one list of every waiting action across meetings, with the card on the right.
+- **Actions inbox** (Q3: the Actions tab plus this inbox in the sidebar): one list of every waiting action across meetings, with the card on the right.
 - **Connected apps** (Settings): Google, Calendar on this Mac, Microsoft 365, other mail through a connector, Jira, Linear, Asana, and "When Lintel may act without asking".
 - **After the meeting**: one macOS notification per meeting and the menu bar ring with a dot plus "Actions to review 5".
 
@@ -23,6 +24,12 @@ Clickable HTML prototype for the owner's vision of 2026-11-26: after a meeting y
 From the 2026-11-23 brainstorm (not asked again): actions before chat; approval is always a click, and "always allow" exists only for actions that affect only the user (an event without guests, a ticket assigned to yourself); email, anything for other people and every MCP tool always ask; actions are found by the provider that writes the notes; the other-speaker guard takes no recipients, links or attachments from someone else's words and never graduates; when the speaker is uncertain, the card asks; Jira uses an API token in the Keychain; MCP only from a Lintel-curated list.
 
 **Owner decision 2026-11-26 (Q1, mail)**: the main path sends from Lintel through a connected **Google or Microsoft** account. Sending through an **MCP mail connector** from the curated list is an extra path. **Open as Draft** is always the fallback. If Google or Microsoft app verification blocks for long, start with the paths that need no verification (MCP, draft). The OAuth research is in `.ai/specs/research/2026-11-26-actions-mail-oauth.md`.
+
+**Owner decisions 2026-11-26 (Q2–Q4)**:
+- **Q2 = A + D.** Events with guests go through the connected Google/Microsoft account, later also through a calendar connector (MCP). EventKit (Calendar on this Mac) is only for events without guests. Without an account, the event goes to Calendar on this Mac and the invitation opens as an email draft with an `.ics` file (toolbar "Account → No account").
+- **Delivery order for sending:** draft → Microsoft → Google (the owner starts Google verification now, in parallel) → MCP.
+- **Q3 = C.** The Actions tab in the note plus the Actions inbox in the sidebar (the layout switch is gone).
+- **Q4 = changed by the owner.** A meeting always opens on Notes. A task linked to an action shows, on hover after a short delay, a card with the action's details and a way into the Actions section.
 
 ## Shape (om-ux-shape, short)
 
@@ -42,9 +49,9 @@ From the 2026-11-23 brainstorm (not asked again): actions before chat; approval 
 
 | # | Question | Options | Recommendation |
 |---|---|---|---|
-| Q2 | Meetings with guests: EventKit cannot add attendees (Apple docs) | A) through the same Google/Microsoft account as mail; B) EventKit + .ics invitation by mail; C) EventKit, then add people in Calendar; D) A + a calendar connector (MCP) | A now, D with the mail connector |
-| Q3 | Where the actions live (toolbar "Where") | A) Actions tab in the note; B) at the top of the Notes tab; C) tab + an Actions inbox in the sidebar across meetings | C |
-| Q4 | Which tab a meeting opens on while actions wait | A) Actions, until all are handled; B) always Notes | A |
+| Q2 | Meetings with guests | **Decided: A + D**, .ics as the fallback without an account | — |
+| Q3 | Where the actions live | **Decided: C** (tab + inbox) | — |
+| Q4 | Which tab a meeting opens on | **Decided (owner's own option)**: always Notes; linked tasks show a hover card | — |
 | Q5 | Card form | A) one card open at a time, editable in place (prototype); B) all cards expanded; C) read-only card with Edit | A |
 | Q6 | Evidence on the card | A) quote + speaker always visible (prototype); B) behind "Why?"; C) quote + surrounding lines | A |
 | Q7 | Undo after approval | A) mail held 10 s with Undo, other actions undone by deleting what was created (prototype); B) no Undo, only a result link | A |

@@ -376,6 +376,25 @@ textarea.in2{display:block;min-height:118px;line-height:1.5;padding:7px 9px;resi
 /* variant notes in the sketch bar */
 #sk-bar .grp2{display:inline-flex;gap:6px;align-items:center}
 .vnote{position:absolute;right:10px;top:-24px;font:12px -apple-system,system-ui,sans-serif;color:var(--sec)}
+/* Q4: tasks linked to actions, hover card */
+.tasks{position:relative}
+.task.linked{border-radius:6px;margin:0 -6px;padding:4px 6px;cursor:default}
+.task.linked:hover,.task.linked:focus-visible{background:var(--fill)}
+.tmark{display:inline-flex;align-items:center;margin-left:7px;color:var(--sec);vertical-align:-2px}
+.tmark .ic{width:13px;height:13px}
+.tmark.need{color:var(--warn)}.tmark.done{color:var(--atext)}
+.tpop{position:absolute;z-index:7;width:350px;padding:12px;border-radius:12px;background:var(--group);box-shadow:0 14px 36px rgba(0,0,0,.2),0 0 0 .5px var(--hair)}
+.dark .tpop{box-shadow:0 14px 36px rgba(0,0,0,.55),0 0 0 .5px var(--hair)}
+.tpop .ph3{display:flex;gap:10px;align-items:flex-start}
+.tpop .ti{width:28px;height:28px;border-radius:7px;background:var(--fill);display:grid;place-items:center;flex:none}
+.tpop .tx{flex:1;min-width:0}.tpop .pt{font-weight:600}.tpop .pm{color:var(--sec);font-size:.923rem}
+.tpop .pl{margin:10px 0 0 38px;display:flex;flex-direction:column;gap:3px}
+.tpop .pk{color:var(--sec);display:inline-block;min-width:64px}
+.tpop .pv{color:var(--sec);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tpop .pn{display:flex;gap:6px;align-items:center;margin:8px 0 0 38px;color:var(--warn);font-weight:600;font-size:.923rem}
+.tpop .pn .ic{width:13px;height:13px}
+.tpop .pa{display:flex;justify-content:flex-end;margin-top:10px}
+.tpop .pa .ic{width:11px;height:11px}
 </style>
 </head>
 <body>

@@ -1,15 +1,15 @@
 /* Lintel post-meeting actions: clickable prototype, iteration 1 (2026-11-26).
    Built on the accepted direction sketch (.ai/prototypes/lintel-direction, owner decisions 2026-11-24): notes explorer,
    working ring, warm neutrals, Verdigris only on the primary button, the selection and live state.
-   Query: ?screen=note|inbox|apps|after  &layout=tab|inline|inbox  &state=ready|finding|none|done|errors|offline|graduate
-          &mail=both|send|draft  &theme=light|dark  &lang=en|pl  &ts=m|l|xl  &chrome=0  &sel=<action id>
+   Query: ?screen=note|inbox|apps|after  &pop=<action id: open the task hover card>  &tab=notes|actions|mine|transcript  &state=ready|finding|none|done|errors|offline|graduate
+          &mail=acct|mcp|nomail  &theme=light|dark  &lang=en|pl  &ts=m|l|xl  &chrome=0  &sel=<action id>
    All names, addresses and data are fictional. Nothing here is a decision until the owner picks it (see README). */
 (function () {
   'use strict';
 
   const COPY = {
     en: {
-      bar: { screen: 'Screen', note: 'Meeting note', inbox: 'Actions inbox', apps: 'Connected apps', after: 'After the meeting', layout: 'Where (Q3)', tab: 'Tab', inline: 'In Notes', inboxL: 'Tab + inbox', state: 'State', ready: 'Ready', finding: 'Finding', none: 'None found', done: 'All done', errors: 'Errors', offline: 'Not connected', graduate: 'Ask less', mail: 'Mail route (Q1 decided)', acct: 'Google/Microsoft', mcp: 'Connector (MCP)', nomail: 'No account', theme: 'Theme', light: 'Light', dark: 'Dark', lang: 'Language' },
+      bar: { screen: 'Screen', note: 'Meeting note', inbox: 'Actions inbox', apps: 'Connected apps', after: 'After the meeting', layout: 'Where (Q3)', tab: 'Tab', inline: 'In Notes', inboxL: 'Tab + inbox', state: 'State', ready: 'Ready', finding: 'Finding', none: 'None found', done: 'All done', errors: 'Errors', offline: 'Not connected', graduate: 'Ask less', mail: 'Account (Q1, Q2 decided)', acct: 'Google/Microsoft', mcp: 'Connector (MCP)', nomail: 'No account', theme: 'Theme', light: 'Light', dark: 'Dark', lang: 'Language' },
       me: 'Anna Nowak', meMail: 'anna.nowak@brightline.example',
       searchNotes: 'Search notes', record: 'Record Meeting', settings: 'Settings',
       nav: { all: 'All notes', meetings: 'Meetings', dictations: 'Dictations', actions: 'Actions', folders: 'Folders', newFolder: 'New Folder', dictionary: 'Dictionary' },
@@ -28,7 +28,7 @@
         tabs: { notes: 'Notes', actions: 'Actions', mine: 'My notes', transcript: 'Transcript' },
         sumH: 'Summary', sum: 'Nordlys accepts the price if work starts in January. Ingrid needs the service levels in writing before she signs.',
         decH: 'Decisions', dec: ['Work starts on 12 January.', 'The price stays as quoted, with no discount.'],
-        taskH: 'Tasks', tasks: [['You', 'Send Ingrid a recap', 'today'], ['You', 'Set up the kick-off on 12 January', ''], ['Marek Lis', 'Write up the service levels', 'by Wednesday'], ['Ingrid Halvorsen', 'Confirm the start date with her board', '']],
+        taskH: 'Tasks', tasks: [['You', 'Send Ingrid a recap', 'today', 'a1'], ['You', 'Set up the kick-off on 12 January', '', 'a2'], ['Marek Lis', 'Write up the service levels', 'by Wednesday', 'a3'], ['You', 'Send the contract draft to Nordlys’ lawyer', '', 'a4'], ['You or Marek Lis', 'Book a room in Bergen for the workshop', '', 'a5'], ['Ingrid Halvorsen', 'Confirm the start date with her board', '']],
         toActions: (n) => `Lintel prepared ${n} actions from this meeting.`, review: 'Review Actions',
         foot: 'Lintel wrote these notes from the recording, on this Mac.',
         mine: ['Ingrid OK with the price if we start in Jan', 'Ask Marek about the wording of the service levels'],
@@ -36,7 +36,7 @@
         tr: [['You', 'Thanks for making time, Ingrid. Shall we start with the price?'], ['Ingrid Halvorsen', 'Yes. We can accept it if you can start in January.'], ['You', 'January works. Let’s put the kick-off on the 12th at ten, with Marek.', 'a2'], ['Marek Lis', 'I’ll write up the service levels by Wednesday.', 'a3'], ['Ingrid Halvorsen', 'Please send the contract draft to our lawyer, olsen@fjordlaw.example.', 'a4'], ['?', 'I’ll book a room in Bergen for the workshop.', 'a5'], ['You', 'Great. I’ll send you a short recap today.', 'a1']],
         unsure: 'You or Marek Lis'
       },
-      sync: { meta: 'Today, 9:00 · 28 min · You, Marek Lis, Ola Berg' },
+      sync: { meta: 'Today, 9:00 · 28 min · You, Marek Lis, Ola Berg', sum: 'Pipeline is on track for Q4. The CRM export bug slows down the weekly report.', dec: ['The Q4 forecast is due on Monday.'], tasks: [['You', 'Log the CRM export bug for the CRM team', '', 's1'], ['You', 'Block time for the Q4 forecast', 'Friday', 's2']] },
       a: {
         hdr: (n, w) => (w ? `${n} actions · ${w} need you` : `${n} actions`), hdrSub: 'Check each one, then approve it.',
         allDone: 'All done', allDoneSub: (d, x) => `${d} done${x ? `, ${x} dismissed` : ''}. Changes in Lintel don’t change what was sent.`,
@@ -50,7 +50,7 @@
         draft: 'Open as Draft', dismiss: 'Dismiss', restore: 'Restore', retry: 'Try Again', undo: 'Undo',
         keys: [['⌘↩', 'approve'], ['⌘⌫', 'dismiss']],
         sendAs: (m) => `Sends from ${m} (Google).`, mcpAs: 'Sends through your mail connector, as you.', draftOnly: 'No mail account is connected, so this opens as a draft in your mail app.', connectMail: 'Connect Google or Microsoft',
-        calAs: 'Google sends the invitations from your account.', calMine: 'Goes to Calendar on this Mac. No one else is invited.',
+        calAs: 'Google sends the invitations from your account.', calMcp: 'Through your calendar connector. Invitations come from your account.', calIcs: 'No Google or Microsoft account: the event goes to Calendar on this Mac and the invitation opens as an email draft with an .ics file. Replies won’t update the event.', icsBtn: 'Add and Draft Invitation', calMine: 'Goes to Calendar on this Mac. No one else is invited.',
         jiraAs: 'Created in brightline.atlassian.net as you.', linAs: 'Through Linear’s connector. Linear gets exactly these fields.',
         edited: 'Edited',
         res: {
@@ -68,7 +68,7 @@
         findT: 'Finding actions in this meeting…', findS: 'You can keep working. Lintel lets you know when they’re ready.',
         noneT: 'No actions in this meeting', noneS: 'Lintel didn’t hear an email to send, a meeting to set up or a ticket to create. Your tasks are in Notes.', showNotes: 'Show Notes',
         gradT: 'You added 3 events just for you without changes.', gradS: 'Add events like this without asking? Events with guests always ask.', gradYes: 'Add Without Asking', gradNo: 'Keep Asking',
-        inlineH: 'Ready to do'
+        inlineH: 'Ready to do', inActions: 'Show in Actions', popVia: { mail: 'Email', event: 'Calendar', jira: 'Jira ticket', linear: 'Linear issue' }, taskHint: 'Point at a task to see the action Lintel prepared.'
       },
       A: {
         a1: { type: 'mail', by: 'You', t: 'Email Ingrid a recap', q: 'Great. I’ll send you a short recap today.',
@@ -110,7 +110,7 @@
       }
     },
     pl: {
-      bar: { screen: 'Ekran', note: 'Notatka ze spotkania', inbox: 'Skrzynka akcji', apps: 'Połączone aplikacje', after: 'Po spotkaniu', layout: 'Gdzie (P3)', tab: 'Zakładka', inline: 'W Notatkach', inboxL: 'Zakładka + skrzynka', state: 'Stan', ready: 'Gotowe', finding: 'Szukanie', none: 'Brak', done: 'Wszystko zrobione', errors: 'Błędy', offline: 'Bez połączenia', graduate: 'Pytaj rzadziej', mail: 'Droga maila (P1 zdecydowane)', acct: 'Google/Microsoft', mcp: 'Łącznik (MCP)', nomail: 'Bez konta', theme: 'Motyw', light: 'Jasny', dark: 'Ciemny', lang: 'Język' },
+      bar: { screen: 'Ekran', note: 'Notatka ze spotkania', inbox: 'Skrzynka akcji', apps: 'Połączone aplikacje', after: 'Po spotkaniu', layout: 'Gdzie (P3)', tab: 'Zakładka', inline: 'W Notatkach', inboxL: 'Zakładka + skrzynka', state: 'Stan', ready: 'Gotowe', finding: 'Szukanie', none: 'Brak', done: 'Wszystko zrobione', errors: 'Błędy', offline: 'Bez połączenia', graduate: 'Pytaj rzadziej', mail: 'Konto (P1, P2 zdecydowane)', acct: 'Google/Microsoft', mcp: 'Łącznik (MCP)', nomail: 'Bez konta', theme: 'Motyw', light: 'Jasny', dark: 'Ciemny', lang: 'Język' },
       me: 'Anna Nowak', meMail: 'anna.nowak@brightline.example',
       searchNotes: 'Szukaj w notatkach', record: 'Nagraj spotkanie', settings: 'Ustawienia',
       nav: { all: 'Wszystkie notatki', meetings: 'Spotkania', dictations: 'Dyktowania', actions: 'Akcje', folders: 'Foldery', newFolder: 'Nowy folder', dictionary: 'Słownik' },
@@ -129,7 +129,7 @@
         tabs: { notes: 'Notatki', actions: 'Akcje', mine: 'Moje notatki', transcript: 'Transkrypt' },
         sumH: 'Podsumowanie', sum: 'Nordlys akceptuje cenę, jeśli prace ruszą w styczniu. Ingrid potrzebuje poziomów usług na piśmie, zanim podpisze.',
         decH: 'Decyzje', dec: ['Prace startują 12 stycznia.', 'Cena zostaje jak w ofercie, bez rabatu.'],
-        taskH: 'Zadania', tasks: [['Ty', 'Wysłać Ingrid podsumowanie', 'dziś'], ['Ty', 'Umówić spotkanie startowe 12 stycznia', ''], ['Marek Lis', 'Spisać poziomy usług', 'do środy'], ['Ingrid Halvorsen', 'Potwierdzić termin startu z zarządem', '']],
+        taskH: 'Zadania', tasks: [['Ty', 'Wysłać Ingrid podsumowanie', 'dziś', 'a1'], ['Ty', 'Umówić spotkanie startowe 12 stycznia', '', 'a2'], ['Marek Lis', 'Spisać poziomy usług', 'do środy', 'a3'], ['Ty', 'Wysłać projekt umowy prawnikowi Nordlys', '', 'a4'], ['Ty albo Marek Lis', 'Zarezerwować salę w Bergen na warsztat', '', 'a5'], ['Ingrid Halvorsen', 'Potwierdzić termin startu z zarządem', '']],
         toActions: (n) => `Lintel przygotował z tego spotkania ${n} akcji.`, review: 'Sprawdź akcje',
         foot: 'Lintel napisał te notatki z nagrania, na tym Macu.',
         mine: ['Ingrid OK z ceną, jeśli start w styczniu', 'Zapytać Marka o brzmienie poziomów usług'],
@@ -137,7 +137,7 @@
         tr: [['Ty', 'Dzięki, że znalazłaś czas, Ingrid. Zaczniemy od ceny?'], ['Ingrid Halvorsen', 'Tak. Przyjmiemy ją, jeśli zaczniecie w styczniu.'], ['Ty', 'Styczeń pasuje. Umówmy start na dwunastego o dziesiątej, z Markiem.', 'a2'], ['Marek Lis', 'Spiszę poziomy usług do środy.', 'a3'], ['Ingrid Halvorsen', 'Proszę wysłać projekt umowy naszemu prawnikowi, olsen@fjordlaw.example.', 'a4'], ['?', 'Zarezerwuję salę w Bergen na warsztat.', 'a5'], ['Ty', 'Świetnie. Wyślę Ci dziś krótkie podsumowanie.', 'a1']],
         unsure: 'Ty albo Marek Lis'
       },
-      sync: { meta: 'Dzisiaj, 9:00 · 28 min · Ty, Marek Lis, Ola Berg' },
+      sync: { meta: 'Dzisiaj, 9:00 · 28 min · Ty, Marek Lis, Ola Berg', sum: 'Lejek sprzedaży na Q4 idzie zgodnie z planem. Błąd eksportu z CRM spowalnia cotygodniowy raport.', dec: ['Prognoza Q4 do poniedziałku.'], tasks: [['Ty', 'Zgłosić zespołowi CRM błąd eksportu', '', 's1'], ['Ty', 'Zablokować czas na prognozę Q4', 'piątek', 's2']] },
       a: {
         hdr: (n, w) => (w ? `Akcje: ${n} · ${w} czeka na Ciebie` : `Akcje: ${n}`), hdrSub: 'Sprawdź każdą i zatwierdź.',
         allDone: 'Wszystko zrobione', allDoneSub: (d, x) => `Zrobione: ${d}${x ? `, odrzucone: ${x}` : ''}. Zmiany w Lintelu nie zmieniają tego, co już wysłano.`,
@@ -151,7 +151,7 @@
         draft: 'Otwórz jako szkic', dismiss: 'Odrzuć', restore: 'Przywróć', retry: 'Spróbuj ponownie', undo: 'Cofnij',
         keys: [['⌘↩', 'zatwierdź'], ['⌘⌫', 'odrzuć']],
         sendAs: (m) => `Wysyłka z ${m} (Google).`, mcpAs: 'Wysyłka przez Twój łącznik poczty, jako Ty.', draftOnly: 'Nie masz połączonej poczty, więc mail otworzy się jako szkic w Twojej aplikacji pocztowej.', connectMail: 'Połącz Google lub Microsoft',
-        calAs: 'Zaproszenia wyśle Google z Twojego konta.', calMine: 'Trafi do Kalendarza na tym Macu. Nikt inny nie jest zapraszany.',
+        calAs: 'Zaproszenia wyśle Google z Twojego konta.', calMcp: 'Przez Twój łącznik kalendarza. Zaproszenia przyjdą z Twojego konta.', calIcs: 'Bez konta Google ani Microsoft: wydarzenie trafi do Kalendarza na tym Macu, a zaproszenie otworzy się jako szkic maila z plikiem .ics. Odpowiedzi gości nie zaktualizują wydarzenia.', icsBtn: 'Dodaj i przygotuj zaproszenie', calMine: 'Trafi do Kalendarza na tym Macu. Nikt inny nie jest zapraszany.',
         jiraAs: 'Zakładane w brightline.atlassian.net jako Ty.', linAs: 'Przez łącznik Linear. Linear dostaje dokładnie te pola.',
         edited: 'Zmienione',
         res: {
@@ -169,7 +169,7 @@
         findT: 'Szukam akcji w tym spotkaniu…', findS: 'Możesz dalej pracować. Lintel da znać, gdy będą gotowe.',
         noneT: 'Brak akcji w tym spotkaniu', noneS: 'Lintel nie usłyszał maila do wysłania, spotkania do umówienia ani ticketu do założenia. Twoje zadania są w Notatkach.', showNotes: 'Pokaż notatki',
         gradT: '3 wydarzenia tylko dla Ciebie dodane bez zmian.', gradS: 'Dodawać takie bez pytania? Wydarzenia z gośćmi zawsze pytają.', gradYes: 'Dodawaj bez pytania', gradNo: 'Pytaj dalej',
-        inlineH: 'Gotowe do zrobienia'
+        inlineH: 'Gotowe do zrobienia', inActions: 'Pokaż w Akcjach', popVia: { mail: 'Mail', event: 'Kalendarz', jira: 'Ticket w Jirze', linear: 'Zgłoszenie w Linear' }, taskHint: 'Najedź na zadanie, żeby zobaczyć akcję przygotowaną przez Lintel.'
       },
       A: {
         a1: { type: 'mail', by: 'Ty', t: 'Mail do Ingrid z podsumowaniem', q: 'Świetnie. Wyślę Ci dziś krótkie podsumowanie.',
@@ -261,7 +261,7 @@
   const NORD = ['a1', 'a2', 'a3', 'a4', 'a5'], SYNC = ['s1', 's2'];
   const S = {
     screen: pick('screen', ['note', 'inbox', 'apps', 'after'], 'note'),
-    layout: pick('layout', ['tab', 'inline', 'inbox'], 'tab'),
+    layout: 'inbox', // Q3 decided: Actions tab + Actions inbox in the sidebar
     state: pick('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline', 'graduate'], 'ready'),
     mail: pick('mail', ['acct', 'mcp', 'nomail'], 'acct'),
     theme: pick('theme', ['light', 'dark'], prefersDark ? 'dark' : 'light'),
@@ -269,7 +269,8 @@
     ts: pick('ts', ['m', 'l', 'xl'], 'm'),
     chrome: qs.get('chrome') !== '0',
     item: pick('item', ['nordlys', 'sync'], 'nordlys'),
-    tab: pick('tab', ['notes', 'actions', 'mine', 'transcript'], 'actions'),
+    tab: pick('tab', ['notes', 'actions', 'mine', 'transcript'], 'notes'), // Q4 decided: a meeting always opens on Notes
+    pop: null,
     open: qs.get('sel') || 'a1',
     st: {}, edits: {}, who: {}, err: {}, toast: null, grad: false, hlq: '', component: ''
   };
@@ -392,7 +393,7 @@
   }
   function viaLine(c, a) {
     if (a.type === 'mail') return S.mail === 'nomail' ? `${c.a.draftOnly} <button class="link" data-go="apps" style="color:var(--ink)">${c.a.connectMail} ›</button>` : S.mail === 'mcp' ? c.a.mcpAs : c.a.sendAs(c.meMail);
-    if (a.type === 'event') return a.mine ? c.a.calMine : c.a.calAs;
+    if (a.type === 'event') return a.mine || !guestsOf(a) ? c.a.calMine : S.mail === 'nomail' ? c.a.calIcs : S.mail === 'mcp' ? c.a.calMcp : c.a.calAs;
     if (a.type === 'jira') return c.a.jiraAs;
     return c.a.linAs;
   }
@@ -400,6 +401,7 @@
     const ap = c.a.approve;
     let label = a.type === 'mail' ? ap.mail : a.type === 'event' ? (guestsOf(a) ? ap.eventGuests(guestsOf(a)) : ap.event) : ap[a.type];
     if (a.type === 'mail' && S.mail === 'nomail') label = c.a.draft;
+    if (a.type === 'event' && guestsOf(a) && S.mail === 'nomail') label = c.a.icsBtn;
     const s = S.st[id];
     let pri = `<button class="btn pri lg" data-act="approve" data-id="${id}">${label}</button>`;
     if (s === 'failed') pri = `<button class="btn pri lg" data-act="approve" data-id="${id}">${c.a.retry}</button>`;
@@ -458,14 +460,30 @@
     if (tab === 'actions') return actionsBlock(c, item);
     if (tab === 'mine') return `<div class="minehelp">${n.mineHelp}</div><div class="mine">${n.mine.map((l) => `<div>${esc(l)}</div>`).join('')}</div>`;
     if (tab === 'transcript') return `<div style="margin-top:10px">${n.tr.map(([s, l, id]) => `<div class="tline" ${id && S.hlq === id ? 'style="background:var(--tint);border-radius:6px;margin:0 -8px;padding:5px 8px"' : ''}><span class="s">${s === '?' ? n.unsure : s}</span><span>${l}</span></div>`).join('')}</div>`;
-    const inline = S.layout === 'inline' ? `<div class="h3">${c.a.inlineH}</div>${actionsBlock(c, item)}` : '';
-    const tasks = S.layout === 'inline' ? '' : `<div class="h3">${n.taskH}</div>${n.tasks.map(([w, x, d]) => `<div class="task"><span class="cb" role="checkbox" aria-checked="false"></span><span><span class="who">${w}:</span> ${x}${d ? ` <span class="who">· ${d}</span>` : ''}</span></div>`).join('')}
-      ${S.state === 'none' || S.state === 'finding' ? '' : `<div class="grad" style="margin-top:12px">${ic('check')}<div class="tx">${n.toActions(ids(item).length)}</div><button class="btn" data-tab="actions">${n.review}</button></div>`}`;
-    return `<div class="note">${inline}<div class="h3">${n.sumH}</div><p>${n.sum}</p><div class="h3">${n.decH}</div><ul>${n.dec.map((d) => `<li>${d}</li>`).join('')}</ul>${tasks}<div class="nfoot">${n.foot}</div></div>`;
+    const src = S.item === 'sync' ? c.sync : n;
+    const showActs = !(S.item === 'nordlys' && ['finding', 'none'].includes(S.state));
+    const task = ([w, x, d, id]) => {
+      const linked = id && showActs;
+      const a = linked ? A(id) : null, st = linked ? S.st[id] : '';
+      const mark = linked ? `<span class="tmark ${['need', 'failed', 'expired', 'disconnected'].includes(st) ? 'need' : st === 'done' ? 'done' : ''}" aria-hidden="true">${ic(st === 'done' ? 'check' : TYPE_IC[a.type])}</span>` : '';
+      return `<div class="task ${linked ? 'linked' : ''}" ${linked ? `data-task="${id}" tabindex="0" aria-describedby="tpop-${id}"` : ''}><span class="cb" role="checkbox" aria-checked="${st === 'done'}"></span><span><span class="who">${w}:</span> ${x}${d ? ` <span class="who">· ${d}</span>` : ''}${mark}</span></div>`;
+    };
+    const tasks = `<div class="h3">${n.taskH}</div><div class="tasks">${src.tasks.map(task).join('')}${S.pop ? taskPop(c) : ''}</div>`;
+    return `<div class="note"><div class="h3">${n.sumH}</div><p>${src.sum}</p><div class="h3">${n.decH}</div><ul>${src.dec.map((d) => `<li>${d}</li>`).join('')}</ul>${tasks}<div class="nfoot">${n.foot}</div></div>`;
+  }
+  function taskPop(c) {
+    const id = S.pop.id, a = A(id), st = S.st[id], k = c.a.k;
+    let lines = '';
+    if (a.type === 'mail') lines = `<div><span class="pk">${k.to}</span> ${a.to.length ? esc(a.to.map((p) => p[0]).join(', ')) : '—'}</div><div><span class="pk">${k.subject}</span> ${esc(a.subject)}</div><div class="pv">${esc(a.body.split('\n').filter(Boolean).slice(1, 2).join(' '))}</div>`;
+    else if (a.type === 'event') lines = `<div><span class="pk">${k.when}</span> ${esc(a.when)}, ${esc(a.time)}</div>${guestsOf(a) ? `<div><span class="pk">${k.guests}</span> ${esc(a.guests.map((g) => g[0]).join(', '))}</div>` : ''}`;
+    else if (a.type === 'jira') { const w = a.unsure ? whoName(id, a) : a.assignee; lines = `<div><span class="pk">${k.project}</span> ${esc(a.project)}</div><div><span class="pk">${k.assignee}</span> ${w ? esc(w) : '—'}${a.due ? ` · ${esc(a.due)}` : ''}</div><div class="pv">${esc(a.summary)}</div>`; }
+    else lines = `<div><span class="pk">${k.team}</span> ${esc(a.team)} · ${esc(a.priority)}</div><div class="pv">${esc(a.summary)}</div>`;
+    const note = a.guard && st === 'need' ? `<div class="pn">${ic('shield')}${esc(c.a.guardT(a.by))}</div>` : a.unsure && !S.who[id] ? `<div class="pn">${ic('q')}${c.a.unsureT}</div>` : '';
+    return `<div class="tpop" id="tpop-${id}" role="tooltip" style="top:${S.pop.top}px;left:${S.pop.left}px" data-pop="${id}"><div class="ph3"><span class="ti">${ic(TYPE_IC[a.type])}</span><div class="tx"><div class="pt">${esc(a.t)}</div><div class="pm">${c.a.popVia[a.type]}</div></div>${statusLabel(c, id, a)}</div><div class="pl">${lines}</div>${note}<div class="pa"><button class="btn" data-goact="${id}">${c.a.inActions} ${ic('chev')}</button></div></div>`;
   }
   function noteView(c) {
     const n = c.note, item = c.items.find((x) => x.id === S.item);
-    const keys = S.layout === 'inline' ? ['notes', 'mine', 'transcript'] : ['notes', 'actions', 'mine', 'transcript'];
+    const keys = ['notes', 'actions', 'mine', 'transcript'];
     let tab = S.tab; if (!keys.includes(tab)) tab = 'notes';
     const w = waiting(S.item);
     const tabs = keys.map((k) => `<button role="tab" aria-selected="${tab === k}" data-tab="${k}">${n.tabs[k]}${k === 'actions' && w && !(S.item === 'nordlys' && ['finding', 'none'].includes(S.state)) ? `<span class="cnt">${w}</span>` : ''}</button>`).join('');
@@ -535,8 +553,7 @@
   function bar() {
     const b = t().bar;
     const seg = (key, opts) => `<span class="sk-seg" role="group" aria-label="${key}">${opts.map(([v, l]) => `<button type="button" data-set="${key}" data-val="${v}" aria-pressed="${S[key] === v}">${l}</button>`).join('')}</span>`;
-    return `<div id="sk-bar"><b>Lintel · actions · iteration 1</b><label>${b.screen}</label>${seg('screen', [['note', b.note], ['inbox', b.inbox], ['apps', b.apps], ['after', b.after]])}
-      <label>${b.layout}</label>${seg('layout', [['tab', b.tab], ['inline', b.inline], ['inbox', b.inboxL]])}
+    return `<div id="sk-bar"><b>Lintel · actions · iteration 2</b><label>${b.screen}</label>${seg('screen', [['note', b.note], ['inbox', b.inbox], ['apps', b.apps], ['after', b.after]])}
       <label>${b.state}</label>${seg('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline', 'graduate'].map((k) => [k, b[k]]))}
       <label>${b.mail}</label>${seg('mail', [['acct', b.acct], ['mcp', b.mcp], ['nomail', b.nomail]])}
       <label>${b.theme}</label>${seg('theme', [['light', b.light], ['dark', b.dark]])}<label>${b.lang}</label>${seg('lang', [['en', 'EN'], ['pl', 'PL']])}
@@ -544,9 +561,9 @@
   }
   function syncURL() {
     const p = new URLSearchParams();
-    p.set('screen', S.screen); p.set('layout', S.layout); p.set('state', S.state); if (S.mail !== 'acct') p.set('mail', S.mail);
+    p.set('screen', S.screen); p.set('state', S.state); if (S.mail !== 'acct') p.set('mail', S.mail);
     p.set('theme', S.theme); p.set('lang', S.lang); if (S.ts !== 'm') p.set('ts', S.ts); if (!S.chrome) p.set('chrome', '0');
-    if (S.item !== 'nordlys') p.set('item', S.item); if (S.tab !== 'actions') p.set('tab', S.tab); if (S.open !== 'a1') p.set('sel', S.open);
+    if (S.item !== 'nordlys') p.set('item', S.item); if (S.tab !== 'notes') p.set('tab', S.tab); if (S.open !== 'a1') p.set('sel', S.open);
     history.replaceState(null, '', location.pathname + '?' + p.toString());
   }
   const SCREENS = { note: noteScr, inbox: inboxScr, apps: appsScr, after: afterScr };
@@ -585,23 +602,23 @@
     nextOpen(id); render();
   }
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-set],[data-act],[data-go],[data-item],[data-tab],[data-open],[data-who],[data-tr]');
+    const el = e.target.closest('[data-set],[data-act],[data-go],[data-item],[data-tab],[data-open],[data-who],[data-tr],[data-goact]');
     if (!el) return;
     const d = el.dataset;
     if (d.set) {
       S[d.set] = d.val;
       if (d.set === 'screen' && d.val === 'inbox') S.layout = 'inbox';
       if (d.set === 'layout' && d.val !== 'inbox' && S.screen === 'inbox') S.screen = 'note';
-      if (d.set === 'state') { S.open = d.val === 'errors' || d.val === 'offline' ? 'a3' : 'a1'; S.item = 'nordlys'; S.tab = S.layout === 'inline' ? 'notes' : 'actions'; S.edits = {}; applyState(); }
-      if (d.set === 'layout') S.tab = d.val === 'inline' ? 'notes' : 'actions';
+      if (d.set === 'state') { S.open = d.val === 'errors' || d.val === 'offline' ? 'a3' : 'a1'; S.item = 'nordlys'; S.tab = 'notes'; S.edits = {}; applyState(); }
       syncURL(); render(); return;
     }
     if (d.go) { S.screen = d.go; if (d.go === 'inbox') S.layout = 'inbox'; syncURL(); render(); return; }
     if (d.item) { S.item = d.item; S.open = d.item === 'sync' ? 's1' : 'a1'; if (S.state === 'graduate' && d.item === 'sync') S.open = 's2'; syncURL(); render(); return; }
-    if (d.tab) { S.tab = d.tab; S.hlq = ''; syncURL(); render(); return; }
+    if (d.tab) { S.tab = d.tab; S.hlq = ''; S.pop = null; syncURL(); render(); return; }
     if (d.open) { S.open = S.open === d.open && S.screen === 'note' ? '' : d.open; render(); return; }
     if (d.who) { S.who[d.id] = d.who; S.st[d.id] = 'ready'; delete S.err[d.id]; render(); return; }
     if (d.tr) { S.hlq = d.tr; S.tab = 'transcript'; render(); return; }
+    if (d.goact) { S.pop = null; S.tab = 'actions'; S.open = d.goact; syncURL(); render(); document.querySelector(`[data-card="${d.goact}"]`)?.scrollIntoView({ block: 'nearest' }); return; }
     const a = d.act, id = d.id;
     if (a === 'approve') approve(id);
     else if (a === 'dismiss') { S.st[id] = 'dismissed'; clearInterval(timer); S.toast = { kind: 'dismissed', id, prev: id }; timer = setTimeout(() => { S.toast = null; render(); }, 6000); nextOpen(id); render(); }
@@ -610,7 +627,7 @@
     else if (a === 'reconnect') { S.st[id] = 'ready'; if (id === 'a3') { S.st.a1 = S.st.a1 === 'expired' ? 'ready' : S.st.a1; S.st.a2 = S.st.a2 === 'expired' ? 'ready' : S.st.a2; } render(); }
     else if (a === 'component') { S.component = S.lang === 'pl' ? 'Umowy' : 'Contracts'; render(); }
     else if (a === 'grad') { S.grad = false; render(); }
-    else if (a === 'reset') { clearInterval(timer); clearTimeout(timer); S.edits = {}; S.hlq = ''; S.item = 'nordlys'; S.tab = S.layout === 'inline' ? 'notes' : 'actions'; S.open = S.state === 'errors' || S.state === 'offline' ? 'a3' : 'a1'; applyState(); render(); const st = document.querySelector('[role=status]'); if (st) st.focus(); }
+    else if (a === 'reset') { clearInterval(timer); clearTimeout(timer); S.edits = {}; S.hlq = ''; S.item = 'nordlys'; S.tab = 'notes'; S.open = S.state === 'errors' || S.state === 'offline' ? 'a3' : 'a1'; applyState(); render(); const st = document.querySelector('[role=status]'); if (st) st.focus(); }
   });
   document.addEventListener('input', (e) => {
     const el = e.target;
@@ -621,7 +638,31 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.metaKey && S.open) { e.preventDefault(); approve(S.open); return; }
     if (e.key === 'Backspace' && e.metaKey && S.open) { e.preventDefault(); document.querySelector(`[data-act=dismiss][data-id="${S.open}"]`)?.click(); return; }
+    if (e.key === 'Escape' && S.pop) { S.pop = null; render(); return; }
     if (e.key === 'Escape' && S.toast) { S.toast = null; render(); }
   });
+  // Task hover card (Q4): after a short delay, a task linked to an action shows the action; it stays while the pointer is on it.
+  let hoverT = null, leaveT = null;
+  function showPop(taskEl) {
+    const box = taskEl.closest('.tasks'); if (!box) return;
+    const r = taskEl.getBoundingClientRect(), b = box.getBoundingClientRect();
+    S.pop = { id: taskEl.dataset.task, top: Math.round(r.bottom - b.top + 4), left: Math.round(Math.min(r.left - b.left + 26, Math.max(0, b.width - 360))) };
+    render();
+  }
+  document.addEventListener('mouseover', (e) => {
+    const tk = e.target.closest('[data-task]'), pp = e.target.closest('[data-pop]');
+    if (pp || (tk && S.pop && S.pop.id === tk.dataset.task)) { clearTimeout(leaveT); return; }
+    clearTimeout(hoverT);
+    if (tk) hoverT = setTimeout(() => showPop(tk), reduced ? 0 : 450);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const from = e.target.closest('[data-task],[data-pop]'); if (!from) return;
+    const to = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('[data-task],[data-pop]') : null;
+    if (to) return;
+    clearTimeout(hoverT);
+    if (S.pop) { clearTimeout(leaveT); leaveT = setTimeout(() => { S.pop = null; render(); }, 200); }
+  });
+  document.addEventListener('focusin', (e) => { const tk = e.target.closest('[data-task]'); if (tk && (!S.pop || S.pop.id !== tk.dataset.task)) { showPop(tk); const el = document.querySelector(`[data-task="${tk.dataset.task}"]`); if (el) el.focus(); } });
   render();
+  if (qs.get('pop')) { const tk = document.querySelector(`[data-task="${qs.get('pop')}"]`); if (tk) showPop(tk); }
 })();
