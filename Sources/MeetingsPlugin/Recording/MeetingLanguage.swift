@@ -41,8 +41,8 @@ final class MeetingLanguage: Sendable {
     /// - Always one language: Whisper pinned to it; Parakeet gets the hint of that language's script only (none
     ///   for a language in another script, Serbian or one outside the catalog).
     /// - Automatic: Parakeet gets no hint until the profile is settled, then the script of the profile when it
-    ///   has one (a mix of scripts gives none). Whisper is pinned to the first listed language (its detection
-    ///   comes in step 2.5).
+    ///   has one (a mix of scripts gives none), and never while a listed language needs Whisper (the router's
+    ///   "Parakeet without hint"). Whisper is pinned to the first listed language (its detection comes in step 2.5).
     static func options(for selection: SpeechLanguageSelection, profile: LanguageProfile) -> SpeechRequestOptions {
         switch selection.mode {
         case .single(let code):
@@ -50,7 +50,8 @@ final class MeetingLanguage: Sendable {
                 scriptHint: ScriptHint.hint(forLanguages: [code]), whisperLanguage: .pinned(code))
         case .automatic:
             return SpeechRequestOptions(
-                scriptHint: profile.scriptHint, whisperLanguage: .pinned(pinnedLanguage(for: selection)))
+                scriptHint: MeetingEngineRouting.allowsScriptHint(selection) ? profile.scriptHint : nil,
+                whisperLanguage: .pinned(pinnedLanguage(for: selection)))
         }
     }
 

@@ -26,6 +26,9 @@ struct MeetingsRuntime: Sendable {
     var inputDiagnostics: @Sendable () -> String = { DefaultInputObserver.diagnostics() }
     /// Yields when the system's default input changes while recording.
     var defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = { DefaultInputObserver.changes() }
+    /// Where a speech package is, with the folder the user chose for it (`nil` = the download). Tests replace it,
+    /// so the engine choice runs without model files.
+    var locateSpeech: @Sendable (ModelPackage, URL?) async -> ModelLocation
 
     @MainActor
     init(context: PluginContext, settings: MeetingsSettings) {
@@ -35,6 +38,8 @@ struct MeetingsRuntime: Sendable {
         speechManager = ModelManagers.shared.manager(
             for: context.modelsDirectory.appending(path: MeetingsUI.speechDirectoryName, directoryHint: .isDirectory),
             logger: context.logger)
+        let manager = self.speechManager
+        locateSpeech = { await manager.location(of: $0, customFolder: $1) }
         diarizationManager = ModelManagers.shared.manager(
             for: context.modelsDirectory.appending(
                 path: MeetingsUI.diarizationDirectoryName, directoryHint: .isDirectory),
@@ -47,10 +52,35 @@ struct MeetingsRuntime: Sendable {
         ModelCatalog.package(id: settings.speechModelID) ?? ModelCatalog.parakeetUltra
     }
 
-    /// Where the speech model chosen in Settings is.
+    /// Where `package` is. A folder the user chose counts only for the model chosen in Settings: "Choose Folder…"
+    /// writes that model's key, so Whisper reached through the router always comes from its download.
+    func location(of package: ModelPackage) async -> ModelLocation {
+        let custom = settings.speechModelID == package.id ? settings.speechModelFolder : nil
+        return await locateSpeech(package, custom)
+    }
+
+    /// Whether the Whisper model can be loaded now.
+    func isWhisperInstalled() async -> Bool {
+        await location(of: ModelCatalog.whisperLargeV3Turbo).folder != nil
+    }
+
+    /// The model the next recording uses (`MeetingEngineRouting`): the chosen one, or Whisper when the languages
+    /// in play need it and it is installed.
+    func routedSpeechPackage() async -> ModelPackage {
+        let selected = speechPackage
+        let installed = selected.id == ModelCatalog.whisperLargeV3Turbo.id ? true : await isWhisperInstalled()
+        return MeetingEngineRouting.package(
+            selected: selected, selection: speechLanguages.current(), whisperInstalled: installed)
+    }
+
+    /// Where the speech model of the next recording is. Read when a recording starts, so the engine is fixed for
+    /// that recording and its stored model id is the engine that really transcribed it.
     func speechLookup() async -> SpeechModelLookup {
-        let package = speechPackage
-        let location = await speechManager.location(of: package, customFolder: settings.speechModelFolder)
+        let package = await routedSpeechPackage()
+        if package.id != speechPackage.id {
+            logger.notice("Meetings: the languages need Whisper, recording with it")
+        }
+        let location = await location(of: package)
         if let folder = location.folder { return .ready(modelID: package.id, folder: folder) }
         if case .customFolderUnavailable = location { return .unavailable }
         return .missing
@@ -98,8 +128,7 @@ struct MeetingsRuntime: Sendable {
             (ModelCatalog.whisperLargeV3Turbo, .whisper), (ModelCatalog.parakeetUltra, .parakeet),
         ]
         for (package, kind) in candidates {
-            let custom = settings.speechModelID == package.id ? settings.speechModelFolder : nil
-            if let folder = await speechManager.location(of: package, customFolder: custom).folder {
+            if let folder = await location(of: package).folder {
                 return RepairSpeech(
                     kind: kind, modelID: package.id, folder: folder, engine: makeEngine(modelID: package.id))
             }

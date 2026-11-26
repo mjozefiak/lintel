@@ -75,8 +75,11 @@ final class MeetingsSettingsModel {
     private(set) var speechPackageID: String
     /// The shared "Languages I speak" (`PluginContext.speechLanguages`), edited by the Languages row's sheet.
     @ObservationIgnored let speechLanguages: any SpeechLanguageSettings
-    /// The Whisper model is on this Mac: the sheet then offers no "Get It in Models".
-    private(set) var whisperInstalled = false
+    /// The Whisper model is on this Mac: the sheet then offers no "Get It in Models". The Settings banner and
+    /// `modelUsage` route the engine with it (`MeetingEngineRouting`), so a change makes the shell read them again.
+    private(set) var whisperInstalled = false {
+        didSet { if whisperInstalled != oldValue { onStatusChange?() } }
+    }
     @ObservationIgnored private let isWhisperInstalled: @MainActor () async -> Bool
 
     @ObservationIgnored let settings: MeetingsSettings
@@ -153,10 +156,12 @@ final class MeetingsSettingsModel {
         provider.refreshStatus()
     }
 
-    /// Re-reads only what the Settings banner shows: the speech model's place and the microphone access. Reads
-    /// files and the permission state, never asks for anything.
+    /// Re-reads only what the Settings banner shows: the speech model's place, whether Whisper is there (the
+    /// languages may need it) and the microphone access. Reads files and the permission state, never asks for
+    /// anything.
     func refreshStatus() async {
         microphone = authorizer.status()
+        whisperInstalled = await isWhisperInstalled()
         await speech.refresh()
         provider.reload()
         provider.refreshStatus(force: false)
