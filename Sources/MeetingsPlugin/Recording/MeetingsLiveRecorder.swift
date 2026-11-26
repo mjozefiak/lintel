@@ -1,0 +1,305 @@
+import Foundation
+import LintelKit
+
+/// The meetings' `LiveRecorder` (notes explorer spec, step 2.3): the recording the Notes window's Record button
+/// drives, read from the HUD's own states, so the window and the HUD never disagree and the shortcut keeps its
+/// behaviour. It is an adapter over `MeetingController`; `start` and `stop` call the same paths as
+/// `meetings.record`.
+///
+/// - `start()` waits until the recording really runs (`meetingRegistered`: the session is up and the meeting has
+///   its row; the HUD shows `recording` before that, and a session whose start fails gets there too) or the HUD
+///   shows why it cannot, then returns or throws the contract's `LiveRecordingFailure`; nothing is left half
+///   started. A denied microphone that the HUD would offer "record the system audio only" for is dismissed: the
+///   window has its own sentence and its own button.
+/// - `stop(writeNotes: false)` keeps the notes off for the meeting it stops (the automatic job after a saved
+///   meeting is dropped for that id); `writeNotes: true` changes nothing, so the automatic job follows
+///   `plugins.meetings.notesEnabled` exactly as the shortcut does.
+/// - `status()` mirrors the HUD (`LiveRecordingStatus` documents the row of every notice); the warnings come from
+///   the same timers, so they go on and off with the HUD's.
+/// - It lives as long as the plugin's activation: `attach` and `detach` are `MeetingsPlugin`'s, and `detach`
+///   emits `.idle` and finishes every stream.
+///
+/// Nothing here logs a title, a transcript or a note, and nothing touches `ranking.sqlite`.
+@MainActor
+final class MeetingsLiveRecorder: LiveRecorder {
+    /// What the adapter needs from the plugin. Tests pass their own.
+    struct Dependencies {
+        /// The Notes key of a meeting (`meetings:<uuid>`), read once per recording; `nil` while the library
+        /// cannot say (closed, the meeting not written yet).
+        var noteKey: @MainActor (Int64) -> NoteKey?
+        /// The row id of a meeting from its Notes key; `nil` when there is no such meeting.
+        var meetingID: @MainActor (NoteKey) -> Int64?
+        /// Queues the notes of a meeting again ("Try Again").
+        var regenerateNotes: @MainActor (Int64) -> Void
+        /// Whether the notes pipeline has a job (queued or running) for this meeting.
+        var hasNotesJob: @MainActor (Int64) -> Bool
+        /// Whether the notes pipeline is busy with any job.
+        var notesBusy: @MainActor () -> Bool
+        /// The date `LiveRecordingStatus.recording.since` carries.
+        var now: @MainActor () -> Date = { Date() }
+    }
+
+    let pluginID: PluginID = MeetingLibraryPresentation.pluginID
+
+    private let deps: Dependencies
+    private var controller: MeetingController?
+    private var value: LiveRecordingStatus = .idle
+    private var continuations: [UUID: AsyncStream<LiveRecordingStatus>.Continuation] = [:]
+    /// A `start()` that waits for the recording to be registered or for the HUD to say why it cannot start.
+    private var pendingStart: CheckedContinuation<Void, any Error>?
+    /// When the recording showed itself to the HUD (`since`).
+    private var startedAt: Date?
+    /// The Notes key of the recording that runs, once the library can say it.
+    private var recordingKey: NoteKey?
+    /// The last recording state the HUD showed (the source of `hearing` and `warning`).
+    private var lastRecording: MeetingHUDState.Recording?
+    /// Meetings whose notes must not be written after they were saved (`stop(writeNotes: false)`).
+    private var suppressedNotes: Set<Int64> = []
+
+    init(dependencies: Dependencies) {
+        deps = dependencies
+    }
+
+    /// True between `attach` and `detach`: the recorder is the active plugin's.
+    var isAttached: Bool { controller != nil }
+
+    /// What a new `status()` subscriber would be sent first (tests read it instead of waiting on a stream).
+    var currentStatus: LiveRecordingStatus { value }
+
+    // MARK: Attach
+
+    /// The plugin is active: the recorder follows this controller.
+    func attach(_ controller: MeetingController) {
+        self.controller = controller
+        clearRecording()
+        set(.idle)
+    }
+
+    /// The plugin is switched off: `.idle` to every subscriber, every stream finished, and any `start()` that is
+    /// still waiting gets `LiveRecordingFailure.other` (nothing was left running by it).
+    func detach() {
+        guard controller != nil else { return }
+        controller = nil
+        cancelPendingStart()
+        clearRecording()
+        set(.idle)
+        let all = continuations
+        continuations = [:]
+        for continuation in all.values { continuation.finish() }
+    }
+
+    // MARK: The HUD
+
+    /// The HUD's state as `MeetingController` showed it, or `nil` when the HUD was hidden (the controller's
+    /// `hudObserver`). A `recording` state alone does not settle a `start()`: the HUD shows it before the session
+    /// starts, and a session whose start fails gets there too — `meetingRegistered` says the recording really runs.
+    func hudChanged(_ state: MeetingHUDState?) {
+        guard isAttached else { return }
+        guard let state else { return recordingEnded() }
+        switch state {
+        case .allowMicrophone:
+            // The prompt is on screen; `start()` keeps waiting.
+            break
+        case .recording(let recording):
+            lastRecording = recording
+            startedAt = startedAt ?? deps.now()
+            updateRecording()
+        case .finishing, .processing:
+            settleStart()
+            lastRecording = nil
+            if let key = resolvedKey() { set(.processing(key: key, progress: nil)) }
+        case .saved, .savedIncomplete:
+            settleStart()
+            recordingEnded()
+        case .problem(let problem):
+            if pendingStart != nil { return failStart(problem) }
+            switch value {
+            case .recording, .processing, .starting:
+                let key = resolvedKey()
+                set(.failed(key: key, reason: Self.failure(problem)))
+                clearRecording()
+            default:
+                break
+            }
+        }
+    }
+
+    /// The recording really started: the meeting has a row, so it has a Notes key.
+    func meetingRegistered(_ meetingID: Int64) {
+        guard isAttached else { return }
+        startedAt = startedAt ?? deps.now()
+        if let key = deps.noteKey(meetingID) { recordingKey = key }
+        settleStart()
+        updateRecording()
+    }
+
+    /// Whether the automatic notes job of a meeting was switched off with `stop(writeNotes: false)`, and forgets
+    /// the answer: the plugin asks this before it queues the notes of a meeting that just became `ready`.
+    func suppressesNotes(_ meetingID: Int64) -> Bool { suppressedNotes.remove(meetingID) != nil }
+
+    // MARK: LiveRecorder
+
+    func status() -> AsyncStream<LiveRecordingStatus> {
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: LiveRecordingStatus.self, bufferingPolicy: .bufferingNewest(1))
+        guard isAttached else {
+            continuation.yield(.idle)
+            continuation.finish()
+            return stream
+        }
+        let id = UUID()
+        continuations[id] = continuation
+        continuation.onTermination = { [weak self] _ in
+            Task { @MainActor in _ = self?.continuations.removeValue(forKey: id) }
+        }
+        continuation.yield(value)
+        return stream
+    }
+
+    func start() async throws {
+        guard let controller else { throw LiveRecordingFailure.other }
+        switch controller.phase {
+        case .idle: break
+        case .recording, .preparing, .awaitingMicrophoneDecision: throw LiveRecordingFailure.alreadyRecording
+        case .finishing: throw LiveRecordingFailure.stillProcessing
+        }
+        clearRecording()
+        set(.starting)
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                guard isAttached else {
+                    set(.idle)
+                    return continuation.resume(throwing: LiveRecordingFailure.other)
+                }
+                pendingStart = continuation
+                controller.start()
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.cancelPendingStart() }
+        }
+    }
+
+    func stop(writeNotes: Bool) async {
+        guard let controller else { return }
+        // A recording that is still being prepared or waiting for the microphone prompt never started: the
+        // window's Stop ends the attempt instead of waiting for a HUD that may never show.
+        if pendingStart != nil { return cancelPendingStart() }
+        if !writeNotes, let id = controller.meetingID { suppressedNotes.insert(id) }
+        controller.stop()
+    }
+
+    func retryNotes(_ key: NoteKey) async throws {
+        guard key.pluginID == pluginID else { throw NoteSourceError.notFound }
+        guard let id = deps.meetingID(key) else { throw NoteSourceError.notFound }
+        // One job at a time: the meeting's own job is fine (it gets the request through `regenerate`), another
+        // meeting's is not.
+        if deps.notesBusy(), !deps.hasNotesJob(id) { throw NoteSourceError.busy }
+        deps.regenerateNotes(id)
+    }
+
+    // MARK: The HUD's mapping
+
+    /// How well the recording hears the call. A microphone that was never part of it (system audio only, or one
+    /// that did not start) wins over the system track's own start problem.
+    static func hearing(_ recording: MeetingHUDState.Recording) -> LiveRecordingStatus.Hearing {
+        if !recording.recordsMicrophone || recording.unavailable.contains(.mic) { return .callOnly }
+        if recording.unavailable.contains(.system) { return .microphoneOnly }
+        return .everyone
+    }
+
+    /// The recording's warning, in the HUD's own order of the notices that have one. `noSystemAudio` of a system
+    /// track that was never available is that start problem's `hearing`, not a warning.
+    static func warning(_ recording: MeetingHUDState.Recording) -> LiveRecordingStatus.Warning? {
+        if recording.lost.contains(.mic) { return .microphoneLost }
+        if recording.lost.contains(.system) { return .callAudioMissing }
+        if recording.noMicrophoneAudio, recording.recordsMicrophone { return .microphoneSilent }
+        if recording.noSystemAudio, recording.recordsSystem, !recording.unavailable.contains(.system) {
+            return .silence
+        }
+        return nil
+    }
+
+    /// The contract's reason for a HUD problem. `nothingHeard` is the discarded recording: the window keeps the
+    /// user's own writing as a manual note.
+    static func failure(_ problem: MeetingHUDState.Problem) -> LiveRecordingFailure {
+        switch problem {
+        case .modelMissing, .modelUnavailable: .modelMissing
+        case .libraryUnavailable: .libraryUnavailable
+        case .microphoneDenied: .microphoneDenied
+        case .noAudioInput: .noAudioInput
+        case .lowDiskAtStart: .lowDisk
+        case .stillProcessing: .stillProcessing
+        case .modelBeingRemoved: .modelBusy
+        case .nothingHeard: .discarded
+        case .couldNotStart, .failed: .other
+        }
+    }
+
+    // MARK: State
+
+    private func set(_ new: LiveRecordingStatus) {
+        guard new != value else { return }
+        value = new
+        for continuation in continuations.values { continuation.yield(new) }
+    }
+
+    /// The recording's status from the last HUD state; `.starting` while the meeting has no Notes key yet.
+    private func updateRecording() {
+        guard let key = recordingKey, let since = startedAt, let recording = lastRecording else {
+            return set(.starting)
+        }
+        set(.recording(key: key, since: since, hearing: Self.hearing(recording), warning: Self.warning(recording)))
+    }
+
+    /// The recording's key, looked up once per recording (a database read).
+    private func resolvedKey() -> NoteKey? {
+        if let recordingKey { return recordingKey }
+        guard let id = controller?.meetingID, let key = deps.noteKey(id) else { return nil }
+        recordingKey = key
+        return key
+    }
+
+    private func recordingEnded() {
+        settleStart()
+        clearRecording()
+        set(.idle)
+    }
+
+    private func clearRecording() {
+        startedAt = nil
+        recordingKey = nil
+        lastRecording = nil
+    }
+
+    private func settleStart() {
+        guard let continuation = pendingStart else { return }
+        pendingStart = nil
+        continuation.resume()
+    }
+
+    private func failStart(_ problem: MeetingHUDState.Problem) {
+        guard let continuation = pendingStart else { return }
+        pendingStart = nil
+        // The HUD would ask whether to record the system audio only; the window says "Allow Microphone" instead,
+        // so the attempt ends here rather than staying half started behind a HUD nobody sees.
+        if case .microphoneDenied(offersSystemOnly: true) = problem,
+            controller?.phase == .awaitingMicrophoneDecision
+        {
+            controller?.perform(.dismiss)
+        }
+        clearRecording()
+        set(.idle)
+        continuation.resume(throwing: Self.failure(problem))
+    }
+
+    private func cancelPendingStart() {
+        guard let continuation = pendingStart else { return }
+        pendingStart = nil
+        if let controller, controller.phase == .preparing || controller.phase == .awaitingMicrophoneDecision {
+            controller.perform(.dismiss)
+        }
+        clearRecording()
+        set(.idle)
+        continuation.resume(throwing: LiveRecordingFailure.other)
+    }
+}
