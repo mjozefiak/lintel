@@ -80,6 +80,22 @@ struct MeetingNoteSourceTrashContractTests {
         #expect(try await rig.source.trashedKeys([plain, try rig.key("notes")]) == [plain: stamp])
     }
 
+    @Test func aTrashedNoteIsNotInTheLaunchersLibraryListModeOrItsFiltersAndHasNoDocumentToExport() async throws {
+        let rig = try await TrashRig()
+        let id = try #require(rig.rig.ids["plain"])
+        #expect(try await rig.rig.search("roadmapa").count == 1)
+        try await rig.source.trash(try rig.key("plain"))
+        let all = try await rig.rig.search("")
+        #expect(rig.rig.keys(all) == ["notes", "stale", "incomplete", "failed"])
+        #expect(try await rig.rig.search("roadmapa").isEmpty)
+        for filter in MeetingLibraryFilter.allCases {
+            #expect(!rig.rig.keys(try await rig.rig.search("", filter: filter)).contains("plain"))
+        }
+        // The copy-Markdown action, the meeting window and the export read the document by row id.
+        #expect(try rig.store.loadDocument(id: id) == nil)
+        #expect(try rig.store.loadDocument(id: id, includingTrashed: true) != nil)
+    }
+
     @Test func aTrashedNoteStillHasItsContentWithDeletedAtAndPurgeAtAndNoActions() async throws {
         let rig = try await TrashRig()
         let key = try rig.key("incomplete")
