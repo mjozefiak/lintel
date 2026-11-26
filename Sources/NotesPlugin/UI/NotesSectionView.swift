@@ -32,35 +32,35 @@ struct NotesSectionView: View {
                 if model.tabs.tabs.isEmpty {
                     NotePreviewView(model: model)
                 } else {
-                VStack(spacing: 0) {
-                    NoteTabBar(model: model)
-                    NotePathBar(model: model)
-                    NoteCenter(model: model)
-                        .hiddenContent(model.hidesContent)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(LintelBrand.windowBackground)
-                // Next to the document when there is room; over its right edge when the section is narrow (the
-                // path bar's button asked for it), so Comments and History stay reachable at the largest text size.
-                .overlay(alignment: .trailing) {
-                    if let document = inspectorDocument, !model.inspectorFits {
+                    VStack(spacing: 0) {
+                        NoteTabBar(model: model)
+                        NotePathBar(model: model)
+                        NoteCenter(model: model)
+                            .hiddenContent(model.hidesContent)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(LintelBrand.windowBackground)
+                    // Next to the document when there is room; over its right edge when the section is narrow (the
+                    // path bar's button asked for it), so Comments and History stay reachable at the largest text size.
+                    .overlay(alignment: .trailing) {
+                        if let document = inspectorDocument, !model.inspectorFits {
+                            NoteInspector(
+                                model: model, document: document,
+                                width: model.paneWidth(.inspector, textScale: textSize.scale)
+                            )
+                            .hiddenContent(model.hidesContent)
+                            .shadow(color: LintelBrand.ink.opacity(0.2), radius: 14, x: -4)
+                            .notesFade(.inspector)
+                        }
+                    }
+                    if let document = inspectorDocument, model.inspectorFits {
                         NoteInspector(
                             model: model, document: document,
                             width: model.paneWidth(.inspector, textScale: textSize.scale)
                         )
                         .hiddenContent(model.hidesContent)
-                        .shadow(color: LintelBrand.ink.opacity(0.2), radius: 14, x: -4)
                         .notesFade(.inspector)
                     }
-                }
-                if let document = inspectorDocument, model.inspectorFits {
-                    NoteInspector(
-                        model: model, document: document,
-                        width: model.paneWidth(.inspector, textScale: textSize.scale)
-                    )
-                    .hiddenContent(model.hidesContent)
-                    .notesFade(.inspector)
-                }
                 }
             }
             .notesAnimation(.inspector, value: inspectorDocument != nil)

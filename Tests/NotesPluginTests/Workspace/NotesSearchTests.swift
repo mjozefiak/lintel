@@ -34,6 +34,9 @@ struct NotesSearchTests {
             environment: NotesWorkspaceModel.Environment(
                 library: NoteLibrary(box: box), pasteboard: RecordingPasteboard(), saver: ScriptedSaver(),
                 now: { Fixtures.epoch }, calendar: utc, locale: Locale(identifier: "en_US"), pageSize: 2))
+        // These tests were written for the old Notes list (meetings and manual notes); the explorer's list that
+        // lists only meetings is the same data.
+        model.prepareCollection(.meetings)
         return (model, meetings, dictation)
     }
 

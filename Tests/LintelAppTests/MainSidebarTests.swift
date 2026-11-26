@@ -19,10 +19,11 @@ struct MainSidebarTests {
         let entries = MainSidebarModel.entries(sections: [
             section("dictionary", order: 40, block: false), section("notes", order: 5, block: true),
         ])
-        #expect(entries == [
-            MainSidebarModel.Entry(sectionID: "notes", hasBlock: true),
-            MainSidebarModel.Entry(sectionID: "dictionary", hasBlock: false),
-        ])
+        #expect(
+            entries == [
+                MainSidebarModel.Entry(sectionID: "notes", hasBlock: true),
+                MainSidebarModel.Entry(sectionID: "dictionary", hasBlock: false),
+            ])
     }
 
     @Test("a plugin that is off has no section, so its row is absent")

@@ -9,10 +9,6 @@ import LintelUI
 struct ExplorerRowText: Sendable {
     var presentation: NoteRowPresentation
 
-    init(presentation: NoteRowPresentation) {
-        self.presentation = presentation
-    }
-
     // MARK: Kind
 
     /// "Meeting", "Dictation" or "Note".
@@ -46,7 +42,8 @@ struct ExplorerRowText: Sendable {
                 parts.append(presentation.duration(milliseconds: ms, kind: summary.kind))
             }
             if let tasks = summary.taskCount, tasks > 0 {
-                parts.append(String(localized: "\(tasks) tasks", comment: "Explorer row: how many tasks the notes carry"))
+                parts.append(
+                    String(localized: "\(tasks) tasks", comment: "Explorer row: how many tasks the notes carry"))
             }
         }
         return parts.joined(separator: " · ")
@@ -76,7 +73,8 @@ struct ExplorerRowText: Sendable {
         case .processing:
             return State(
                 ring: .processing(progress: nil),
-                text: String(localized: "Processing…", comment: "Explorer row: the recording is being turned into text"),
+                text: String(
+                    localized: "Processing…", comment: "Explorer row: the recording is being turned into text"),
                 level: level)
         case .writing(let done, let of):
             return State(
@@ -92,7 +90,8 @@ struct ExplorerRowText: Sendable {
             return State(
                 ring: .idle,
                 text: String(
-                    localized: "Waiting for a download", comment: "Explorer row: the notes need something to download first"),
+                    localized: "Waiting for a download",
+                    comment: "Explorer row: the notes need something to download first"),
                 level: level)
         default:
             return State(ring: .idle, text: NoteRowPresentation.stateText(badge), level: level)
@@ -119,9 +118,10 @@ struct ExplorerRowText: Sendable {
         case .today: return String(localized: "Today", comment: "Explorer: group of today's notes")
         case .yesterday: return String(localized: "Yesterday", comment: "Explorer: group of yesterday's notes")
         case .day(let day):
-            let days = presentation.calendar.dateComponents(
-                [.day], from: day, to: presentation.calendar.startOfDay(for: now)
-            ).day ?? 0
+            let days =
+                presentation.calendar.dateComponents(
+                    [.day], from: day, to: presentation.calendar.startOfDay(for: now)
+                ).day ?? 0
             let style = Date.FormatStyle(
                 locale: presentation.locale, calendar: presentation.calendar, timeZone: presentation.calendar.timeZone)
             if days < 7 { return day.formatted(style.weekday(.wide)).capitalizedFirst(locale: presentation.locale) }

@@ -316,9 +316,9 @@ final class NotesWorkspaceModel {
         let previous = explorer.selection
         let next = explorer.reconcile(order: visibleRows.map(\.id))
         guard next != previous else { return }
-        // The row that was selected left the list: its preview goes (unless it is open in a tab).
+        // The row that was selected left the list: its preview goes (unless it is open in a tab). The view that
+        // shows the new selection reads it (`loadPreview`).
         if let previous { dropPreview(previous) }
-        if let next { loadPreview(next) }
     }
 
     /// A click or an arrow key: the preview shows this note. It opens no tab.
@@ -327,7 +327,6 @@ final class NotesWorkspaceModel {
         previewRetryFailed = false
         explorer.select(id)
         if let previous, previous != id { dropPreview(previous) }
-        loadPreview(id)
     }
 
     /// ↑ / ↓ in the list.
@@ -340,11 +339,13 @@ final class NotesWorkspaceModel {
     /// The model of the note the preview shows; `nil` while nothing is selected.
     var previewDocument: NoteDocumentModel? { explorer.selection.flatMap { documents[$0] } }
 
-    /// Reads the selected note once for the preview (its document is the one a tab would use).
-    private func loadPreview(_ id: NoteItemID) {
+    /// Reads the selected note once for the preview (its document is the one a tab would use). The preview view calls
+    /// it for the selection it shows, so no read runs in the background of a model nobody looks at.
+    func loadPreview(_ id: NoteItemID) async {
+        guard explorer.selection == id else { return }
         if documents[id] == nil { documents[id] = makeDocument(id) }
         guard documents[id]?.phase == .loading else { return }
-        Task { await loadContent(id) }
+        await loadContent(id)
     }
 
     /// Forgets a preview nobody sees; a note that has a tab keeps its document.
@@ -497,8 +498,6 @@ final class NotesWorkspaceModel {
         contentEpochs[id] = nil
         // The buffer is written before the document is forgotten, then the deferred delete of a detached row runs.
         if let registry = environment.registry { Task { await registry.release(item: id) } }
-        // The note stays selected in the list: its preview reads it again.
-        if explorer.selection == id { loadPreview(id) }
     }
 
     /// A detach re-keyed an open note: its tab and document move from `.live(key)` to
@@ -640,7 +639,9 @@ final class NotesWorkspaceModel {
     /// Every open tab is read on its own, so a source that does not answer holds up only its own tabs.
     private func reloadOpenDocuments() async {
         var ids = tabs.tabs.map(\.id)
-        if let selected = explorer.selection, !ids.contains(selected), documents[selected] != nil { ids.append(selected) }
+        if let selected = explorer.selection, !ids.contains(selected), documents[selected] != nil {
+            ids.append(selected)
+        }
         let reads = ids.map { id in Task { await loadContent(id) } }
         for read in reads { await read.value }
     }

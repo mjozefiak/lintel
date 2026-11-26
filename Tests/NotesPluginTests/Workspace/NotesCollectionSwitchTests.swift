@@ -48,7 +48,8 @@ struct NotesCollectionSwitchTests {
         let rig = SwitchRig()
         await rig.model.refresh()
         #expect(rig.model.collection == .all)
-        #expect(rig.model.rows.map(\.id.key.rawValue) == ["meetings:a", "dictation:s/0", "dictation:s/1", "meetings:b"])
+        #expect(
+            rig.model.rows.map(\.id.key.rawValue) == ["meetings:a", "dictation:s/0", "dictation:s/1", "meetings:b"])
         #expect(rig.model.statusSummary == "4 notes")
         await rig.model.setCollection(.dictations)
         #expect(rig.model.collection == .dictations)

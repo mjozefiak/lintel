@@ -42,7 +42,8 @@ struct NoteListView: View {
         switch collection {
         case .all: String(localized: "All notes", comment: "Sidebar and list heading: every note")
         case .meetings: String(localized: "Meetings", comment: "Explorer: group of meeting notes")
-        case .dictations: String(localized: "Dictations", comment: "Explorer: the switch and the label above the list of dictations")
+        case .dictations:
+            String(localized: "Dictations", comment: "Explorer: the switch and the label above the list of dictations")
         }
     }
 
@@ -75,7 +76,7 @@ struct NoteListView: View {
                 }
                 .hiddenContent(model.hidesContent)
                 .onChange(of: model.explorer.selection) { _, id in
-                    if let id { withAnimation(nil) { proxy.scrollTo(id) } }
+                    if let id { proxy.scrollTo(id) }
                 }
             }
             .focusable()

@@ -75,6 +75,7 @@ private final class GalleryRecorder: LiveRecorder, @unchecked Sendable {
     var environment = NotesWorkspaceModel.Environment(
         library: NoteLibrary(sources: { sources }, overlays: overlays, detacher: overlays),
         pasteboard: GalleryPasteboard(), now: { galleryNow }, calendar: galleryCalendar, locale: .current)
+    environment.canCreateNotes = true
     environment.dictationShortcut = { scenario.dictationShortcut }
     if scenario.canRetry { environment.liveRecorder = { GalleryRecorder() } }
     let model = NotesWorkspaceModel(environment: environment)
@@ -112,7 +113,8 @@ private struct NotesExplorerGalleryHost: View {
             }
             guard let key = scenario.selected else { return }
             model.select(row: .live(key))
-            for _ in 0..<100 where model.previewDocument?.phase == .loading {
+            // The preview view reads the selection; wait until it has.
+            for _ in 0..<100 where model.previewDocument?.phase != .loaded {
                 try? await Task.sleep(for: .milliseconds(10))
             }
             if let layer = scenario.layer { model.previewDocument?.selectLayer(layer) }
@@ -207,7 +209,7 @@ private struct NotesSidebarGalleryHost: View {
                 state(
                     "meeting-notes",
                     "A meeting's notes with the tabs Notes, My notes and Transcript and the footer that says who wrote them.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID)),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.summaryID)),
                 state(
                     "meeting-transcript",
                     "The Transcript tab: speakers and times, the text read-only.",

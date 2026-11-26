@@ -13,9 +13,16 @@ struct NotePreviewView: View {
 
     var body: some View {
         Group {
-            if let id = model.explorer.selection, let document = model.previewDocument {
-                content(id: id, document: document)
-                    .id(id)
+            if let id = model.explorer.selection {
+                Group {
+                    if let document = model.previewDocument {
+                        content(id: id, document: document)
+                    } else {
+                        NoteSkeletonDocument()
+                    }
+                }
+                .id(id)
+                .task(id: id) { await model.loadPreview(id) }
             } else {
                 EmptyStateView(
                     message: Text("Select a note to read it here.", comment: "Preview: nothing is selected"))
@@ -48,7 +55,10 @@ struct NotePreviewView: View {
     }
 
     private func isMeeting(_ document: NoteDocumentModel) -> Bool {
-        document.layers.contains { $0.id == "notes" || $0.id == NoteDocumentModel.transcriptLayerID }
+        if let summary = document.summary {
+            return NoteCollection.meetings.contains(key: summary.id, kind: summary.kind)
+        }
+        return NoteCollection.meetings.contains(document.id)
     }
 
     @ViewBuilder private func loaded(id: NoteItemID, document: NoteDocumentModel) -> some View {
@@ -83,13 +93,15 @@ struct NotePreviewView: View {
                 Text("Open", comment: "Preview: opens the note in the full window")
             }
             .buttonStyle(LintelSecondaryButtonStyle())
-            Button {
-                if let text = document.markdown { NoteClipboard.copy(text, to: model.environment.pasteboard) }
-            } label: {
-                Text("Copy", comment: "Preview: copies the note as Markdown")
+            // Without text there is nothing to copy; the button is left out rather than shown disabled with no reason.
+            if let text = document.markdown {
+                Button {
+                    NoteClipboard.copy(text, to: model.environment.pasteboard)
+                } label: {
+                    Text("Copy", comment: "Preview: copies the note as Markdown")
+                }
+                .buttonStyle(LintelSecondaryButtonStyle())
             }
-            .buttonStyle(LintelSecondaryButtonStyle())
-            .disabled(document.markdown == nil)
         }
         .padding(.horizontal, 24 * textSize.scale)
         .padding(.top, 16 * textSize.scale)
@@ -104,12 +116,19 @@ struct NotePreviewView: View {
     private func tabs(_ document: NoteDocumentModel) -> some View {
         HStack(spacing: 4 * textSize.scale) {
             ForEach(tabItems(document), id: \.id) { item in
-                let selected = item.id == "mine" ? showsMine : (!showsMine && document.layerID == item.id)
+                let onTranscript = document.layerID == NoteDocumentModel.transcriptLayerID
+                let selected =
+                    switch item.id {
+                    case "mine": showsMine
+                    case NoteDocumentModel.transcriptLayerID: !showsMine && onTranscript
+                    default: !showsMine && !onTranscript
+                    }
                 Button {
                     if item.id == "mine" {
                         showsMine = true
                     } else {
                         showsMine = false
+                        // A layer the note does not have leaves the shown one as it was.
                         document.selectLayer(item.id)
                     }
                 } label: {
@@ -137,19 +156,14 @@ struct NotePreviewView: View {
     }
 
     private func tabItems(_ document: NoteDocumentModel) -> [TabItem] {
-        var items: [TabItem] = []
-        if document.layers.contains(where: { $0.id == "notes" }) {
-            items.append(TabItem(id: "notes", title: NoteDocumentModel.title(ofLayer: "notes")))
-        }
-        items.append(
-            TabItem(id: "mine", title: String(localized: "My notes", comment: "Preview: the tab with your own notes")))
-        if document.layers.contains(where: { $0.id == NoteDocumentModel.transcriptLayerID }) {
-            items.append(
-                TabItem(
-                    id: NoteDocumentModel.transcriptLayerID,
-                    title: NoteDocumentModel.title(ofLayer: NoteDocumentModel.transcriptLayerID)))
-        }
-        return items
+        // A meeting always has the three tabs: what is missing from one is said inside it.
+        [
+            TabItem(id: "notes", title: NoteDocumentModel.title(ofLayer: "notes")),
+            TabItem(id: "mine", title: String(localized: "My notes", comment: "Preview: the tab with your own notes")),
+            TabItem(
+                id: NoteDocumentModel.transcriptLayerID,
+                title: NoteDocumentModel.title(ofLayer: NoteDocumentModel.transcriptLayerID)),
+        ]
     }
 
     // MARK: Body
@@ -234,7 +248,7 @@ struct NotePreviewView: View {
                     localized: "Lintel is writing the notes.", comment: "Preview: the notes are being written"),
                 isWriting: true)
         default:
-            guard !document.layers.contains(where: { $0.id == "notes" }) else { return nil }
+            guard document.state == .ready, !document.layers.contains(where: { $0.id == "notes" }) else { return nil }
             return Problem(
                 message: String(
                     localized: "Notes are off for this meeting.", comment: "Preview: no notes were written"))

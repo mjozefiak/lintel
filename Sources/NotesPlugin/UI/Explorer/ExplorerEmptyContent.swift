@@ -60,7 +60,8 @@ struct ExplorerEmptyContent: Equatable {
                             comment: "Explorer empty state of All notes while meetings are off; the shortcut")
                     }
                         ?? String(
-                            localized: "Your notes will appear here. Hold your dictation shortcut to dictate in any app.",
+                            localized:
+                                "Your notes will appear here. Hold your dictation shortcut to dictate in any app.",
                             comment: "Explorer empty state of All notes while meetings are off, no shortcut known"))
             case (false, false):
                 return ExplorerEmptyContent(

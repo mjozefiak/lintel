@@ -74,7 +74,8 @@ struct ExplorerModelTests {
 struct ExplorerEmptyContentTests {
     @Test("All notes: four variants by what is on, the shortcut read as given")
     func allNotes() {
-        let both = ExplorerEmptyContent.library(collection: .all, meetingsOn: true, dictationOn: true, shortcut: "⌥Space")
+        let both = ExplorerEmptyContent.library(
+            collection: .all, meetingsOn: true, dictationOn: true, shortcut: "⌥Space")
         #expect(both.message.contains("⌥Space"))
         #expect(both.action == nil)
         let noShortcut = ExplorerEmptyContent.library(
