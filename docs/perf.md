@@ -487,3 +487,52 @@ The renderer draws every bitmap itself at exactly 2 pixels per point (`GalleryRe
 fingerprint, so the picture does not depend on the display of the machine (a CI VM can report a backing scale of 1).
 Renderer fingerprint changes (macOS build, Xcode build) are expected a few times a year; if more often than once a month,
 pin the runner image.
+
+## Automatic language and the language repair (spec `2026-11-23-automatic-language-detection`, step 2.5)
+
+**Measured on one unlabeled meeting and on the dictation corpus; the measurement gate is not complete.** The two
+labelled #132 meetings and a Cyrillic recording are not on the measuring Mac, and FLEURS `uk` is not downloaded, so gate
+items 1 (wrong-language share), 2 (Cyrillic), 4 (audit of replaced segments) and the quality half of 5 were not measured.
+Measured: item 3 (the differ), item 6 (timings) and the time half of item 5. Counts only, no text. Apple M4 Max, release build of
+`9f365759`, `scripts/meeting-eval/run.sh`, one owner meeting of 55 min (3 322 s, Polish, microphone track, unlabeled),
+list `pl,en`, Parakeet live.
+
+| Run | Segments | Live requests: no hint / Latin | Profile settled at (audio) | Repair: suspect / re-decoded / replaced / kept / skipped | Repair time = `ready` delay | Peak during repair |
+|---|---|---|---|---|---|---|
+| Baseline `pl` (as `main`) | 280 | 0 / 311 | (151.7 s if it ran) | — | — | — |
+| Automatic, no repair | 280 | 9 / 302 | 151.7 s | — | — | — |
+| Automatic, Whisper repair (model warm in the Core ML cache) | 280 | 9 / 302 | 151.7 s | 19 / 19 / 3 / 16 / 0 | 10.5 s | 765 MB |
+| Automatic, Parakeet repair | 281 | 9 / 302 | 151.7 s | 20 / 20 / 4 / 16 / 0 | 2.1 s | 657 MB |
+| Automatic, Whisper repair, **first Whisper load after a build** (5 min excerpt) | 19 | 9 / 12 | 151.7 s | 3 / 0 / 0 / 0 / 3 (`timeLimit`) | **142.9 s** | 266 MB |
+
+- The profile is Polish only (confident share `pl` 1.000 over 2 582 s). It settles at 151.7 s of audio: the 7 stored
+  segments that start before it (9 requests with the empty results) went out without a hint, what the app sends in real
+  time too (the eval feeds the WAV faster than real time, but no segment from before the settle point was replayed later
+  with the settled hint).
+- Item 3: the rows the repair changed (`diff_segments.py --repaired-only`) are 3 (Whisper) and 3 (Parakeet, plus one
+  row only that run has), all ≤ 4.1 s and ≤ 3 words: **0 segments longer than 2 s and 3 words changed by the repair.**
+  Compared across runs the differ cannot judge item 3: two baseline runs with the same settings already differ on 11
+  segments, 9 of them long (probably the 15 s hard cuts and the spool replays, whose number changes per run because the
+  WAV is fed faster than real time; the suspect count varies too, 19 vs 20).
+- **The repair's time bound did not hold once.** The limit includes loading the model but does not interrupt the load:
+  the first Whisper load of the evaluation (cold; probably the Core ML cache, the next load took 4 s) held `beforeReady`
+  for 143 s, past `LanguageRepair.timeLimit` (60 s) and past the spec's 2 min worst case, and decoded nothing
+  (`stop=timeLimit`). Whether an app update triggers the same cold load was not measured.
+- Item 5 (time only): Whisper live on the same meeting took 214.6 s pinned to `pl` and 230.9 s in Automatic (29 detected
+  segments), about **+0.56 s per detection** (one run each). Whether Automatic writes fewer wrong-language segments
+  needs labels.
+- Not measured: the reload of Parakeet for the next dictation after a Whisper repair (not added to the harness).
+
+Engine check on files (`LanguageEvalTests.OwnerCorpusEval`, whole files, no VAD; this branch changes no dictation path, so
+it checks the engines only). WER %:
+
+| Setup | Owner corpus, 40 files: Phase 1 → now (second run) | FLEURS `pl`, 60 | FLEURS `en`, 60 |
+|---|---|---|---|
+| Parakeet, no hint | 30.1 → 30.0 (30.0) | 6.7 | 5.7 |
+| Parakeet, Latin hint | 30.1 → 30.0 (30.0) | 6.7 | 5.7 |
+| Whisper pinned `pl` | 34.1 → 38.4 (34.0) | 5.6 | 27.9 (4 empty) |
+| Whisper detecting among `pl,en` | 29.7 → 29.7 (29.0) | 5.6 | 4.9 |
+
+No regression: the one jump (Whisper pinned `pl`, 38.4) is run-to-run variance of Whisper (English pinned to Polish and
+one empty output); the second run gives 34.0. Detection picked the spoken language on every FLEURS file (61/61 `pl`, 61/61 `en`; 60 of each are scored)
+clips. There is no Phase 1 FLEURS baseline.
