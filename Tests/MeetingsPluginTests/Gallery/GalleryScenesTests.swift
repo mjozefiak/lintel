@@ -64,9 +64,11 @@ struct GalleryScenesTests {
 
     /// States whose pictures are the same on purpose: what tells them apart is the host's banner (issue #280).
     private static let aliasGroups: [Set<String>] = [
+        ["ready-sonnet", "job-running"],
+        // They draw the Failed · Last meeting row (not the picture of ready-sonnet); the reason is the banner's (#280).
         [
-            "ready-sonnet", "job-running", "failed-timed-out", "failed-network", "failed-rate-limited", "failed-other",
-            "failed-too-long", "failed-model-not-available",
+            "failed-timed-out", "failed-network", "failed-rate-limited", "failed-other", "failed-too-long",
+            "failed-model-not-available",
         ],
         ["incompatible-version", "newer-version"],
     ]
@@ -90,8 +92,9 @@ struct GalleryScenesTests {
         }
         for ids in byPicture.values where ids.count > 1 {
             #expect(
-                Self.aliasGroups.contains { Set(ids).isSubset(of: $0) },
-                "\(ids.sorted()) draw the same picture; make the states differ or declare them aliases")
+                Self.aliasGroups.contains { Set(ids) == $0 },
+                "\(ids.sorted()) draw the same picture, which is not a declared alias group: make the states differ or declare them"
+            )
         }
     }
 

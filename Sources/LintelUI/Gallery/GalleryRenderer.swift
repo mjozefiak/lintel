@@ -19,6 +19,17 @@ import SwiftUI
     /// turns of the run loop, but the number of renders a state needs does not change.
     public static let maxAttempts = 120
 
+    /// A backstop for the render of one state, measured inside the gate (nothing else renders meanwhile), so it does not
+    /// depend on how busy the machine is with other work: a state that never settles fails with a name, it does not eat
+    /// the step's whole time limit.
+    static let wallClockLimit: Duration = .seconds(20)
+
+    /// How long the last render took once it held the gate (the number `docs/perf.md` quotes).
+    public private(set) static var lastDrawDuration: Duration = .zero
+    /// The most renders ever in flight at once; the gate keeps it at 1 (a test asserts it).
+    static private(set) var peakInFlight = 0
+    private static var inFlight = 0
+
     // One render at a time: renders spin the main run loop and a second one would run inside the first one's waits.
     private static var gateBusy = false
     private static var gateWaiters: [CheckedContinuation<Void, Never>] = []
@@ -50,11 +61,19 @@ import SwiftUI
     ) async throws -> NSBitmapImageRep {
         await acquireGate()
         defer { releaseGate() }
-        return try await draw(state, variant, maxAttempts: maxAttempts)
+        inFlight += 1
+        peakInFlight = max(peakInFlight, inFlight)
+        let clock = ContinuousClock()
+        let started = clock.now
+        defer {
+            inFlight -= 1
+            lastDrawDuration = started.duration(to: clock.now)
+        }
+        return try await draw(state, variant, maxAttempts: maxAttempts, deadline: started.advanced(by: wallClockLimit))
     }
 
     private static func draw(
-        _ state: GalleryState, _ variant: GalleryVariant, maxAttempts: Int
+        _ state: GalleryState, _ variant: GalleryVariant, maxAttempts: Int, deadline: ContinuousClock.Instant
     ) async throws -> NSBitmapImageRep {
         let process = processLanguage
         guard variant.language == process else {
@@ -88,7 +107,7 @@ import SwiftUI
         // Layout and the tasks a state starts (a probe that answers, a text that loads) need a few turns of the
         // loop; the picture counts as settled when two renders in a row are the same.
         var attempts = 0
-        while stableRenders < 2 && attempts < maxAttempts {
+        while stableRenders < 2 && attempts < maxAttempts && ContinuousClock.now < deadline {
             attempts += 1
             try await Task.sleep(for: .milliseconds(15))
             Self.spinRunLoop()

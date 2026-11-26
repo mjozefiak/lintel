@@ -146,7 +146,7 @@ struct QAOptions: Equatable {
     /// `-AppleLanguages "(pl)"` sets: texts are read from the process's language, not from the view.
     var galleryLanguage: String?
     /// `--qa-gallery-compare <dir>` / `--qa-gallery-record <dir>`: compares or writes the golden PNGs of the CI subset in
-    /// that language, with the same renderer and diff the plugins' tests use, and quits (exit code 1 on a difference).
+    /// that language, with the gallery's renderer and diff, and quits (exit code 1 on a difference).
     var galleryCompare: URL?
     var galleryRecord: URL?
 

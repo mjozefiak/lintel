@@ -147,7 +147,7 @@ jobs:
 
       # `actual.png`, `diff.png` and `fingerprint.json` of the pictures that differ, only on a failure.
       - name: Upload gallery diffs
-        if: ${{ !cancelled() && steps.gallery.outcome == 'failure' }}
+        if: ${{ !cancelled() && steps.gallery.outcome != 'success' && steps.gallery.outcome != 'skipped' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: gallery-diffs
@@ -156,9 +156,9 @@ jobs:
           retention-days: 14
 
       - name: Fail on gallery differences
-        if: ${{ !cancelled() && steps.gallery.outcome == 'failure' }}
+        if: ${{ !cancelled() && steps.gallery.outcome != 'success' && steps.gallery.outcome != 'skipped' }}
         run: |
-          echo "The gallery pictures differ from the goldens (see the step 'Gallery snapshots' and the artifact gallery-diffs)."
+          echo "The step 'Gallery snapshots' did not pass: pictures differ from the goldens (artifact gallery-diffs), or the app did not build."
           exit 1
 
       # A hung test run leaves stack samples and the names of the unfinished tests here (never test output).

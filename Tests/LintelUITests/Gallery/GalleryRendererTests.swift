@@ -49,7 +49,12 @@ private func digest(_ bitmap: NSBitmapImageRep) -> String {
     var tick = 0
     var running = true
 
-    init() {
+    private var started = false
+
+    /// Called when the view appears, so a render waiting behind the gate does not load the main actor meanwhile.
+    func start() {
+        guard !started else { return }
+        started = true
         Task { @MainActor [weak self] in
             while let self, self.running {
                 self.tick += 1
@@ -62,7 +67,7 @@ private func digest(_ bitmap: NSBitmapImageRep) -> String {
 private struct FlickerView: View {
     let model: Flicker
     var body: some View {
-        Text(verbatim: "tick \(model.tick)").frame(width: 200, height: 40)
+        Text(verbatim: "tick \(model.tick)").frame(width: 200, height: 40).onAppear { model.start() }
     }
 }
 
@@ -97,16 +102,16 @@ struct GalleryRendererTests {
 
     @Test("the same state rendered 20 times in one process is the same picture")
     func renderIsDeterministic() async throws {
-        let clock = ContinuousClock()
         var digests = Set<String>()
-        let started = clock.now
+        var drawing = Duration.zero
         for _ in 0..<20 {
             digests.insert(digest(try await GalleryRenderer.render(state(), lightM)))
+            drawing += GalleryRenderer.lastDrawDuration
         }
-        let elapsed = started.duration(to: clock.now)
         #expect(digests.count == 1, "20 renders gave \(digests.count) different pictures")
-        // Measurement for docs/perf.md; printed, not asserted.
-        print("GALLERY-PERF 20 renders of the controls pane: \(elapsed)")
+        // Measurement for docs/perf.md; printed, not asserted. Only the time a render held the gate counts, not the
+        // time it waited behind other suites' renders.
+        print("GALLERY-PERF 20 renders of the controls pane, drawing only: \(drawing)")
         if let path = ProcessInfo.processInfo.environment["LINTEL_GALLERY_DIGEST_FILE"], let one = digests.first {
             try? one.write(toFile: path, atomically: true, encoding: .utf8)
         }
@@ -167,6 +172,18 @@ struct GalleryRendererTests {
         var digests = Set<String>()
         for task in tasks { digests.insert(try await task.value) }
         #expect(digests.count == 1)
+        #expect(GalleryRenderer.peakInFlight == 1, "the gate lets one render in at a time")
+    }
+
+    @Test("a render cancelled while it waits for the gate does not strand the next one")
+    func aCancelledRenderReleasesTheGate() async throws {
+        let first = Task { @MainActor in try await GalleryRenderer.render(state(), lightM).pixelsWide }
+        let second = Task { @MainActor in try await GalleryRenderer.render(state(), lightM).pixelsWide }
+        second.cancel()
+        _ = try? await second.value
+        _ = try await first.value
+        let later = try await GalleryRenderer.render(state(), lightM)
+        #expect(later.pixelsWide > 0)
     }
 }
 #endif

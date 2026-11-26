@@ -34,7 +34,7 @@ import LintelUI
 
 /// `--qa-gallery-export`, `--qa-gallery-compare` and `--qa-gallery-record`: draw and quit, with a nonzero exit code when
 /// something differs or fails. Nothing of the app starts (no plugin, no data root, no window); the same
-/// `GalleryRenderer` and `GalleryGoldens` the plugins' tests use do the work. Logs only state names and counts.
+/// `GalleryRenderer` and `GalleryGoldens` (the plugins' tests use the renderer too) do the work. Logs only state names and counts.
 @MainActor enum GalleryBatch {
     /// The language the batch draws: the one asked for, which must be the language of this process.
     static func language(_ options: QAOptions) -> Result<String, GalleryBatchError> {

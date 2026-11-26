@@ -151,7 +151,7 @@ private struct NotesProviderGalleryPane: View {
     ) -> GalleryState {
         pane(
             "failed-\(id)",
-            "Claude Code is chosen and the last job failed: \(what). \(Self.bannerOnly)",
+            "Claude Code is chosen and the last job failed: \(what). \(Self.failedNote)",
             NotesProviderGalleryCase(provider: chosen(), failure: reason))
     }
 
@@ -166,8 +166,13 @@ private struct NotesProviderGalleryPane: View {
         }
     }
 
-    /// States whose difference is shown only by the host's banner (`StatusBanner`, issue #280): until its scenes exist
-    /// the pane looks as in `ready-sonnet`, and `GalleryScenesTests` lists them as declared aliases.
+    /// The six failed-* states: the pane shows the Failed · Last meeting row, but the reason itself is only in the host's
+    /// banner (issue #280), so they draw the same picture until its scenes exist (`GalleryScenesTests` lists them).
+    private static let failedNote =
+        "The pane shows the Failed · Last meeting row; the reason is only in the host's banner (issue #280), so the six failed-* states draw one picture."
+
+    /// `job-running`: its difference is the host's banner (`StatusBanner`, issue #280), so until its scenes exist the
+    /// pane looks as in `ready-sonnet`.
     private static let bannerOnly =
         "The pane looks as in ready-sonnet; the host's banner (issue #280) shows the difference."
 

@@ -7,8 +7,8 @@ import AppKit
 public struct GalleryFingerprint: Codable, Equatable, Sendable {
     /// The macOS version and build, `27.0.1 (26A434)`.
     public var os: String
-    /// `xcodebuild -version` as the workflow passes it in `LINTEL_GALLERY_XCODE`; `nil` when it is not known, which
-    /// makes a comparison impossible.
+    /// `xcodebuild -version` as the workflow passes it in `LINTEL_GALLERY_XCODE`; `nil` when it is not known. Goldens
+    /// recorded with a known build do not compare against a run without one (the builds differ); two unknowns match.
     public var xcode: String?
     /// The backing scale of the bitmaps (always `GalleryRenderer.scale`: forced, not read from a window).
     public var scale: Int
