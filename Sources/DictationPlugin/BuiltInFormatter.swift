@@ -10,6 +10,7 @@ struct BuiltInFormatter: TextFormatter {
     static let loadAllowance: TimeInterval = 20
 
     private let runtime: KeepWarmRuntime
+    private let level: DictationSettings.CleanupLevel
     private let timeout: @Sendable (Int) -> Duration
     private let clock: any Clock<Duration>
     private let logger: Logger
@@ -17,12 +18,15 @@ struct BuiltInFormatter: TextFormatter {
     /// - Parameters:
     ///   - timeout: how long a chunk of this many words may take; tests shorten it.
     ///   - clock: the clock the time limit is measured on; a test passes a virtual one.
+    ///   - level: the cleanup level whose prompt and guard limits are used (`.full` or `.standard`).
     init(
-        runtime: KeepWarmRuntime, timeout: @escaping @Sendable (Int) -> Duration = BuiltInFormatter.timeout(forWords:),
+        runtime: KeepWarmRuntime, level: DictationSettings.CleanupLevel = .standard,
+        timeout: @escaping @Sendable (Int) -> Duration = BuiltInFormatter.timeout(forWords:),
         clock: any Clock<Duration> = ContinuousClock(),
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "dictation")
     ) {
         self.runtime = runtime
+        self.level = level
         self.timeout = timeout
         self.clock = clock
         self.logger = logger
@@ -45,7 +49,7 @@ struct BuiltInFormatter: TextFormatter {
     func format(chunk: String, previousContext: String?) async throws -> FormatResult {
         let raw = FormatResult.raw(chunk)
         let words = FormatterGuard.words(in: chunk)
-        let messages = CleanupPrompt.messages(transcript: chunk, context: previousContext)
+        let messages = CleanupPrompt.messages(transcript: chunk, context: previousContext, level: level)
         let runtime = runtime
         let outcome: Result<String, any Error>?
         do {
@@ -71,7 +75,7 @@ struct BuiltInFormatter: TextFormatter {
             logger.error("The built-in model failed: \(String(describing: type(of: error)), privacy: .public)")
             return raw.falling(Self.reason(for: error))
         case .success(let content):
-            switch FormatterGuard.check(input: chunk, output: content) {
+            switch FormatterGuard.check(input: chunk, output: content, level: level) {
             case .accepted(let text):
                 return FormatResult(text: text, outcome: .formatted)
             case .rejected(let reason):
