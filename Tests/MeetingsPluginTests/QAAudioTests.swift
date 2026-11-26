@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import LintelSpeech
 import Testing
@@ -170,3 +171,4 @@ import Testing
         return Array(samples.prefix(count))
     }
 }
+#endif
