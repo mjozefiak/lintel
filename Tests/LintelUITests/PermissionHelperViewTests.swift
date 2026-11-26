@@ -83,6 +83,15 @@ import Testing
                 .value == "Przeciągnij Lintel na listę, a potem włącz przełącznik.")
     }
 
+    /// Owner decision (2026-11-26, the sheet's copy review): the Polish button drops the app name, the English key
+    /// keeps it. The button sits under a sentence that already says where Lintel is.
+    @Test func theFinderButtonDropsTheAppNameInPolish() throws {
+        let catalog = try catalog()
+        let entry = try #require(catalog.strings["Show Lintel in Finder"])
+        #expect(entry.localizations?["pl"]?.stringUnit?.value == "Pokaż w Finderze")
+        #expect(entry.localizations?["en"]?.stringUnit?.value == "Show Lintel in Finder")
+    }
+
     @Test func theSentencesAreShortEnoughForOneGlance() throws {
         // About 15 words at most (tone of voice, #247).
         let catalog = try catalog()
