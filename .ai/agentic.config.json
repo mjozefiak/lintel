@@ -15,7 +15,11 @@
   "labels": {
     "enabled": true,
     "pipeline": [
+      "review",
+      "changes-requested",
+      "qa",
       "qa-failed",
+      "merge-queue",
       "blocked",
       "do-not-merge"
     ],
@@ -27,8 +31,17 @@
     ],
     "meta": [
       "needs-qa",
+      "needs-human-qa",
+      "skip-qa",
       "qa-approved",
-      "state:in-progress"
+      "qa-self-verified",
+      "in-progress",
+      "ci-monitoring",
+      "claim-reset",
+      "automerge-signal-1-cr",
+      "automerge-signal-2-qa",
+      "automerge-signal-3-ci",
+      "automerge-signal-3-passes-local-ci-checks"
     ],
     "priority": [],
     "risk": [
@@ -45,26 +58,27 @@
     "state": [
       "state:idea",
       "state:needs-decision",
-      "state:agent-ready",
-      "state:in-progress"
+      "state:agent-ready"
     ],
     "milestones": [
       "beta.2",
       "later"
-    ],
-    "claim": "state:in-progress",
-    "rationaleComments": false
+    ]
   },
   "qaGate": true,
   "ci": {
-    "maxWaitMinutes": 40
+    "maxWaitMinutes": 40,
+    "approveHeldRunsOnReview": false
   },
   "automerge": {
     "label": "automerge",
-    "mode": "prepare-to-merge",
+    "mode": "prepare-and-merge",
     "requireIndependentReview": false,
     "defaultToHumanQa": true,
-    "humanOnlyLabels": [],
+    "humanOnlyLabels": [
+      "risk-high",
+      "state:needs-decision"
+    ],
     "humanOnlyAuthors": [],
     "complexQa": "always",
     "windowMinutes": 120,
@@ -165,5 +179,39 @@
     "ignore": []
   },
   "prTitleTemplate": "{prefix}({area}): {summary}{issueRef}",
-  "ticketKeyPattern": ""
+  "ticketKeyPattern": "",
+  "qaGateLabel": "needs-human-qa",
+  "qaReadyLabel": null,
+  "humanQaPolicy": {
+    "paths": [
+      "Package.swift",
+      "Package.resolved",
+      "Packages/**",
+      "Sources/LintelKit/**",
+      "Sources/LintelPersistence/**",
+      "Sources/LintelApp/PluginRegistry.swift",
+      "Sources/ClipboardPlugin/**",
+      "Resources/Info.plist",
+      "Resources/*.entitlements",
+      "Resources/designated-requirement.txt",
+      ".github/workflows/**",
+      "scripts/make-app.sh",
+      "scripts/make-dmg.sh",
+      "scripts/notarize.sh",
+      "scripts/requirement.sh",
+      "scripts/select-entitlements.sh",
+      "scripts/sparkle-sign.sh",
+      "scripts/make-appcast.sh",
+      "scripts/release-appcast.sh"
+    ],
+    "uiPaths": [],
+    "uiFileThreshold": 0,
+    "whenUnsure": "human",
+    "approvedDesign": {
+      "source": "merged-spec",
+      "label": null
+    },
+    "humanVerdictLabels": [],
+    "trustedTriageAuthors": []
+  }
 }
