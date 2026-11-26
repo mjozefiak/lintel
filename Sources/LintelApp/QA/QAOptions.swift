@@ -90,8 +90,9 @@ struct QAOptions: Equatable {
     /// microphone or any permission; `--qa-snapshot` then writes the HUD instead of the main window (`docs/qa.md`).
     var hud: QAHUDRequest?
     /// `--qa-meeting-mic-wav <path>` / `--qa-meeting-system-wav <path>`: 16 kHz mono WAV files played back as
-    /// the meeting's microphone and system tracks instead of real audio (meeting notes, step 1.5). Real
-    /// capture is never started in QA mode.
+    /// the meeting's microphone and system tracks (`AppEnvironment.qaAudioSettings`; a track without a file is
+    /// silence). Real capture is never started in QA mode: `AppEnvironment.qa` always switches the plugins to these
+    /// sources, and `RealAudioGuard` makes the real microphone, tap and tone player throw.
     var meetingMicWAV: URL?
     var meetingSystemWAV: URL?
     /// `--qa-meeting-spool-dir <path>`: folder for the encrypted spool of QA meetings instead of
@@ -164,6 +165,12 @@ struct QAOptions: Equatable {
     static let appsLiveActivityKey = "plugins.apps.qaLiveActivity"
     /// The Notes plugin's DEBUG-only fixtures key (`AppEnvironment.qaNotesSettings`).
     static let notesFixturesKey = "plugins.notes.qaFixtures"
+    /// The DEBUG-only keys that switch meetings and dictation to WAV files or silence (`AppEnvironment.qaAudioSettings`).
+    static let meetingsAudioKey = "plugins.meetings.qaAudio"
+    static let meetingsMicWAVKey = "plugins.meetings.qaMicWAV"
+    static let meetingsSystemWAVKey = "plugins.meetings.qaSystemWAV"
+    static let meetingsSpoolDirectoryKey = "plugins.meetings.qaSpoolDir"
+    static let dictationAudioKey = "plugins.dictation.qaAudio"
     static let meetingsAccountNameKey = "plugins.meetings.qaAccountName"
     static let meetingsProviderBinaryKey = "plugins.meetings.qaProviderBinary"
     /// Settings that `--qa-setting` reads as comma-separated lists.

@@ -35,7 +35,7 @@ Any `--qa…` argument turns QA mode on:
 |---|---|---|
 | Data root | `~/Library/Application Support/Lintel` | `--qa-data-root <path>`, or a fresh `$TMPDIR/lintel-qa-<uuid>` |
 | Settings | `UserDefaults` domain `com.lintelapp.Lintel` | in memory; no defaults domain is written |
-| Keychain | file-based login keychain | in memory; the real `com.lintelapp.clipboard` item is never created or read |
+| Keychain | file-based login keychain | in memory; the real `com.lintelapp.clipboard` item is never created or read. With `--qa-persistent-settings` the throwaway QA keys are kept in `<data root>/qa-keychain.json` (0600), so an encrypted QA library can be reopened after a relaunch |
 | Pasteboard | `NSPasteboard.general` | private named pasteboard `com.lintelapp.qa.<pid>` |
 | Global hotkeys | registered | never registered, so ⌘Space and ⌘⇧V stay with the tester; the shortcut recorders show the would-be shortcut from the volatile registration domain |
 | Caches | `~/Library/Caches/Lintel` | `Caches/` under the data root |
@@ -120,9 +120,9 @@ old switches. A stored switch is never changed, and a second run changes nothing
 | `--qa-gallery-export <dir>` / `--qa-gallery-scene <id>` / `--qa-gallery-language en\|pl` | Design gallery, phase 1 | Draws the full matrix (S, M, XL, light, dark) of every state, or of one scene, in the language of the process to `<dir>/<scene>/<state>/<variant>.png`, and quits. The language must be the process's: use `scripts/gallery-export.sh <dir>`, which runs the app bundle with `-AppleLanguages "(en)"` and `"(pl)"` and writes `index.html`. |
 | `--qa-gallery-compare <dir>` / `--qa-gallery-record <dir>` | Design gallery, phase 1 | Compares (exit code 1 on a difference or an unknown fingerprint; `actual.png`/`diff.png` to `$LINTEL_SNAPSHOT_ARTIFACTS`) or writes the golden PNGs of the CI subset in that language with the gallery's renderer and diff, and quits. CI compares `en` and `pl` this way; do not record to make a test pass. |
 | `--qa-setting plugins.meetings.qaNotesDownload=missing\|partial\|downloading\|offline\|noSpace\|installed` | Notes on by default (#252), DEBUG only | Forces the state of the "Notes on this Mac" part of the `meetings.setup` step with nothing read from the disk or the network: `missing` (Download with the size of the model for this Mac), `partial` (Continue Download with what is left), `downloading` (progress at 40 % with Cancel), `offline` ("The download did not finish…" with Try Again), `noSpace` (the space needed and an invented free space, Check Again, no Download button), `installed` (Downloaded). Clicking Download or Try Again downloads nothing. Recipes in "Meeting notes on by default (#252)". Not a contract. |
-| `--qa-meeting-mic-wav <path>` | Meeting notes 1.5 | A 16 kHz mono WAV (16-bit PCM or 32-bit float) played back as the meeting's microphone track instead of the real microphone. Options parsing only until the plugin is registered (step 1.10). |
-| `--qa-meeting-system-wav <path>` | Meeting notes 1.5 | The same for the system-audio track; real Core Audio capture is never started in QA mode. |
-| `--qa-meeting-spool-dir <path>` | Meeting notes 1.5 | Folder for the encrypted spool of QA meetings instead of `<data root>/Plugins/meetings/Spool`. The Keychain is the in-memory one in QA mode, so the spool key never reaches the real Keychain. |
+| `--qa-meeting-mic-wav <path>` | Meeting notes 1.5 | A 16 kHz mono WAV (16-bit PCM or 32-bit float; `say -o mic.wav --file-format=WAVE --data-format=LEI16@16000 "..."` makes one) played as the meeting's microphone track. The file plays in real time (both tracks start together), then the track is silence until the recording stops (the stream never ends, or the session would take it for a lost microphone and play the file again). Without the flag the track is silence. An unreadable file makes the recording fail to start. |
+| `--qa-meeting-system-wav <path>` | Meeting notes 1.5 | The same for the system-audio track; without it that track is silence. |
+| `--qa-meeting-spool-dir <path>` | Meeting notes 1.5 | Folder for the encrypted spool of QA meetings instead of `<data root>/Plugins/meetings/Spool`. The Keychain is the in-memory one in QA mode (unless `--qa-persistent-settings`), so the spool key never reaches the real Keychain. |
 | `--qa-move-prompt` | Updates and open-source hygiene, step 4.2 | Show the launch-time "Move Lintel to Applications?" alert (Move, Don't Move, "Don't ask again") as if Lintel ran from a disk image (`/Volumes/Lintel/Lintel.app`), before the plugins start. Full QA mode still applies. The alert never appears in DEBUG builds otherwise, QA or not; release builds show it once per launch when the app is outside `/Applications` and `~/Applications`. The Move flow runs over fakes (`QAInstallFakes`): it only logs what it would copy, trash, rename and open, never touches `/Applications`, the Trash or other apps, and never quits. "Don't ask again" writes the in-memory settings; `--qa-setting app.install.moveDeclined=true` checks that the alert then stays hidden. With `--qa-quit-after` and `--qa-snapshot <path>` the alert (not the main window) is written as a PNG before quitting. |
 | `--qa-move-scenario standard\|user-applications\|unwritable\|newer` | Updates and open-source hygiene, step 4.2 | With `--qa-move-prompt`: which variant the fake file manager produces. `standard` (default): the alert names `/Applications`. `user-applications`: `~/Applications` exists and holds an app, so the alert names `~/Applications`. `unwritable`: `/Applications` cannot be written, so the alert offers the Applications folder in the home folder (Lintel never asks for an administrator). `newer`: a copy with a higher build number is installed, so the alert offers to open it. All over fakes: nothing is created, trashed or copied. |
 | `--qa-update-available <version>` | Updates and open-source hygiene, step 4.4 | A fake updater (`QAUpdateChecker`) reports at launch that a background check found `<version>`: the menu bar item gets the dot and the menu starts with "Update Available: <version>…". No window opens. Choosing the item clears the reminder (the real updater would bring its window forward). The real update framework is never created in a DEBUG build and nothing is requested from the network. Use with `--qa-show-menu` for a screenshot of the menu. |
@@ -459,7 +459,31 @@ isolates the Keychain; audio permissions are per app, not per `--qa` data folder
 
 The plugin is on by default since 2026-11-24 (the recipes below still pass `--qa-setting plugins.meetings.enabled=true`, which changes nothing).
 The Keychain is the in-memory one in QA mode, so the library key never reaches the real Keychain, and the data root is
-fresh unless `--qa-data-root` is given. Real capture is never started in QA mode: the audio comes from WAV files.
+fresh unless `--qa-data-root` is given. A second launch on the same `--qa-data-root` needs `--qa-persistent-settings` too: without it
+the Keychain is new on every launch, the library key is gone and the library is reset instead of showing the earlier meeting.
+
+**No real audio in QA mode.** A `--qa` run never opens the tester's microphone, never taps the system audio and never
+plays a sound on the speakers. This holds without any flag:
+
+- Meetings record WAV files (`--qa-meeting-mic-wav`, `--qa-meeting-system-wav`) or silence, with the microphone permission
+  reported as granted (no system prompt) and the system-audio test answering "works" over a fake tap and a silent tone
+  (`plugins.meetings.qaAudio`, set by every `--qa` run and not changeable with `--qa-setting`).
+- Dictation hears silence unless `qa dictation play` (below) feeds it a file; its permission reads as granted
+  (`plugins.dictation.qaAudio`). There is no `--qa-dictation-wav` flag: `qa dictation play` is the way.
+- As a backstop, `RealAudioGuard` (DEBUG only, set at launch) makes the real microphone engine, the Core Audio process tap
+  and the tone player throw instead of touching the hardware, so a path nobody wired fails loudly and shows no
+  recording indicator.
+- Not covered: the buttons that only ask for the microphone permission (Settings → Permissions) still show the system
+  prompt, and the meeting detector still reads which apps use audio (it records nothing). Do not press the permission
+  button in an unattended run.
+
+To check that a QA run left the microphone alone, watch the menu bar for the orange recording dot, and ask Core Audio
+for `kAudioProcessPropertyIsRunningInput` of the QA app's process while the recording runs: it must stay false for the whole
+recording. `kAudioDevicePropertyDeviceIsRunningSomewhere` on the default input proves nothing, because it is true whenever
+any other app (a camera app, a call) holds the input.
+
+The Settings panes and banners of meetings and dictation read the microphone permission as granted in a QA run, so no
+"Allow microphone" button appears there; only Settings → Permissions can still raise the system prompt.
 
 Options that matter (see the table above for all of them):
 
