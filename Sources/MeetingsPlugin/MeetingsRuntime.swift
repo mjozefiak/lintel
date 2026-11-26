@@ -56,13 +56,34 @@ struct MeetingsRuntime: Sendable {
         ModelCatalog.package(id: settings.speechModelID) ?? ModelCatalog.parakeetUltra
     }
 
-    /// Where the speech model chosen in Settings is.
+    /// Where the speech model chosen in Settings is; a new recording starts with it.
     func speechLookup() async -> SpeechModelLookup {
         let package = speechPackage
         let location = await speechManager.location(of: package, customFolder: settings.speechModelFolder)
         if let folder = location.folder { return .ready(modelID: package.id, folder: folder) }
         if case .customFolderUnavailable = location { return .unavailable }
         return .missing
+    }
+
+    /// Where the speech model stored with a meeting is. A resumed meeting is transcribed with the model it was
+    /// recorded with, never with the one chosen in Settings now (#314), so one meeting never mixes two engines.
+    func speechLookup(for modelID: String) async -> SpeechModelLookup {
+        guard let package = Self.resumePackage(storedModelID: modelID, selected: speechPackage) else {
+            return .missing
+        }
+        // A folder the user chose belongs to the model chosen in Settings: it is tried for that model only, and
+        // any other stored model is looked up where Lintel installed it.
+        let customFolder = package.id == speechPackage.id ? settings.speechModelFolder : nil
+        let location = await speechManager.location(of: package, customFolder: customFolder)
+        if let folder = location.folder { return .ready(modelID: package.id, folder: folder) }
+        return .missing
+    }
+
+    /// The speech package a resumed meeting is transcribed with: the one stored with it. A row that recorded no
+    /// model at all follows the choice in Settings (what the resumer did before #314); an id that is not in the
+    /// catalog is a model that is gone, so the meeting waits instead of switching engines.
+    static func resumePackage(storedModelID: String, selected: ModelPackage) -> ModelPackage? {
+        storedModelID.isEmpty ? selected : ModelCatalog.package(id: storedModelID)
     }
 
     /// One engine per recording, fixed to the model the recording started with: a change in Settings during
@@ -128,15 +149,19 @@ struct MeetingsRuntime: Sendable {
 
     // MARK: Recovery and "Dokończ"
 
-    /// The resumer the library uses after a crash and for "Dokończ": the same speech setup and finalizer.
+    /// The resumer the library uses after a crash and for "Dokończ": the same speech setup and finalizer. The
+    /// setup is looked up by the model stored with each meeting (`speechLookup(for:)`), never by the current
+    /// choice in Settings (#314).
     func makeResumer(store: MeetingsStore, keys: MeetingKeys, spool: SpoolStorage) -> any MeetingResuming {
         let finalizer = makeFinalizer(store: store, keys: keys, spool: spool)
         let runtime = self
         return MeetingResumer(
             store: store, keys: keys, spool: spool,
-            makeVAD: { FolderResolvingVAD(folder: { await runtime.speechLookup().folder }) },
-            speech: {
-                guard case .ready(let id, let folder) = await runtime.speechLookup() else { return nil }
+            makeVAD: { modelID in
+                FolderResolvingVAD(folder: { await runtime.speechLookup(for: modelID).folder })
+            },
+            speech: { modelID in
+                guard case .ready(let id, let folder) = await runtime.speechLookup(for: modelID) else { return nil }
                 return ResumeSpeech(engine: runtime.makeEngine(modelID: id), modelID: id, folder: folder)
             }, finalize: finalizer.hook, keepAudio: { [settings] in settings.keepAudio }, logger: logger)
     }

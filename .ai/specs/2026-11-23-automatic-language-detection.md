@@ -64,7 +64,7 @@ The hint and the language choice are **per request, never per engine instance**.
    - `TextLanguageIdentifier` does not place it **confidently** in a language outside the profile. A short text the identifier is unsure about passes: the identifier is not reliable below about 8 words, so it may veto, never approve.
 
    The repair runs on **every** finalizer path that leaves a transcript: diarized, the diarization fallbacks (speaker model missing, over budget, failed) and diarization switched off. It does not run for `.cancelled` (the meeting stays `processing` with its spool for a later run) or `.nothingToLabel`. `SpoolReader` reads forward only, so the repair is one more decrypting pass over each track that has a suspect segment, collecting just the suspect ranges.
-5. A meeting resumed after a crash (`MeetingResumer`, `RecoveryJob`) rebuilds the profile from its stored segment texts, so no new column is needed.
+5. A meeting resumed after a crash (`MeetingResumer`, `RecoveryJob`) rebuilds the profile from its stored segment texts, so no new column is needed. It is transcribed with the model stored with it (`meeting.speech_model_id`), never with the one the router would pick now: the router only decides a new recording, and a stored model that is gone leaves the meeting `incomplete` with its spool instead of mixing two engines in one meeting (#314).
 
 ### Meetings and Dictation, Whisper
 

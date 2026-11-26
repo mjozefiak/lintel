@@ -6,6 +6,10 @@ struct RecoverableMeeting: Equatable, Sendable {
     let id: Int64
     /// `nil` when the stored `uuid` is not a UUID (then there is no spool folder to find).
     let uuid: UUID?
+    /// The speech model the meeting was recorded with (`meeting.speech_model_id`). A resumed meeting is
+    /// transcribed with this model, never with the one chosen in Settings at resume time (#314), so the engine
+    /// stays the same across the crash. Empty only for a row that recorded no model.
+    let speechModelID: String
     let status: MeetingStatus
     let audioState: AudioState
     let startedAt: Date
@@ -25,7 +29,8 @@ extension MeetingsStore {
             return try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT m.id, m.uuid, m.status, m.audio_state, m.started_at, m.ended_at, m.duration_ms,
+                    SELECT m.id, m.uuid, m.speech_model_id, m.status, m.audio_state, m.started_at, m.ended_at,
+                        m.duration_ms,
                         (SELECT count(*) FROM meeting_segment s WHERE s.meeting_id = m.id) AS segments
                     FROM meeting m WHERE m.status IN (\(marks)) ORDER BY m.started_at, m.id
                     """, arguments: StatementArguments(names)
@@ -38,7 +43,8 @@ extension MeetingsStore {
             try Row.fetchOne(
                 db,
                 sql: """
-                    SELECT m.id, m.uuid, m.status, m.audio_state, m.started_at, m.ended_at, m.duration_ms,
+                    SELECT m.id, m.uuid, m.speech_model_id, m.status, m.audio_state, m.started_at, m.ended_at,
+                        m.duration_ms,
                         (SELECT count(*) FROM meeting_segment s WHERE s.meeting_id = m.id) AS segments
                     FROM meeting m WHERE m.id = ?
                     """, arguments: [id]
@@ -53,7 +59,8 @@ extension MeetingsStore {
         let uuid: String = row["uuid"]
         let ended: Double? = row["ended_at"]
         return RecoverableMeeting(
-            id: row["id"], uuid: UUID(uuidString: uuid), status: status, audioState: audio,
+            id: row["id"], uuid: UUID(uuidString: uuid), speechModelID: row["speech_model_id"], status: status,
+            audioState: audio,
             startedAt: Date(timeIntervalSince1970: row["started_at"]),
             endedAt: ended.map(Date.init(timeIntervalSince1970:)),
             durationMs: row["duration_ms"], segmentCount: row["segments"])

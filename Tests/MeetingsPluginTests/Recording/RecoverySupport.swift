@@ -85,7 +85,8 @@ final class RecoveryRig {
     func seed(
         _ status: MeetingStatus, mic: TrackScript, system: TrackScript? = nil,
         stored: [(AudioChannel, Range<Int>, String)] = [], spoolKeys: MeetingKeys? = nil, writeSpool: Bool = true,
-        closeSpool: Bool = false, uuid: UUID = UUID(), audioState: AudioState = .spool
+        closeSpool: Bool = false, uuid: UUID = UUID(), audioState: AudioState = .spool,
+        modelID: String = "test-model"
     ) async throws -> (id: Int64, uuid: UUID) {
         let store = try #require(seedStore)
         let spool = spool
@@ -96,17 +97,17 @@ final class RecoveryRig {
         return try await Self.write(
             status, store: store, spool: spool, keys: spoolKeys ?? keys, micSamples: micSamples,
             systemSamples: systemSamples, stored: stored, writeSpool: writeSpool, closeSpool: closeSpool, uuid: uuid,
-            audioState: audioState)
+            audioState: audioState, modelID: modelID)
     }
 
     private nonisolated static func write(
         _ status: MeetingStatus, store: MeetingsStore, spool: SpoolStorage, keys writerKeys: MeetingKeys,
         micSamples: [Int16], systemSamples: [Int16]?,
         stored: [(channel: AudioChannel, samples: Range<Int>, text: String)],
-        writeSpool: Bool, closeSpool: Bool, uuid: UUID, audioState: AudioState
+        writeSpool: Bool, closeSpool: Bool, uuid: UUID, audioState: AudioState, modelID: String
     ) async throws -> (id: Int64, uuid: UUID) {
         let id = try store.insertMeeting(
-            uuid: SpoolStorage.name(of: uuid), startedAt: started, speechModelID: "test-model", status: status)
+            uuid: SpoolStorage.name(of: uuid), startedAt: started, speechModelID: modelID, status: status)
         if audioState == .deleted { try store.setAudioState(id, state: .deleted) }
         for (channel, samples, text) in stored {
             try store.insertSegment(
@@ -155,14 +156,16 @@ final class RecoveryRig {
         return { store, keys, spool in
             MeetingResumer(
                 store: store, keys: keys, spool: spool,
-                makeVAD: {
+                makeVAD: { _ in
                     let index = counter.withLock { value -> Int in
                         defer { value += 1 }
                         return value
                     }
                     return ScriptedVAD(spans[index % spans.count])
                 },
-                speech: { haveModel ? ResumeSpeech(engine: engine, modelID: "test-model", folder: folder) : nil },
+                speech: { _ in
+                    haveModel ? ResumeSpeech(engine: engine, modelID: "test-model", folder: folder) : nil
+                },
                 lease: lease, keepWarm: { .seconds(600) },
                 finalize: { id, uuid in
                     let status = try? store.status(of: id)
