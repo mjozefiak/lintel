@@ -89,6 +89,10 @@ private final class LengthEngine: SpeechEngine {
         lengths.withLock { $0.append(samples.count) }
         return TranscriptSegment(text: "words")
     }
+
+    func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
+        try await transcribe(samples)
+    }
     func unload() async {}
 }
 

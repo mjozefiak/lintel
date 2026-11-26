@@ -19,6 +19,9 @@ private struct UnloadableEngine: SpeechEngine {
     var isLoaded: Bool { false }
     func load(modelFolder: URL) async throws { throw LoadFailed() }
     func transcribe(_ samples: [Float]) async throws -> TranscriptSegment { throw LoadFailed() }
+    func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
+        throw LoadFailed()
+    }
     func unload() async {}
 }
 

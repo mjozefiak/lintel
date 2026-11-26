@@ -15,12 +15,43 @@ private let folder = URL(filePath: "/models/speech/shared")
         #expect(SpeechRequestOptions.none.whisperLanguage == nil)
     }
 
-    @Test func anEngineThatKnowsNothingAboutOptionsIgnoresThem() async throws {
-        // `FakeEngine` only implements `transcribe(_:)`; the protocol extension's default calls it.
-        let engine = FakeEngine()
-        let segment = try await engine.transcribe(
-            [0.07], options: SpeechRequestOptions(scriptHint: .cyrillic, whisperLanguage: .pinned("uk")))
-        #expect(segment.text == "segment 7")
+    /// Review rv-272: `SpeechEngine.transcribe(_:options:)` has no protocol-extension default, so a wrapping engine
+    /// cannot drop the options by forgetting to forward them (it would not compile). This keeps the default from
+    /// coming back.
+    @Test func theProtocolHasNoDefaultThatCouldDropTheOptions() throws {
+        let ports = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Sources/LintelSpeech/AudioPorts.swift")
+        let source = try String(contentsOf: ports, encoding: .utf8)
+        #expect(!source.contains("extension SpeechEngine"))
+    }
+
+    /// The whole path of a plugin's request: lease, then `SwitchingEngine`, then the chosen engine. Each request's
+    /// options arrive unchanged, for the engine of either model.
+    @Test(arguments: ["parakeet", "whisper"])
+    func optionsSurviveTheLeaseAndTheSwitchingEngine(_ selected: String) async throws {
+        let parakeet = OptionsEngine()
+        let whisper = OptionsEngine()
+        let switching = SwitchingEngine(engines: ["parakeet": parakeet, "whisper": whisper], selected: { selected })
+        let lease = SpeechEngineLease()
+        let handle = try await lease.acquire(
+            modelID: selected, folder: folder, engine: switching, priority: .background, keepWarm: { .seconds(1) })
+        let requests = [
+            SpeechRequestOptions(scriptHint: .cyrillic, whisperLanguage: .pinned("uk")),
+            .none,
+            SpeechRequestOptions(whisperLanguage: .detect(candidates: ["pl", "en"], fallback: "pl")),
+            SpeechRequestOptions(scriptHint: .latin),
+        ]
+        for (index, options) in requests.enumerated() {
+            #expect(
+                try await handle.transcribe([Float(index)], options: options)
+                    == .transcript(TranscriptSegment(text: "options \(index)")))
+        }
+        let chosen = selected == "parakeet" ? parakeet : whisper
+        let other = selected == "parakeet" ? whisper : parakeet
+        #expect(chosen.received.withLock { $0 } == requests)
+        #expect(other.received.withLock { $0 }.isEmpty)
+        await handle.release()
     }
 
     /// The shared-engine case: Dictation and Meetings lease the same model, so the engine is one object and the

@@ -337,11 +337,14 @@ final class ScriptedEngine: SpeechEngine {
         var texts: [Int: String] = [:]
         var failures: [Int: Int] = [:]
         var heard: [Int] = []
+        var options: [(code: Int, options: SpeechRequestOptions)] = []
         var entered = 0
     }
 
     private let state = Mutex(State())
     let gate = Gate()
+    /// The options each utterance was sent with, in the order the engine got them.
+    var options: [(code: Int, options: SpeechRequestOptions)] { state.withLock { $0.options } }
 
     init(texts: [Int: String]) { state.withLock { $0.texts = texts } }
 
@@ -364,12 +367,17 @@ final class ScriptedEngine: SpeechEngine {
     }
 
     func transcribe(_ samples: [Float]) async throws -> TranscriptSegment {
+        try await transcribe(samples, options: .none)
+    }
+
+    func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
         state.withLock { $0.entered += 1 }
         transcribing.poke()
         await gate.pass()
         let code = Int(((samples.first ?? 0) * 100).rounded())
         let result: String? = state.withLock { state in
             state.heard.append(code)
+            state.options.append((code, options))
             if let left = state.failures[code], left > 0 {
                 if left != .max { state.failures[code] = left - 1 }
                 return nil

@@ -204,6 +204,10 @@ final class LeaseEngine: SpeechEngine, @unchecked Sendable {
         state.withLock { $0.finished.append(id) }
         return TranscriptSegment(text: "segment \(id)")
     }
+
+    func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
+        try await transcribe(samples)
+    }
 }
 
 /// `seconds` of audio whose first sample is `id`.

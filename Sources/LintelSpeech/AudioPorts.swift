@@ -50,16 +50,11 @@ public protocol SpeechEngine: Sendable {
     var isLoaded: Bool { get async }
     func load(modelFolder: URL) async throws
     func transcribe(_ samples: [Float]) async throws -> TranscriptSegment
-    /// Transcribes with what this one request asks for (a script hint, a language). The default ignores the
-    /// options, so an engine that knows nothing about them keeps working unchanged.
+    /// Transcribes with what this one request asks for (a script hint, a language). There is no default: every
+    /// engine, and every engine that wraps another, implements it, so the options of a request can never be lost
+    /// on the way to the model.
     func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment
     func unload() async
-}
-
-extension SpeechEngine {
-    public func transcribe(_ samples: [Float], options: SpeechRequestOptions) async throws -> TranscriptSegment {
-        try await transcribe(samples)
-    }
 }
 
 public struct VADEvent: Equatable, Sendable {
