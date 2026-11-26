@@ -1029,8 +1029,8 @@ struct NotesGuard: Sendable {
             let given = topic.name.map(Self.topicName) ?? ""
             if given.isEmpty {
                 topics.append(.init(name: nil, points: kept))
-            } else if topicNameRefusal(given, points: kept) == nil {
-                topics.append(.init(name: given, points: kept))
+            } else if let name = acceptedTopicName(given, points: kept) {
+                topics.append(.init(name: name, points: kept))
             } else {
                 trail?.topicNameRefused += 1
                 other.append(contentsOf: kept)
@@ -1085,6 +1085,24 @@ struct NotesGuard: Sendable {
         // of a point's text (a word of four letters or more that shares a stem with the topic's material); a name
         // the points do not have is still refused, at the start or later.
         return textRefusal(name, material: summaryMaterial(points: points), strictStart: false)
+    }
+
+    /// The name a topic is shown with: `name` when `topicNameRefusal` passes it, or, when only its first word is
+    /// refused (`unsupportedSentenceStart`: a capitalised word its points do not have, such as "Core" in "Core
+    /// functionality"), the rest of the name with its new first word capitalised, when that word is a word of the
+    /// points (four letters or more, without a digit, sharing a stem with their material, so the name never
+    /// starts with "i", "and" or a number) and the rest passes the same checks. Nil when neither passes.
+    func acceptedTopicName(_ name: String, points: [NotesPoint]) -> String? {
+        guard let refusal = topicNameRefusal(name, points: points) else { return name }
+        guard refusal == .unsupportedSentenceStart else { return nil }
+        let words = name.split(whereSeparator: \.isWhitespace)
+        guard words.count >= 2, let next = NotesText.words(String(words[1])).first, next.count >= 4,
+            !next.contains(where: \.isNumber),
+            summaryMaterial(points: points).vocabulary.sharesStem(next)
+        else { return nil }
+        let rest = words.dropFirst().joined(separator: " ")
+        let shorter = rest.prefix(1).uppercased() + rest.dropFirst()
+        return topicNameRefusal(shorter, points: points) == nil ? shorter : nil
     }
 
     /// The first whole sentences of `text` that fit the intro's limits (`NotesLayout.maxIntroSentences` and

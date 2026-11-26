@@ -151,6 +151,22 @@ import Testing
         #expect(refused.audit.topicNameRefused == 1)
     }
 
+    @Test(
+        arguments: [
+            // Only the first word is refused: the rest is the name when it starts with a word of the points.
+            ("Kampania ustalenia tematu1", "Ustalenia tematu1"),
+            // The rest would start with a short word or a word the points do not have: refused.
+            ("Kampania i ustalenie", nil), ("Kampania Kowalskiego", nil), ("Kampania budżetu", nil),
+            // A one-word name has no rest; a name refused for something else is not shortened.
+            ("Kampania", nil), ("Ustalenie Kowalskiego", nil),
+        ] as [(String, String?)])
+    func aNameRefusedForItsFirstWordAloneKeepsTheRest(name: String, shown: String?) {
+        let audited = guardrail.auditedVerifyReduce(
+            NotesReduceOutput(topics: [topic(name, "p1", "p2")]), points: findings(2), durationMs: 3_600_000)
+        #expect(audited.verdict.topics.compactMap(\.name) == (shown.map { [$0] } ?? []))
+        #expect(audited.audit.topicNameRefused == (shown == nil ? 1 : 0))
+    }
+
     @Test func theTopicLimitFollowsTheLengthOfTheMeetingAndATopicHoldsSixPoints() {
         let points = findings(24)
         let topics = (0..<6).map { index in
