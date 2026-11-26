@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import LintelTestSupport
@@ -54,15 +55,23 @@ import Testing
     var onDone: (() -> Void)?
     var shown: [Shown] = []
     var updates: [PermissionHelperContent] = []
+    var updateFrames: [CGRect] = []
     var moves: [CGRect] = []
     var closes = 0
     var panelSize = CGSize(width: 300, height: 100)
+    /// The Allowed state's own size; `nil` is `panelSize`, as for every other content.
+    var allowedSize: CGSize?
 
-    func size(for content: PermissionHelperContent) -> CGSize { panelSize }
+    func size(for content: PermissionHelperContent) -> CGSize {
+        content == .allowed ? (allowedSize ?? panelSize) : panelSize
+    }
     func show(content: PermissionHelperContent, frame: CGRect, motion: PermissionHelperMotion) {
         shown.append(Shown(content: content, frame: frame, motion: motion))
     }
-    func update(content: PermissionHelperContent) { updates.append(content) }
+    func update(content: PermissionHelperContent, frame: CGRect) {
+        updates.append(content)
+        updateFrames.append(frame)
+    }
     func move(to frame: CGRect) { moves.append(frame) }
     func close() { closes += 1 }
 }
@@ -130,6 +139,20 @@ import Testing
         #expect(reduced.2.shown.first?.motion == .fade)
     }
 
+    @Test func itSlidesInFromTheAllowButtonWhenItIsGiven() {
+        let world = HelperWorld()
+        world.settingsWindow(settings)
+        let panel = FakeHelperPanel()
+        let button = CGRect(x: 1200, y: 300, width: 80, height: 24)
+        let controller = PermissionHelperController(
+            content: .dragTile, environment: world.environment(), panel: panel, clock: TestClock(),
+            slideOrigin: button)
+        controller.start()
+        let origin = CGRect(x: button.midX - 150, y: button.midY - 50, width: 300, height: 100)
+        #expect(panel.shown.first?.motion == .slide(from: origin))
+        controller.stop()
+    }
+
     @Test func itFollowsTheWindowWhenItMovesAndStaysWhenItDoesNot() {
         let (controller, world, panel, _, _) = make()
         world.settingsWindow(settings)
@@ -192,6 +215,7 @@ import Testing
         world.advance(.milliseconds(250))
         controller.tick()
         #expect(panel.updates == [.allowed])
+        #expect(panel.updateFrames == [expected(beside: settings, world: world)])
         #expect(panel.closes == 0)
         world.advance(.milliseconds(500))
         controller.tick()
@@ -201,6 +225,24 @@ import Testing
         #expect(panel.closes == 1)
         #expect(reasons.all == [.granted])
         #expect(!controller.isOpen)
+    }
+
+    @Test func theSmallerAllowedStateIsPutAtItsOwnFrameInOneStep() {
+        let panel = FakeHelperPanel()
+        panel.allowedSize = CGSize(width: 300, height: 44)
+        let (controller, world, _, _, _) = make(panel: panel)
+        world.settingsWindow(settings)
+        controller.start()
+        world.granted = true
+        world.advance(.milliseconds(250))
+        controller.tick()
+        #expect(panel.updates == [.allowed])
+        #expect(
+            panel.updateFrames == [expected(beside: settings, world: world, size: CGSize(width: 300, height: 44))])
+        #expect(panel.moves.isEmpty, "the new content and its frame come in one call, not a resize and a move")
+        world.advance(.milliseconds(250))
+        controller.tick()
+        #expect(panel.moves.isEmpty, "the frame is already the Allowed one")
     }
 
     @Test func aGrantBeforeThePanelIsShownShowsItAllowedBesideLintel() {
@@ -319,17 +361,34 @@ import Testing
         #expect(await clock.waitForCancelledSleeps(1))
     }
 
-    @Test func aHelperThatEndedOnItsFirstTickNeverStartsThePoll() {
-        let (controller, world, panel, clock, reasons) = make()
+    @Test func thePollStopsWhenAGrantClosesTheHelper() async {
+        let closed = Latch()
+        let reasons = Reasons()
+        let world = HelperWorld()
         world.settingsWindow(settings)
-        world.granted = true
-        world.now = .zero
+        let panel = FakeHelperPanel()
+        let clock = TestClock()
+        let controller = PermissionHelperController(
+            content: .dragTile, environment: world.environment(), panel: panel, clock: clock,
+            onClose: {
+                reasons.all.append($0)
+                closed.open()
+            })
         controller.start()
+        #expect(await clock.waitForSleepers(1))
+        world.granted = true
+        clock.advance(by: .milliseconds(250))
+        #expect(await clock.waitForSleepCalls(2), "the poll read the grant and slept again")
+        #expect(panel.updates == [.allowed])
         world.advance(.seconds(1))
-        controller.tick()
+        clock.advance(by: .milliseconds(250))
+        #expect(await closed.wait())
         #expect(reasons.all == [.granted])
-        #expect(clock.sleeperCount == 0 || !controller.isOpen)
-        #expect(panel.closes == 1)
+        #expect(!controller.isOpen)
+        let reads = world.windowReads
+        clock.advance(by: .seconds(5))
+        #expect(world.windowReads == reads)
+        #expect(clock.sleeperCount == 0)
     }
 
     // MARK: One at a time
@@ -376,5 +435,52 @@ import Testing
         let controller = presenter.show(.dragTile, isGranted: { true })
         #expect(askedForGrant >= 1)
         controller.stop()
+    }
+}
+
+/// Which of Lintel's windows the helper sits beside when there is no System Settings window (spec 2026-11-24,
+/// section 3). The windows here are never shown: the choice reads only their style and class.
+@MainActor @Suite struct PermissionHelperAnchorWindowTests {
+    private func titled() -> NSWindow {
+        NSWindow(
+            contentRect: .init(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered,
+            defer: true)
+    }
+
+    private func borderless() -> NSWindow {
+        // Like the status item's NSStatusBarWindow: untitled and always visible.
+        NSWindow(
+            contentRect: .init(x: 0, y: 0, width: 30, height: 22), styleMask: [.borderless], backing: .buffered,
+            defer: true)
+    }
+
+    private func panel() -> NSPanel {
+        NSPanel(
+            contentRect: .init(x: 0, y: 0, width: 300, height: 80), styleMask: [.titled, .nonactivatingPanel],
+            backing: .buffered, defer: true)
+    }
+
+    @Test func theStatusItemWindowAndPanelsAreSkipped() {
+        let main = titled()
+        let chosen = PermissionHelperEnvironment.anchorWindow(
+            key: nil, main: nil, visible: [borderless(), panel(), main])
+        #expect(chosen === main)
+    }
+
+    @Test func theKeyWindowComesFirstThenTheMainOne() {
+        let key = titled()
+        let main = titled()
+        let other = titled()
+        #expect(PermissionHelperEnvironment.anchorWindow(key: key, main: main, visible: [other]) === key)
+        #expect(PermissionHelperEnvironment.anchorWindow(key: nil, main: main, visible: [other]) === main)
+    }
+
+    @Test func aKeyPanelSuchAsTheLauncherIsNoAnchor() {
+        let main = titled()
+        #expect(PermissionHelperEnvironment.anchorWindow(key: panel(), main: nil, visible: [main]) === main)
+    }
+
+    @Test func withOnlyTheStatusItemThereIsNoAnchor() {
+        #expect(PermissionHelperEnvironment.anchorWindow(key: nil, main: nil, visible: [borderless()]) == nil)
     }
 }

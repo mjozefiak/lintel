@@ -95,13 +95,8 @@ import SwiftUI
         }
     }
 
-    func update(content: PermissionHelperContent) {
+    func update(content: PermissionHelperContent, frame: CGRect) {
         host.rootView = view(for: content)
-        let new = size(for: content)
-        // Keep the panel's top left corner where it is: the "Allowed" state is smaller than the content it replaces.
-        var frame = self.frame
-        frame.origin.y += frame.height - new.height
-        frame.size = new
         setFrame(frame, display: true)
     }
 
@@ -141,14 +136,17 @@ import SwiftUI
     }
 
     /// Shows the helper for `content`. `isGranted` is read on every poll (a permission that is granted closes it).
+    /// `slideOrigin` is the frame of the Allow button the user pressed (AppKit coordinates), where the panel slides
+    /// in from; without it the panel slides from the centre of Lintel's window.
     @discardableResult
     func show(
-        _ content: PermissionHelperContent, isGranted: @escaping @MainActor () -> Bool,
+        _ content: PermissionHelperContent, slideOrigin: CGRect? = nil, isGranted: @escaping @MainActor () -> Bool,
         onClose: @escaping (PermissionHelperSession.CloseReason) -> Void = { _ in }
     ) -> PermissionHelperController {
         current?.stop()
         let controller = PermissionHelperController(
-            content: content, environment: makeEnvironment(isGranted), panel: makePanel(content), onClose: onClose)
+            content: content, environment: makeEnvironment(isGranted), panel: makePanel(content),
+            slideOrigin: slideOrigin, onClose: onClose)
         current = controller
         controller.start()
         return controller

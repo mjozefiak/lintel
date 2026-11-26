@@ -29,16 +29,24 @@ struct PermissionHelperEnvironment {
             settingsPIDs: { SystemWindowList.settingsPIDs() },
             displays: { SystemWindowList.displayFrames() },
             lintelFrame: {
-                let window =
-                    NSApp.keyWindow ?? NSApp.mainWindow
-                    ?? NSApp.windows.first { $0.isVisible && !($0 is NSPanel) }
-                return window?.frame
+                anchorWindow(
+                    key: NSApp.keyWindow, main: NSApp.mainWindow, visible: NSApp.windows.filter(\.isVisible)
+                )?.frame
             },
             primaryHeight: { NSScreen.screens.first?.frame.height ?? 0 },
             isGranted: isGranted,
             reduceMotion: { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
             now: { start.duration(to: .now) },
             showInFinder: { NSWorkspace.shared.activateFileViewerSelecting([bundleURL]) })
+    }
+
+    /// Lintel's own window to sit beside: the key window, else the main one, else the first visible one, keeping
+    /// only titled windows that are not panels. While System Settings is the active app Lintel has no key or main
+    /// window, and the status item's untitled `NSStatusBarWindow` is always visible (`DockPresence.appWindowRoles`),
+    /// so without the filter the helper would sit next to the menu bar icon. A panel (the launcher, a HUD, the
+    /// helper itself) is no anchor either.
+    @MainActor static func anchorWindow(key: NSWindow?, main: NSWindow?, visible: [NSWindow]) -> NSWindow? {
+        ([key, main].compactMap { $0 } + visible).first { $0.styleMask.contains(.titled) && !($0 is NSPanel) }
     }
 }
 
@@ -50,7 +58,8 @@ struct PermissionHelperEnvironment {
     func size(for content: PermissionHelperContent) -> CGSize
     /// Puts the panel on screen at `frame` (AppKit coordinates).
     func show(content: PermissionHelperContent, frame: CGRect, motion: PermissionHelperMotion)
-    func update(content: PermissionHelperContent)
+    /// Swaps the content and puts the panel at `frame`, which the controller computed for the new content's size.
+    func update(content: PermissionHelperContent, frame: CGRect)
     func move(to frame: CGRect)
     func close()
 }
@@ -66,6 +75,9 @@ struct PermissionHelperEnvironment {
     private let panel: any PermissionHelperPresenting
     private let clock: any Clock<Duration>
     private let interval: Duration
+    /// Where the panel slides in from (AppKit coordinates): the Allow button the user pressed. `nil` is the
+    /// centre of Lintel's window.
+    private let slideOrigin: CGRect?
     private let onClose: (PermissionHelperSession.CloseReason) -> Void
 
     private var session: PermissionHelperSession?
@@ -84,7 +96,7 @@ struct PermissionHelperEnvironment {
     init(
         content: PermissionHelperContent, environment: PermissionHelperEnvironment,
         panel: any PermissionHelperPresenting, clock: any Clock<Duration> = ContinuousClock(),
-        interval: Duration = PermissionHelperController.pollInterval,
+        interval: Duration = PermissionHelperController.pollInterval, slideOrigin: CGRect? = nil,
         onClose: @escaping (PermissionHelperSession.CloseReason) -> Void = { _ in }
     ) {
         self.content = content
@@ -92,6 +104,7 @@ struct PermissionHelperEnvironment {
         self.panel = panel
         self.clock = clock
         self.interval = interval
+        self.slideOrigin = slideOrigin
         self.onClose = onClose
     }
 
@@ -170,9 +183,10 @@ struct PermissionHelperEnvironment {
             isShown = true
             shownAllowed = showsAllowed
             lastFrame = target
-            let origin = environment.lintelFrame().map { lintel in
+            let from = slideOrigin ?? environment.lintelFrame()
+            let origin = from.map { start in
                 CGRect(
-                    x: lintel.midX - size.width / 2, y: lintel.midY - size.height / 2, width: size.width,
+                    x: start.midX - size.width / 2, y: start.midY - size.height / 2, width: size.width,
                     height: size.height)
             }
             panel.show(
@@ -181,8 +195,12 @@ struct PermissionHelperEnvironment {
             return
         }
         if showsAllowed != shownAllowed {
+            // One call puts the new content at the frame computed for its size, so the panel does not resize
+            // in one place and move in another.
             shownAllowed = showsAllowed
-            panel.update(content: shown)
+            lastFrame = target
+            panel.update(content: shown, frame: target)
+            return
         }
         if lastFrame != target {
             lastFrame = target
