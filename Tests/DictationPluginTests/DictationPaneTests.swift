@@ -59,7 +59,8 @@ import Testing
     @Test func theRowsFollowThePrototypeOrder() throws {
         let source = try Self.paneSource()
         let rows = [
-            "\"Basics\"", "\"Dictate\"", "\"Speech model\"", "\"Clean up text\"", "\"Input device\"",
+            "\"Basics\"", "\"Dictate\"", "\"Speech model\"", "SpeechLanguagesSetting(", "\"Clean up text\"",
+            "\"Input device\"",
             "\"Restore the clipboard after pasting\"", "\"Keep a history\"", "\"Keep for\"", "\"At most\"",
             "\"Clear History…\"",
         ]
@@ -72,11 +73,14 @@ import Testing
         #expect(source.contains("dataTitle: LocalizedStringResource(\"History\""))
     }
 
-    @Test func thereIsNoAutomaticLanguageRow() throws {
+    /// Spec `2026-11-23-automatic-language-detection`, step 2.3: the Whisper-only language picker is gone; the shared
+    /// Languages row stands for every model, right under the speech model.
+    @Test func theSharedLanguagesRowReplacesTheWhisperOnlyPicker() throws {
         let source = try Self.paneSource()
-        #expect(!source.contains("\"Automatic\""))
-        // The language is offered only for Whisper, which listens for one language.
-        #expect(source.contains("if model.usesPinnedLanguage {"))
+        #expect(!source.contains("usesPinnedLanguage"))
+        #expect(!source.contains("$model.speechLanguage"))
+        #expect(source.contains("settings: model.speechLanguages"))
+        #expect(source.contains("openModels(ModelCatalog.whisperLargeV3Turbo.id)"))
     }
 
     @Test func theMainWindowPaneRendersAtEveryTextSize() throws {
@@ -308,7 +312,7 @@ import Testing
             "Press to start and again to stop, or hold.", "Clean up text",
             "Built-in model fixes punctuation and filler words.",
             "Your server on this Mac fixes punctuation and filler words.", "Keep a history",
-            "Whisper listens for the language you choose.",
+            "Languages", "Shared by Dictation and Meetings.",
             "Lintel pastes through the clipboard and puts back what was there a second later.",
         ] {
             let entry = try #require(strings[key] as? [String: Any], "\(key) is missing from the catalog")

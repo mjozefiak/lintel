@@ -1,5 +1,7 @@
 import Foundation
+import LintelKit
 import LintelSpeech
+import LintelUI
 import Observation
 
 /// What Settings → Meetings and the `meetings.setup` step show and do. Shared by both screens, so a model
@@ -71,6 +73,11 @@ final class MeetingsSettingsModel {
     /// The speech models to choose from.
     let speechPackages: [ModelPackage]
     private(set) var speechPackageID: String
+    /// The shared "Languages I speak" (`PluginContext.speechLanguages`), edited by the Languages row's sheet.
+    @ObservationIgnored let speechLanguages: any SpeechLanguageSettings
+    /// The Whisper model is on this Mac: the sheet then offers no "Get It in Models".
+    private(set) var whisperInstalled = false
+    @ObservationIgnored private let isWhisperInstalled: @MainActor () async -> Bool
 
     @ObservationIgnored let settings: MeetingsSettings
     @ObservationIgnored private let library: MeetingsLibrary
@@ -99,8 +106,12 @@ final class MeetingsSettingsModel {
         authorizer: any MicrophoneAuthorizer,
         listDevices: @escaping () -> [MicrophoneCapture.InputDevice] = MicrophoneCapture.inputDevices,
         openURL: @escaping @MainActor (URL) -> Void,
-        accountName: @escaping () -> String = { NSFullUserName() }
+        accountName: @escaping () -> String = { NSFullUserName() },
+        speechLanguages: any SpeechLanguageSettings = FixedSpeechLanguageSettings(),
+        isWhisperInstalled: @escaping @MainActor () async -> Bool = { false }
     ) {
+        self.speechLanguages = speechLanguages
+        self.isWhisperInstalled = isWhisperInstalled
         self.settings = settings
         self.library = library
         self.privacy = privacy
@@ -134,6 +145,7 @@ final class MeetingsSettingsModel {
         devices = listDevices()
         reloadSuggestionLists()
         keptAudioCount = privacy.keptRecordingCount()
+        whisperInstalled = await isWhisperInstalled()
         await speech.refresh()
         await diarization.refresh()
         await notes.refresh()
@@ -152,12 +164,10 @@ final class MeetingsSettingsModel {
 
     // MARK: Speech engine
 
-    /// The Whisper engine needs a pinned language; the Parakeet engine detects it.
-    var usesPinnedLanguage: Bool { speechPackageID == ModelCatalog.whisperLargeV3Turbo.id }
-
-    var speechLanguage: String {
-        get { settings.speechLanguage }
-        set { settings.setSpeechLanguage(newValue) }
+    /// Every language the Languages sheet offers, from the catalog: the ones the standard model cannot transcribe
+    /// need Whisper.
+    static let speechLanguageOptions: [SpeechLanguageOption] = SpeechLanguageCatalog.all.map {
+        SpeechLanguageOption(code: $0.code, needsWhisper: !$0.parakeetSupported)
     }
 
     func selectSpeechModel(_ id: String) {

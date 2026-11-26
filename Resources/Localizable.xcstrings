@@ -2449,24 +2449,6 @@
         }
       }
     },
-    "English" : {
-      "comment" : "Dictation language choice",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "English"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Angielski"
-          }
-        }
-      }
-    },
     "Entries are encrypted and stay on this Mac. Concealed content, such as passwords, is never recorded." : {
       "comment" : "Settings footer of clipboard recording",
       "extractionState" : "manual",
@@ -5311,24 +5293,6 @@
         }
       }
     },
-    "Polish" : {
-      "comment" : "Dictation language choice",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Polish"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Polski"
-          }
-        }
-      }
-    },
     "Lintel" : {
       "comment" : "Menu bar item accessibility label",
       "extractionState" : "manual",
@@ -7341,24 +7305,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Witaj w aplikacji Lintel"
-          }
-        }
-      }
-    },
-    "Whisper listens for the language you choose." : {
-      "comment" : "Settings → Dictation: help under the language of the Whisper model",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Whisper listens for the language you choose."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Whisper słucha w wybranym przez ciebie języku."
           }
         }
       }

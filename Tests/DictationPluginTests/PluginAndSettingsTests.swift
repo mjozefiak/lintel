@@ -59,7 +59,6 @@ import Testing
             "plugins.dictation.speechModelFolder": .string("/Volumes/Models/parakeet"),
             "plugins.dictation.inputDevice": .string("uid-1"),
             "plugins.dictation.restoreClipboard": .bool(false),
-            "plugins.dictation.speechLanguage": .string("en"),
         ])
         defer { harness.tearDown() }
         let settings = DictationSettings(harness.context.settings)
@@ -67,7 +66,6 @@ import Testing
         #expect(settings.speechModelFolder?.path == "/Volumes/Models/parakeet")
         #expect(settings.inputDevice == "uid-1")
         #expect(!settings.restoresClipboard)
-        #expect(settings.speechLanguage == "en")
         #expect(settings.speechModelID == "parakeet-ultra")
 
         let fresh = try DictationHarness()
@@ -76,7 +74,6 @@ import Testing
         #expect(defaults.keepWarm == .seconds(600))
         #expect(defaults.speechModelFolder == nil)
         #expect(defaults.restoresClipboard)
-        #expect(defaults.speechLanguage == "pl")
     }
 }
 

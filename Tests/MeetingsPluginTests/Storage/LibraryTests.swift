@@ -228,7 +228,6 @@ private func mode(_ url: URL) throws -> Int {
     @Test func defaultsMatchTheSpecTable() throws {
         let settings = try MeetingsHarness().meetingsSettings
         #expect(settings.speechModelID == "parakeet-ultra")
-        #expect(settings.speechLanguage == "pl")
         #expect(settings.speechModelFolder == nil)
         #expect(settings.inputDevice == nil)
         #expect(settings.voiceProcessing == false)
@@ -258,7 +257,6 @@ private func mode(_ url: URL) throws -> Int {
     @Test func storedValuesAreReadUnderTheMeetingsPrefix() throws {
         let harness = try MeetingsHarness(settings: [
             "plugins.meetings.speechModel": .string("whisper"),
-            "plugins.meetings.speechLanguage": .string("en"),
             "plugins.meetings.speechModelFolder": .string("/tmp/model"),
             "plugins.meetings.inputDevice": .string("uid-1"),
             "plugins.meetings.voiceProcessing": .bool(true),
@@ -276,7 +274,6 @@ private func mode(_ url: URL) throws -> Int {
         ])
         let settings = harness.meetingsSettings
         #expect(settings.speechModelID == "whisper")
-        #expect(settings.speechLanguage == "en")
         #expect(settings.speechModelFolder?.path == "/tmp/model")
         #expect(settings.inputDevice == "uid-1")
         #expect(settings.voiceProcessing)
@@ -298,12 +295,10 @@ private func mode(_ url: URL) throws -> Int {
         let harness = try MeetingsHarness()
         let settings = harness.meetingsSettings
         settings.setRetentionDays(180)
-        settings.setSpeechLanguage("en")
         settings.setSuggestMeetings(true)
         #expect(harness.settings.value(forKey: "plugins.meetings.retentionDays") == .integer(180))
-        #expect(harness.settings.value(forKey: "plugins.meetings.speechLanguage") == .string("en"))
         #expect(harness.settings.value(forKey: "plugins.meetings.suggestMeetings") == .bool(true))
-        #expect(harness.settings.value(forKey: "plugins.dictation.speechLanguage") == nil)
+        #expect(harness.settings.value(forKey: "plugins.dictation.retentionDays") == nil)
         settings.setRetentionDays(-5)
         #expect(settings.retentionDays == 0)
     }

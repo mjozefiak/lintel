@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The Languages row of the Dictation and Meetings panes (spec `2026-11-23-automatic-language-detection`, "UI/UX"):
 /// the shared selection in one line, "Automatic · Polish, English" or "Always Polish", an Edit… button that opens
-/// `SpeechLanguagesSheet`, and the caption that the setting is shared. Not placed in a pane yet (step 2.3).
+/// `SpeechLanguagesSheet`, and the caption that the setting is shared. The panes place it through `SpeechLanguagesSetting`.
 public struct SpeechLanguagesRow: View {
     private let selection: SpeechLanguageSelection
     private let names: [String: String]

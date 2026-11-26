@@ -89,7 +89,13 @@ final class MeetingsUI {
             systemAudioTest: SystemAudioTestModel(makeTest: makeSelfTest, blocked: { activity.isActive }),
             notes: NotesSettingsModel(settings: settings, service: service, manager: llmManager), provider: provider,
             authorizer: authorizer, openURL: { url in Task { try? await workspace.open(url) } },
-            accountName: { providerSettings.qaAccountName ?? NSFullUserName() })
+            accountName: { providerSettings.qaAccountName ?? NSFullUserName() },
+            speechLanguages: context.speechLanguages,
+            isWhisperInstalled: {
+                let whisper = ModelCatalog.whisperLargeV3Turbo
+                let folder = settings.speechModelID == whisper.id ? settings.speechModelFolder : nil
+                return await speechManager.location(of: whisper, customFolder: folder).folder != nil
+            })
         let countersStore = CaptureCountersStore(directory: context.storageDirectory)
         model.captureCounters = { countersStore.load() }
         model.copyText = { pasteboard.setString($0) }

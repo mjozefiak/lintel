@@ -9,7 +9,6 @@ import Testing
     /// Key constant name to a token that must appear in the pane sources.
     static let paneTokens: [String: String] = [
         "speechModel": "setSpeechModelID",
-        "speechLanguage": "setSpeechLanguage",
         "speechModelFolder": "setSpeechModelFolder",
         "diarizationModelFolder": "setDiarizationModelFolder",
         "inputDevice": "setInputDevice",
@@ -71,7 +70,6 @@ import Testing
             ],
             [
                 "speechModel": "model.selectSpeechModel(",
-                "speechLanguage": "$model.speechLanguage",
                 "speechModelFolder": "chooseFolder: { settings.setSpeechModelFolder($0) }",
                 "diarizationModelFolder": "chooseFolder: { settings.setDiarizationModelFolder($0) }",
                 "inputDevice": "$model.inputDevice",

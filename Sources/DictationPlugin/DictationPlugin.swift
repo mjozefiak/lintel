@@ -120,7 +120,8 @@ public final class DictationPlugin: LintelPlugin {
             settings: settings,
             authorizer: authorizer,
             pickFolder: { Self.chooseModelFolder() },
-            openURL: { url in Task { try? await workspace.open(url) } })
+            openURL: { url in Task { try? await workspace.open(url) } },
+            speechLanguages: context.speechLanguages)
         // The banner reads the model's place and the microphone; a change makes the shell read it again.
         let resultsChanged = context.resultsChanged
         settingsModel.onStatusChange = { resultsChanged() }
