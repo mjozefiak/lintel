@@ -22,7 +22,7 @@ struct ScriptedTrashList: TrashSource {
         TrashPage(items: Array(items.prefix(limit)), next: nil, total: items.count)
     }
     func trash(_ ids: [String]) async throws {}
-    func restore(_ ids: [String]) async throws {}
+    func restore(_ ids: [String]) async throws -> Set<String> { [] }
     func deleteNow(_ ids: [String]) async throws {}
     func trashAll(at deletedAt: Date) async throws -> TrashBatch {
         TrashBatch(deletedAt: deletedAt, moved: 0, stayed: 0)
@@ -41,7 +41,7 @@ struct HidingTrashList: TrashSource {
     func trashedCount() async throws -> Int { 0 }
     func trashed(after: String?, limit: Int) async throws -> TrashPage { TrashPage() }
     func trash(_ ids: [String]) async throws {}
-    func restore(_ ids: [String]) async throws {}
+    func restore(_ ids: [String]) async throws -> Set<String> { [] }
     func deleteNow(_ ids: [String]) async throws {}
     func trashAll(at deletedAt: Date) async throws -> TrashBatch {
         TrashBatch(deletedAt: deletedAt, moved: 0, stayed: 0)
@@ -53,7 +53,7 @@ struct HidingTrashList: TrashSource {
 /// A note source that offers Recently deleted, to check the optional refinement is found through `any NoteSource`.
 struct ScriptedTrashSource: NoteSourceTrash {
     let pluginID: PluginID = "meetings"
-    var trashedKeysValue: Set<NoteKey> = []
+    var trashedKeysValue: [NoteKey: Date] = [:]
 
     func list(matching: NormalizedQuery?, after: NoteCursor?, limit: Int) async throws -> NotePage { NotePage() }
     func exists(_ keys: [NoteKey]) async throws -> Set<NoteKey> { Set(keys) }
@@ -62,16 +62,18 @@ struct ScriptedTrashSource: NoteSourceTrash {
     func actions(for key: NoteKey) -> [NoteSourceAction] { [] }
     func makeChanges() -> AsyncStream<Void> { AsyncStream { $0.finish() } }
 
-    func trash(_ key: NoteKey) async throws {}
+    func trash(_ key: NoteKey) async throws -> Date { Date(timeIntervalSince1970: 7) }
     func trashAll(at deletedAt: Date) async throws -> TrashBatch {
         TrashBatch(deletedAt: deletedAt, moved: 0, stayed: 0)
     }
-    func restore(_ keys: [NoteKey]) async throws {}
+    func restore(_ keys: [NoteKey]) async throws -> Set<NoteKey> { [] }
     func restoreBatch(deletedAt: Date) async throws -> Int { 0 }
     func liveCount() async throws -> Int { 0 }
     func trashed(after: NoteCursor?, limit: Int) async throws -> NotePage { NotePage() }
     func trashedCount() async throws -> Int { trashedKeysValue.count }
-    func trashedKeys(_ keys: [NoteKey]) async throws -> Set<NoteKey> { trashedKeysValue.intersection(keys) }
+    func trashedKeys(_ keys: [NoteKey]) async throws -> [NoteKey: Date] {
+        trashedKeysValue.filter { keys.contains($0.key) }
+    }
 }
 
 @MainActor final class ScriptedLiveRecorder: LiveRecorder {
@@ -169,18 +171,14 @@ struct ScriptedTrashSource: NoteSourceTrash {
 
     // MARK: NoteWriter
 
-    @Test func noteWriterReadsAnUnknownValueAsNil() throws {
+    @Test func noteWriterIsAClosedSetTheSourceMapsItselfWithoutCodable() {
+        #expect(NoteWriter.allCases == [.thisMac, .claude])
         #expect(NoteWriter(rawValue: "thisMac") == .thisMac)
         #expect(NoteWriter(rawValue: "claude") == .claude)
+        // The stored provider id of Claude Code is "claude-code"; it is the source that maps it, not the raw value.
+        #expect(NoteWriter(rawValue: "claude-code") == nil)
         #expect(NoteWriter(rawValue: "future") == nil)
-        #expect(try JSONDecoder().decode(NoteWriter.self, from: Data("\"claude\"".utf8)) == .claude)
-
-        // A stored value the source cannot place (a provider added later) reads as `nil`: no footer, not a guess.
-        let unknown = try JSONDecoder().decode(String?.self, from: Data("\"future\"".utf8))
-        #expect(NoteWriter(reading: unknown) == nil)
-        #expect(NoteWriter(reading: nil) == nil)
-        #expect(NoteWriter(reading: "") == nil)
-        #expect(NoteWriter(reading: "thisMac") == .thisMac)
+        #expect(!(NoteWriter.thisMac is any Codable))
     }
 
     // MARK: Recently deleted
@@ -216,6 +214,11 @@ struct ScriptedTrashSource: NoteSourceTrash {
         #expect(try await source.trashedCount() == 0)
     }
 
+    @Test func aTrashSourceRestoreReportsTheIdsThatAreGone() async throws {
+        let source: any TrashSource = ScriptedTrashList()
+        #expect(try await source.restore(["1", "2"]).isEmpty)
+    }
+
     @Test func aTrashSourceCanHideContent() async throws {
         let source: any TrashSource = HidingTrashList()
         #expect(source.hidesContent)
@@ -223,13 +226,16 @@ struct ScriptedTrashSource: NoteSourceTrash {
 
     @Test func theTrashRefinementIsFoundThroughTheNoteSource() async throws {
         let trashedKey = NoteKey(pluginID: "meetings", id: "m1")
-        let source: any NoteSource = ScriptedTrashSource(trashedKeysValue: [trashedKey])
+        let stamp = Date(timeIntervalSince1970: 99)
+        let source: any NoteSource = ScriptedTrashSource(trashedKeysValue: [trashedKey: stamp])
         #expect(source as? any NoteSourceTrash != nil)
 
         let trash = try #require(source as? any NoteSourceTrash)
         #expect(try await trash.trashedCount() == 1)
-        #expect(try await trash.trashedKeys([trashedKey, NoteKey(pluginID: "meetings", id: "m2")]) == [trashedKey])
-        try await trash.trash(trashedKey)
+        #expect(
+            try await trash.trashedKeys([trashedKey, NoteKey(pluginID: "meetings", id: "m2")]) == [trashedKey: stamp])
+        #expect(try await trash.trash(trashedKey) == Date(timeIntervalSince1970: 7))
+        #expect(try await trash.restore([trashedKey]).isEmpty)
         let batch = try await trash.trashAll(at: Date(timeIntervalSince1970: 1))
         #expect(batch.moved == 0 && batch.stayed == 0)
         #expect(try await trash.restoreBatch(deletedAt: Date(timeIntervalSince1970: 1)) == 0)
@@ -276,6 +282,28 @@ struct ScriptedTrashSource: NoteSourceTrash {
         #expect(LiveRecordingStatus.Warning.microphoneSilent == .microphoneSilent)
     }
 
+    @Test func theFailureSetCoversTheHUDProblems() {
+        let all: [LiveRecordingFailure] = [
+            .microphoneDenied, .alreadyRecording, .libraryUnavailable, .modelMissing, .stillProcessing,
+            .noAudioInput, .lowDisk, .modelBusy, .discarded, .other,
+        ]
+        #expect(Set(all.map { "\($0)" }).count == all.count)
+        // A discarded recording names its meeting, so Notes can keep the user's own writing as a manual note.
+        let key = NoteKey(pluginID: "meetings", id: "m1")
+        #expect(
+            LiveRecordingStatus.failed(key: key, reason: .discarded) != .failed(key: nil, reason: .discarded))
+    }
+
+    @Test func hearingAndWarningNameTheCallOnlyAndMicrophoneLostCases() {
+        let key = NoteKey(pluginID: "meetings", id: "m1")
+        let since = Date(timeIntervalSince1970: 5)
+        #expect(LiveRecordingStatus.Hearing.callOnly != .microphoneOnly)
+        #expect(LiveRecordingStatus.Warning.microphoneLost != .microphoneSilent)
+        #expect(
+            LiveRecordingStatus.recording(key: key, since: since, hearing: .callOnly, warning: .microphoneLost)
+                == .recording(key: key, since: since, hearing: .callOnly, warning: .microphoneLost))
+    }
+
     // MARK: Routes and sidebar
 
     @Test func theShellRouteValuesAreNamedAndCarryNoId() {
@@ -293,8 +321,8 @@ struct ScriptedTrashSource: NoteSourceTrash {
         }
         #expect(plain.sidebar == nil)
 
-        let sidebar = WorkspaceSidebar { activate in
-            activate()
+        let sidebar = WorkspaceSidebar { context in
+            context.activate()
             return AnyView(EmptyView())
         }
         let section = WorkspaceSection(
@@ -303,7 +331,19 @@ struct ScriptedTrashSource: NoteSourceTrash {
         #expect(section.sidebar != nil)
 
         let activated = Mutex(false)
-        _ = section.sidebar?.makeView { activated.withLock { $0 = true } }
+        _ = section.sidebar?.makeView(
+            WorkspaceSidebarContext(isSelected: false) { activated.withLock { $0 = true } })
         #expect(activated.withLock { $0 })
+    }
+
+    @Test func theSidebarContextTellsTheBlockWhetherItsSectionIsSelected() {
+        let seen = Mutex<[Bool]>([])
+        let sidebar = WorkspaceSidebar { context in
+            seen.withLock { $0.append(context.isSelected) }
+            return AnyView(EmptyView())
+        }
+        _ = sidebar.makeView(WorkspaceSidebarContext(isSelected: true) {})
+        _ = sidebar.makeView(WorkspaceSidebarContext(isSelected: false) {})
+        #expect(seen.withLock { $0 } == [true, false])
     }
 }

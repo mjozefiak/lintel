@@ -36,16 +36,34 @@ public struct WorkspaceRoute: Hashable, Sendable {
     public static let showRecentlyDeleted = WorkspaceRoute(kind: Kind.showRecentlyDeleted, id: "")
 }
 
+/// What the shell tells a section's sidebar block each time it draws it.
+///
+/// A value, not an observable object: the shell calls `WorkspaceSidebar.makeView` from the body that reads the
+/// window's selection, so the block gets a fresh context on every render and `isSelected` is always current. A
+/// block that needs state of its own (which collection is highlighted) keeps it in its own `@Observable` model that
+/// the closure captures; the context only says whether the shell shows this section. New fields (a count, keyboard
+/// focus) can be added later without changing the `makeView` signature.
+public struct WorkspaceSidebarContext: Sendable {
+    /// `true` while the shell shows this section's page. A block turns its own highlight off when it is `false`
+    /// (the user opened another section's row, such as the Dictionary).
+    public let isSelected: Bool
+    /// Asks the shell to select this section, so a row of the block is a way into it.
+    public let activate: @MainActor @Sendable () -> Void
+
+    public init(isSelected: Bool, activate: @escaping @MainActor @Sendable () -> Void) {
+        self.isSelected = isSelected
+        self.activate = activate
+    }
+}
+
 /// The part of the main window's sidebar a section draws itself instead of one row (the notes explorer's
 /// collections, and later its folders). The shell stacks the active sections' blocks in `order` and draws one row
 /// with the section's `title` and `symbolName` for a section that contributes none (the Dictionary).
 public struct WorkspaceSidebar: Sendable {
-    /// The section's block. `activate` asks the shell to select this section, so a row is a way into it.
-    public let makeView: @MainActor @Sendable (_ activate: @escaping @MainActor @Sendable () -> Void) -> AnyView
+    /// The section's block, built from the context of this render (see `WorkspaceSidebarContext`).
+    public let makeView: @MainActor @Sendable (_ context: WorkspaceSidebarContext) -> AnyView
 
-    public init(
-        makeView: @escaping @MainActor @Sendable (_ activate: @escaping @MainActor @Sendable () -> Void) -> AnyView
-    ) {
+    public init(makeView: @escaping @MainActor @Sendable (_ context: WorkspaceSidebarContext) -> AnyView) {
         self.makeView = makeView
     }
 }

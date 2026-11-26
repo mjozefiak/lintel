@@ -99,20 +99,19 @@ public struct NoteAuthor: RawRepresentable, Hashable, Sendable, Codable {
 }
 
 /// Who wrote the text of one layer, named for the reader ("Lintel wrote these notes … on this Mac.", "Claude wrote
-/// these notes …"). A closed set with a failable raw-value init: a value this build does not know (a provider added
-/// later) reads as `nil`, so an older build shows no footer instead of guessing. Added with the notes explorer.
-public enum NoteWriter: String, Sendable, Codable, CaseIterable {
+/// these notes …"). A closed set: the source maps its own record to a case, and a record this build cannot map
+/// (a provider added later, no notes at all) is `nil`, so an older build shows no footer instead of guessing.
+/// Not `Codable`: nothing stores it, the source derives it on every read. Added with the notes explorer.
+///
+/// Meetings maps `meeting.notes_status` and `meeting.notes_provider` like this: notes exist (`ok`, `partial` or
+/// `stale`) and `notes_provider IS NULL` is `.thisMac`; `notes_provider == "claude-code"` (`ProviderID.claudeCode`,
+/// not `claude`) is `.claude`; any other value, or no notes, is `nil`. The mapping and its test belong to the
+/// source, not to `LintelKit`.
+public enum NoteWriter: String, Sendable, CaseIterable {
     /// The built-in language model, on this Mac.
     case thisMac
-    /// An external AI provider's CLI (the `claude` provider).
+    /// An external AI provider's CLI (Claude Code).
     case claude
-
-    /// The writer a stored value names; `nil` for an unknown value and for `nil` or an empty string. A reader maps
-    /// an unknown provider id here, never to a guess.
-    public init?(reading raw: String?) {
-        guard let raw, let writer = NoteWriter(rawValue: raw) else { return nil }
-        self = writer
-    }
 }
 
 /// The state of a note as its source reports it. A closed set, frozen with step 1.1: it mirrors the sources'
@@ -158,7 +157,9 @@ public struct NoteSummary: Sendable, Identifiable, Equatable {
     /// (`nil` everywhere else, a live note included). Added with the notes explorer.
     public var deletedAt: Date?
     /// When the note is deleted for good: the earlier of `deletedAt` + 30 days and the row's retention limit.
-    /// Set only together with `deletedAt`; `nil` when the source cannot say. Added with the notes explorer.
+    /// Set only together with `deletedAt`. Never `nil` in the pages of `NoteSourceTrash.trashed(after:limit:)`
+    /// (every row there carries it); `Date?` only because the struct is shared with the live list, where it is
+    /// `nil`. Added with the notes explorer.
     public var purgeAt: Date?
     /// How many tasks the notes carry ("3 tasks"); `nil` means the row shows no count. Added with the notes
     /// explorer.
@@ -251,8 +252,9 @@ public struct NoteLayer: Sendable, Equatable, Identifiable {
     /// speaker names nor speaker ids are part of it.
     public var version: String
     /// Who wrote the layer's text, when the source can say who ("On this Mac" / "Claude"); `nil` shows no footer.
-    /// The source derives it from its own record (Meetings from `meeting.notes_provider`), never the UI. Added with
-    /// the notes explorer.
+    /// The source maps its own record to a `NoteWriter` (Meetings: notes exist and `notes_provider IS NULL` is
+    /// `.thisMac`, `"claude-code"` is `.claude`, anything else or no notes is `nil`; see `NoteWriter`), never the
+    /// UI. Added with the notes explorer.
     public var writer: NoteWriter?
 
     public init(
@@ -361,8 +363,17 @@ public protocol NoteSource: Sendable {
     func exists(_ keys: [NoteKey]) async throws -> Set<NoteKey>
     /// `nil` means the note is gone (the store is open and has no such note); any thrown error means "unknown"
     /// (source off, failed, locked).
+    ///
+    /// Since the notes explorer: **a note in Recently deleted still has its content.** `content(for:)` returns it,
+    /// with `summary.deletedAt` and `summary.purgeAt` set, and never `nil`; `nil` only after a permanent delete,
+    /// the purge or retention. Hiding a trashed note is the reader's job (Notes checks `deletedAt` and
+    /// `trashedKeys`). A reconcile that read `nil` would detach the overlays of a trashed note, which the
+    /// deletion lifecycle forbids.
     func content(for key: NoteKey) async throws -> NoteContent?
+    /// Deletes the note permanently. It works on a note that is in Recently deleted too (Delete Now and Empty call
+    /// it there).
     func delete(_ key: NoteKey) async throws
+    /// The owner's actions on a note. For a key that is in Recently deleted: an empty list.
     func actions(for key: NoteKey) -> [NoteSourceAction]
     /// One stream per call (`.bufferingNewest(1)`), finished on `deactivate()`.
     func makeChanges() -> AsyncStream<Void>
@@ -394,6 +405,10 @@ public enum NoteSourceError: Error, Sendable, Equatable {
 /// The stamp is the batch: `restoreBatch(deletedAt:)` puts back exactly the rows it moved, never a row deleted
 /// earlier or later, and it survives a quit (Cancel of a bulk deletion uses it). A single `trash` never reuses a
 /// batch stamp.
+///
+/// Precision: stamps are compared to within 1 µs. The store writes `at` and compares it through the same
+/// conversion (the same round trip to its column type), so a stamp read back after the database is reopened
+/// equals the one written. A single `trash` that would land on a batch stamp (within 1 µs) is stamped 1 µs later.
 public struct TrashBatch: Sendable, Equatable {
     /// The `deleted_at` every moved row was stamped with.
     public var deletedAt: Date
@@ -457,17 +472,23 @@ public struct TrashPage: Sendable {
 ///
 /// The rules are the ones of `NoteSourceTrash`, with `String` ids instead of `NoteKey`s:
 ///
-/// - `trash`, `restore` and `deleteNow` take at most 500 ids per call. A busy row (recording, being processed)
-///   makes `trash` throw `NoteSourceError.busy` and changes nothing; it is read as no-op on a row that is already
-///   trashed and `notFound` on an id the store does not have.
-/// - `restore` is a no-op on a row that is not trashed, and `notFound` after the purge.
+/// - `trash`, `restore` and `deleteNow` take at most 500 ids per call; a store that is given more processes them
+///   in chunks of 500, never truncating silently and never trapping. An id the store does not have is skipped (it
+///   is gone already, which is what the caller wanted). A busy row (recording, being processed) makes `trash`
+///   throw `NoteSourceError.busy` for the whole call and change nothing; `trash` of a row already trashed is a
+///   no-op.
+/// - `restore` puts back every id that is trashed, is a no-op for a live one, and returns the ids the store no
+///   longer has (purged or deleted permanently) so the UI can say how many were gone; it does not throw
+///   `notFound` for a batch.
 /// - `trashed(after:limit:)` pages newest-deleted first with `purgeAt` on every row.
 /// - `trashAll(at:)` moves every live row that is not busy, all with the same `deleted_at`; the stamp is the
 ///   batch, so `restoreBatch(deletedAt:)` puts back exactly that batch and skips rows already purged or removed
-///   by retention, answering how many came back. A single `trash` never reuses a batch stamp.
-/// - `deleteNow` is the permanent delete (Delete Now, Empty Recently deleted).
-/// - `makeChanges()` fires after trash, restore and a purge; one stream per call, finished when the plugin
-///   deactivates.
+///   by retention, answering how many came back. A single `trash` never reuses a batch stamp. Stamps are compared
+///   to within 1 µs, through the same conversion on write and on compare; a single `trash` that would clash with
+///   a batch stamp is stamped 1 µs later.
+/// - `deleteNow` is the permanent delete (Delete Now, Empty Recently deleted); it works on a trashed row.
+/// - `makeChanges()` fires after trash, restore, `trashAll`, `restoreBatch` and a purge (the retention job
+///   included); one stream per call, finished when the plugin deactivates.
 /// - With `hidesContent`, no method ever returns a title or any text of an item.
 /// - The store logs codes, counts and hashed ids only, never titles or text.
 public protocol TrashSource: Sendable {
@@ -482,7 +503,9 @@ public protocol TrashSource: Sendable {
     func trashedCount() async throws -> Int
     func trashed(after: String?, limit: Int) async throws -> TrashPage
     func trash(_ ids: [String]) async throws
-    func restore(_ ids: [String]) async throws
+    /// Returns the ids the store no longer has; see the rules above.
+    @discardableResult
+    func restore(_ ids: [String]) async throws -> Set<String>
     func deleteNow(_ ids: [String]) async throws
     func trashAll(at deletedAt: Date) async throws -> TrashBatch
     func restoreBatch(deletedAt: Date) async throws -> Int
@@ -502,27 +525,38 @@ extension TrashSource {
 ///
 /// - `trash` on a note that is recording or being processed throws `NoteSourceError.busy` and changes nothing; on
 ///   an already trashed note it is a no-op; on a missing note it throws `NoteSourceError.notFound`.
-/// - `restore` on a note that is not trashed is a no-op; after the purge it throws `NoteSourceError.notFound`
-///   (the UI removes the row and says "This note was deleted permanently.").
+/// - `restore(_:)` is the batch restore: it puts back every key that exists and returns the keys that no longer
+///   exist (purged or deleted permanently); `NoteSourceError.notFound` is not thrown for a batch, a live note is a
+///   no-op. The UI says "N notes were deleted permanently." for a non-empty result.
 /// - `trashed(after:limit:)` pages newest-deleted first, and every returned `NoteSummary` carries `deletedAt` and
 ///   `purgeAt`. `NoteSource.list` and every search never return a trashed note.
+/// - A note in Recently deleted still has content: `content(for:)` returns it (with `deletedAt` and `purgeAt`),
+///   never `nil`; `nil` only after a permanent delete, the purge or retention. `actions(for:)` of a trashed key is
+///   empty, and `delete(_:)` works on it (Delete Now and Empty call it; it keeps its meaning, permanent).
 /// - `trashAll(at:)` moves every live note except busy ones, stamping all of them with exactly `at`; the stamp is
 ///   the batch, so `restoreBatch(deletedAt:)` puts back exactly that batch (never a note deleted earlier or later)
-///   and it survives a quit. A single `trash` never reuses a batch stamp (the store adds 1 µs on a clash).
-/// - `restore(_:)` is the batch restore (at most 500 keys per call); `trashedKeys(_:)` answers for at most 500
-///   keys without loading the rows.
-/// - `delete` keeps its meaning (permanent) and is what Delete Now and Empty call.
+///   and it survives a quit. A single `trash` never reuses a batch stamp: stamps are compared to within 1 µs,
+///   written and compared through the same conversion (a round trip that survives reopening the database), and a
+///   single `trash` that would clash is stamped 1 µs later.
+/// - After `trash`, `restore`, `trashAll`, `restoreBatch` and a purge (the retention job included) the source
+///   announces the change through the same stream as after `delete`: `NoteSource.makeChanges()`. There is no new
+///   method; Notes' sweep stands on that event.
+/// - `restore(_:)` and `trashedKeys(_:)` take at most 500 keys per call; a source that is given more processes
+///   them in chunks of 500, never truncating silently and never trapping.
 /// - The trash of a note never touches another store, its audio or the notes overlays; Notes marks the overlays
 ///   through `trashedKeys(_:)` and only the owner's purge makes a note gone.
 public protocol NoteSourceTrash: NoteSource {
     /// Moves one note to Recently deleted; `NoteSourceError.notFound` when there is no such note, `.busy` while
-    /// it is recording or being processed.
-    func trash(_ key: NoteKey) async throws
+    /// it is recording or being processed. Returns the `deleted_at` the owner used, so Notes marks the overlays
+    /// with the same time.
+    @discardableResult
+    func trash(_ key: NoteKey) async throws -> Date
     /// Moves every live note except the busy ones to Recently deleted, all stamped with `deletedAt`.
     func trashAll(at deletedAt: Date) async throws -> TrashBatch
-    /// Puts the notes back (batch, at most 500 keys); no-op on a note that is not trashed, `notFound` after the
-    /// purge.
-    func restore(_ keys: [NoteKey]) async throws
+    /// Puts the notes back (batch, at most 500 keys per call) and returns the keys that no longer exist; see the
+    /// rules above.
+    @discardableResult
+    func restore(_ keys: [NoteKey]) async throws -> Set<NoteKey>
     /// Puts back every note whose `deleted_at` equals the batch stamp and that still exists, answering how many
     /// came back; a note already purged or removed by retention is skipped.
     func restoreBatch(deletedAt: Date) async throws -> Int
@@ -532,15 +566,17 @@ public protocol NoteSourceTrash: NoteSource {
     func trashedCount() async throws -> Int
     /// One page of Recently deleted notes, newest-deleted first, every row with `deletedAt` and `purgeAt`.
     func trashed(after: NoteCursor?, limit: Int) async throws -> NotePage
-    /// Which of these keys are in Recently deleted (batch, at most 500 keys, without loading the rows). The
-    /// trash sweep uses it to mark the overlays of a note deleted elsewhere (the launcher's panel, a bulk delete).
-    func trashedKeys(_ keys: [NoteKey]) async throws -> Set<NoteKey>
+    /// Which of these keys are in Recently deleted, each with the owner's `deleted_at` (batch, at most 500 keys per
+    /// call, without loading the rows). The trash sweep uses it to mark the overlays of a note deleted elsewhere
+    /// (the launcher's panel, a bulk delete) with the owner's time.
+    func trashedKeys(_ keys: [NoteKey]) async throws -> [NoteKey: Date]
 }
 
 // MARK: - Live recording (notes explorer, phase 1.1)
 
-/// Why a live recording could not start, or why it failed. Each case has one sentence and one fix button in the
-/// UI; any other error is the plugin's own and gets the generic sentence.
+/// Why a live recording could not start or was lost. Each case has one sentence and one fix button in the UI; any
+/// other error is the plugin's own and gets the generic sentence. A closed set: adding a case is a change in tree
+/// that needs the UI's sentence (a compile error, not a runtime one).
 public enum LiveRecordingFailure: Error, Sendable, Equatable {
     /// The microphone permission is denied or was refused at the key press.
     case microphoneDenied
@@ -550,9 +586,37 @@ public enum LiveRecordingFailure: Error, Sendable, Equatable {
     case libraryUnavailable
     /// The speech recognition model is not on this Mac.
     case modelMissing
+    /// The previous recording is still being processed; one can start after it is saved.
+    case stillProcessing
+    /// There is no audio input device.
+    case noAudioInput
+    /// There is too little free disk space to start.
+    case lowDisk
+    /// The speech model is not usable right now: it is being removed or used by another job.
+    case modelBusy
+    /// Nothing was heard, so the recording was discarded. Reported as `LiveRecordingStatus.failed(key:reason:)`
+    /// with the discarded recording's key, so Notes can keep the user's own writing (`mine`) as a manual note.
+    case discarded
+    /// Any other failure; the UI shows its generic sentence.
+    case other
 }
 
 /// What a live recording is doing now, as the core toolbar, the list and the preview draw it.
+///
+/// The owner maps its own recording notices to `hearing` and `warning` like this (Meetings, from the HUD's state):
+///
+/// | The recording notices | Status |
+/// |---|---|
+/// | System audio unavailable at the start (`unavailable(.system)`), microphone fine | `hearing: .microphoneOnly`, no warning |
+/// | The microphone is denied or not recorded, system audio fine | `hearing: .callOnly` |
+/// | System audio was lost during the recording (`lost(.system)`) | `warning: .callAudioMissing` |
+/// | The system track heard nothing for about 20 s (`noSystemAudio`) | `warning: .silence` |
+/// | The microphone track is digitally silent (`noMicrophoneAudio`) | `warning: .microphoneSilent` |
+/// | The microphone was lost (device gone, `microphoneNotRecorded`) | `warning: .microphoneLost` |
+/// | Low disk space, a write problem, the time-limit countdown | HUD only, never a status |
+///
+/// The notes' own failure is not a status: after `processing` comes `idle`, and the state of the notes is read
+/// from `NoteSummary.state` (`writing`, `partial`, `failed`) of the owner's note.
 public enum LiveRecordingStatus: Sendable, Equatable {
     /// How well Lintel hears the call.
     public enum Hearing: Sendable, Equatable {
@@ -560,25 +624,29 @@ public enum LiveRecordingStatus: Sendable, Equatable {
         case everyone
         /// Only the microphone (no system audio); the UI offers "Fix Call Audio".
         case microphoneOnly
+        /// Only the call's audio (the microphone is denied or not recorded); the UI offers "Fix Microphone".
+        case callOnly
     }
 
     /// A problem the recording notices: set by the same timers as the HUD notices and cleared when it goes away.
     public enum Warning: Sendable, Equatable {
         /// The system track heard nothing for about 20 s.
         case silence
-        /// System audio could not be recorded (permission, no tap).
+        /// System audio could not be recorded (permission, no tap) or was lost during the recording.
         case callAudioMissing
         /// The microphone is digitally silent (about 10 s).
         case microphoneSilent
+        /// The microphone was lost during the recording (the device went away, it stopped being recorded).
+        case microphoneLost
     }
 
     case idle
     case starting
     case recording(key: NoteKey, since: Date, hearing: Hearing, warning: Warning?)
     /// The recording stopped; the meeting is being transcribed and its notes written. `progress` is `0…1` when
-    /// the owner can say, `nil` when not.
+    /// the owner can say, `nil` when not. When it is done the status goes to `idle`.
     case processing(key: NoteKey, progress: Double?)
-    /// The recording or the notes failed; `key` is `nil` when no meeting was made.
+    /// The recording failed or was discarded; `key` is the meeting that was made, `nil` when none was.
     case failed(key: NoteKey?, reason: LiveRecordingFailure)
 }
 
@@ -588,15 +656,18 @@ public enum LiveRecordingStatus: Sendable, Equatable {
 ///
 /// The rules every implementation follows:
 ///
-/// - `start()` throws `LiveRecordingFailure.microphoneDenied`, `.alreadyRecording`, `.libraryUnavailable` or
-///   `.modelMissing`; nothing is left half started.
+/// - `start()` throws a `LiveRecordingFailure` (`microphoneDenied`, `alreadyRecording`, `libraryUnavailable`,
+///   `modelMissing`, `stillProcessing`, `noAudioInput`, `lowDisk` or `modelBusy`); any other error is the
+///   plugin's own. Nothing is left half started.
 /// - `stop(writeNotes: true)` is "Stop and Write Notes" and honours `plugins.meetings.notesEnabled` exactly as the
-///   global shortcut does (with notes off it is "Stop Recording"); `stop(writeNotes: false)` never writes notes.
-/// - `status()` replays the current value to a new subscriber and emits on every change of the recording state,
-///   including the warnings going on and off.
+///   global shortcut does: with notes off, `writeNotes: true` does NOT write notes (the button is then "Stop
+///   Recording"). `stop(writeNotes: false)` never writes notes.
+/// - `status()` returns one stream per call. It replays the current value to its subscriber and emits on every
+///   change of the recording state, including the warnings going on and off. Every stream emits `.idle` and
+///   finishes on `deactivate()`, so a subscriber never holds a stream of a recorder that is gone.
 /// - `retryNotes` runs the notes pipeline again for a meeting in `failed` or `partial`, and is refused with
 ///   `NoteSourceError.busy` while another job runs.
-/// - It lives as long as the plugin's activation; after `deactivate()` it reports `idle`.
+/// - It lives as long as the plugin's activation.
 @MainActor
 public protocol LiveRecorder: AnyObject, Sendable {
     /// The plugin that owns the recording (`meetings`).
