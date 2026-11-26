@@ -130,7 +130,8 @@ extension MeetingsPlugin {
                 id: MeetingsUI.onboardingStepID,
                 title: LocalizedStringResource("Meetings", comment: "Plugin name of meeting transcription"),
                 symbolName: "person.2.wave.2",
-                text: MeetingsSetupView.text
+                text: MeetingsSetupView.text,
+                goal: .meetingNotes
             ) {
                 AnyView(MeetingsSetupView(model: model))
             }
@@ -153,5 +154,14 @@ extension MeetingsPlugin {
         return AnyView(
             SystemAudioPermissionAccessory(
                 test: model.systemAudioTest, openSettings: { model.openSystemAudioSettings() }))
+    }
+
+    /// The Access step's reason for hearing the other people in a call, in plain words (spec
+    /// `2026-11-24-first-run-onboarding`). The microphone keeps the shell's generic reason. Nothing reads this yet.
+    public func permissionReason(for permission: Permission) -> LocalizedStringResource? {
+        guard permission == .systemAudioRecording else { return nil }
+        return LocalizedStringResource(
+            "So notes include what the others say.",
+            comment: "Onboarding Access step: why meeting notes need the call's audio")
     }
 }

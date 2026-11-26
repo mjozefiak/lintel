@@ -143,6 +143,31 @@ public struct PanelMode: Identifiable, Sendable {
     public var isListMode: Bool { source != nil }
 }
 
+/// What a first-launch step serves: one goal of the first-run onboarding ("Type what I say", "Write my meeting
+/// notes"). An open set: a release may add a goal and never removes or renames one, and the shell compares goals
+/// by raw value only (`BACKWARD_COMPATIBILITY.md` section 1). Added with the first-run onboarding (spec
+/// `2026-11-24-first-run-onboarding`, step 3.1).
+public struct OnboardingGoal: RawRepresentable, Hashable, Sendable, ExpressibleByStringLiteral,
+    CustomStringConvertible
+{
+    public let rawValue: String
+
+    public init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    public init(stringLiteral value: String) {
+        self.rawValue = value
+    }
+
+    public var description: String { rawValue }
+
+    /// "Type what I say": dictation.
+    public static let dictation: OnboardingGoal = "dictation"
+    /// "Write my meeting notes": recording a meeting and writing its notes.
+    public static let meetingNotes: OnboardingGoal = "meetingNotes"
+}
+
 /// One skippable first-launch step contributed by a plugin.
 public struct OnboardingStep: Identifiable, Sendable {
     public let id: String
@@ -152,6 +177,13 @@ public struct OnboardingStep: Identifiable, Sendable {
     /// `makeView` draws only the step's controls. `nil` (the default) shows no line: the view brings its own
     /// text. Added with the welcome screen's single column (PR #52, step 6.6f).
     public let text: LocalizedStringResource?
+    /// The goal this step serves, which decides for whom it is shown on the onboarding goal page. `nil` (the
+    /// default) means every goal, like a step written before goals existed. Added with the first-run onboarding
+    /// (step 3.1).
+    public let goal: OnboardingGoal?
+    /// The step's primary button when it should not follow the shell's own wording ("Next: <next step>"). `nil`
+    /// (the default) lets the shell name the next step. Added with the first-run onboarding (step 3.1).
+    public let primaryActionTitle: LocalizedStringResource?
     public let makeView: @MainActor @Sendable () -> AnyView
 
     public init(
@@ -159,12 +191,16 @@ public struct OnboardingStep: Identifiable, Sendable {
         title: LocalizedStringResource,
         symbolName: String,
         text: LocalizedStringResource? = nil,
+        goal: OnboardingGoal? = nil,
+        primaryActionTitle: LocalizedStringResource? = nil,
         makeView: @escaping @MainActor @Sendable () -> AnyView
     ) {
         self.id = id
         self.title = title
         self.symbolName = symbolName
         self.text = text
+        self.goal = goal
+        self.primaryActionTitle = primaryActionTitle
         self.makeView = makeView
     }
 }

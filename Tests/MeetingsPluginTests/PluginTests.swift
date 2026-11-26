@@ -30,6 +30,19 @@ import Testing
         #expect(plugin.settingsPane() != nil)
     }
 
+    /// Spec `2026-11-24-first-run-onboarding`, step 3.1: the step serves the meeting-notes goal and the plugin
+    /// explains the call-audio permission in plain words. No UI reads either yet.
+    @Test func theSetupStepServesMeetingNotesAndExplainsTheCallAudio() throws {
+        let harness = try MeetingsHarness()
+        let plugin = MeetingsPlugin(context: harness.context)
+        let step = try #require(plugin.onboardingSteps.first)
+        #expect(step.goal == .meetingNotes)
+        #expect(
+            plugin.permissionReason(for: .systemAudioRecording).map { String(localized: $0) }
+                == "So notes include what the others say.")
+        #expect(plugin.permissionReason(for: .microphone) == nil)
+    }
+
     @Test func activatingOpensTheLibraryAndDeactivatingClosesIt() async throws {
         let harness = try MeetingsHarness()
         let plugin = MeetingsPlugin(context: harness.context)

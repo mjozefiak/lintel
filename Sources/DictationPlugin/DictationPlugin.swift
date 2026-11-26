@@ -429,6 +429,15 @@ public final class DictationPlugin: LintelPlugin {
 
     public var requiredPermissions: Set<Permission> { [.microphone, .accessibility] }
 
+    /// The Access step's reason for typing into other apps, in plain words (spec `2026-11-24-first-run-onboarding`).
+    /// The microphone keeps the shell's generic reason. Nothing reads this yet.
+    public func permissionReason(for permission: Permission) -> LocalizedStringResource? {
+        guard permission == .accessibility else { return nil }
+        return LocalizedStringResource(
+            "So your words appear where your cursor is.",
+            comment: "Onboarding Access step: why dictation needs to type into other apps")
+    }
+
     /// The models dictation uses, for the shell's Models pane (spec `2026-11-04-lintel-main-window`, step 3.2):
     /// the selected speech model (required unless the user chose a folder for it) and the built-in formatting model
     /// (optional, selected only while the built-in source is chosen; in use while a request holds it, as the
@@ -465,7 +474,8 @@ public final class DictationPlugin: LintelPlugin {
                 id: Self.onboardingStepID,
                 title: LocalizedStringResource("Dictation", comment: "Plugin name of voice dictation"),
                 symbolName: "mic",
-                text: DictationSetupView.text
+                text: DictationSetupView.text,
+                goal: .dictation
             ) {
                 AnyView(
                     DictationSetupView(
