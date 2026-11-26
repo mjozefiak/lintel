@@ -9,7 +9,7 @@
 
   const COPY = {
     en: {
-      bar: { screen: 'Screen', note: 'Meeting note', inbox: 'Actions inbox', apps: 'Connected apps', after: 'After the meeting', layout: 'Where (Q3)', tab: 'Tab', inline: 'In Notes', inboxL: 'Tab + inbox', state: 'State', ready: 'Ready', finding: 'Finding', none: 'None found', done: 'All done', errors: 'Errors', offline: 'Not connected', mail: 'Account (Q1, Q2 decided)', acct: 'Google/Microsoft', mcp: 'Connector (MCP)', nomail: 'No account', theme: 'Theme', light: 'Light', dark: 'Dark', lang: 'Language' },
+      bar: { screen: 'Screen', note: 'Meeting note', inbox: 'Actions inbox', apps: 'Connected apps', after: 'After the meeting', state: 'State', ready: 'Ready', finding: 'Finding', none: 'None found', done: 'All done', errors: 'Errors', offline: 'Not connected', mail: 'Account (Q1, Q2 decided)', acct: 'Google/Microsoft', mcp: 'Connector (MCP)', nomail: 'No account', theme: 'Theme', light: 'Light', dark: 'Dark', lang: 'Language' },
       me: 'Anna Nowak', meMail: 'anna.nowak@brightline.example',
       searchNotes: 'Search notes', record: 'Record Meeting', settings: 'Settings',
       nav: { all: 'All notes', meetings: 'Meetings', dictations: 'Dictations', actions: 'Actions', folders: 'Folders', newFolder: 'New Folder', dictionary: 'Dictionary' },
@@ -93,9 +93,6 @@
       after: {
         procHover: ['Writing notes', 'Finding actions'], ready: (n) => n ? `Ready · ${n} actions` : 'Ready', open: 'Open', close: 'Close', replay: 'Play again', phaseL: 'Pill', proc: 'Processing', readyL: 'Ready',
         cap2: 'P10 (owner): after the audio is saved, the pill shows only the closing ring (#273, OD-9; hover: what it is doing). When the notes AND the actions are ready it turns into “Ready · 5 actions · Open”; the meeting row and the Actions inbox show the count. No macOS notification. Open goes to the meeting’s Notes. After 8 s the pill goes and a dot stays on the menu bar ring until you open the actions (Q15 = B). ✕ closes the pill early; the dot stays.',
-        notifT: '5 actions ready', notifS: 'Client call: Nordlys Energy · 2 need you', notifB: 'Review', now: 'now',
-        menu: [['Record Meeting', '⌃⌥M'], ['Actions to review', '5'], ['Open Lintel', ''], ['Settings…', '⌘,']],
-        cap: 'Q6: how you learn that actions are ready. Shown here: one macOS notification per meeting, and a dot on the menu bar ring while something waits. The list row also says “5 to review”.'
       },
       set: {
         side: { general: 'General', dictation: 'Dictation', meetings: 'Meetings & notes', ai: 'AI assistant', apps: 'Connected apps', privacy: 'Privacy & data', addons: 'Add-ons', about: 'About & help' },
@@ -110,7 +107,7 @@
       }
     },
     pl: {
-      bar: { screen: 'Ekran', note: 'Notatka ze spotkania', inbox: 'Skrzynka akcji', apps: 'Połączone aplikacje', after: 'Po spotkaniu', layout: 'Gdzie (P3)', tab: 'Zakładka', inline: 'W Notatkach', inboxL: 'Zakładka + skrzynka', state: 'Stan', ready: 'Gotowe', finding: 'Szukanie', none: 'Brak', done: 'Wszystko zrobione', errors: 'Błędy', offline: 'Bez połączenia', mail: 'Konto (P1, P2 zdecydowane)', acct: 'Google/Microsoft', mcp: 'Łącznik (MCP)', nomail: 'Bez konta', theme: 'Motyw', light: 'Jasny', dark: 'Ciemny', lang: 'Język' },
+      bar: { screen: 'Ekran', note: 'Notatka ze spotkania', inbox: 'Skrzynka akcji', apps: 'Połączone aplikacje', after: 'Po spotkaniu', state: 'Stan', ready: 'Gotowe', finding: 'Szukanie', none: 'Brak', done: 'Wszystko zrobione', errors: 'Błędy', offline: 'Bez połączenia', mail: 'Konto (P1, P2 zdecydowane)', acct: 'Google/Microsoft', mcp: 'Łącznik (MCP)', nomail: 'Bez konta', theme: 'Motyw', light: 'Jasny', dark: 'Ciemny', lang: 'Język' },
       me: 'Anna Nowak', meMail: 'anna.nowak@brightline.example',
       searchNotes: 'Szukaj w notatkach', record: 'Nagraj spotkanie', settings: 'Ustawienia',
       nav: { all: 'Wszystkie notatki', meetings: 'Spotkania', dictations: 'Dyktowania', actions: 'Akcje', folders: 'Foldery', newFolder: 'Nowy folder', dictionary: 'Słownik' },
@@ -194,9 +191,6 @@
       after: {
         procHover: ['Piszę notatki', 'Szukam akcji'], ready: (n) => n ? `Gotowe · ${n} akcji` : 'Gotowe', open: 'Otwórz', close: 'Zamknij', replay: 'Odtwórz jeszcze raz', phaseL: 'Pastylka', proc: 'Przetwarzanie', readyL: 'Gotowe',
         cap2: 'P10 (właściciel): po zapisaniu audio pastylka pokazuje tylko zamykający się pierścień (#273, OD-9; po najechaniu: co robi). Gdy notatki I akcje są gotowe, zmienia się w „Gotowe · 5 akcji · Otwórz”; wiersz spotkania i skrzynka Akcje pokazują licznik. Bez powiadomienia macOS. Otwórz prowadzi do Notatek spotkania. Po 8 s pastylka znika, a na pierścieniu w pasku menu zostaje kropka, dopóki nie otworzysz akcji (P15 = B). ✕ zamyka pastylkę wcześniej; kropka zostaje.',
-        notifT: '5 akcji gotowych', notifS: 'Rozmowa z klientem: Nordlys Energy · 2 czekają na Ciebie', notifB: 'Sprawdź', now: 'teraz',
-        menu: [['Nagraj spotkanie', '⌃⌥M'], ['Akcje do sprawdzenia', '5'], ['Otwórz Lintel', ''], ['Ustawienia…', '⌘,']],
-        cap: 'P6: skąd wiesz, że akcje są gotowe. Tu: jedno powiadomienie macOS na spotkanie i kropka na pierścieniu w pasku menu, póki coś czeka. Wiersz na liście mówi też „5 do sprawdzenia”.'
       },
       set: {
         side: { general: 'Ogólne', dictation: 'Dyktowanie', meetings: 'Spotkania i notatki', ai: 'Asystent AI', apps: 'Połączone aplikacje', privacy: 'Prywatność i dane', addons: 'Dodatki', about: 'O programie i pomoc' },
@@ -261,7 +255,6 @@
   const NORD = ['a1', 'a2', 'a3', 'a4', 'a5'], SYNC = ['s1', 's2'];
   const S = {
     screen: pick('screen', ['note', 'inbox', 'apps', 'after'], 'note'),
-    layout: 'inbox', // Q3 decided: Actions tab + Actions inbox in the sidebar
     state: pick('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline'], 'ready'),
     phase: pick('phase', ['proc', 'ready'], 'proc'), // P10: the pill after the recording
     pillGone: false,
@@ -276,7 +269,6 @@
     open: qs.get('sel') || 'a1',
     st: {}, edits: {}, who: {}, err: {}, toast: null, hlq: '', component: ''
   };
-  if (S.screen === 'inbox') S.layout = 'inbox';
   const t = () => COPY[S.lang];
   const A = (id) => Object.assign({}, t().A[id], S.edits[id] || {});
 
@@ -309,7 +301,7 @@
     const on = (k) => (S.screen === 'inbox' ? k === 'actions' : k === 'all');
     const it = (k, icn, label, num, cls) => `<button class="si ${on(k) ? 'on' : ''}" ${k === 'actions' ? 'data-go="inbox"' : k === 'all' ? 'data-go="note"' : ''}>${icn}<span>${label}</span>${num !== undefined ? `<span class="n ${cls || ''}">${num}</span>` : ''}</button>`;
     const w = waiting('nordlys') + waiting('sync');
-    const actionsRow = S.layout === 'inbox' ? it('actions', ic('inbox'), n.actions, w || undefined, 'wait') : '';
+    const actionsRow = it('actions', ic('inbox'), n.actions, w || undefined, 'wait'); // Q3 = C: the Actions inbox in the sidebar
     return `<aside class="side">${lights()}
       ${it('all', ic('stack'), n.all, 42)}${it('meetings', ring('meeting', 15), n.meetings, 18)}${it('dictations', ring('dictation', 15), n.dictations, 24)}${actionsRow}
       <div class="sh">${n.folders}</div>${c.folders.map(([k, l]) => it(k, ic('folder'), l, k === 'clients' ? 9 : 4)).join('')}
@@ -499,7 +491,7 @@
     return `<div class="win mainw">${sidebar(c)}<div class="content">${toolbar(c)}<div class="body2">${listCol(c)}<article class="prev">${noteView(c)}</article></div></div>${toastEl(c)}</div>`;
   }
 
-  // ---------- inbox (layout C) ----------
+  // ---------- Actions inbox ----------
   function inboxScr(c) {
     const groups = [['nordlys', NORD], ['sync', SYNC]];
     let out = `<div style="padding:16px 20px 4px"><div class="ntitle">${c.inbox.t}</div><div class="help">${c.inbox.s}</div></div>`;
@@ -515,7 +507,7 @@
     const id = S.open, a = A(id), s = S.st[id];
     const it = c.items.find((x) => x.id === (SYNC.includes(id) ? 'sync' : 'nordlys'));
     const detail = ['done', 'dismissed', 'sending'].includes(s)
-      ? `<div class="cardhead"><span class="ti">${ic(TYPE_IC[a.type])}</span><div><div class="ntitle" style="font-size:1.154rem">${esc(a.t)}</div></div>${statusLabel(c, id, a)}</div><div class="from">${it.t}</div>${resultLine(c, id, a).replace('res2', 'res2" style="padding-left:48px')}${SYNC.includes(id) ? gradOffer(c) : ''}`
+      ? `<div class="cardhead"><span class="ti">${ic(TYPE_IC[a.type])}</span><div><div class="ntitle" style="font-size:1.154rem">${esc(a.t)}</div></div>${statusLabel(c, id, a)}</div><div class="from">${it.t}</div>${resultLine(c, id, a).replace('res2', 'res2" style="padding-left:48px')}`
       : `<div class="cardhead"><span class="ti">${ic(TYPE_IC[a.type])}</span><div style="flex:1"><div class="ntitle" style="font-size:1.154rem">${esc(a.t)}</div></div>${statusLabel(c, id, a)}</div><div class="from">${it.t} · ${it.w}</div>
         <div class="ab">${evidence(c, id, a)}${notices(c, id, a)}${form(c, id, a)}<div class="sendas">${viaLine(c, a)}</div>${buttons(c, id, a)}</div><div class="trust">${ic('lock')}${c.a.trust}</div>`;
     return `<div class="win mainw">${sidebar(c)}<div class="content">${toolbar(c)}<div class="body2"><nav class="list alist2">${out}</nav><article class="dpane">${detail}</article></div></div>${toastEl(c)}</div>`;
@@ -611,14 +603,12 @@
     const d = el.dataset;
     if (d.set) {
       S[d.set] = d.val;
-      if (d.set === 'screen' && d.val === 'inbox') S.layout = 'inbox';
-      if (d.set === 'layout' && d.val !== 'inbox' && S.screen === 'inbox') S.screen = 'note';
       if (d.set === 'phase') { clearTimeout(pillT); clearInterval(procT); S.pillGone = false; if (S.phase === 'ready') armPill(); }
       if (d.set === 'screen' && d.val === 'after') { syncURL(); playPill(); return; }
       if (d.set === 'state') { S.open = d.val === 'errors' || d.val === 'offline' ? 'a3' : 'a1'; S.item = 'nordlys'; S.tab = 'notes'; S.edits = {}; applyState(); }
       syncURL(); render(); return;
     }
-    if (d.go) { S.screen = d.go; if (d.go === 'inbox') S.layout = 'inbox'; syncURL(); render(); return; }
+    if (d.go) { S.screen = d.go; syncURL(); render(); return; }
     if (d.item) { S.item = d.item; S.open = d.item === 'sync' ? 's1' : 'a1'; syncURL(); render(); return; }
     if (d.tab) { S.tab = d.tab; S.hlq = ''; S.pop = null; syncURL(); render(); return; }
     if (d.open) { S.open = S.open === d.open && S.screen === 'note' ? '' : d.open; render(); return; }
