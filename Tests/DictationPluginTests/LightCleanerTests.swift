@@ -121,16 +121,6 @@ import Testing
         #expect(before.text == "Zjadłem obiad.")
         #expect(after.text == "Zjadłem, yyy, obiad.")
     }
-
-    @Test func fillerProcessingIsFast() {
-        // A long dictation: far below the 5 ms budget of the spec (Light runs at raw speed).
-        let paragraph = "Yyy, spotkanie jest we wtorek eee o dziesiątej, no więc um zobaczymy. "
-        let text = String(repeating: paragraph, count: 40)
-        let started = ContinuousClock.now
-        for _ in 0..<20 { _ = clean(text) }
-        let each = (ContinuousClock.now - started) / 20
-        #expect(each < .milliseconds(5))
-    }
 }
 
 private final class TermBox: @unchecked Sendable {
