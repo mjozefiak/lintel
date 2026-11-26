@@ -157,6 +157,12 @@ public struct PluginContext: Sendable {
     /// "Also delete kept copies"; `ownerErased` is true after Erase Data. Returns `false` when something could not
     /// be deleted. Added with the Notes workspace; the default deletes nothing and returns `true`.
     public let deleteKeptNoteCopies: @MainActor @Sendable (_ owner: PluginID, _ ownerErased: Bool) async -> Bool
+    /// The Recently deleted of the ACTIVE plugins' stores that are not note sources (`TrashSource`), for the
+    /// Recently deleted view and the shell's counts. Added with the notes explorer; the default has none.
+    public let trashSources: @MainActor @Sendable () -> [any TrashSource]
+    /// The first active plugin's live recording (`LiveRecorder`), for the Notes section's Record button. The shell
+    /// logs a second one once. Added with the notes explorer; the default has none.
+    public let liveRecorder: @MainActor @Sendable () -> (any LiveRecorder)?
 
     public init(
         storageDirectory: URL,
@@ -194,7 +200,9 @@ public struct PluginContext: Sendable {
         keptNoteCopies: @escaping @MainActor @Sendable (_ owner: PluginID) async -> Int = { _ in 0 },
         deleteKeptNoteCopies: @escaping @MainActor @Sendable (_ owner: PluginID, _ ownerErased: Bool) async -> Bool = {
             _, _ in true
-        }
+        },
+        trashSources: @escaping @MainActor @Sendable () -> [any TrashSource] = { [] },
+        liveRecorder: @escaping @MainActor @Sendable () -> (any LiveRecorder)? = { nil }
     ) {
         self.storageDirectory = storageDirectory
         self.settings = settings
@@ -226,5 +234,7 @@ public struct PluginContext: Sendable {
         self.openNote = openNote
         self.keptNoteCopies = keptNoteCopies
         self.deleteKeptNoteCopies = deleteKeptNoteCopies
+        self.trashSources = trashSources
+        self.liveRecorder = liveRecorder
     }
 }

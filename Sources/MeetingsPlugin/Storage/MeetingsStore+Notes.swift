@@ -20,12 +20,15 @@ struct NotesRecord: Equatable, Sendable {
 /// changes nothing. The transcript is never touched here.
 extension MeetingsStore {
     /// `ready` → notes `running`. Returns the status the notes had before (to put back when the run is
-    /// cancelled), or `nil` when the meeting is gone, is not `ready`, or its notes already run.
+    /// cancelled), or `nil` when the meeting is gone, is not `ready`, is in Recently deleted (nothing of it is
+    /// sent to a provider) or its notes already run.
     func beginNotes(_ id: Int64) throws -> NotesStatus? {
         try write { db in
             guard
                 let raw = try String.fetchOne(
-                    db, sql: "SELECT notes_status FROM meeting WHERE id = ? AND status = 'ready'", arguments: [id]),
+                    db,
+                    sql: "SELECT notes_status FROM meeting WHERE id = ? AND status = 'ready' AND deleted_at IS NULL",
+                    arguments: [id]),
                 let previous = NotesStatus(rawValue: raw), previous != .running
             else { return nil }
             try db.execute(
@@ -137,7 +140,8 @@ extension MeetingsStore {
             try Int64.fetchAll(
                 db,
                 sql: """
-                    SELECT id FROM meeting WHERE notes_awaiting_model = 1 AND status = 'ready'
+                    SELECT id FROM meeting
+                    WHERE notes_awaiting_model = 1 AND status = 'ready' AND deleted_at IS NULL
                     ORDER BY started_at, id
                     """)
         }

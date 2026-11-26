@@ -178,7 +178,9 @@ enum TestContext {
 
     static func make(
         modelsDirectory: URL? = nil, pluginID: PluginID = "minimal",
-        services: any PluginServices = UnsharedPluginServices()
+        services: any PluginServices = UnsharedPluginServices(),
+        trashSources: @escaping @MainActor @Sendable () -> [any TrashSource] = { [] },
+        liveRecorder: @escaping @MainActor @Sendable () -> (any LiveRecorder)? = { nil }
     ) -> PluginContext {
         PluginContext(
             storageDirectory: FileManager.default.temporaryDirectory.appending(path: "lintel-kit-tests"),
@@ -192,7 +194,9 @@ enum TestContext {
             permissions: NoPermissions(),
             clock: ContinuousClock(),
             modelsDirectory: modelsDirectory,
-            services: services
+            services: services,
+            trashSources: trashSources,
+            liveRecorder: liveRecorder
         )
     }
 }

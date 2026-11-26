@@ -6,14 +6,15 @@ import LintelKit
 /// here is made AFTER the source's own deletion succeeded; none of them runs on its own.
 extension NotesStore {
     /// Copies of `owner`'s recordings that Notes keeps (user writing or an open comment): one per recording, however
-    /// many of its layers were edited. This is the "N copies in Notes are kept" of Clear, Erase and Delete.
+    /// many of its layers were edited. This is the "N copies in Notes are kept" of Clear, Erase and Delete. An overlay
+    /// marked deleted is never kept as a copy, so it is not counted.
     func keptCopyCount(owner: PluginID) throws -> Int {
         try read { db in
             try Int.fetchOne(
                 db,
                 sql: """
                     SELECT COUNT(*) FROM (SELECT DISTINCT d.key, IFNULL(d.source_started_at_ms, 0) FROM note_doc d
-                        WHERE d.source_plugin_id = ? AND \(Self.keptSQL))
+                        WHERE d.source_plugin_id = ? AND d.deleted_at IS NULL AND \(Self.keptSQL))
                     """, arguments: [owner.rawValue]) ?? 0
         }
     }

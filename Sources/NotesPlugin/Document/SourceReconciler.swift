@@ -24,11 +24,15 @@ final class SourceReconciler: Sendable {
     private let budget: Duration
     private let now: @Sendable () -> Date
     private let log: any NotesLogging
+    private let trash: NoteTrashSweep
+    /// Told when the purge removed manual notes from Recently deleted (Notes' own `TrashSource` change stream).
+    private let trashChanged: @Sendable () -> Void
 
     init(
         store: NotesStore, library: NoteLibrary, detacher: any OverlayDetacher, registry: NoteDocumentRegistry,
         clock: any Clock<Duration> = ContinuousClock(), budget: Duration = SourceFanOut.defaultBudget,
-        now: @escaping @Sendable () -> Date = { Date() }, log: any NotesLogging = OSNotesLog()
+        now: @escaping @Sendable () -> Date = { Date() }, log: any NotesLogging = OSNotesLog(),
+        trashChanged: @escaping @Sendable () -> Void = {}
     ) {
         self.store = store
         self.library = library
@@ -38,6 +42,8 @@ final class SourceReconciler: Sendable {
         self.budget = budget
         self.now = now
         self.log = log
+        self.trashChanged = trashChanged
+        trash = NoteTrashSweep(store: store, library: library, clock: clock, budget: budget, log: log)
     }
 
     /// A note was opened (or its source said it changed): reads its content once, detaches overlays written
@@ -100,23 +106,44 @@ final class SourceReconciler: Sendable {
         for key in await registry.openLiveKeys { await reconcile(key) }
     }
 
-    /// The detach sweep (`exists` in batches of 500, only through an open source) followed by the persistent
-    /// delete of detached rows that are neither kept nor open. Returns the keys it detached.
+    /// The trash sweep alone (`NoteTrashSweep.run`): what a source's `makeChanges()` event triggers, so a note
+    /// deleted in the launcher's panel leaves Notes' search without waiting for the next full sweep.
     @discardableResult
-    func sweep() async -> [NoteKey] {
+    func trashSweep() async -> NoteTrashSweep.Result {
+        await trash.run()
+    }
+
+    /// The trash sweep (marks and clears the overlays of notes their owner trashed or restored), then the detach
+    /// sweep (`exists` in batches of 500, only through an open source; a gone key whose overlays carry a mark is
+    /// deleted, never kept as a copy), the removal of folder entries whose key is gone, and the persistent delete
+    /// of detached rows that are neither kept nor open. With `purgesTrash` the manual notes trashed 30 days ago or
+    /// more are purged too. Returns the keys it detached or deleted.
+    @discardableResult
+    func sweep(purgesTrash: Bool = false) async -> [NoteKey] {
+        await trash.run()
         let detached = await library.sweep()
+        await trash.removeGoneFolderEntries()
         do {
-            try store.applyRetention(excluding: await registry.openDocIDs(), now: now())
+            let retention = try store.applyRetentionReporting(
+                excluding: await registry.openDocIDs(), now: now(), purgesTrash: purgesTrash)
+            if !retention.purged.isEmpty {
+                log.notice(NotesLogEvent("trashPurge", count: retention.purged.count))
+                trashChanged()
+            }
         } catch {
             log.error(NotesLogEvent("sweep", code: (error as? NotesError)?.code ?? "sweepFailed"))
         }
         return detached
     }
 
-    /// Runs on source activation, then every 10 minutes on the injected clock, until cancelled.
+    /// Runs on source activation, then every 10 minutes on the injected clock, until cancelled. The first sweep
+    /// never purges Recently deleted: the purge runs from the second one on (10 minutes after activation), so the
+    /// trash sweep has marked the overlays first (notes explorer spec, Deletion lifecycle).
     func runSweeps(every interval: Duration = SourceReconciler.sweepInterval) async {
+        var first = true
         while !Task.isCancelled {
-            await sweep()
+            await sweep(purgesTrash: !first)
+            first = false
             do { try await clock.sleep(for: interval) } catch { return }
         }
     }

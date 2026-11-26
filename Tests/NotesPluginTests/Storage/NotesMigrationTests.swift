@@ -21,7 +21,7 @@ import Testing
         #expect(try names(store, type: "view") == ["note_fts_source"])
         #expect(try names(store, type: "index").contains("note_doc_live"))
         let applied = try store.read { db in try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations") }
-        #expect(applied == ["v1-notes"])
+        #expect(applied == ["v1-notes", "v2-explorer"])
         #expect(!store.hasNewerSchema)
     }
 
@@ -42,11 +42,11 @@ import Testing
         #expect(try reopened.liveOverlays(for: [NoteKey(pluginID: "meetings", id: "m1")]).count == 1)
         #expect(try reopened.search("kept").count == 1)
         let applied = try reopened.read { db in try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations") }
-        #expect(applied == ["v1-notes"])
+        #expect(applied == ["v1-notes", "v2-explorer"])
     }
 
-    @Test func theMigratorOnlyKnowsV1Notes() {
-        #expect(NotesStore.migrator.migrations == ["v1-notes"])
+    @Test func theMigratorKnowsItsMigrationsInOrder() {
+        #expect(NotesStore.migrator.migrations == ["v1-notes", "v2-explorer"])
     }
 
     // MARK: CHECKs

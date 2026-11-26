@@ -20,6 +20,7 @@ section (pre-releases use `x.y.z-beta.N`).
 ### Fixed
 
 - A meeting that was waiting for the notes model is no longer forgotten when Lintel restarts: it still says that its notes need the model, and it gets its notes when the model is downloaded.
+- A meeting that waits for the notes model no longer loses its notes when the model is downloaded while Lintel is saving that wait: they are written as soon as the download finishes.
 
 ## [0.1.0-beta.1] - 2026-11-22
 

@@ -41,6 +41,9 @@ struct MeetingDocument: Sendable, Equatable {
     /// built-in model and for notes never written by a provider.
     var notesProvider: String? = nil
     var notesProviderModel: String? = nil
+    /// When the meeting moved to Recently deleted; `nil` for a live one. Only a read that asked for trashed
+    /// meetings (`includingTrashed`) can return a document with it set.
+    var deletedAt: Date? = nil
 
     func speaker(id: Int64?) -> Speaker? {
         guard let id else { return nil }
@@ -56,23 +59,27 @@ enum MeetingActionError: Error, Equatable {
 }
 
 extension MeetingsStore {
-    /// The whole meeting for the window and the export; `nil` when it does not exist.
-    func loadDocument(id: Int64) throws -> MeetingDocument? {
-        try loadDocument(where: "id = ?", argument: id)
+    /// The whole meeting for the window and the export; `nil` when it does not exist, and for one in Recently
+    /// deleted unless `includingTrashed` (only the Notes source asks: a note in Recently deleted still has its
+    /// content).
+    func loadDocument(id: Int64, includingTrashed: Bool = false) throws -> MeetingDocument? {
+        try loadDocument(where: "id = ?", argument: id, includingTrashed: includingTrashed)
     }
 
     /// The same by the meeting's public `uuid` (the Notes workspace's key `meetings:<uuid>`).
-    func loadDocument(uuid: String) throws -> MeetingDocument? {
-        try loadDocument(where: "uuid = ?", argument: uuid)
+    func loadDocument(uuid: String, includingTrashed: Bool = false) throws -> MeetingDocument? {
+        try loadDocument(where: "uuid = ?", argument: uuid, includingTrashed: includingTrashed)
     }
 
-    private func loadDocument(where condition: String, argument: any DatabaseValueConvertible) throws
-        -> MeetingDocument?
+    private func loadDocument(where condition: String, argument: any DatabaseValueConvertible, includingTrashed: Bool)
+        throws -> MeetingDocument?
     {
         try read { db in
             guard
                 let row = try Row.fetchOne(
-                    db, sql: "SELECT * FROM meeting WHERE \(condition)", arguments: [argument])
+                    db,
+                    sql: "SELECT * FROM meeting WHERE \(condition)\(includingTrashed ? "" : " AND deleted_at IS NULL")",
+                    arguments: [argument])
             else {
                 return nil
             }
@@ -105,7 +112,8 @@ extension MeetingsStore {
                 consentTextCopiedAt: (row["consent_text_copied_at"] as Int64?).map {
                     Date(timeIntervalSince1970: TimeInterval($0))
                 },
-                notesProvider: row["notes_provider"], notesProviderModel: row["notes_provider_model"])
+                notesProvider: row["notes_provider"], notesProviderModel: row["notes_provider_model"],
+                deletedAt: (row["deleted_at"] as Double?).map(TrashStamp.date(column:)))
         }
     }
 

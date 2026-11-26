@@ -17,16 +17,21 @@ import LintelUI
     static let shellGroupID = "shell"
 
     static var groups: [Group] {
-        let plugins = PluginRegistry.all.compactMap { type -> Group? in
+        // The shared components of `LintelUI` first (the working ring), then the plugins', then the shell's own.
+        let shared = [Group(id: "lintel-ui", title: "Shared UI", scenes: LintelUIGallery.scenes)]
+        let shell = ShellGallery.galleryScenes
+        guard !shell.isEmpty else { return shared + pluginGroups }
+        return shared + pluginGroups + [Group(id: shellGroupID, title: "Shell", scenes: shell)]
+    }
+
+    private static var pluginGroups: [Group] {
+        PluginRegistry.all.compactMap { type in
             guard let provider = type as? any GalleryProviding.Type else { return nil }
             let scenes = provider.galleryScenes
             guard !scenes.isEmpty else { return nil }
             return Group(
                 id: type.manifest.id.rawValue, title: String(localized: type.manifest.displayName), scenes: scenes)
         }
-        let shell = ShellGallery.galleryScenes
-        guard !shell.isEmpty else { return plugins }
-        return plugins + [Group(id: shellGroupID, title: "Shell", scenes: shell)]
     }
 
     static var scenes: [GalleryScene] { groups.flatMap(\.scenes) }

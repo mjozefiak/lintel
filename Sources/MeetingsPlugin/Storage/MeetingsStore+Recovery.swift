@@ -16,7 +16,8 @@ struct RecoverableMeeting: Equatable, Sendable {
 
 /// Reads for crash recovery and "Dokończ" (spec step 1.7).
 extension MeetingsStore {
-    /// The meetings with one of these statuses, oldest first.
+    /// The meetings with one of these statuses, oldest first. A meeting in Recently deleted is never resumed, so
+    /// it is not here.
     func recoverableMeetings(statuses: [MeetingStatus]) throws -> [RecoverableMeeting] {
         let names = statuses.map(\.rawValue)
         guard !names.isEmpty else { return [] }
@@ -27,7 +28,8 @@ extension MeetingsStore {
                 sql: """
                     SELECT m.id, m.uuid, m.status, m.audio_state, m.started_at, m.ended_at, m.duration_ms,
                         (SELECT count(*) FROM meeting_segment s WHERE s.meeting_id = m.id) AS segments
-                    FROM meeting m WHERE m.status IN (\(marks)) ORDER BY m.started_at, m.id
+                    FROM meeting m WHERE m.status IN (\(marks)) AND m.deleted_at IS NULL
+                    ORDER BY m.started_at, m.id
                     """, arguments: StatementArguments(names)
             ).compactMap(Self.recoverable)
         }
@@ -40,7 +42,7 @@ extension MeetingsStore {
                 sql: """
                     SELECT m.id, m.uuid, m.status, m.audio_state, m.started_at, m.ended_at, m.duration_ms,
                         (SELECT count(*) FROM meeting_segment s WHERE s.meeting_id = m.id) AS segments
-                    FROM meeting m WHERE m.id = ?
+                    FROM meeting m WHERE m.id = ? AND m.deleted_at IS NULL
                     """, arguments: [id]
             ).flatMap(Self.recoverable)
         }
@@ -107,7 +109,7 @@ extension MeetingsStore {
             try db.execute(
                 sql: """
                     UPDATE meeting SET status = 'processing', resume_attempts = 0
-                    WHERE id = ? AND status = 'incomplete'
+                    WHERE id = ? AND status = 'incomplete' AND deleted_at IS NULL
                     """, arguments: [id])
             return db.changesCount == 1
         }
@@ -152,13 +154,20 @@ extension MeetingsStore {
         }
     }
 
-    /// `ready` meetings whose audio is still marked as spooled: a delete that did not finish.
+    /// `ready` meetings whose audio is still marked as spooled: a delete that did not finish. A meeting in Recently
+    /// deleted keeps its audio until the purge, so it is not a leftover.
     func readyMeetingsWithSpool() throws -> [(id: Int64, uuid: UUID)] {
         try read { db in
-            try Row.fetchAll(db, sql: "SELECT id, uuid FROM meeting WHERE status = 'ready' AND audio_state = 'spool'")
-                .compactMap { row in
-                    UUID(uuidString: row["uuid"]).map { (row["id"] as Int64, $0) }
-                }
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT id, uuid FROM meeting
+                    WHERE status = 'ready' AND audio_state = 'spool' AND deleted_at IS NULL
+                    """
+            )
+            .compactMap { row in
+                UUID(uuidString: row["uuid"]).map { (row["id"] as Int64, $0) }
+            }
         }
     }
 }
