@@ -345,13 +345,20 @@ pasting into another app cannot be faked. Check the HUD, the Settings pane and t
 
 ### Dictation formatting (Phase 2)
 
-Cleanup levels (spec `2026-11-25-dictation-cleanup-levels`, Phase 1): Settings → Dictation → Basics → "Tidy up my text" is
-Off, Light or Standard (Full comes with its phase). Screenshots of the pane at each value, light and dark, English and
+Cleanup levels (spec `2026-11-25-dictation-cleanup-levels`, Phases 1 and 2): Settings → Dictation → Basics → "Tidy up my
+text" is Off, Light, Standard or Full. Screenshots of the pane at each value, light and dark, English and
 Polish, need no model and no server: `--qa --qa-window settings --qa-settings dictation` with
 `--qa-setting plugins.dictation.mode=raw` (Off), `--qa-setting plugins.dictation.mode=cleanup
---qa-setting plugins.dictation.cleanupLevel=light` (Light) or `--qa-setting plugins.dictation.mode=cleanup` (Standard),
+--qa-setting plugins.dictation.cleanupLevel=light` (Light) or `--qa-setting plugins.dictation.mode=cleanup` (Standard) or
+`--qa-setting plugins.dictation.mode=cleanup --qa-setting plugins.dictation.cleanupLevel=full` (Full),
 `--qa-appearance light|dark`, `--qa-snapshot <png> --qa-quit-after 6` and `-AppleLanguages "(pl)"` from the app bundle.
-The model, server and "Try it" rows show only at Standard. The popup's states are also gallery scene `dictation.tidy-up`.
+The model, server and "Try it" rows show at Standard and Full. At Full on the smallest built-in model
+(`--qa-setting plugins.dictation.llmSource=builtIn`, `plugins.dictation.builtInLLMModel=llm-qwen3-4b-instruct-2507-q4km`)
+the help line adds "Works best with the Recommended assistant.". The popup's states are also gallery scene
+`dictation.tidy-up`. A Full dictation through the real model, without a microphone or speakers, is `qa dictation play`
+("Dictation from a WAV file" below) with `plugins.dictation.cleanupLevel=full` and a WAV made by `say -o`; the paste goes
+to the QA pasteboard, so the result card (`<prefix>-light.png`) shows the pasted paragraphs. A paste into TextEdit cannot
+be done in QA mode: the keystroke is only logged and no Accessibility grant is used.
 Light needs no model: with no model downloaded and no server set, dictation at Light still removes "yyy"/"um" (by hand).
 
 The formatting server is the user's own, so it cannot be faked in CI. With Ollama (or LM Studio,

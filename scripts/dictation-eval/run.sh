@@ -3,7 +3,7 @@
 # JSONL the benchmark scorer reads (see README.md).
 # Usage: run.sh --input <raw.jsonl> --out <result.jsonl> [--level light|standard|full] [--model <model.gguf>]
 #        [--app <label>]
-# --level standard (default) needs --model; light runs LightCleaner alone, no model; full arrives in phase 2.
+# --level standard (default) and full need --model; light runs LightCleaner alone, no model.
 # Exit codes: 0 ok, 2 usage/input error, 4 test failure, 5 build failure.
 # Builds DictationPluginTests in release (`swift test -c release` fails to link other plugin tests) and runs
 # ONLY DictationEvalTests through the Swift Testing helper, so no other suite shares the process.
@@ -27,7 +27,7 @@ done
 case "$level" in
   light) ;;
   standard) [[ -n "$model" ]] || die "--level standard needs --model" ;;
-  full) die "--level full is not available before phase 2 of the cleanup levels spec" ;;
+  full) [[ -n "$model" ]] || die "--level full needs --model" ;;
   *) die "--level must be light, standard or full" ;;
 esac
 [[ -n "$input" && -n "$out" ]] || die "required: --input --out"
