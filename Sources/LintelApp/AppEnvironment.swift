@@ -328,6 +328,8 @@ struct AppEnvironment {
                 || settings.value(forKey: PluginDefaultsMigration.migratedKey) != nil)
         PluginDefaultsMigration.run(settings: settings, isExistingInstall: existing)
         NotesDefaultMigration.run(settings: settings, isExistingInstall: existing)
+        // Not tied to "ran before": the old language keys exist only where the user picked a language.
+        SpeechLanguageMigration.run(settings: settings)
     }
 
     /// `ranking.sqlite` at the data root. If it cannot be opened, ranking falls back to memory for this
