@@ -8,7 +8,7 @@ import Testing
 
 /// The gallery scene of the floating permission helper (`docs/design-gallery.md`, "Adding a scene"). The pictures are
 /// compared by the app bundle in CI, not here: only the app bundle has the accent colour and the string catalog.
-/// There are no goldens in the repository yet; they come after the owner approves the sheet.
+/// The goldens are recorded on the CI runner by `gallery-goldens.yml`.
 @MainActor
 @Suite(.serialized)
 struct PermissionHelperGalleryTests {
