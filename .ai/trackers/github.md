@@ -44,7 +44,7 @@ Upstream references: cli/cli#11983 (`gh pr edit` aborts without any project flag
 - **Repository process rules** (`SDLC.md`). They apply on top of the installed skills; none of them edits a skill:
   - **Priority is the milestone.** There are no `priority-*` labels: the guards below turn a `priority-*` name into a no-op, so a step that says "apply exactly one priority label" lands nothing. Set the issue's milestone (`beta.2` or `later`) with **set-milestone** instead.
   - **Categories are the `type:*` labels.** `labels.category` in the config lists `type:bug`, `type:feature` and `type:chore`; the guards map the upstream category names a skill passes (`bug`, `feature`, `refactor`, `documentation`, `dependencies`) onto them.
-  - **No label-rationale prose.** Labels are self-explanatory; a step that posts a comment explaining why labels were applied posts only the machine-readable `<!-- qa-triage v1 ... -->` block (one comment, edited in place, because the human-QA lane reads it) and no sentence per label. The run's summary comment may name the labels in one line.
+  - **No label-rationale prose.** Labels are self-explanatory; a step that posts a comment explaining why labels were applied posts only its marker line (for example `` 🤖 `om-auto-review-pr` — 🏷️ label rationale ``, so the next run finds and rewrites the same comment) and the machine-readable `<!-- qa-triage v1 ... -->` block (one comment, edited in place, because the human-QA lane reads it), and no sentence per label. The run's summary comment may name the labels in one line.
   - **Review nits are never filed as issues.** A nit or non-blocking finding is fixed in the same PR or dropped (and listed as dropped in the summary comment). Only a real bug becomes a new issue (`type:bug` + `area:*`); a flaky test is added as a checklist line to the open umbrella issue "Flaky tests" (#240) instead of a new issue. Steps such as "file follow-up issues for nits" do not run.
   - **`risk-*` labels are for PRs only.** `apply_issue_label` skips them; an issue's weight is its milestone.
   - **One QA comment per PR, edited in place.** The QA evidence and the `QA head:` line live in a single comment that each QA round rewrites through **update-comment**; a new QA round never posts a second QA comment.
@@ -224,7 +224,10 @@ Title, body, assignee, labels → created issue URL. The issue is created **with
 ```bash
 ISSUE_URL=$(gh issue create --repo {owner}/{repo} --title "<title>" --assignee <login> --body "<body>")
 ISSUE_ID=${ISSUE_URL##*/}
-for l in <labels>; do apply_issue_label "$l" "$ISSUE_ID"; done   # one quoted word per label
+ISSUE_LABELS="<labels>"   # space-separated; split through read, because zsh does not word-split "for l in $ISSUE_LABELS"
+printf '%s\n' "$ISSUE_LABELS" | tr ' ' '\n' | while IFS= read -r l; do
+  [ -n "$l" ] && apply_issue_label "$l" "$ISSUE_ID"
+done
 ```
 
 #### close-issue
@@ -639,6 +642,14 @@ gh pr review {prNumber} --request-changes --body "<body>"
 ```
 GitHub rejects self-approval (reviewing your own PR); surface that instead of working around it.
 
+**Self-authored PRs (this repository).** The owner and the agents share one GitHub account, so every PR is self-authored and GitHub refuses both `--approve` and `--request-changes` on it. When the PR author equals `CURRENT_USER`, submit the same body as a comment review instead, with the verdict as its first line (`Verdict: APPROVED` or `Verdict: CHANGES REQUESTED`); that comment review is the review evidence `om-auto-merge-buddy` accepts on a self-authored PR (signal 1), and the pipeline label (`merge-queue` or `changes-requested`) carries the state. Never switch accounts to obtain a native approval; the ruleset "main" requires none.
+```bash
+PR_AUTHOR=$(gh pr view {prNumber} --json author --jq .author.login)
+if [ "$PR_AUTHOR" = "$CURRENT_USER" ]; then
+  gh pr review {prNumber} --comment --body-file <path>   # body starts with the Verdict line
+fi
+```
+
 #### merge-pr
 `{prNumber}`; squash is the default merge strategy. `--auto` merges when checks pass; `--delete-branch` only when asked.
 ```bash
@@ -811,6 +822,8 @@ gh label create area:app          --color 1d76db --description "Shell, launcher,
 gh label create state:idea        --color ededed --description "Not decided yet"
 gh label create state:needs-decision --color d876e3 --description "Waiting for the owner's decision"
 gh label create state:agent-ready --color 0e8a16 --description "Specified enough for an agent to pick up"
-gh api repos/{owner}/{repo}/milestones -f title=beta.2
-gh api repos/{owner}/{repo}/milestones -f title=later
+for ms in beta.2 later; do
+  gh api 'repos/{owner}/{repo}/milestones?state=all' --jq '.[].title' | grep -Fxq "$ms" ||
+    gh api repos/{owner}/{repo}/milestones -f title="$ms" >/dev/null
+done
 ```
