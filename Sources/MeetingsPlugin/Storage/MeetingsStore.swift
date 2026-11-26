@@ -263,6 +263,17 @@ final class MeetingsStore: Sendable {
         migrator.registerMigration("v4-notes-awaiting-model") { db in
             try db.execute(sql: "ALTER TABLE meeting ADD COLUMN notes_awaiting_model INTEGER NOT NULL DEFAULT 0")
         }
+        // Recently deleted (notes explorer spec, Data Model): `deleted_at` is the Unix time (seconds, REAL) a meeting
+        // moved to Recently deleted; NULL = live. Nothing else moves: the spool, the kept recording and the FTS rows of
+        // a trashed meeting stay until the 30-day purge, so a restore brings the audio back. Every read the user sees
+        // filters `deleted_at IS NULL`. Additive only: an older build never names the column or the index, reads every
+        // row as live and loses nothing. The name is registered after every migration already released, never
+        // between them.
+        migrator.registerMigration("v4-trash") { db in
+            try db.execute(sql: "ALTER TABLE meeting ADD COLUMN deleted_at REAL")
+            try db.execute(
+                sql: "CREATE INDEX meeting_deleted ON meeting(deleted_at) WHERE deleted_at IS NOT NULL")
+        }
         return migrator
     }
 }
@@ -510,7 +521,7 @@ extension MeetingsStore {
     }
 
     func meetingCount() throws -> Int {
-        try read { db in try Int.fetchOne(db, sql: "SELECT count(*) FROM meeting") ?? 0 }
+        try read { db in try Int.fetchOne(db, sql: "SELECT count(*) FROM meeting WHERE deleted_at IS NULL") ?? 0 }
     }
 
     func segmentCount(meetingID: Int64? = nil) throws -> Int {
@@ -532,7 +543,10 @@ extension MeetingsStore {
 
     /// Ids of meetings, newest first.
     func meetingIDs() throws -> [Int64] {
-        try read { db in try Int64.fetchAll(db, sql: "SELECT id FROM meeting ORDER BY started_at DESC, id DESC") }
+        try read { db in
+            try Int64.fetchAll(
+                db, sql: "SELECT id FROM meeting WHERE deleted_at IS NULL ORDER BY started_at DESC, id DESC")
+        }
     }
 
     func status(of id: Int64) throws -> MeetingStatus? {
@@ -554,7 +568,13 @@ extension MeetingsStore {
         guard let pattern = FTS5Pattern(matchingAllPrefixesIn: FullTextFolding.fold(text)) else { return [] }
         return try read { db in
             try Int64.fetchAll(
-                db, sql: "SELECT rowid FROM meeting_fts WHERE meeting_fts MATCH ? ORDER BY rank LIMIT ?",
+                db,
+                sql: """
+                    SELECT meeting_fts.rowid FROM meeting_fts
+                    JOIN meeting_segment AS segment ON segment.id = meeting_fts.rowid
+                    JOIN meeting ON meeting.id = segment.meeting_id
+                    WHERE meeting_fts MATCH ? AND meeting.deleted_at IS NULL ORDER BY rank LIMIT ?
+                    """,
                 arguments: [pattern, max(0, limit)])
         }
     }
@@ -565,7 +585,11 @@ extension MeetingsStore {
         return try read { db in
             try Int64.fetchAll(
                 db,
-                sql: "SELECT rowid FROM meeting_notes_fts WHERE meeting_notes_fts MATCH ? ORDER BY rank LIMIT ?",
+                sql: """
+                    SELECT meeting_notes_fts.rowid FROM meeting_notes_fts
+                    JOIN meeting ON meeting.id = meeting_notes_fts.rowid
+                    WHERE meeting_notes_fts MATCH ? AND meeting.deleted_at IS NULL ORDER BY rank LIMIT ?
+                    """,
                 arguments: [pattern, max(0, limit)])
         }
     }

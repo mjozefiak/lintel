@@ -17,6 +17,9 @@ enum NotesError: Error, Equatable, Sendable {
     case migrationFailed(step: String)
     /// The store was closed while background work still used it.
     case storeClosed
+    /// Something other than the user tried to write the `mine` layer (My notes of a recorded note): only `human`
+    /// revisions go there, and nothing is written.
+    case mineIsHumanOnly
 
     /// The stable code written to the log; never changes after release.
     var code: String {
@@ -30,6 +33,7 @@ enum NotesError: Error, Equatable, Sendable {
         case .sourceUnavailable(let pluginID): "sourceUnavailable(\(pluginID.rawValue))"
         case .migrationFailed(let step): "migrationFailed(\(step))"
         case .storeClosed: "storeClosed"
+        case .mineIsHumanOnly: "mineIsHumanOnly"
         }
     }
 }

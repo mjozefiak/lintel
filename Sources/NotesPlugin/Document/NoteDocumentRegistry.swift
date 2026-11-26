@@ -192,14 +192,17 @@ final class NoteDocumentRegistry {
 /// The one place that detaches an overlay (merge, open and sweep): asks the registry first, flushes the open
 /// documents of the key, moves every live row of the key to `detached` in one transaction, re-keys the open
 /// documents, and then deletes what no longer needs to live ("detach means delete" for an overlay without user
-/// writing and without an open comment; an open document is deleted only after its tab closes).
+/// writing and without an open comment; an open document is deleted only after its tab closes). Rows that carry a
+/// Recently deleted mark (the owner trashed the note) are deleted instead, never kept as a copy, and their writers
+/// are discarded once the rows are gone.
 struct RegistryOverlayDetacher: OverlayDetacher {
     let store: NotesStore
     let registry: NoteDocumentRegistry
 
     func detach(_ key: NoteKey, reason: OverlayDetachReason) async throws {
         for (_, writer) in await registry.writers(forKey: key) { try await writer.flush() }
-        let moved = try store.detachReportingRows(key)
+        let (moved, deleted) = try store.detachOrDeleteTrashed(key)
+        if !deleted.isEmpty { await registry.discard(docIDs: Set(deleted)) }
         await registry.rekey(key: key, moved: moved)
         try store.deleteUnkeptDetached(excluding: await registry.openDocIDs())
     }

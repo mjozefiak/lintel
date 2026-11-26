@@ -33,8 +33,11 @@ public final class NotesPlugin: LintelPlugin {
     private(set) lazy var library = NotesLibraryOpener(
         directory: context.storageDirectory, keychain: context.keychain, settings: NotesSettings(context.settings))
 
-    /// Nothing to start: the store opens on first need, so activation touches no file and no Keychain.
-    public func activate() async throws {}
+    /// Activation touches no file and no Keychain: it only starts the trash-sweep task (`startTrashSweeps`), which
+    /// reads nothing until `hasLibrary()` says a library exists.
+    public func activate() async throws {
+        startTrashSweeps()
+    }
 
     /// The open documents: one `RevisionWriter` each, flushed on blur, tab close, window close and here.
     private(set) lazy var documents = NoteDocumentRegistry()
@@ -45,10 +48,23 @@ public final class NotesPlugin: LintelPlugin {
     /// A run is cancelled first (the document stays as it was), then typed text is written before the store closes
     /// (spec "Saving": quit loses nothing).
     public func deactivate() async {
+        await stopTrashSweeps()
         await reviseService.cancelAll()
         await documents.flushAll()
         library.close()
+        trashChanges.finishAll()
     }
+
+    /// The change streams of Notes' own Recently deleted (`ManualNotesTrash.makeChanges()`).
+    let trashChanges = TrashChangeBroadcaster()
+
+    /// Recently deleted for the manual notes (Notes is their owner). Reads only an existing library: on a fresh
+    /// profile it answers 0 and empty pages without creating the Keychain item or `notes.sqlite`.
+    private(set) lazy var manualTrash = ManualNotesTrash(
+        store: { [hasLibrary, storeProvider] in hasLibrary() ? storeProvider() : nil }, changes: trashChanges,
+        discard: { [documents] ids in await documents.discard(docIDs: ids) })
+
+    public var trashSources: [any TrashSource] { [manualTrash] }
 
     /// "Erase Data" (Settings → Features): removes the Keychain item and `Plugins/notes/`; never touches the
     /// sources. The same as "Erase Notes Data…": the open documents' writers hold the store that is erased, so they
@@ -128,6 +144,105 @@ public final class NotesPlugin: LintelPlugin {
         { [library] in library.store != nil || library.storeFileExists }
     }
 
+    /// Whether the real store backs the section. Always, except in a DEBUG QA run that shows fixtures or the locked
+    /// state without a QA note of Notes' own.
+    private var usesRealStore: Bool {
+        #if DEBUG
+        let locked = qaState == "locked" || qaState == "locked-rows"
+        let fixtures = context.settings.bool(NotesSettingsKey.qaFixtures, default: false)
+        let qaManual =
+            context.settings.string(NotesSettingsKey.qaManual) != nil
+            || context.settings.string(NotesSettingsKey.qaHistory) != nil
+            || context.settings.string(NotesSettingsKey.qaDelete) != nil
+            || context.settings.string(NotesSettingsKey.qaComments) != nil
+        return !locked && (!fixtures || qaManual)
+        #else
+        return true
+        #endif
+    }
+
+    /// One reconciler over an open store: the sweeps and the open note's reconcile share it.
+    var makeReconciler: @MainActor @Sendable (NotesStore, NoteLibrary) -> SourceReconciler {
+        { [clock = context.clock, trashChanges, documents] store, library in
+            SourceReconciler(
+                store: store, library: library, detacher: RegistryOverlayDetacher(store: store, registry: documents),
+                registry: documents, clock: clock, trashChanged: { trashChanges.signal() })
+        }
+    }
+
+    // MARK: Trash sweeps
+
+    /// The sweeps live as long as the plugin is active (spec "Deletion lifecycle": Notes' trash sweep runs at
+    /// activation), not as long as the section is on screen: the main window is built lazily, so without this a
+    /// recording deleted in the launcher would stay unmarked, and its overlay would turn into a kept copy when its
+    /// owner purges it. One task, started by `activate()`, ended by `deactivate()`.
+    private var trashSweepTask: Task<Void, Never>?
+
+    /// Called after every pass of the sweep task, whether or not a library existed (a test seam: it lets a test wait
+    /// for a pass without polling).
+    var trashSweepPassFinished: (@MainActor @Sendable () -> Void)?
+
+    /// Called when the task's source-change listener has ended (a test seam, like `trashSweepPassFinished`).
+    var trashSweepListenerEnded: (@MainActor @Sendable () -> Void)?
+
+    /// Starts the one sweep task (a second activation replaces it). Nothing is read here: the task asks
+    /// `hasLibrary()` first, on every pass, so a fresh profile creates no file and no Keychain item, and a
+    /// library created later by a first write is swept from the next pass on.
+    func startTrashSweeps() {
+        trashSweepTask?.cancel()
+        trashSweepTask = nil
+        guard usesRealStore else { return }
+        let hasLibrary = hasLibrary
+        let storeProvider = storeProvider
+        let makeReconciler = makeReconciler
+        let sweepLibrary = NoteLibrary(
+            sources: noteSourceProvider,
+            overlays: LazyStoreOverlays(store: storeProvider, registry: documents, exists: hasLibrary),
+            detacher: LazyStoreOverlays(store: storeProvider, registry: documents, exists: hasLibrary),
+            clock: context.clock)
+        let sourceSetChanges = context.noteSourcesChanged
+        let clock = context.clock
+        trashSweepTask = Task { @MainActor [weak self] in
+            // A source's change (a trash, a restore, a purge in its own store, a plugin switched on or off) runs
+            // the trash sweep at once, so a note deleted in the launcher's panel leaves Notes' search before the
+            // next full sweep.
+            let changes = Task { @MainActor [weak self] in
+                defer { self?.trashSweepListenerEnded?() }
+                for await _ in sweepLibrary.changes(sourceSetChanges: sourceSetChanges()) {
+                    if Task.isCancelled { return }
+                    guard hasLibrary(), let store = storeProvider() else { continue }
+                    await makeReconciler(store, sweepLibrary).trashSweep()
+                }
+            }
+            // The first sweep after activation never purges Recently deleted: the purge starts with the second,
+            // 10 minutes later, after the trash sweep has marked the overlays.
+            var first = true
+            while !Task.isCancelled {
+                if hasLibrary(), let store = storeProvider() {
+                    // Notes activates before the plugins whose recordings it sweeps, and a change of the set may
+                    // be signalled before the listener above subscribed: read the active sources again, so a
+                    // set the library cached while those plugins were still off never outlives one pass.
+                    await sweepLibrary.refreshSources()
+                    await makeReconciler(store, sweepLibrary).sweep(purgesTrash: !first)
+                    first = false
+                }
+                self?.trashSweepPassFinished?()
+                do { try await clock.sleep(for: SourceReconciler.sweepInterval) } catch { break }
+            }
+            // The listener may be mid-sweep: end it and wait, so nothing writes after `deactivate()` closes the store.
+            changes.cancel()
+            await changes.value
+        }
+    }
+
+    /// Ends the sweep task and waits for it, so no sweep touches the store that `deactivate()` closes.
+    func stopTrashSweeps() async {
+        guard let task = trashSweepTask else { return }
+        trashSweepTask = nil
+        task.cancel()
+        await task.value
+    }
+
     private func makeWorkspace() -> NotesWorkspaceModel {
         let context = context
         let provider = noteSourceProvider
@@ -142,13 +257,7 @@ public final class NotesPlugin: LintelPlugin {
         // QA fixtures stand in for the sources and have no overlays, unless `qaManual` asks for notes of Notes' own
         // (they need the store); `locked` shows the locked state.
         let locked = qaState == "locked" || qaState == "locked-rows"
-        let fixtures = context.settings.bool(NotesSettingsKey.qaFixtures, default: false)
-        let qaManual =
-            context.settings.string(NotesSettingsKey.qaManual) != nil
-            || context.settings.string(NotesSettingsKey.qaHistory) != nil
-            || context.settings.string(NotesSettingsKey.qaDelete) != nil
-            || context.settings.string(NotesSettingsKey.qaComments) != nil
-        let usesStore = !locked && (!fixtures || qaManual)
+        let usesStore = usesRealStore
         let overlays: any OverlayIndex & OverlayDetacher
         if locked {
             overlays = NotesQALockedOverlays()
@@ -203,19 +312,16 @@ public final class NotesPlugin: LintelPlugin {
                 guard await hasLibrary(), let store = await storeProvider() else { return [] }
                 return (try? NoteOverlayContent.heads(for: item, in: store)) ?? []
             }
-            let clock = context.clock
-            let makeReconciler: @Sendable (NotesStore) -> SourceReconciler = { store in
-                SourceReconciler(
-                    store: store, library: library, detacher: RegistryOverlayDetacher(store: store, registry: registry),
-                    registry: registry, clock: clock)
-            }
+            let makeReconciler = makeReconciler
             environment.reconcile = { key in
                 guard await hasLibrary(), let store = await storeProvider() else { return }
-                await makeReconciler(store).reconcile(key)
+                await makeReconciler(store, library).reconcile(key)
             }
-            environment.sweepLoop = {
+            // The sweeps themselves belong to the plugin (`startTrashSweeps`), not to this view: the section only
+            // asks for a trash pass when it is shown.
+            environment.requestTrashSweep = {
                 guard await hasLibrary(), let store = await storeProvider() else { return }
-                await makeReconciler(store).runSweeps()
+                await makeReconciler(store, library).trashSweep()
             }
         }
         let model = NotesWorkspaceModel(environment: environment)

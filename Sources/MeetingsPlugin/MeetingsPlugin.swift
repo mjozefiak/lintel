@@ -126,7 +126,7 @@ public final class MeetingsPlugin: LintelPlugin {
             library: library, board: notes.board, hub: noteChanges,
             regenerate: { [weak notes] id in notes?.regenerate(id) },
             openNotesModel: { [openModels = context.openModels] in openModels(settings.builtInLLMModel.id) },
-            changed: changed)
+            changed: changed, retentionDays: { settings.retentionDays })
         ui = MeetingsUI(
             context: context, settings: settings, library: library, activity: activity,
             authorizer: authorizer ?? system.microphoneAuthorizer(), makeSelfTest: system.makeSelfTest, notes: notes,

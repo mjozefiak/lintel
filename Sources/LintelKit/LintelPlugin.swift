@@ -106,6 +106,13 @@ public protocol LintelPlugin: AnyObject {
     /// The recorded notes this plugin owns, read by the Notes section (`NoteSource`). Added with the Notes
     /// workspace; the default has none.
     var noteSources: [any NoteSource] { get }
+    /// The Recently deleted of the stores this plugin owns that are not note sources (the clipboard, Notes' own
+    /// manual notes), read by the Recently deleted view. Added with the notes explorer; the default has none.
+    var trashSources: [any TrashSource] { get }
+    /// The plugin's live recording, shown and driven from the main window (Meetings). The shell hands the first
+    /// active plugin's recorder to the Notes section, which logs a second one once. Added with the notes
+    /// explorer; the default has none.
+    var liveRecorder: (any LiveRecorder)? { get }
     /// Notes only (step 4.6): how many copies of `owner`'s recordings the plugin keeps because the user edited or
     /// commented on them, so that Clear Library, Clear History, Erase Data and Delete in the owner can say so.
     /// Added with the Notes workspace; the default is 0.
@@ -157,6 +164,8 @@ extension LintelPlugin {
     public var busyReason: BusyReason? { nil }
     public var modelUsage: [ModelUsage] { [] }
     public var noteSources: [any NoteSource] { [] }
+    public var trashSources: [any TrashSource] { [] }
+    public var liveRecorder: (any LiveRecorder)? { nil }
     public func keptNoteCopyCount(ofOwner owner: PluginID) async -> Int { 0 }
     public func deleteKeptNoteCopies(ofOwner owner: PluginID, ownerErased: Bool) async -> Bool { true }
     public func eraseData() async throws {}
