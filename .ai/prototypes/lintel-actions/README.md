@@ -44,20 +44,23 @@ From the 2026-11-23 brainstorm (not asked again): actions before chat; approval 
 |---|---|---|---|
 | Q2 | Meetings with guests: EventKit cannot add attendees (Apple docs) | A) through the same Google/Microsoft account as mail; B) EventKit + .ics invitation by mail; C) EventKit, then add people in Calendar; D) A + a calendar connector (MCP) | A now, D with the mail connector |
 | Q3 | Where the actions live (toolbar "Where") | A) Actions tab in the note; B) at the top of the Notes tab; C) tab + an Actions inbox in the sidebar across meetings | C |
-| Q4 | Which tab a meeting opens on while actions wait | Actions / Notes | Actions until all are handled |
-| Q5 | Card form | one card open at a time (prototype) / all cards expanded / read-only card with Edit | one open card, editable in place |
-| Q6 | Evidence on the card | quote + speaker always visible (prototype) / behind "Why?" / quote + surrounding lines | always visible |
-| Q7 | Undo after approval | mail held 10 s with Undo, other actions undone by deleting what was created (prototype) / no Undo, only a result link | the prototype's version |
-| Q8 | Bulk approval | none in v1 / "Approve all just for you" / "Approve all" | none in v1 |
-| Q9 | How you learn actions are ready | only in the app / + one macOS notification per meeting / + a dot on the menu bar ring | notification + dot |
-| Q10 | When to offer "ask less" (only-you actions) | after 3 approvals without edits / only a switch in Settings / not in v1 | after 3 without edits, plus the switch |
-| Q11 | "Assigned to you" in Jira | you said it and the Jira assignee is you / only the assignee | both conditions |
-| Q12 | Curated connectors in v1 | Linear + Asana / + Notion and Slack / Linear only | Linear + Asana, plus mail connectors from Q1 |
-| Q13 | When detection runs | automatically after the notes / only when you click "Find actions" | automatically |
+| Q4 | Which tab a meeting opens on while actions wait | A) Actions, until all are handled; B) always Notes | A |
+| Q5 | Card form | A) one card open at a time, editable in place (prototype); B) all cards expanded; C) read-only card with Edit | A |
+| Q6 | Evidence on the card | A) quote + speaker always visible (prototype); B) behind "Why?"; C) quote + surrounding lines | A |
+| Q7 | Undo after approval | A) mail held 10 s with Undo, other actions undone by deleting what was created (prototype); B) no Undo, only a result link | A |
+| Q8 | Two filled buttons on the note screen (Record Meeting + the card's approve button) | A) keep both filled; B) the card button tinted; C) Record Meeting unfilled while Actions is open | A |
+| Q9 | Bulk approval | A) none in v1; B) "Approve all just for you"; C) "Approve all" | A |
+| Q10 | How you learn actions are ready | A) only in the app; B) + one macOS notification per meeting; C) B + a dot on the menu bar ring (prototype) | C |
+| Q11 | When to offer "ask less" (only-you actions) | A) after 3 approvals without edits, plus a Settings switch (prototype); B) only the switch; C) not in v1 | A |
+| Q12 | "Assigned to you" in Jira | A) you said it AND the Jira assignee is you; B) only the assignee | A |
+| Q13 | Curated MCP connectors in v1 (plus the mail connectors from Q1) | A) Linear + Asana; B) + Notion and Slack; C) Linear only | A |
+| Q14 | When detection runs | A) automatically after the notes; B) only when you click "Find actions" | A |
+
+Sent to the owner through L0: Q2 alone; Q3–Q8 (card and layout) and Q9–Q14 (behaviour) as two batches.
 
 ## Design notes
 
-- **One filled button per screen.** The toolbar's Record Meeting is filled (direction sketch), and so is the open card's approve button. That makes two filled buttons on the note screen. The owner decides whether the card's button stays filled or uses the tinted style.
+- **One filled button per screen** is broken on the note screen (Record Meeting + approve); that is Q8.
 - **Speaker labels are gender-neutral** ("Ty:" / "You:"). Polish verbs never assume the user's gender.
 - **No timestamps in notes** (owner 2026-11-19). The card shows the quote and "Show in Transcript", with no time.
 - Calendar conflict checks are not shown: write-only calendar access cannot read events. Through a Google or Microsoft account it becomes possible (Q2).
