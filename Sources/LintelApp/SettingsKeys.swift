@@ -14,8 +14,8 @@ enum SettingsKeys {
     static let hotkeyUserDefined = "app.hotkey.userDefined"
 
     /// `[String]`: plugin command ids whose default shortcut was already applied once, so a shortcut the
-    /// user cleared is not restored.
-    static let commandShortcutDefaultsApplied = "app.hotkey.commandDefaultsApplied"
+    /// user cleared is not restored. `nonisolated` because the DEBUG-only QA settings store names it too (#300).
+    nonisolated static let commandShortcutDefaultsApplied = "app.hotkey.commandDefaultsApplied"
 
     /// `Bool`: the first-launch Shortcut step was accepted or skipped.
     static let onboardingShortcutCompleted = "app.onboarding.shortcutCompleted"

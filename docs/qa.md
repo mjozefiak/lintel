@@ -780,9 +780,12 @@ keeping every other isolation (temporary data root, in-memory Keychain, no globa
 pass with `--qa-setting plugins.windows.floatingApps=<comma-separated bundle ids>` (a list setting). Hotkeys stay off
 because the shortcut library keeps its recorded shortcuts in the real defaults domain. `--qa-persistent-settings` keeps
 the QA settings in `<data root>/qa-settings.json` (inside the isolated root; command-line `--qa-setting` values win at
-every launch), so a second launch sees what the first stored. `--qa-setting plugins.windows.qaCapturable=true` (DEBUG
-only) makes the zone overlay, the HUD and the display identifier capturable for screenshots (the menu bar strip is a
-status item and was never excluded); release builds always keep them out of screen sharing (`ScreenCapture`).
+every launch), so a second launch sees what the first stored. The commands' default shortcuts are re-applied at every
+launch (the QA registrar is in-memory, so no shortcut survives a relaunch): `app.hotkey.commandDefaultsApplied` is never
+kept in `qa-settings.json`, and a second launch shows the default shortcuts again, never empty ones (#300).
+`--qa-setting plugins.windows.qaCapturable=true` (DEBUG only) makes the zone overlay, the HUD and the display
+identifier capturable for screenshots (the menu bar strip is a status item and was never excluded); release builds
+always keep them out of screen sharing (`ScreenCapture`).
 `--qa-setting plugins.windows.qaDragTrace=<file>` (DEBUG only) appends one line per snap drag with the time of each
 stage from the engine receiving the first moved event to the overlay being ordered in
 (`ingest`, `flushStart`, `read`, `reportedOnMain`, `targets`, `overlayShown`, in ms): the part before `ingest` is the
