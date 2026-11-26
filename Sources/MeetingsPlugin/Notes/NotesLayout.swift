@@ -54,9 +54,20 @@ struct NotesLayout: Equatable, Sendable {
     /// that topic holds at most six points. Points without a name come first, so they never read as part of a
     /// heading above them.
     func shownTopics(durationMs: Int?) -> [Topic] {
+        Self.arranged(
+            topics.map { (name: $0.name, isOther: $0.isOther, points: $0.points) },
+            short: isShortMeeting(durationMs: durationMs)
+        ).map { Topic(name: $0.name, points: $0.points, isOther: $0.isOther) }
+    }
+
+    /// `shownTopics` for topics of any kind of point (the built-in track arranges its verified points with it, so
+    /// the trace knows exactly which ones are shown). `short` is `isShortMeeting` of the same topics.
+    static func arranged<Point>(
+        _ topics: [(name: String?, isOther: Bool, points: [Point])], short: Bool
+    ) -> [(name: String?, isOther: Bool, points: [Point])] {
         let filled = topics.filter { !$0.points.isEmpty }
         if filled.isEmpty { return [] }
-        if isShortMeeting(durationMs: durationMs) { return [Topic(name: nil, points: filled.flatMap(\.points))] }
+        if short { return [(name: nil, isOther: false, points: filled.flatMap(\.points))] }
         let unnamed = filled.filter { $0.name == nil && !$0.isOther }
         let named = filled.filter { $0.name != nil && !$0.isOther }
         var other = filled.filter(\.isOther).flatMap(\.points)
@@ -65,7 +76,7 @@ struct NotesLayout: Equatable, Sendable {
         var kept = merge ? named.filter { $0.points.count > 1 } : named
         if merge { other = singles.flatMap(\.points) + other }
         if !other.isEmpty {
-            kept.append(Topic(name: nil, points: Array(other.prefix(Self.maxPointsPerTopic)), isOther: true))
+            kept.append((name: nil, isOther: true, points: Array(other.prefix(maxPointsPerTopic))))
         }
         return unnamed + kept
     }

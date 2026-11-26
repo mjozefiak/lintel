@@ -97,6 +97,9 @@ enum NotesParser {
 
     // MARK: REDUCE
 
+    /// The REDUCE answer: `INTRO:` (or the older `SUMMARY:`), `TOPIC: name | ids` lines, `DECISIONS:`, `TASKS:`,
+    /// `QUESTIONS:`. The older `FINDINGS:` list is still read, as one topic without a name, so an answer in the old
+    /// format is not lost.
     static func parseReduce(_ raw: String) -> NotesReduceOutput? {
         let cleaned = NotesText.clean(raw)
         var output = NotesReduceOutput()
@@ -106,7 +109,11 @@ enum NotesParser {
 
         for rawLine in cleaned.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = stripBullet(String(rawLine)).trimmingCharacters(in: .whitespaces)
-            if let (key, value) = keyLine(line) {
+            if let topic = topicLine(line, kind: .point) {
+                recognised = true
+                current = .topic
+                output.topics.append(topic)
+            } else if let (key, value) = keyLine(line) {
                 recognised = true
                 current = key
                 switch key {
@@ -114,8 +121,8 @@ enum NotesParser {
                 case .decisions: output.decisions.append(contentsOf: ids(in: value))
                 case .tasks: output.tasks.append(contentsOf: ids(in: value))
                 case .questions: output.questions.append(contentsOf: ids(in: value))
-                case .findings: output.keyPoints.append(contentsOf: ids(in: value))
-                case .ignored: break
+                case .findings: output.topics.append(.init(name: nil, ids: ids(in: value)))
+                case .topic, .ignored: break
                 }
             } else if current == .summary, !line.isEmpty {
                 summaryLines.append(line)
@@ -125,32 +132,68 @@ enum NotesParser {
                 case .decisions: output.decisions.append(contentsOf: ids(in: line))
                 case .tasks: output.tasks.append(contentsOf: ids(in: line))
                 case .questions: output.questions.append(contentsOf: ids(in: line))
-                case .findings: output.keyPoints.append(contentsOf: ids(in: line))
+                case .findings, .topic:
+                    if !output.topics.isEmpty { output.topics[output.topics.count - 1].ids += ids(in: line) }
                 default: break
                 }
             }
         }
         guard recognised else { return nil }
+        output.topics = output.topics.filter { !$0.ids.isEmpty }
         let summary = summaryLines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         output.summary = summary.isEmpty || summary == "-" ? nil : summary
         return output
     }
 
-    /// `SUMMARY: …` of the merge of partial summaries.
+    /// `SUMMARY: …` (or `INTRO: …`) of the merge of partial summaries.
     static func parseSummary(_ raw: String) -> String? {
         parseReduce(raw)?.summary
     }
 
-    private enum Key { case summary, decisions, tasks, questions, findings, ignored }
+    /// The `TOPIC: name | t1, t3` lines of the merge of the topics of several REDUCE batches; nil when there is
+    /// none. The ids are the merge request's topic ids (`t1`, `t2`, …).
+    static func parseTopicMerge(_ raw: String) -> [NotesReduceOutput.Topic]? {
+        let topics = NotesText.clean(raw).split(separator: "\n").compactMap {
+            topicLine(stripBullet(String($0)).trimmingCharacters(in: .whitespaces), kind: .topic)
+        }.filter { !$0.ids.isEmpty }
+        return topics.isEmpty ? nil : topics
+    }
+
+    private enum Key { case summary, decisions, tasks, questions, findings, topic, ignored }
 
     private static let keys: [(names: [String], key: Key)] = [
-        (["summary", "podsumowanie"], .summary),
+        (["summary", "intro", "podsumowanie", "wstęp", "wstep"], .summary),
         (["decisions", "decyzje"], .decisions),
         (["tasks", "zadania", "action items"], .tasks),
         (["questions", "open questions", "pytania", "otwarte pytania"], .questions),
         (["findings", "topics", "key points", "ustalenia", "omowione tematy", "omówione tematy"], .findings),
         (["participants", "uczestnicy"], .ignored),
     ]
+
+    /// `TOPIC: name | ids` (also `TEMAT:`). Without the bar, the name is the text before the first id. The name
+    /// is taken as written; `NotesGuard` cleans and checks it.
+    private static func topicLine(_ line: String, kind: IDKind) -> NotesReduceOutput.Topic? {
+        let flat = line.replacingOccurrences(of: "**", with: "").trimmingCharacters(
+            in: CharacterSet(charactersIn: "# "))
+        guard let colon = flat.firstIndex(of: ":") else { return nil }
+        let key = flat[flat.startIndex..<colon].trimmingCharacters(in: .whitespaces).lowercased()
+        guard key == "topic" || key == "temat" else { return nil }
+        let rest = String(flat[flat.index(after: colon)...])
+        let name: String
+        let list: String
+        if let bar = rest.lastIndex(of: "|") {
+            name = String(rest[rest.startIndex..<bar])
+            list = String(rest[rest.index(after: bar)...])
+        } else if let first = rest.firstMatch(of: kind.pattern) {
+            name = String(rest[rest.startIndex..<first.range.lowerBound])
+            list = String(rest[first.range.lowerBound...])
+        } else {
+            name = rest
+            list = ""
+        }
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        return .init(name: trimmed.isEmpty || trimmed == "-" ? nil : trimmed, ids: ids(in: list, kind: kind))
+    }
 
     private static func keyLine(_ line: String) -> (Key, String)? {
         let flat = line.replacingOccurrences(of: "**", with: "").trimmingCharacters(
@@ -161,8 +204,20 @@ enum NotesParser {
         return (entry.key, String(flat[flat.index(after: colon)...]).trimmingCharacters(in: .whitespaces))
     }
 
-    private static func ids(in text: String) -> [String] {
-        text.matches(of: /(?i)\bp\d{1,6}\b/).map { String($0.output).lowercased() }
+    /// The ids of the code: points (`p12`) and, in the topic merge, the topics of the batches (`t3`).
+    private enum IDKind {
+        case point, topic
+
+        var pattern: Regex<Substring> {
+            switch self {
+            case .point: /(?i)\bp\d{1,6}\b/
+            case .topic: /(?i)\bt\d{1,6}\b/
+            }
+        }
+    }
+
+    private static func ids(in text: String, kind: IDKind = .point) -> [String] {
+        text.matches(of: kind.pattern).map { String($0.output).lowercased() }
     }
 
     private static func stripBullet(_ line: String) -> String {

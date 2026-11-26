@@ -436,8 +436,10 @@ import Testing
     }
 
     @Test func aTooLongParagraphIsRefused() {
-        let long = Array(repeating: "budżet", count: 200).joined(separator: " ") + "."
+        let long = Array(repeating: "budżet", count: 400).joined(separator: " ") + "."
         #expect(!faithful(long))
+        // A paragraph within the character limit passes the check and is cut to the intro afterwards.
+        #expect(NotesGuard.introPrefix(of: Array(repeating: "budżet", count: 80).joined(separator: " ") + ".") == nil)
     }
 
     @Test func aSummaryThatIsRefusedIsNotShownAndNothingTakesItsPlace() {
@@ -455,9 +457,12 @@ import Testing
             changed.summary = hostile
             let markdown = NotesComposer.markdown(verdict: changed, participants: [], labels: .polish)
             #expect(!markdown.contains("\n# "))
-            let afterSummary = markdown.split(separator: "\n").drop { !$0.hasPrefix("### Podsumowanie") }.dropFirst(1)
-                .first
-            #expect(afterSummary.map { !$0.hasPrefix("#") && !$0.hasPrefix("-") && !$0.hasPrefix("1.") } ?? true)
+            // The intro is the first line, without a heading of its own; when nothing of it is left, the notes
+            // start with the code's first section.
+            let first = markdown.split(separator: "\n").first.map(String.init) ?? ""
+            #expect(
+                first == "### Podjęte decyzje"
+                    || (!first.hasPrefix("#") && !first.hasPrefix("-") && !first.hasPrefix("1.")), "\(hostile)")
         }
     }
 }

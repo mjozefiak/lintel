@@ -329,7 +329,7 @@ final class NotesTraceLog: Sendable {
 
         // The composer shows what the trace says it shows.
         let markdown = try #require(result.markdown)
-        #expect(markdown.contains("### Omówione tematy"))
+        #expect(Self.keyPointLines(markdown).count == 1)
         #expect(markdown.contains("Zatwierdzamy budżet marketingu na ten kwartał."))
         #expect(!markdown.contains("bez zmian"))
     }
@@ -461,10 +461,13 @@ final class NotesTraceLog: Sendable {
         }
     }
 
-    /// The bullets under the topics heading, in order.
+    /// The findings, in order: the bullets under the code's topics heading or, in a short meeting, the list
+    /// without a heading above the first section.
     private static func keyPointLines(_ markdown: String) -> [String] {
         let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-        guard let start = lines.firstIndex(of: "### Omówione tematy") else { return [] }
+        guard let start = lines.firstIndex(of: "### Omówione tematy") else {
+            return lines.prefix { !$0.hasPrefix("#") }.filter { $0.hasPrefix("- ") }
+        }
         return Array(lines[(start + 1)...].drop { $0.isEmpty }.prefix { $0.hasPrefix("- ") })
     }
 
@@ -489,7 +492,7 @@ final class NotesTraceLog: Sendable {
                 "- Serwer produkcyjny działał stabilnie przez cały kwartał.",
             ])
         #expect(!markdown.contains("fuzj"))
-        #expect(!markdown.contains("### Decyzje"))
+        #expect(!markdown.contains("### Podjęte decyzje"))
         #expect(log.summary?.origin == .model)
         #expect(log.points.values.allSatisfy { $0.fate == .rendered(.keyPoints, via: .reduce) })
         #expect(log.reduce?.keyPoints == 6)

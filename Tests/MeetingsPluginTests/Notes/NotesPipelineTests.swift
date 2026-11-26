@@ -47,9 +47,9 @@ import Testing
         #expect(result.droppedCount == 0)
         #expect(result.failedChunks.isEmpty)
         #expect(!result.reduceFailed)
-        #expect(result.promptVersion == "6")
+        #expect(result.promptVersion == "7")
         let markdown = try #require(result.markdown)
-        #expect(markdown.contains("### Decyzje"))
+        #expect(markdown.contains("### Podjęte decyzje"))
         #expect(markdown.contains("Zatwierdzamy ten budżet bez zmian."))
         #expect(markdown.contains("- [ ] ") && markdown.contains(" — osoba\\: Marek, termin\\: piątek"))
         #expect(markdown.contains("Kto zajmie się umową z dostawcą?"))
@@ -235,9 +235,10 @@ import Testing
         #expect(rig.llm.calls.filter { NotesFake.isReduce($0.messages) }.map(\.maxTokens) == [1500, 3000])
         // The sections are still there, in time order by the code; no summary is composed from the points.
         let markdown = try #require(result.markdown)
-        #expect(markdown.contains("### Decyzje"))
-        #expect(markdown.contains("### Zadania"))
+        #expect(markdown.contains("### Podjęte decyzje"))
+        #expect(markdown.contains("### Następne kroki"))
         #expect(!markdown.contains("### Podsumowanie"))
+        #expect(markdown.hasPrefix("- ") || markdown.hasPrefix("###"))
     }
 
     // MARK: REDUCE levels

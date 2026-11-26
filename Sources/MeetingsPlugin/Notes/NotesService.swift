@@ -403,7 +403,7 @@ final class NotesService: ProviderNotesControl {
         let outcome: Result<NotesResult, any Error>
         do {
             outcome = .success(
-                try await pipeline.run(utterances: utterances) { [weak self] event in
+                try await pipeline.run(utterances: utterances, durationMs: document.durationMs) { [weak self] event in
                     Task { @MainActor in self?.apply(event, to: id) }
                 })
         } catch {

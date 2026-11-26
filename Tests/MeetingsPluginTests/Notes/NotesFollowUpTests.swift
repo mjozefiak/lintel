@@ -28,7 +28,7 @@ import Testing
     @Test func theFallbackSpreadsTopicsOverTheWholeMeetingInTimeOrder() {
         let points = (0..<30).map { Self.point("p\($0 + 1)", .summary, at: $0 * 60) }
         let output = NotesPipeline.codeOrder(points)
-        #expect(output.keyPoints.count == NotesGuard.maxKeyPoints)
+        #expect(output.keyPoints.count == NotesLayout.maxPointsPerTopic)
         let times = output.keyPoints.compactMap { id in points.first { $0.id == id }?.timeMs }
         #expect(times == times.sorted())
         #expect(times.first == 0)
@@ -82,7 +82,7 @@ import Testing
         let result = try await rig.pipeline().run(utterances: utterances)
         #expect(result.status == .partial)
         let numbers = (result.markdown ?? "").matches(of: /Subject alpha(\d+)\s/).compactMap { Int($0.output.1) }
-        #expect(numbers.count == NotesGuard.maxKeyPoints)
+        #expect(numbers.count == NotesLayout.maxPointsPerTopic)
         #expect(numbers.contains { $0 >= 10 && $0 < 20 }, "the middle of the meeting is missing")
         #expect(numbers.contains { $0 >= 20 })
     }
@@ -294,7 +294,7 @@ import Testing
         #expect(english.contains("a reader can understand alone"))
         #expect(english.contains("only with its verdict"))
         #expect(NotesPrompt.mapSystem(language: .polish).contains("to samo zadanie wpisujesz raz"))
-        #expect(NotesPrompt.reduceSystem.contains("whole meeting"))
+        #expect(NotesPrompt.reduceSystem(maxTopics: 6).contains("Cover the whole meeting"))
     }
 }
 

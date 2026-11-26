@@ -94,3 +94,19 @@ func notesEventually(_ condition: @Sendable () -> Bool) async {
         try? await Task.sleep(for: .milliseconds(10))
     }
 }
+
+/// The REDUCE output of prompt 6 (`FINDINGS:`): the findings are one topic without a name, as the parser reads an
+/// answer in the old format.
+extension NotesReduceOutput {
+    init(
+        decisions: [String] = [], tasks: [String] = [], questions: [String] = [], keyPoints: [String],
+        summary: String? = nil
+    ) {
+        self.init(
+            decisions: decisions, tasks: tasks, questions: questions,
+            topics: keyPoints.isEmpty ? [] : [.init(name: nil, ids: keyPoints)], summary: summary)
+    }
+
+    /// The ids of every topic, in order.
+    var keyPoints: [String] { topics.flatMap(\.ids) }
+}

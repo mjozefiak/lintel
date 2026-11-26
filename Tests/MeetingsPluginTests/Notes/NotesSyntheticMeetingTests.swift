@@ -115,20 +115,25 @@ import Testing
 
     @Test func theNotesAreASummaryNotAListOfQuotes() async throws {
         let (markdown, _) = try await notes()
-        // Sections in the order of the template.
-        let headings = ["Podsumowanie", "Decyzje", "Zadania", "Omówione tematy", "Otwarte kwestie", "Uczestnicy"]
+        // Sections in the order of the layout; a meeting of two minutes is short, so its findings are one list
+        // without a topic heading, under the intro.
+        let headings = ["Podjęte decyzje", "Następne kroki", "Otwarte kwestie", "Uczestnicy"]
         let positions = headings.map { markdown.range(of: "### \($0)")?.lowerBound }
         #expect(!positions.contains { $0 == nil }, "\(markdown)")
         let found = positions.compactMap { $0 }
         #expect(found == found.sorted())
+        #expect(!markdown.contains("### Podsumowanie") && !markdown.contains("### Omówione tematy"))
+        let lines = markdown.split(separator: "\n").map(String.init)
+        let firstHeading = lines.firstIndex { $0.hasPrefix("#") } ?? lines.count
+        let findings = lines[..<firstHeading].filter { $0.hasPrefix("- ") }
+        #expect(!findings.isEmpty, "\(markdown)")
+        #expect(lines.first == "Mamy budżet festynu i podział prac. Budżet to osiem tysięcy.")
 
-        // Nothing from the microphone talk, the fragments or the bare question stands among the topics.
+        // Nothing from the microphone talk, the fragments or the bare question stands among the findings.
         #expect(!markdown.contains("mikrofon"))
         #expect(!markdown.contains("Coś mi się zacina"))
-        let topics = Self.section("Omówione tematy", in: markdown)
-        #expect(!topics.contains { $0.hasSuffix("?") })
-        // At most ten topics.
-        #expect(topics.count <= NotesGuard.maxKeyPoints)
+        #expect(!findings.contains { $0.hasSuffix("?") })
+        #expect(findings.count <= NotesLayout.maxPointsPerTopic * NotesLayout.maxTopics(durationMs: 140_000))
 
         // The decisions and tasks are there, with the people the speech names.
         #expect(markdown.contains("Budżet festynu to osiem tysięcy złotych."))

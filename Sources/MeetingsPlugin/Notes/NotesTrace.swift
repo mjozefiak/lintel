@@ -297,7 +297,11 @@ struct NotesTraceVerifier: Equatable, Sendable, Codable {
 }
 
 struct NotesTraceReduceRequest: Equatable, Sendable, Codable {
-    enum Stage: String, Sendable, Codable { case sections, summaryMerge }
+    enum Stage: String, Sendable, Codable {
+        case sections, summaryMerge
+        /// The merge of the topics of several batches (prompt 7); `pointIDs` are the points of the topics sent.
+        case topics
+    }
     enum Outcome: String, Sendable, Codable {
         case value
         /// The prompt did not fit; the points went on in two batches.
@@ -343,24 +347,26 @@ struct NotesTraceReduce: Equatable, Sendable, Codable {
     /// Points left out and not added back because a near-duplicate is in their section (the key points
     /// included).
     var nearDuplicatesSkipped = 0
-    /// The findings shown under "Topics discussed".
+    /// The findings shown (since prompt 7, the points of every topic shown).
     var keyPoints = 0
     var summaryReplaced = false
-    /// The topic layout (schema 6): reserved, zero until the phase that writes topics; nil in older traces.
+    /// The topic layout (schema 6; zeros before prompt 7); nil in older traces.
     var layout: NotesTraceLayout? = NotesTraceLayout()
 }
 
 /// Counts of the topic layout of the notes (spec `2026-11-25-meeting-notes-structure`). Reserved in schema 6 and
-/// written as zeros until the phase that makes topics; numbers only, never a topic name.
+/// written since prompt 7; numbers only, never a topic name.
 struct NotesTraceLayout: Equatable, Sendable, Codable {
+    /// Topics shown with a heading ("Other" included; the list of a short meeting has none).
     var topics = 0
-    /// Points shown under each topic, in order.
+    /// Points shown under each topic, in order (the headingless list of a short meeting included).
     var pointsPerTopic: [Int] = []
     /// Topic names the fact check refused (their points went to "Other").
     var topicNameRefused = 0
     /// Verified `SUM` points REDUCE assigned to no topic.
     var notChosen = 0
-    /// Points cut by the limit of topics times points per topic.
+    /// Verified `SUM` points REDUCE put under a topic and the limits cut: the number of topics, the points per topic,
+    /// the size of "Other".
     var cutByLimit = 0
 }
 
@@ -428,8 +434,8 @@ struct NotesTracePoint: Equatable, Sendable, Codable {
         case nearDuplicateInSection(of: String)
         /// A summary point REDUCE did not choose as a topic discussed (nothing adds it back).
         case notChosen
-        /// A finding REDUCE chose that is not shown: it is a question, or the limit of
-        /// `NotesGuard.maxKeyPoints` (or, for an open question, `NotesGuard.maxQuestions`) was reached.
+        /// A finding REDUCE chose that is not shown: it is a question, or a limit of `NotesLayout` (topics, points
+        /// per topic, "Other"; for an open question, `NotesGuard.maxQuestions`) was reached.
         case overLimit
         /// The trace cannot tell from the guard's audit; the balance counts it apart.
         case unexplained
@@ -483,6 +489,8 @@ final class NotesTraceRecorder: Sendable {
             switch stage {
             case .sections: state.reduce.sectionRequests += 1
             case .summaryMerge: state.reduce.summaryMergeRequests += 1
+            // Counted by its `reduceRequest` event and in `generationRequests`; the reduce event has no field for it.
+            case .topics: break
             }
             state.reduce.generationRequests += attempts.requests
             state.reduce.truncatedAnswers += attempts.truncated
@@ -502,10 +510,13 @@ final class NotesTraceRecorder: Sendable {
     }
 
     /// The `reduce`, `summary` and `point` events, once the structure is verified.
+    /// `shownKeyPoints` are the topics as the composer shows them (`NotesComposer.shownKeyPoints`).
     func reduced(
         points: [NotesPoint], proposed: [NotesPoint], verdict: NotesGuard.ReduceVerdict,
-        audit: NotesGuard.ReduceAudit, reduceFailed: Bool, summaryShown: Bool
+        audit: NotesGuard.ReduceAudit, shownKeyPoints: [NotesGuard.ReduceVerdict.Topic], reduceFailed: Bool,
+        summaryShown: Bool
     ) {
+        let shownIDs = Set(shownKeyPoints.flatMap(\.points).map(\.id))
         let (reduce, codeOrderIDs) = state.withLock { state -> (NotesTraceReduce, Set<String>) in
             state.reduce.reduceFailed = reduceFailed
             state.reduce.decisions = verdict.decisions.count
@@ -517,8 +528,11 @@ final class NotesTraceRecorder: Sendable {
             state.reduce.repeatedIDs = audit.repeatedIDs
             state.reduce.backfilled = verdict.backfilled
             state.reduce.nearDuplicatesSkipped = audit.nearDuplicateOf.count
-            state.reduce.keyPoints = verdict.keyPoints.count
+            state.reduce.keyPoints = shownIDs.count
             state.reduce.summaryReplaced = verdict.summaryReplaced
+            state.reduce.layout = Self.layout(
+                points: points, verdict: verdict, audit: audit, shown: shownKeyPoints, codeOrderIDs: state.codeOrderIDs,
+                summaryShown: summaryShown)
             return (state.reduce, state.codeOrderIDs)
         }
         emit(.reduce(reduce))
@@ -532,7 +546,8 @@ final class NotesTraceRecorder: Sendable {
         let proposedKinds = Dictionary(proposed.map { ($0.id, $0.kind) }, uniquingKeysWith: { first, _ in first })
         for point in points {
             let fate = Self.fate(
-                of: point, verdict: verdict, audit: audit, codeOrderIDs: codeOrderIDs, summaryShown: summaryShown)
+                of: point, verdict: verdict, audit: audit, shownIDs: shownIDs, codeOrderIDs: codeOrderIDs,
+                summaryShown: summaryShown)
             state.withLock { state in
                 if case .rendered = fate { state.rendered += 1 } else { state.notRendered += 1 }
             }
@@ -553,17 +568,43 @@ final class NotesTraceRecorder: Sendable {
                 notRendered: notRendered))
     }
 
-    /// Read from the verdict and the guard's audit: the composer shows every point of `keyPoints`, `decisions`,
-    /// `tasks` and `questions` as a bullet and nothing else, and the paragraph when `NotesComposer.shownSummary`
-    /// has one.
+    /// The counts of the topic layout: the topics as shown, the refused names and the findings REDUCE did not
+    /// choose or the limits cut.
+    static func layout(
+        points: [NotesPoint], verdict: NotesGuard.ReduceVerdict, audit: NotesGuard.ReduceAudit,
+        shown: [NotesGuard.ReduceVerdict.Topic], codeOrderIDs: Set<String>, summaryShown: Bool
+    ) -> NotesTraceLayout {
+        var layout = NotesTraceLayout()
+        layout.topics = shown.filter { $0.name != nil || $0.isOther }.count
+        layout.pointsPerTopic = shown.map(\.points.count)
+        layout.topicNameRefused = audit.topicNameRefused
+        let shownIDs = Set(shown.flatMap(\.points).map(\.id))
+        for point in points where point.kind == .summary {
+            let outcome = Self.fate(
+                of: point, verdict: verdict, audit: audit, shownIDs: shownIDs, codeOrderIDs: codeOrderIDs,
+                summaryShown: summaryShown)
+            switch outcome {
+            case .notRendered(.notChosen): layout.notChosen += 1
+            case .notRendered(.overLimit) where !point.text.hasSuffix("?"): layout.cutByLimit += 1
+            default: break
+            }
+        }
+        return layout
+    }
+
+    /// Read from the verdict, the guard's audit and the topics as shown: the composer shows every point of
+    /// `shownIDs`, `decisions`, `tasks` and `questions` as a bullet and nothing else, and the paragraph when
+    /// `NotesComposer.shownSummary` has one.
     static func fate(
         of point: NotesPoint, verdict: NotesGuard.ReduceVerdict, audit: NotesGuard.ReduceAudit,
-        codeOrderIDs: Set<String>, summaryShown: Bool
+        shownIDs: Set<String>, codeOrderIDs: Set<String>, summaryShown: Bool
     ) -> NotesTracePoint.Fate {
         guard let section = NotesTracePoint.Section(kind: point.kind) else {
-            if verdict.keyPoints.contains(where: { $0.id == point.id }) {
+            if shownIDs.contains(point.id) {
                 return .rendered(.keyPoints, via: codeOrderIDs.contains(point.id) ? .codeOrder : .reduce)
             }
+            // Under a topic in the verdict but not shown: the arrangement's limit of "Other".
+            if verdict.keyPoints.contains(where: { $0.id == point.id }) { return .notRendered(.overLimit) }
             if audit.inModelParagraph.contains(point.id) {
                 return summaryShown ? .rendered(.summary, via: .modelSummary) : .notRendered(.summaryNotShown)
             }

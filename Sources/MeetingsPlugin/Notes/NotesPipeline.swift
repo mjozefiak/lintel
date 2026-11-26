@@ -130,9 +130,11 @@ struct NotesPipeline: Sendable {
     }
 
     /// Writes the notes. Throws `CancellationError` when cancelled and `NotesFailure` when the model cannot be
-    /// had; every other trouble is in the result.
+    /// had; every other trouble is in the result. `durationMs` is the length of the meeting (the topic limit and
+    /// the short-meeting rule of `NotesLayout`); without it the last utterance plus one minute.
     func run(
-        utterances: [NotesUtterance], onEvent: @escaping @Sendable (NotesEvent) -> Void = { _ in }
+        utterances: [NotesUtterance], durationMs: Int? = nil,
+        onEvent: @escaping @Sendable (NotesEvent) -> Void = { _ in }
     ) async throws -> NotesResult {
         let chunks = TranscriptChunker(chunkTokens: configuration.chunkTokens).chunks(from: utterances)
         let verifier = NotesGuard(utterances: utterances)
@@ -153,8 +155,8 @@ struct NotesPipeline: Sendable {
         try await lease.open()
         do {
             let result = try await work(
-                chunks: chunks, utterances: utterances, verifier: verifier, lease: lease, recorder: recorder,
-                onEvent: onEvent)
+                chunks: chunks, utterances: utterances, durationMs: verifier.meetingLength(durationMs),
+                verifier: verifier, lease: lease, recorder: recorder, onEvent: onEvent)
             recorder?.finish(result)
             await lease.release()
             return result
@@ -167,8 +169,8 @@ struct NotesPipeline: Sendable {
     // MARK: Flow
 
     private func work(
-        chunks: [TranscriptChunk], utterances: [NotesUtterance], verifier: NotesGuard, lease: NotesLease,
-        recorder: NotesTraceRecorder?, onEvent: @Sendable (NotesEvent) -> Void
+        chunks: [TranscriptChunk], utterances: [NotesUtterance], durationMs: Int, verifier: NotesGuard,
+        lease: NotesLease, recorder: NotesTraceRecorder?, onEvent: @Sendable (NotesEvent) -> Void
     ) async throws -> NotesResult {
         var proposed: [NotesPoint] = []
         var failed: [String] = []
@@ -227,31 +229,32 @@ struct NotesPipeline: Sendable {
             if !failed.isEmpty { return result(status: .failed, markdown: nil, dropped: verdict.dropped) }
             let empty = NotesGuard.ReduceVerdict(
                 decisions: [], tasks: [], questions: [], summary: nil, summaryReplaced: false, rejectedIDs: 0)
-            let markdown = NotesComposer.markdown(verdict: empty, participants: participants, labels: labels)
+            let markdown = NotesComposer.markdown(
+                verdict: empty, participants: participants, labels: labels, durationMs: durationMs)
             return result(
                 status: .ok, markdown: markdown, dropped: verdict.dropped, downgraded: verdict.downgraded)
         }
 
-        let reduced = try await reduce(points: points, lease: lease, recorder: recorder)
+        let maxTopics = NotesLayout.maxTopics(durationMs: durationMs)
+        let reduced = try await reduce(points: points, maxTopics: maxTopics, lease: lease, recorder: recorder)
         onEvent(.finishing)
-        let final: NotesGuard.ReduceVerdict
-        if let recorder {
-            // The same check as `verifyReduce`, with the guard's record of every id for the trace.
-            let audited = verifier.auditedVerifyReduce(reduced.output, points: points)
-            final = audited.verdict
-            recorder.reduced(
-                points: points, proposed: proposed, verdict: final, audit: audited.audit,
-                reduceFailed: reduced.failed, summaryShown: NotesComposer.shownSummary(of: final) != nil)
-        } else {
-            final = verifier.verifyReduce(reduced.output, points: points)
-        }
-        let markdown = NotesComposer.markdown(verdict: final, participants: participants, labels: labels)
+        // The same check as `verifyReduce`, with the guard's record of every id for the trace.
+        let audited = verifier.auditedVerifyReduce(reduced.output, points: points, durationMs: durationMs)
+        let final = audited.verdict
+        // The layout decides what is shown (the short-meeting list, one-point topics joined into "Other"); the
+        // Markdown, the trace and the result all read the same arrangement.
+        let shown = NotesComposer.shownKeyPoints(of: final, labels: labels, durationMs: durationMs)
+        recorder?.reduced(
+            points: points, proposed: proposed, verdict: final, audit: audited.audit, shownKeyPoints: shown,
+            reduceFailed: reduced.failed, summaryShown: NotesComposer.shownSummary(of: final) != nil)
+        let markdown = NotesComposer.markdown(
+            verdict: final, participants: participants, labels: labels, durationMs: durationMs)
         return result(
             status: reduced.failed ? .partial : flowStatus, markdown: markdown, dropped: verdict.dropped,
             points: points.count, reduceFailed: reduced.failed, replaced: final.summaryReplaced,
             rejected: final.rejectedIDs, downgraded: verdict.downgraded,
             backfilled: final.backfilled, kept: final.decisions + final.tasks + final.questions,
-            keyPoints: final.keyPoints)
+            keyPoints: shown.flatMap(\.points))
     }
 
     /// Chunk overlap and a model that says a thing twice give the same point twice; the first one stays. Two
@@ -402,51 +405,104 @@ struct NotesPipeline: Sendable {
     }
 
     private func reduce(
-        points: [NotesPoint], lease: NotesLease, recorder: NotesTraceRecorder?
+        points: [NotesPoint], maxTopics: Int, lease: NotesLease, recorder: NotesTraceRecorder?
     ) async throws -> Reduced {
         if points.count <= 1 || points.reduce(0, { $0 + cost(of: $1) }) <= configuration.reduceInputTokens {
             recorder?.reduceBatches(1)
-            return try await reduceSingle(points, lease: lease, recorder: recorder)
+            return try await reduceSingle(points, maxTopics: maxTopics, lease: lease, recorder: recorder)
         }
         let batches = Self.batches(points, budget: configuration.reduceInputTokens, cost: { cost(of: $0) })
         recorder?.reduceBatches(batches.count)
-        return try await reduceBatches(batches, lease: lease, recorder: recorder)
+        return try await reduceBatches(batches, maxTopics: maxTopics, lease: lease, recorder: recorder)
     }
 
-    /// One request per batch, then the sections joined in order and the partial summaries merged into one.
+    /// One request per batch, then the sections joined in order, the topics merged (`mergeTopics`) and the partial
+    /// intros merged into one.
     private func reduceBatches(
-        _ batches: [[NotesPoint]], lease: NotesLease, recorder: NotesTraceRecorder?
+        _ batches: [[NotesPoint]], maxTopics: Int, lease: NotesLease, recorder: NotesTraceRecorder?
     ) async throws -> Reduced {
         var merged = Reduced()
         var summaries: [String] = []
         var questions: [[String]] = []
-        var keyPoints: [[String]] = []
+        var topics: [NotesReduceOutput.Topic] = []
         for batch in batches {
-            let part = try await reduceSingle(batch, lease: lease, recorder: recorder)
+            let part = try await reduceSingle(batch, maxTopics: maxTopics, lease: lease, recorder: recorder)
             merged.output.decisions.append(contentsOf: part.output.decisions)
             merged.output.tasks.append(contentsOf: part.output.tasks)
             questions.append(part.output.questions)
-            keyPoints.append(part.output.keyPoints)
+            topics.append(contentsOf: part.output.topics)
             if let summary = part.output.summary { summaries.append(summary) }
             merged.failed = merged.failed || part.failed
         }
-        // The guard keeps the first `maxQuestions` and `maxKeyPoints` in this order, so the batches take turns:
-        // one that comes first in the meeting must not use up the whole limit.
+        // The guard keeps the first `maxQuestions` in this order, so the batches take turns: one that comes first
+        // in the meeting must not use up the whole limit.
         merged.output.questions = Self.interleaved(questions)
-        merged.output.keyPoints = Self.interleaved(keyPoints)
+        merged.output.topics = try await mergeTopics(topics, maxTopics: maxTopics, lease: lease, recorder: recorder)
         let summary = try await mergeSummaries(summaries, lease: lease, recorder: recorder)
         merged.output.summary = summary.text
         merged.failed = merged.failed || summary.failed
         return merged
     }
 
+    /// The topics of several batches as one list: the model joins the ones about the same subject (it sees only
+    /// their names and gives back the batches' topic ids, `NotesPrompt.topicsMessages`), and the code puts the
+    /// points of the joined topics together in their order. A batch topic the model left out follows at the end,
+    /// so nothing REDUCE chose is lost here (the guard's limits cut the rest). When the request fails or does not
+    /// fit, the batches' topics stay as they are, in order. Topics without a name are not sent and stay in place.
+    private func mergeTopics(
+        _ topics: [NotesReduceOutput.Topic], maxTopics: Int, lease: NotesLease, recorder: NotesTraceRecorder?
+    ) async throws -> [NotesReduceOutput.Topic] {
+        let named = topics.filter { $0.name != nil }
+        guard named.count > 1 else { return topics }
+        let names = named.map { NotesGuard.topicName($0.name ?? "") }
+        let size = names.reduce(0) { $0 + NotesText.estimateTokens($1, fallback: .unknown) + 4 }
+        guard size <= configuration.reduceInputTokens else { return topics }
+        var attempts = NotesTraceAttempts()
+        let completion = try await complete(
+            lease, maxTokens: configuration.reduceMaxTokens, timeout: configuration.reduceTimeout,
+            messages: { NotesPrompt.topicsMessages(names: names, maxTopics: maxTopics, reminder: $0) },
+            parse: { NotesParser.parseTopicMerge($0) }, attempts: &attempts)
+        let tried = attempts
+        let pointIDs = named.flatMap(\.ids)
+        guard case .value(let merged) = completion else {
+            recorder?.reduceRequest(
+                stage: .topics, inputs: named.count, pointIDs: pointIDs, attempts: tried, outcome: .failed)
+            return topics
+        }
+        recorder?.reduceRequest(
+            stage: .topics, inputs: named.count, pointIDs: pointIDs, attempts: tried, outcome: .value)
+        return Self.joinedTopics(merged, batchTopics: topics)
+    }
+
+    /// The merge's topics with the point ids of the batch topics they name (`t1` is the first named batch topic),
+    /// each batch topic used once; the unnamed and the unused batch topics follow in their order.
+    static func joinedTopics(
+        _ merged: [NotesReduceOutput.Topic], batchTopics: [NotesReduceOutput.Topic]
+    ) -> [NotesReduceOutput.Topic] {
+        let named = batchTopics.filter { $0.name != nil }
+        var used = Set<Int>()
+        var result: [NotesReduceOutput.Topic] = []
+        for topic in merged {
+            var ids: [String] = []
+            for ref in topic.ids {
+                guard let number = Int(ref.dropFirst()), (1...named.count).contains(number),
+                    used.insert(number - 1).inserted
+                else { continue }
+                ids.append(contentsOf: named[number - 1].ids)
+            }
+            if !ids.isEmpty { result.append(.init(name: topic.name, ids: ids)) }
+        }
+        result.append(contentsOf: named.indices.filter { !used.contains($0) }.map { named[$0] })
+        return batchTopics.filter { $0.name == nil } + result
+    }
+
     private func reduceSingle(
-        _ points: [NotesPoint], lease: NotesLease, recorder: NotesTraceRecorder?
+        _ points: [NotesPoint], maxTopics: Int, lease: NotesLease, recorder: NotesTraceRecorder?
     ) async throws -> Reduced {
         var attempts = NotesTraceAttempts()
         let completion = try await complete(
             lease, maxTokens: configuration.reduceMaxTokens, timeout: configuration.reduceTimeout,
-            messages: { NotesPrompt.reduceMessages(points: points, reminder: $0) },
+            messages: { NotesPrompt.reduceMessages(points: points, maxTopics: maxTopics, reminder: $0) },
             parse: { NotesParser.parseReduce($0) }, attempts: &attempts)
         let tried = attempts
         func report(_ outcome: NotesTraceReduceRequest.Outcome) {
@@ -461,23 +517,26 @@ struct NotesPipeline: Sendable {
             report(.split)
             let middle = points.count / 2
             return try await reduceBatches(
-                [Array(points[..<middle]), Array(points[middle...])], lease: lease, recorder: recorder)
+                [Array(points[..<middle]), Array(points[middle...])], maxTopics: maxTopics, lease: lease,
+                recorder: recorder)
         case .promptTooLong, .failed:
             report(.codeOrder)
             return Reduced(output: Self.codeOrder(points), failed: true)
         }
     }
 
-    /// REDUCE could not be had: every decision and task in time order, the questions and the topics picked evenly
-    /// over the WHOLE meeting (not the first ones: the middle is where the main decision usually is), and no
-    /// paragraph (nothing is composed without REDUCE). Without the topics a meeting of findings only would read
-    /// as one with nothing in it.
+    /// REDUCE could not be had: every decision and task in time order, the questions and the findings picked
+    /// evenly over the WHOLE meeting (not the first ones: the middle is where the main decision usually is), and no
+    /// paragraph (nothing is composed without REDUCE). The findings are one topic without a name (the code has no
+    /// words for one), as many as a topic holds (`NotesLayout.maxPointsPerTopic`); the composer gives it the
+    /// code's heading. Without them a meeting of findings only would read as one with nothing in it.
     static func codeOrder(_ points: [NotesPoint]) -> NotesReduceOutput {
-        NotesReduceOutput(
+        let findings = spread(points.filter { $0.kind == .summary }, count: NotesLayout.maxPointsPerTopic)
+        return NotesReduceOutput(
             decisions: points.filter { $0.kind == .decision }.map(\.id),
             tasks: points.filter { $0.kind == .task }.map(\.id),
             questions: spread(points.filter { $0.kind == .question }, count: NotesGuard.maxQuestions).map(\.id),
-            keyPoints: spread(points.filter { $0.kind == .summary }, count: NotesGuard.maxKeyPoints).map(\.id),
+            topics: findings.isEmpty ? [] : [.init(name: nil, ids: findings.map(\.id))],
             summary: nil)
     }
 

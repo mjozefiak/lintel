@@ -39,8 +39,8 @@ import Testing
         #expect(result.status == .ok)
         #expect(result.backfilledCount == 2)
         let markdown = try #require(result.markdown)
-        #expect(markdown.contains("### Decyzje"))
-        #expect(markdown.contains("### Zadania"))
+        #expect(markdown.contains("### Podjęte decyzje"))
+        #expect(markdown.contains("### Następne kroki"))
         #expect(!markdown.contains("### Otwarte kwestie"))
     }
 

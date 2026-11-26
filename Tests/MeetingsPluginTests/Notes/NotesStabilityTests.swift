@@ -143,7 +143,7 @@ import Testing
                 case .noise: return .done("I cannot help with that.")
                 }
             }
-            return .done("SUMMARY: The areas are on track.")
+            return .done("INTRO: The areas are on track.")
         }
     }
 
@@ -169,9 +169,9 @@ import Testing
         row.requests = filtered.llm.calls.count
         let markdown = result.markdown ?? ""
         row.decisions = bullets(of: "Decisions", in: markdown).count
-        row.tasks = bullets(of: "Action items", in: markdown).count
+        row.tasks = bullets(of: "Next steps", in: markdown).count
         row.questions = bullets(of: "Open questions", in: markdown).count
-        let topics = bullets(of: "Topics discussed", in: markdown)
+        let topics = topicBullets(in: markdown)
         row.topics = topics.count
         var thirds = Set<Int>()
         for topic in topics {
@@ -182,6 +182,21 @@ import Testing
         row.thirds = thirds.count
         row.hasSummary = markdown.contains("## Summary")
         return row
+    }
+
+    /// The findings: the bullets outside the sections of decisions, next steps and open questions (under a topic
+    /// heading, or the list of a short meeting).
+    static func topicBullets(in markdown: String) -> [String] {
+        var section: String?
+        var result: [String] = []
+        for line in markdown.split(separator: "\n").map(String.init) {
+            if line.hasPrefix("#") {
+                section = line.drop { $0 == "#" || $0 == " " }.description
+            } else if line.hasPrefix("- "), !["Decisions", "Next steps", "Open questions"].contains(section ?? "") {
+                result.append(line)
+            }
+        }
+        return result
     }
 
     static func bullets(of heading: String, in markdown: String) -> [String] {

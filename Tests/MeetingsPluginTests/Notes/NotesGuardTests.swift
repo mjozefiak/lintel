@@ -335,25 +335,22 @@ enum GuardFixtures {
         decisions: ["p1"], tasks: ["p2", "p3"], questions: ["p4"], keyPoints: ["p5"],
         summary: "Spotkanie dotyczyło budżetu na przyszły kwartał i oferty dla klienta.")
 
-    @Test func theNotesAreComposedByCodeInTheOrderSummaryDecisionsTasksTopicsQuestionsParticipants() {
+    /// A short meeting: the intro, its findings as one list without a heading, then the sections of the layout.
+    @Test func theNotesAreComposedByCodeInTheOrderIntroFindingsDecisionsNextStepsQuestionsParticipants() {
         let markdown = compose(full)
         let expected = """
-            ### Podsumowanie
-
             Spotkanie dotyczyło budżetu na przyszły kwartał i oferty dla klienta.
 
-            ### Decyzje
+            - Spotkanie dotyczyło budżetu na przyszły kwartał.
+
+            ### Podjęte decyzje
 
             - Zatwierdzono budżet marketingowy w wysokości czterdziestu tysięcy złotych.
 
-            ### Zadania
+            ### Następne kroki
 
             - [ ] Wysłać ofertę do klienta. — osoba\\: Marek, termin\\: piątek
             - [ ] Przygotować umowę. — osoba\\: Ewa
-
-            ### Omówione tematy
-
-            - Spotkanie dotyczyło budżetu na przyszły kwartał.
 
             ### Otwarte kwestie
 
@@ -368,7 +365,8 @@ enum GuardFixtures {
 
     @Test func theEnglishLabelsExist() {
         let markdown = compose(full, labels: .english)
-        #expect(markdown.contains("### Action items"))
+        #expect(markdown.contains("### Next steps"))
+        #expect(markdown.contains("### Decisions"))
         #expect(markdown.contains("### Open questions"))
         #expect(markdown.contains("owner\\: Marek, due\\: piątek"))
         #expect(NotesComposer.Labels.forLanguage(.unknown, fallback: .polish) == .polish)
@@ -377,8 +375,8 @@ enum GuardFixtures {
 
     @Test func emptySectionsAreLeftOut() {
         let markdown = compose(NotesReduceOutput(decisions: ["p1"], summary: nil), points: [GuardFixtures.budget])
-        #expect(markdown.contains("### Decyzje"))
-        #expect(!markdown.contains("### Zadania"))
+        #expect(markdown.contains("### Podjęte decyzje"))
+        #expect(!markdown.contains("### Następne kroki"))
         #expect(!markdown.contains("### Otwarte kwestie"))
     }
 
@@ -473,14 +471,14 @@ enum GuardFixtures {
         #expect(verdict.backfilled == 0)
     }
 
-    @Test func atMostTenFindingsAreShownTheOnesReduceRankedFirst() {
+    @Test func aTopicShowsAtMostSixFindingsTheOnesReduceRankedFirst() {
         let points = manyFindings(14)
         let chosen = points.reversed().map(\.id)
         let audited = guardrail.auditedVerifyReduce(
             NotesReduceOutput(keyPoints: chosen, summary: nil), points: points)
-        #expect(audited.verdict.keyPoints.count == NotesGuard.maxKeyPoints)
-        #expect(audited.verdict.keyPoints.map(\.id) == Array(chosen.prefix(10)))
-        #expect(audited.audit.findingsOverLimit == Set(chosen.suffix(4)))
+        #expect(audited.verdict.keyPoints.count == NotesLayout.maxPointsPerTopic)
+        #expect(audited.verdict.keyPoints.map(\.id) == Array(chosen.prefix(6)))
+        #expect(audited.audit.findingsOverLimit == Set(chosen.suffix(8)))
     }
 
     @Test func aQuestionIsNeverATopic() {
@@ -524,15 +522,16 @@ enum GuardFixtures {
             decisions: ["p1"], tasks: ["p2", "p3"], questions: ["p4"], keyPoints: ["p5"], summary: modelSummary)
         let mixed = guardrail.verifyReduce(output, points: GuardFixtures.verified)
         let markdown = NotesComposer.markdown(verdict: mixed, participants: participants, labels: .polish)
-        let headings = ["Podsumowanie", "Decyzje", "Zadania", "Omówione tematy", "Otwarte kwestie", "Uczestnicy"]
+        let headings = ["Podjęte decyzje", "Następne kroki", "Otwarte kwestie", "Uczestnicy"]
         let positions = headings.map { markdown.range(of: "### \($0)")?.lowerBound }
         #expect(!positions.contains { $0 == nil })
         let found = positions.compactMap { $0 }
         #expect(found == found.sorted())
-        #expect(!markdown.contains("Ustalenia"))
+        #expect(!markdown.contains("Ustalenia") && !markdown.contains("### Podsumowanie"))
+        #expect(markdown.hasPrefix(modelSummary))
 
         let english = NotesComposer.markdown(verdict: mixed, participants: participants, labels: .english)
-        #expect(english.contains("### Topics discussed"))
+        #expect(english.contains("### Next steps") && english.contains("### Decisions"))
         #expect(NotesComposer.Labels.polish.keyPoints == "Omówione tematy")
         #expect(NotesComposer.Labels.english.keyPoints == "Topics discussed")
     }
@@ -568,7 +567,7 @@ enum GuardFixtures {
             NotesReduceOutput(keyPoints: ["p5", "p8"], summary: modelSummary), points: [hostile, heading])
         #expect(verdict.keyPoints.map(\.id) == ["p5", "p8"])
         let markdown = NotesComposer.markdown(verdict: verdict, participants: [], labels: .polish)
-        #expect(markdown.contains("### Omówione tematy"))
+        #expect(markdown.split(separator: "\n").filter { $0.hasPrefix("- ") }.count == 2)
         #expect(MarkdownHardeningTests.unescapedStructure(in: markdown).isEmpty)
         #expect(markdown.contains("\\!\\[x\\]\\(http\\://evil.example/p.png\\)"))
         #expect(!markdown.contains("\n## "))
@@ -636,7 +635,7 @@ enum GuardFixtures {
         let markdown = NotesComposer.markdown(verdict: audited.verdict, participants: [], labels: .polish)
         #expect(!markdown.contains("### Omówione tematy"))
         #expect(markdown.components(separatedBy: "Głównym tematem jest budżet").count == 2)
-        #expect(markdown.contains("### Decyzje"))
+        #expect(markdown.contains("### Podjęte decyzje"))
     }
 
     @Test func onlyThePointsTheModelsParagraphRepeatsAreLeftOut() {

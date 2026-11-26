@@ -16,7 +16,12 @@ enum NotesFake {
     static func isMap(_ messages: [ChatMessage]) -> Bool {
         messages.first.map { NotesPrompt.isMapSystem($0.content) } ?? false
     }
-    static func isReduce(_ messages: [ChatMessage]) -> Bool { messages.first?.content == NotesPrompt.reduceSystem }
+    static func isReduce(_ messages: [ChatMessage]) -> Bool {
+        messages.first.map { NotesPrompt.isReduceSystem($0.content) } ?? false
+    }
+    static func isTopics(_ messages: [ChatMessage]) -> Bool {
+        messages.first.map { NotesPrompt.isTopicsSystem($0.content) } ?? false
+    }
     static func isSummary(_ messages: [ChatMessage]) -> Bool { messages.first?.content == NotesPrompt.summarySystem }
 
     /// The `[mm:ss] Speaker: text` lines of the request.
@@ -45,7 +50,10 @@ enum NotesFake {
         return lines.isEmpty ? "NONE" : lines.joined(separator: "\n")
     }
 
-    static func reduceAnswer(_ messages: [ChatMessage], summary: String? = nil) -> String {
+    /// The v7 answer: the intro, one topic with every summary point (named with the first two words of its first
+    /// point, so the guard finds the name in the topic's own points) and the sections. `oldFormat` answers in the
+    /// format of prompt 6 (`SUMMARY:` and `FINDINGS:`), which the parser still reads.
+    static func reduceAnswer(_ messages: [ChatMessage], summary: String? = nil, oldFormat: Bool = false) -> String {
         var decisions: [String] = []
         var tasks: [String] = []
         var questions: [String] = []
@@ -66,14 +74,25 @@ enum NotesFake {
         let paragraph =
             summary ?? firstSummary.map { NotesText.firstSentence($0) } ?? "Spotkanie dotyczyło kilku spraw."
         func list(_ ids: [String]) -> String { ids.isEmpty ? "-" : ids.joined(separator: ", ") }
-        return
-            "SUMMARY: \(paragraph)\nDECISIONS: \(list(decisions))\nTASKS: \(list(tasks))\nFINDINGS: \(list(findings))\nQUESTIONS: \(list(questions))"
+        if oldFormat {
+            return
+                "SUMMARY: \(paragraph)\nDECISIONS: \(list(decisions))\nTASKS: \(list(tasks))\nFINDINGS: \(list(findings))\nQUESTIONS: \(list(questions))"
+        }
+        var lines = ["INTRO: \(paragraph)"]
+        if let first = firstSummary, !findings.isEmpty {
+            let name = first.split(separator: " ").prefix(2).joined(separator: " ")
+                .trimmingCharacters(in: .punctuationCharacters)
+            lines.append("TOPIC: \(name) | \(list(findings))")
+        }
+        lines += ["DECISIONS: \(list(decisions))", "TASKS: \(list(tasks))", "QUESTIONS: \(list(questions))"]
+        return lines.joined(separator: "\n")
     }
 
     static func answer(_ messages: [ChatMessage]) -> String {
         if isMap(messages) { return mapAnswer(messages) }
         if isReduce(messages) { return reduceAnswer(messages) }
-        return "SUMMARY: Spotkanie dotyczyło zatwierdzania punktów harmonogramu."
+        if isTopics(messages) { return "TOPIC: Spotkanie | t1" }
+        return "INTRO: Spotkanie dotyczyło zatwierdzania punktów harmonogramu."
     }
 
     static var standard: ScriptedLLM.Handler {
