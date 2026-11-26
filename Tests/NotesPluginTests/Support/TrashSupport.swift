@@ -46,7 +46,9 @@ final class TrashingNoteSource: NoteSourceTrash, Sendable {
         state.withLock { $0.trashed[key] = $0.trashed[key] ?? now }
         return state.withLock { $0.trashed[key] ?? now }
     }
-    func trashAll(at deletedAt: Date) async throws -> TrashBatch { TrashBatch(deletedAt: deletedAt, moved: 0, stayed: 0) }
+    func trashAll(at deletedAt: Date) async throws -> TrashBatch {
+        TrashBatch(deletedAt: deletedAt, moved: 0, stayed: 0)
+    }
     @discardableResult
     func restore(_ keys: [NoteKey]) async throws -> Set<NoteKey> {
         state.withLock { state in for key in keys { state.trashed[key] = nil } }
