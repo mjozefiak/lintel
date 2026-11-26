@@ -334,14 +334,31 @@ import Testing
 /// A writer whose open waits until the test lets it go, ignoring cancellation like a model load.
 final class StuckOpenGenerator: NotesGenerating, @unchecked Sendable {
     let profile = NotesGeneratorProfile(strategy: .quotedChunks, inputBudgetTokens: 8192, promptFormat: "test")
-    private let state = Mutex((open: false, released: 0, requests: 0))
+    private let state = Mutex(
+        (opened: false, released: 0, requests: 0, opener: CheckedContinuation<Void, Never>?.none))
 
     var released: Int { state.withLock { $0.released } }
     var requests: Int { state.withLock { $0.requests } }
-    func letGo() { state.withLock { $0.open = true } }
+
+    /// Ends the open, which ignores cancellation: it suspends until here, never spins.
+    func letGo() {
+        let opener = state.withLock { state -> CheckedContinuation<Void, Never>? in
+            state.opened = true
+            defer { state.opener = nil }
+            return state.opener
+        }
+        opener?.resume()
+    }
 
     func open() async throws {
-        while !state.withLock({ $0.open }) { try? await Task.sleep(for: .milliseconds(2)) }
+        await withCheckedContinuation { continuation in
+            let alreadyOpen = state.withLock { state -> Bool in
+                guard !state.opened else { return true }
+                state.opener = continuation
+                return false
+            }
+            if alreadyOpen { continuation.resume() }
+        }
     }
 
     func release() async { state.withLock { $0.released += 1 } }

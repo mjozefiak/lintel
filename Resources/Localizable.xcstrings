@@ -17947,24 +17947,6 @@
         }
       }
     },
-    "Rename this speaker, then press Return" : {
-      "comment" : "Hint of a speaker name field",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rename this speaker, then press Return"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zmień nazwę tego mówcy i naciśnij Return"
-          }
-        }
-      }
-    },
     "Rename…" : {
       "comment" : "Layouts window: changes the name of the selected layout",
       "extractionState" : "manual",
@@ -17979,24 +17961,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zmień nazwę…"
-          }
-        }
-      }
-    },
-    "Renaming a speaker changes the name in the transcript at once. Notes already written change after you regenerate them." : {
-      "comment" : "Meeting window: hint under the speaker list",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Renaming a speaker changes the name in the transcript at once. Notes already written change after you regenerate them."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zmiana nazwy mówcy od razu zmienia ją w transkrypcie. Napisane już notatki zmienią się po ich ponownym wygenerowaniu."
           }
         }
       }
