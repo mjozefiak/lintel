@@ -58,7 +58,7 @@ private struct LintelRingSheet: View {
     private static let window = GalleryPresentation.window(width: 560)
 
     private static func state(
-        _ id: String, _ summary: String, _ states: [LintelRingState], motion: LintelRingMotion = .system,
+        _ id: String, _ summary: String, _ states: [LintelRingState], motion: LintelRingMotion = .frozen,
         onAccent: Bool = false
     ) -> GalleryState {
         GalleryState(
