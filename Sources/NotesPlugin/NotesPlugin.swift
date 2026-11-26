@@ -48,7 +48,19 @@ public final class NotesPlugin: LintelPlugin {
         await reviseService.cancelAll()
         await documents.flushAll()
         library.close()
+        trashChanges.finishAll()
     }
+
+    /// The change streams of Notes' own Recently deleted (`ManualNotesTrash.makeChanges()`).
+    let trashChanges = TrashChangeBroadcaster()
+
+    /// Recently deleted for the manual notes (Notes is their owner). Reads only an existing library: on a fresh
+    /// profile it answers 0 and empty pages without creating the Keychain item or `notes.sqlite`.
+    private(set) lazy var manualTrash = ManualNotesTrash(
+        store: { [hasLibrary, storeProvider] in hasLibrary() ? storeProvider() : nil }, changes: trashChanges,
+        discard: { [documents] ids in await documents.discard(docIDs: ids) })
+
+    public var trashSources: [any TrashSource] { [manualTrash] }
 
     /// "Erase Data" (Settings → Features): removes the Keychain item and `Plugins/notes/`; never touches the
     /// sources. The same as "Erase Notes Data…": the open documents' writers hold the store that is erased, so they
@@ -204,18 +216,30 @@ public final class NotesPlugin: LintelPlugin {
                 return (try? NoteOverlayContent.heads(for: item, in: store)) ?? []
             }
             let clock = context.clock
+            let trashChanges = trashChanges
             let makeReconciler: @Sendable (NotesStore) -> SourceReconciler = { store in
                 SourceReconciler(
                     store: store, library: library, detacher: RegistryOverlayDetacher(store: store, registry: registry),
-                    registry: registry, clock: clock)
+                    registry: registry, clock: clock, trashChanged: { trashChanges.signal() })
             }
             environment.reconcile = { key in
                 guard await hasLibrary(), let store = await storeProvider() else { return }
                 await makeReconciler(store).reconcile(key)
             }
+            let sourceSetChanges = context.noteSourcesChanged
             environment.sweepLoop = {
                 guard await hasLibrary(), let store = await storeProvider() else { return }
-                await makeReconciler(store).runSweeps()
+                let reconciler = makeReconciler(store)
+                // A source's change (a trash, a restore, a purge in its own store) runs the trash sweep at once, so
+                // a note deleted in the launcher's panel leaves Notes' search before the next full sweep.
+                let changes = Task {
+                    for await _ in library.changes(sourceSetChanges: sourceSetChanges()) {
+                        if Task.isCancelled { return }
+                        await reconciler.trashSweep()
+                    }
+                }
+                defer { changes.cancel() }
+                await reconciler.runSweeps()
             }
         }
         let model = NotesWorkspaceModel(environment: environment)
