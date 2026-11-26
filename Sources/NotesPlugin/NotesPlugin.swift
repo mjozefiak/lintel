@@ -182,6 +182,9 @@ public final class NotesPlugin: LintelPlugin {
     /// for a pass without polling).
     var trashSweepPassFinished: (@MainActor @Sendable () -> Void)?
 
+    /// Called when the task's source-change listener has ended (a test seam, like `trashSweepPassFinished`).
+    var trashSweepListenerEnded: (@MainActor @Sendable () -> Void)?
+
     /// Starts the one sweep task (a second activation replaces it). Nothing is read here: the task asks
     /// `hasLibrary()` first, on every pass, so a fresh profile creates no file and no Keychain item, and a
     /// library created later by a first write is swept from the next pass on.
@@ -203,25 +206,32 @@ public final class NotesPlugin: LintelPlugin {
             // A source's change (a trash, a restore, a purge in its own store, a plugin switched on or off) runs
             // the trash sweep at once, so a note deleted in the launcher's panel leaves Notes' search before the
             // next full sweep.
-            let changes = Task { @MainActor in
+            let changes = Task { @MainActor [weak self] in
+                defer { self?.trashSweepListenerEnded?() }
                 for await _ in sweepLibrary.changes(sourceSetChanges: sourceSetChanges()) {
                     if Task.isCancelled { return }
                     guard hasLibrary(), let store = storeProvider() else { continue }
                     await makeReconciler(store, sweepLibrary).trashSweep()
                 }
             }
-            defer { changes.cancel() }
             // The first sweep after activation never purges Recently deleted: the purge starts with the second,
             // 10 minutes later, after the trash sweep has marked the overlays.
             var first = true
             while !Task.isCancelled {
                 if hasLibrary(), let store = storeProvider() {
+                    // Notes activates before the plugins whose recordings it sweeps, and a change of the set may
+                    // be signalled before the listener above subscribed: read the active sources again, so a
+                    // set the library cached while those plugins were still off never outlives one pass.
+                    await sweepLibrary.refreshSources()
                     await makeReconciler(store, sweepLibrary).sweep(purgesTrash: !first)
                     first = false
                 }
                 self?.trashSweepPassFinished?()
-                do { try await clock.sleep(for: SourceReconciler.sweepInterval) } catch { return }
+                do { try await clock.sleep(for: SourceReconciler.sweepInterval) } catch { break }
             }
+            // The listener may be mid-sweep: end it and wait, so nothing writes after `deactivate()` closes the store.
+            changes.cancel()
+            await changes.value
         }
     }
 

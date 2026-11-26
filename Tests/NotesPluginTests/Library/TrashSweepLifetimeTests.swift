@@ -1,5 +1,6 @@
 import Foundation
 import LintelKit
+import Synchronization
 import Testing
 
 @testable import NotesPlugin
@@ -9,6 +10,15 @@ import Testing
 /// tests builds the workspace. All data is synthetic.
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct TrashSweepLifetimeTests {
+    private final class Flag: Sendable {
+        private let state: Mutex<Bool>
+        init(_ value: Bool) { state = Mutex(value) }
+        var value: Bool {
+            get { state.withLock { $0 } }
+            set { state.withLock { $0 = newValue } }
+        }
+    }
+
     private let key = NoteKey(pluginID: "meetings", id: "m1")
     private let deletedAt = Date(timeIntervalSince1970: 1_800_000_500)
 
@@ -18,17 +28,24 @@ import Testing
         let passes = CountLatch()
         let owner = TrashingNoteSource(ScriptedNoteSource("meetings"))
         let plugin: NotesPlugin
+        /// Whether the owner's plugin is active: what `PluginContext.noteSources` hands out, with no signal when it
+        /// changes (the shell's signal can come before a subscriber exists).
+        private let active: Flag
 
         /// A plugin over the harness's storage directory (an existing library when the test opened the store first).
         @MainActor
         init(sources: Bool = true) throws {
             harness = try NotesHarness()
             let owner = owner
+            let active = Flag(sources)
+            self.active = active
             plugin = NotesPlugin(
                 context: makeContext(
                     storage: harness.directory, settings: harness.settingsStore, keychain: harness.keychain,
-                    noteSources: { sources ? [owner] : [] }, clock: clock))
+                    noteSources: { active.value ? [owner] : [] }, clock: clock))
         }
+
+        func activateOwner() { active.value = true }
     }
 
     private func rig(sources: Bool = true) throws -> Rig { try Rig(sources: sources) }
@@ -179,5 +196,49 @@ import Testing
         await view.value
         await r.plugin.deactivate()
         #expect(r.clock.sleeperCount == 0)
+    }
+
+    @Test func aSourceThatBecameActiveAfterTheFirstPassIsSweptFromTheNextPassWithoutASignal() async throws {
+        // Notes activates before Meetings and Dictation, so the set the library cached on the first pass is empty.
+        let r = try rig(sources: false)
+        let store = try r.harness.openStore()
+        try store.insertDocument(.overlay("m1"))
+        r.owner.trashed = [key: deletedAt]
+        r.plugin.trashSweepPassFinished = { r.passes.increment() }
+        try await r.plugin.activate()
+        await r.passes.wait(atLeast: 1)
+        await r.clock.waitForSleeps(1)
+        #expect(try store.markedOverlayKeys().isEmpty)
+
+        r.activateOwner()  // no `noteSourcesChanged` event
+        r.clock.advance(by: SourceReconciler.sweepInterval)
+        await r.passes.wait(atLeast: 2)
+
+        #expect(try store.markedOverlayKeys() == [key])
+        await r.plugin.deactivate()
+    }
+
+    @Test func deactivationWaitsForTheSourceChangeListenerEvenMidSweep() async throws {
+        let r = try rig()
+        let store = try r.harness.openStore()
+        try store.insertDocument(.overlay("m1"))
+        let order = Mutex<[String]>([])
+        r.plugin.trashSweepPassFinished = { r.passes.increment() }
+        r.plugin.trashSweepListenerEnded = { order.withLock { $0.append("listener ended") } }
+        try await r.plugin.activate()
+        await r.passes.wait(atLeast: 1)
+        await r.clock.waitForSleeps(2)  // the first pass's source deadline, then the loop's own sleep
+        await r.owner.inner.waitForChangeStream(1)
+
+        // A change event puts the listener in the middle of a trash sweep that never answers.
+        r.owner.trashedKeysBehavior = .hangs
+        r.owner.inner.signalChange()
+        await r.clock.waitForSleeps(3)  // the hanging call's deadline
+
+        await r.plugin.deactivate()
+        order.withLock { $0.append("deactivate returned") }
+
+        #expect(order.withLock { $0 } == ["listener ended", "deactivate returned"])
+        #expect(r.plugin.library.store == nil)  // closed after the task, not under it
     }
 }
