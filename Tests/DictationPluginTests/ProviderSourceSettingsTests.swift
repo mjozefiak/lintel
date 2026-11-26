@@ -62,7 +62,8 @@ import Testing
     @Test func anUnknownProviderIsNotChosen() {
         #expect(
             settings([
-                "plugins.dictation.provider": .string("other-cli"), "plugins.dictation.providerModel": .string("sonnet"),
+                "plugins.dictation.provider": .string("other-cli"),
+                "plugins.dictation.providerModel": .string("sonnet"),
             ]).providerSelection == nil)
         #expect(settings(["plugins.dictation.provider": .string("")]).providerSelection == nil)
     }
@@ -96,18 +97,17 @@ import Testing
     @Test func theSourceByLevelTable() throws {
         let selection = Self.sonnet
         // (source, server set, built-in installed, level) -> the source that runs
-        let rows:
-            [(String, Bool, Bool, DictationSettings.CleanupLevel, DictationSettings.EffectiveSource)] = [
-                ("builtIn", false, true, .light, .none),
-                ("builtIn", false, true, .standard, .builtIn),
-                ("builtIn", false, false, .full, .builtIn),
-                ("server", true, false, .light, .none),
-                ("server", true, false, .standard, .server),
-                ("server", true, true, .full, .server),
-                ("provider", false, false, .light, .none),
-                ("provider", false, false, .standard, .provider(selection)),
-                ("provider", true, true, .full, .provider(selection)),
-            ]
+        let rows: [(String, Bool, Bool, DictationSettings.CleanupLevel, DictationSettings.EffectiveSource)] = [
+            ("builtIn", false, true, .light, .none),
+            ("builtIn", false, true, .standard, .builtIn),
+            ("builtIn", false, false, .full, .builtIn),
+            ("server", true, false, .light, .none),
+            ("server", true, false, .standard, .server),
+            ("server", true, true, .full, .server),
+            ("provider", false, false, .light, .none),
+            ("provider", false, false, .standard, .provider(selection)),
+            ("provider", true, true, .full, .provider(selection)),
+        ]
         for (source, server, installed, level, expected) in rows {
             let dictation = chosen(source: source, server: server)
             #expect(
@@ -190,5 +190,20 @@ import Testing
         #expect(
             DictationPlugin.releaseDeadline(settings: chosen(source: "server", server: true), builtInInstalled: true)
                 == nil)
+    }
+}
+
+/// The history keeps `cli:<provider>/<model>` for a dictation tidied by a provider; Notes shows where the text went.
+@Suite struct ProviderHistoryMarkTests {
+    @Test func theNotesDetailNamesTheCompanyAndTheModel() {
+        #expect(DictationNoteMapping.providerDetail("cli:claude-code/sonnet") == "Claude · sonnet")
+        #expect(DictationNoteMapping.providerDetail("cli:claude-code/opus") == "Claude · opus")
+    }
+
+    @Test func aLocalModelOrAnUnknownMarkIsNotAProviderDetail() {
+        #expect(DictationNoteMapping.providerDetail("qwen2.5-7b") == nil)
+        #expect(DictationNoteMapping.providerDetail("cli:other-cli/x") == nil)
+        #expect(DictationNoteMapping.providerDetail("cli:claude-code") == nil)
+        #expect(DictationNoteMapping.providerDetail("") == nil)
     }
 }

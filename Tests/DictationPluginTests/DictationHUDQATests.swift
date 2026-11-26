@@ -18,7 +18,9 @@ import Testing
         #expect(states.contains(.pasted))
         #expect(states.contains(.pastedUnformatted(all: true)))
         #expect(states.contains(.pastedUnformatted(all: false)))
-        for name in ["provider-too-slow", "provider-signed-out", "provider-limit", "provider-no-network", "provider-unavailable"] {
+        for name in [
+            "provider-too-slow", "provider-signed-out", "provider-limit", "provider-no-network", "provider-unavailable",
+        ] {
             #expect(DictationHUDQA.state(named: name) != nil)
         }
         #expect(states.contains(.problem(.nothingToPaste)))

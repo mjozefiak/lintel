@@ -4,8 +4,8 @@ import LintelKit
 import LintelProviders
 import LintelSpeech
 import LintelUI
-import Synchronization
 import SwiftUI
+import Synchronization
 import os
 
 /// Voice dictation (spec: Dyktowanie głosowe): records under a global shortcut, transcribes with a speech
@@ -58,7 +58,8 @@ public final class DictationPlugin: LintelPlugin {
     let qaPlayback = DictationQAPlayback()
     private(set) var qaRecorder: DictationQARecorder?
     #endif
-    private let formattingModel: FormattingSettingsModel
+    /// Internal for the tests (the pane's model of the tidy-up rows).
+    let formattingModel: FormattingSettingsModel
     private let transport: any HTTPTransport
     /// The runner of the provider source, made on first use (`DictationProviders`).
     let providerRunner: ProviderRunnerHolder
@@ -331,7 +332,8 @@ public final class DictationPlugin: LintelPlugin {
                             settings: settings, transport: transport, builtIn: builtInLLM, logger: context.logger,
                             protectedWords: Self.protectedWords(settings: settings, vocabulary: vocabulary),
                             builtInInstalled: builtInInstalled.value, providerRunner: providerRunner),
-                        releaseDeadline: Self.releaseDeadline(settings: settings, builtInInstalled: builtInInstalled.value),
+                        releaseDeadline: Self.releaseDeadline(
+                            settings: settings, builtInInstalled: builtInInstalled.value),
                         replaceTerms: Self.termReplacement(settings: settings, vocabulary: vocabulary),
                         modelFolder: folder, lease: lease, modelID: settings.speechModelID,
                         keepWarm: { settings.keepWarm }, logger: context.logger, onEvent: onEvent)

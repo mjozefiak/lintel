@@ -418,6 +418,48 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(rig.hud.last == .pastedUnformatted(all: true))
     }
 
+    @Test func aProviderThatWasTooSlowIsAnnouncedInOneLineAndTheRawTextIsPasted() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.formatter = StubFormatter { chunk, _ in FormatResult(text: chunk, outcome: .fellBack(.tooSlow)) }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        controller.menu()
+        await settle(rig)
+
+        #expect(rig.paste.pasteboard.string() == "segment 1")
+        #expect(rig.hud.last == .pastedAsSpoken(.init(.tooSlow, name: "Claude")))
+        #expect(rig.hud.milestones.last == "pastedAsSpoken:tooSlow")
+    }
+
+    @Test func aSignedOutProviderIsAnnouncedWithItsOwnLine() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.formatter = StubFormatter { chunk, _ in
+            FormatResult(text: chunk, outcome: .fellBack(.provider(.notSignedIn)))
+        }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        controller.menu()
+        await settle(rig)
+        #expect(rig.hud.last == .pastedAsSpoken(.init(.notSignedIn, name: "Claude")))
+    }
+
+    @Test func aProviderThatTidiedEverythingShowsTheNormalPastedState() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.formatter = StubFormatter { chunk, _ in FormatResult(text: "Clean: \(chunk)", outcome: .formatted) }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        controller.menu()
+        await settle(rig)
+        // No provider line in the normal state: it looks like any other dictation.
+        #expect(rig.hud.milestones == ["recording", "finishing", "pasted"])
+    }
+
     @Test func pasteLastRawPastesTheTranscriptWithoutFormatting() async throws {
         let rig = try Rig()
         defer { rig.tearDown() }

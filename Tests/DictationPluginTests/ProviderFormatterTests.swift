@@ -72,7 +72,8 @@ import Testing
 
     @Test func theGuardRejectsAnAnswerThatDriftedAndTheChunkStaysRaw() async throws {
         // A new number the speaker never said.
-        let process = FakeProviderProcess(answer: "Jutro zadzwonię do klienta 25 razy w sprawie umowy i potem wyślę mu ofertę.")
+        let process = FakeProviderProcess(
+            answer: "Jutro zadzwonię do klienta 25 razy w sprawie umowy i potem wyślę mu ofertę.")
         let result = try await formatter(process).format(chunk: Self.chunk, previousContext: nil)
         #expect(result.text == Self.chunk)
         #expect(result.outcome == .fellBack(.rejected(.newNumber)))

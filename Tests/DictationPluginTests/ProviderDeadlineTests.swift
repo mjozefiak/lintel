@@ -14,7 +14,9 @@ import Testing
     private static let selection = DictationSettings.ProviderSelection(provider: .claudeCode, model: "sonnet")
 
     /// Two segments of 50 words (so two chunks) with a 3 s pause between them.
-    private static let words = ["jutro", "zadzwonię", "do", "klienta", "w", "sprawie", "umowy", "oraz", "wyślę", "ofertę"]
+    private static let words = [
+        "jutro", "zadzwonię", "do", "klienta", "w", "sprawie", "umowy", "oraz", "wyślę", "ofertę",
+    ]
     private static func text(_ offset: Int) -> String {
         (0..<50).map { words[($0 + offset) % words.count] }.joined(separator: " ")
     }
@@ -33,7 +35,8 @@ import Testing
     /// The tidied form the guard accepts: the chunk, capitalised and ended with a full stop.
     private static func tidy(_ spec: ProviderProcessSpec) -> String {
         let input = String(decoding: spec.stdin, as: UTF8.self)
-        let transcript = input.components(separatedBy: "<transcript>").last?
+        let transcript =
+            input.components(separatedBy: "<transcript>").last?
             .components(separatedBy: "</transcript>").first ?? ""
         return transcript.prefix(1).uppercased() + transcript.dropFirst() + "."
     }

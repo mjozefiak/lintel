@@ -275,6 +275,15 @@ final class FormattingSettingsModel {
         providerCheck = .known(report.status)
     }
 
+    #if DEBUG
+    /// DEBUG only (the design gallery): the state the rows draw, with no process and no model manager.
+    func galleryShow(providerCheck check: ProviderCheck, version: String? = nil, builtInInstalled: Bool = false) {
+        providerCheck = check
+        providerVersion = version
+        builtInLocation = builtInInstalled ? .installed(URL(filePath: "/gallery/model")) : .missing
+    }
+    #endif
+
     /// "Check Again" of the status line.
     func checkProviderAgain() { Task { await refreshProvider(force: true) } }
 

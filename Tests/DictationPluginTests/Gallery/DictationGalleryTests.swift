@@ -27,9 +27,16 @@ struct DictationGalleryTests {
     func scenesAreValid() {
         let scenes = DictationPlugin.galleryScenes
         #expect(GalleryScene.validationProblems(scenes).isEmpty, "\(GalleryScene.validationProblems(scenes))")
-        #expect(scenes.map(\.id) == ["dictation.tidy-up"])
-        let ids = Set(scenes.flatMap { $0.states.map(\.id) })
-        #expect(ids == ["off", "light", "standard", "full", "full-small-model", "standard-dimmed"])
+        #expect(scenes.map(\.id) == ["dictation.tidy-up", "dictation.tidy-source"])
+        let tidyUp = Set(scenes[0].states.map(\.id))
+        #expect(tidyUp == ["off", "light", "standard", "full", "full-small-model", "standard-dimmed"])
+        let source = Set(scenes[1].states.map(\.id))
+        #expect(
+            source == [
+                "this-mac-standard", "this-mac-add-provider", "claude-standard", "claude-full",
+                "claude-heavier-model", "claude-signed-out", "claude-not-installed", "claude-checking",
+                "claude-full-falls-back-to-this-mac", "claude-full-falls-back-to-nothing",
+            ])
     }
 
     @Test("every state draws real content in the CI appearances")
@@ -47,7 +54,10 @@ struct DictationGalleryTests {
 
     @Test("a state is made fresh each time, and the states differ from one another")
     func statesAreIndependent() async throws {
-        let states = try #require(DictationPlugin.galleryScenes.first).states
+        for scene in DictationPlugin.galleryScenes { try await assertIndependent(scene.states) }
+    }
+
+    private func assertIndependent(_ states: [GalleryState]) async throws {
         var first: [String: String] = [:]
         for state in states {
             let bitmap = try await GalleryRenderer.render(state, Self.lightM)

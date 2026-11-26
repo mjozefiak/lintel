@@ -19,7 +19,8 @@ enum TidySourceText {
     }
 
     static var addProvider: Text {
-        Text("Add a provider…", comment: "Settings → Dictation, Tidy up with: the row for a provider that is not set up")
+        Text(
+            "Add a provider…", comment: "Settings → Dictation, Tidy up with: the row for a provider that is not set up")
     }
 
     static func providerName(_ descriptor: ProviderDescriptor) -> Text {
@@ -139,6 +140,8 @@ enum TidySourceText {
 /// drawn alone by the gallery. The built-in model's and the server's own rows stay in the pane.
 struct TidySourceRows: View {
     @Bindable var formatting: FormattingSettingsModel
+    /// The levels Claude serves; the constant, except in the gallery (which draws the line of a level it does not serve).
+    var offered: Set<DictationSettings.CleanupLevel> = ProviderLevels.offered
     @Environment(\.lintelTextSize) private var textSize
 
     /// What the picker's tags stand for. The "Add a provider…" row has a tag of its own so the menu can list it, but it is
@@ -213,7 +216,7 @@ struct TidySourceRows: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(verbatim: TidySourceText.spokenDisclosure(descriptor)))
         if let line = TidySourceText.fallbackLine(
-            descriptor, level: formatting.choice, offered: ProviderLevels.offered, fallback: formatting.localFallback)
+            descriptor, level: formatting.choice, offered: offered, fallback: formatting.localFallback)
         {
             line.font(textSize.font(.callout)).foregroundStyle(LintelBrand.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
