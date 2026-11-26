@@ -304,6 +304,68 @@ final class ScriptedGenerator: NotesGenerating, @unchecked Sendable {
         #expect(!kept(fraction, "Mamy 1.4 dnia."))
     }
 
+    /// A decimal is backed by the decimal itself, never by its two halves said on their own: a meeting that said
+    /// "jeden" and "cztery" (and not "czternaście") says nothing about "1.4".
+    @Test func anInventedDecimalIsNotBackedByItsHalves() {
+        let guardian = NotesFactGuard(utterances: [
+            NotesUtterance(
+                startMs: 0, speaker: "Marek",
+                text: "Mamy jeden projekt i cztery osoby, a na wdrożenie dwa tygodnie i pięć dni.")
+        ])
+        func kept(_ line: String) -> Bool {
+            guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        #expect(!kept("Wzrost 1.4 procent."))
+        #expect(!kept("Wzrost 2.5 procent."))
+        #expect(!kept("Wzrost 2,5 procent."))
+        #expect(kept("Na wdrożenie mamy 2 tygodnie i 5 dni."))
+
+        let english = NotesFactGuard(utterances: [
+            NotesUtterance(startMs: 0, speaker: "Dan", text: "We have one project and four people for five days.")
+        ])
+        #expect(
+            english.check(NotesDraftParser.parse("OPEN | Growth was 4.1 percent.").draft).draft.open.isEmpty,
+            "one and four were said, 4.1 was not")
+    }
+
+    /// A time the meeting said as a phrase ("half past ten", "wpół do jedenastej", "kwadrans po trzeciej") is
+    /// backed by that phrase, by its hour and by its minutes: the digits a model writes for it are not removed.
+    @Test func aClockPhraseBacksTheTimeItNames() {
+        func kept(_ said: String, _ line: String) -> Bool {
+            let guardian = NotesFactGuard(utterances: [NotesUtterance(startMs: 0, speaker: "Marek", text: said)])
+            return guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        let polish = "Widzimy się wpół do jedenastej w biurze."
+        #expect(kept(polish, "Spotkanie jest o 10:30."))
+        #expect(!kept(polish, "Spotkanie jest o 11:30."))
+        #expect(!kept(polish, "Spotkanie jest o 10:45."))
+        let english = "Let us meet at half past ten in the office."
+        #expect(kept(english, "The meeting is at 10:30."))
+        #expect(!kept(english, "The meeting is at 10:45."))
+        let quarter = "Spotkanie jest za kwadrans trzecia."
+        #expect(kept(quarter, "Spotkanie jest o 2:45."))
+        #expect(!kept(quarter, "Spotkanie jest o 3:15."))
+        // A phrase with "to" names the minutes of the hour before it, and twelve when that hour is one.
+        let noon = "Spotkanie jest kwadrans do pierwszej."
+        #expect(kept(noon, "Spotkanie jest o 12:45."))
+        #expect(!kept(noon, "Spotkanie jest o 12:30."))
+    }
+
+    /// A quotation mark or a bracket before the first word does not make that word a name: a line that opens
+    /// with an ordinary word the meeting did not say as such still stands.
+    @Test func aLineOpeningWithAQuotationMarkIsNoName() {
+        let guardian = NotesFactGuard(utterances: [
+            NotesUtterance(startMs: 0, speaker: "Marek", text: "Ustalamy, że idziemy w prawo.")
+        ])
+        func kept(_ line: String) -> Bool {
+            guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        #expect(kept("„Zdecydowano” razem o projekcie."))
+        #expect(kept("(Zdecydowano) razem o projekcie."))
+        // A capital that follows a colon is still checked as a name, quotation mark or not.
+        #expect(!kept("Ustalenia: „Zenon” przygotuje raport."))
+    }
+
     /// A capitalised word after a colon is a name, not a place in the sentence: an invented person written there
     /// goes, a person who was in the meeting stays.
     @Test func aNameAfterAColonIsChecked() {

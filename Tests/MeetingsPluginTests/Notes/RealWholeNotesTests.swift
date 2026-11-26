@@ -51,7 +51,7 @@ struct RealWholeNotesTests {
                 if let out = Self.environment["LINTEL_WHOLE_NOTES_OUT"] {
                     let base = URL(filePath: out)
                     try #require(
-                        base.path.hasPrefix("/Volumes/LintelMeetingEval/work/"),
+                        Self.isInsideEvalImage(base),
                         "LINTEL_WHOLE_NOTES_OUT goes only into the encrypted image")
                     let directory = base.appending(path: "synthetic")
                     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -102,7 +102,7 @@ struct RealWholeNotesTests {
         else { return }
         let out = URL(filePath: try #require(Self.environment["LINTEL_WHOLE_NOTES_OUT"]))
         try #require(
-            out.path.hasPrefix("/Volumes/LintelMeetingEval/work/"), "real content goes only to the encrypted image")
+            Self.isInsideEvalImage(out), "real content goes only to the encrypted image")
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         for path in list.split(separator: ",").map(String.init) {
             let directory = URL(filePath: path)
@@ -154,7 +154,7 @@ struct RealWholeNotesTests {
             Self.environment["LINTEL_WHOLE_NOTES_OFFLINE"] != nil
         else { return }
         let out = URL(filePath: try #require(Self.environment["LINTEL_WHOLE_NOTES_OUT"]))
-        try #require(out.path.hasPrefix("/Volumes/LintelMeetingEval/work/"))
+        try #require(Self.isInsideEvalImage(out))
         for path in list.split(separator: ",").map(String.init) {
             let directory = URL(filePath: path)
             let document = try Self.loadExport(directory)
@@ -171,6 +171,14 @@ struct RealWholeNotesTests {
                     + "dropped=\(report.dropped) byRule=\(report.droppedByRule.map { "\($0.key.rawValue):\($0.value)" }.sorted().joined(separator: ",")) "
                     + "personReset=\(report.personReset) dueRemoved=\(report.dueRemoved)")
         }
+    }
+
+    /// Whether `url` is inside the encrypted eval image. Both paths are standardised and their symbolic links
+    /// resolved first, so a `..` or a link on the way cannot walk out of the image.
+    static func isInsideEvalImage(_ url: URL) -> Bool {
+        let root = URL(filePath: "/Volumes/LintelMeetingEval/work").standardizedFileURL.resolvingSymlinksInPath()
+        let path = url.standardizedFileURL.resolvingSymlinksInPath()
+        return path.path == root.path || path.path.hasPrefix(root.path + "/")
     }
 
     private static func seconds(_ duration: Duration) -> Double {
@@ -219,6 +227,19 @@ struct RealWholeNotesTests {
                     endMs: $0.endMs,
                     speakerID: $0.speakerId, text: $0.text)
             })
+    }
+}
+
+/// The harness's output check: a path is standardised and its links resolved first, so `..` cannot walk out of the
+/// encrypted image.
+@Suite struct EvalImagePathTests {
+    @Test func aPathWithDotDotCannotLeaveTheImage() {
+        let root = URL(filePath: "/Volumes/LintelMeetingEval/work")
+        #expect(RealWholeNotesTests.isInsideEvalImage(root))
+        #expect(RealWholeNotesTests.isInsideEvalImage(root.appending(path: "run")))
+        #expect(!RealWholeNotesTests.isInsideEvalImage(URL(filePath: "/Volumes/LintelMeetingEval/work/../outside")))
+        #expect(!RealWholeNotesTests.isInsideEvalImage(URL(filePath: "/Volumes/LintelMeetingEval/workbook")))
+        #expect(!RealWholeNotesTests.isInsideEvalImage(URL(filePath: "/tmp/work")))
     }
 }
 
