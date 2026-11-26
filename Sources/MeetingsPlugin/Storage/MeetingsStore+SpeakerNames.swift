@@ -70,44 +70,50 @@ extension MeetingsStore {
 
     /// The name state of every speaker of the meeting, in id order.
     func speakerNameStates(meetingID: Int64) throws -> [SpeakerNameState] {
-        try read { db in
-            try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT id, label, is_self, name_source, name_status, suggested_name, rejected_names
-                    FROM meeting_speaker WHERE meeting_id = ? ORDER BY id
-                    """,
-                arguments: [meetingID]
-            ).map { row in
-                SpeakerNameState(
-                    speakerID: row["id"], label: row["label"], isSelf: row["is_self"],
-                    source: NameSource(rawValue: row["name_source"]),
-                    status: SpeakerNameStatus(rawValue: row["name_status"]),
-                    suggestedName: row["suggested_name"],
-                    rejectedNames: Self.decodeNames(row["rejected_names"]))
-            }
+        try read { db in try Self.speakerNameStates(meetingID: meetingID, in: db) }
+    }
+
+    /// The same inside a caller's transaction (`resolveSpeakerNames`).
+    static func speakerNameStates(meetingID: Int64, in db: Database) throws -> [SpeakerNameState] {
+        try Row.fetchAll(
+            db,
+            sql: """
+                SELECT id, label, is_self, name_source, name_status, suggested_name, rejected_names
+                FROM meeting_speaker WHERE meeting_id = ? ORDER BY id
+                """,
+            arguments: [meetingID]
+        ).map { row in
+            SpeakerNameState(
+                speakerID: row["id"], label: row["label"], isSelf: row["is_self"],
+                source: NameSource(rawValue: row["name_source"]),
+                status: SpeakerNameStatus(rawValue: row["name_status"]),
+                suggestedName: row["suggested_name"],
+                rejectedNames: Self.decodeNames(row["rejected_names"]))
         }
     }
 
     /// The evidence stored for the meeting, in the order it was written. A row with a source this build does not
     /// know is left out.
     func nameEvidence(meetingID: Int64) throws -> [StoredNameEvidence] {
-        try read { db in
-            try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT speaker_id, source, name, kind, segment_id, start_ms, end_ms, strength
-                    FROM meeting_name_evidence WHERE meeting_id = ? ORDER BY id
-                    """,
-                arguments: [meetingID]
-            ).compactMap { row -> StoredNameEvidence? in
-                guard let source = NameSource(rawValue: row["source"]) else { return nil }
-                return StoredNameEvidence(
-                    speakerID: row["speaker_id"], source: source, name: row["name"],
-                    kind: (row["kind"] as String?).flatMap(NameEvidenceKind.init(rawValue:)),
-                    segmentID: row["segment_id"], startMs: row["start_ms"], endMs: row["end_ms"],
-                    strength: row["strength"])
-            }
+        try read { db in try Self.nameEvidence(meetingID: meetingID, in: db) }
+    }
+
+    /// The same inside a caller's transaction (`resolveSpeakerNames`).
+    static func nameEvidence(meetingID: Int64, in db: Database) throws -> [StoredNameEvidence] {
+        try Row.fetchAll(
+            db,
+            sql: """
+                SELECT speaker_id, source, name, kind, segment_id, start_ms, end_ms, strength
+                FROM meeting_name_evidence WHERE meeting_id = ? ORDER BY id
+                """,
+            arguments: [meetingID]
+        ).compactMap { row -> StoredNameEvidence? in
+            guard let source = NameSource(rawValue: row["source"]) else { return nil }
+            return StoredNameEvidence(
+                speakerID: row["speaker_id"], source: source, name: row["name"],
+                kind: (row["kind"] as String?).flatMap(NameEvidenceKind.init(rawValue:)),
+                segmentID: row["segment_id"], startMs: row["start_ms"], endMs: row["end_ms"],
+                strength: row["strength"])
         }
     }
 
@@ -122,45 +128,89 @@ extension MeetingsStore {
     func saveSpeakerNames(_ updates: [SpeakerNameUpdate], evidence: [StoredNameEvidence], meetingID: Int64) throws
         -> Set<Int64>
     {
+        try write { db in
+            try Self.applySpeakerNames(updates, evidence: evidence, meetingID: meetingID, in: db)
+        }
+    }
+
+    /// The body of `saveSpeakerNames`, for a caller that is already in a transaction (`resolveSpeakerNames`).
+    @discardableResult
+    static func applySpeakerNames(
+        _ updates: [SpeakerNameUpdate], evidence: [StoredNameEvidence], meetingID: Int64, in db: Database
+    ) throws -> Set<Int64> {
         guard updates.allSatisfy(\.isAutomatic) else { throw SpeakerNamesError.notAnAutomaticName }
-        return try write { db in
-            var written: Set<Int64> = []
-            var labelChanged = false
-            for update in updates {
-                let oldLabel = try String.fetchOne(
-                    db, sql: "SELECT label FROM meeting_speaker WHERE id = ? AND meeting_id = ?",
-                    arguments: [update.speakerID, meetingID])
-                try db.execute(
-                    sql: """
-                        UPDATE meeting_speaker
-                        SET label = ?, name_source = ?, name_status = ?, suggested_name = ?
-                        WHERE id = ? AND meeting_id = ? AND \(Self.overwritableSpeakerNameSQL)
-                        """,
-                    arguments: [
-                        update.label, update.source.rawValue, update.status.rawValue, update.suggestedName,
-                        update.speakerID, meetingID,
-                    ])
-                guard db.changesCount > 0 else { continue }
-                written.insert(update.speakerID)
-                if oldLabel != update.label { labelChanged = true }
+        var written: Set<Int64> = []
+        var labelChanged = false
+        for update in updates {
+            let oldLabel = try String.fetchOne(
+                db, sql: "SELECT label FROM meeting_speaker WHERE id = ? AND meeting_id = ?",
+                arguments: [update.speakerID, meetingID])
+            try db.execute(
+                sql: """
+                    UPDATE meeting_speaker
+                    SET label = ?, name_source = ?, name_status = ?, suggested_name = ?
+                    WHERE id = ? AND meeting_id = ? AND \(overwritableSpeakerNameSQL)
+                    """,
+                arguments: [
+                    update.label, update.source.rawValue, update.status.rawValue, update.suggestedName,
+                    update.speakerID, meetingID,
+                ])
+            guard db.changesCount > 0 else { continue }
+            written.insert(update.speakerID)
+            if oldLabel != update.label { labelChanged = true }
+        }
+        try db.execute(sql: "DELETE FROM meeting_name_evidence WHERE meeting_id = ?", arguments: [meetingID])
+        for item in evidence {
+            try db.execute(
+                sql: """
+                    INSERT INTO meeting_name_evidence
+                        (meeting_id, speaker_id, source, name, kind, segment_id, start_ms, end_ms, strength)
+                    VALUES (
+                        ?, (SELECT id FROM meeting_speaker WHERE id = ? AND meeting_id = ?), ?, ?, ?,
+                        (SELECT id FROM meeting_segment WHERE id = ? AND meeting_id = ?), ?, ?, ?)
+                    """,
+                arguments: [
+                    meetingID, item.speakerID, meetingID, item.source.rawValue, item.name, item.kind?.rawValue,
+                    item.segmentID, meetingID, item.startMs, item.endMs, item.strength,
+                ])
+        }
+        if labelChanged { try markNotesStale(meetingID: meetingID, in: db) }
+        return written
+    }
+
+    /// Why a resolution was not written.
+    enum ResolveError: Error, Equatable {
+        /// The stored evidence could not be read: the write would delete the evidence it could not see.
+        case evidenceRead
+    }
+
+    /// Reads the meeting, its speakers and their evidence, resolves the names with `plan` and writes the result, all
+    /// in one `write` transaction: no user write (a rename, "Tak", "Nie", a merge) can land between the state the
+    /// resolution sees and the state it writes.
+    ///
+    /// `nil` when the meeting is gone (deleted or trashed), has no speakers or its rows cannot be read — nothing is
+    /// written then. A plan that throws aborts the write; `ResolveError.evidenceRead` says the evidence could not be
+    /// read. The plan gets the state as the transaction sees it, so everything it does must be synchronous.
+    @discardableResult
+    func resolveSpeakerNames(meetingID: Int64, _ plan: MeetingSpeakerNames.ResolvePlan) throws
+        -> MeetingSpeakerNames.WriteResult?
+    {
+        try write { db in
+            guard
+                let document = try? Self.loadDocument(id: meetingID, includingTrashed: false, in: db),
+                !document.speakers.isEmpty,
+                let states = try? Self.speakerNameStates(meetingID: meetingID, in: db)
+            else { return nil }
+            let stored: [StoredNameEvidence]
+            do {
+                stored = try Self.nameEvidence(meetingID: meetingID, in: db)
+            } catch {
+                throw ResolveError.evidenceRead
             }
-            try db.execute(sql: "DELETE FROM meeting_name_evidence WHERE meeting_id = ?", arguments: [meetingID])
-            for item in evidence {
-                try db.execute(
-                    sql: """
-                        INSERT INTO meeting_name_evidence
-                            (meeting_id, speaker_id, source, name, kind, segment_id, start_ms, end_ms, strength)
-                        VALUES (
-                            ?, (SELECT id FROM meeting_speaker WHERE id = ? AND meeting_id = ?), ?, ?, ?,
-                            (SELECT id FROM meeting_segment WHERE id = ? AND meeting_id = ?), ?, ?, ?)
-                        """,
-                    arguments: [
-                        meetingID, item.speakerID, meetingID, item.source.rawValue, item.name, item.kind?.rawValue,
-                        item.segmentID, meetingID, item.startMs, item.endMs, item.strength,
-                    ])
-            }
-            if labelChanged { try Self.markNotesStale(meetingID: meetingID, in: db) }
-            return written
+            let plan = try plan(document, states, stored)
+            let written = try Self.applySpeakerNames(
+                plan.updates, evidence: plan.evidence, meetingID: meetingID, in: db)
+            return MeetingSpeakerNames.WriteResult(written: written, plan: plan)
         }
     }
 

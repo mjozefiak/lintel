@@ -1,22 +1,21 @@
 import Foundation
 
 /// The store calls one name refresh makes. `MeetingsStore` is the only real one; the seam exists so a test can make
-/// one read fail (a failing read must abort the write, and the real store cannot be made to fail on one read only).
+/// the resolution fail inside the store's transaction (a failed read must abort the write, and the real store cannot
+/// be made to fail on one read only).
 protocol SpeakerNameStore: Sendable {
     func loadDocument(id: Int64, includingTrashed: Bool) throws -> MeetingDocument?
-    func speakerNameStates(meetingID: Int64) throws -> [MeetingsStore.SpeakerNameState]
-    func nameEvidence(meetingID: Int64) throws -> [MeetingsStore.StoredNameEvidence]
-    @discardableResult
-    func saveSpeakerNames(
-        _ updates: [MeetingsStore.SpeakerNameUpdate], evidence: [MeetingsStore.StoredNameEvidence], meetingID: Int64
-    ) throws -> Set<Int64>
+    /// One transaction: the meeting, its speakers and their evidence are read, `plan` resolves and `applySpeakerNames`
+    /// writes. `nil` when the meeting is gone or its rows cannot be read.
+    func resolveSpeakerNames(meetingID: Int64, _ plan: MeetingSpeakerNames.ResolvePlan) throws
+        -> MeetingSpeakerNames.WriteResult?
 }
 
 extension MeetingsStore: SpeakerNameStore {}
 
 /// The speakers' names of one meeting, between the store and the pure name layer (spec
 /// `2026-11-25-meeting-speaker-names`, step 1.4b). Reads the speakers and the transcript, runs `SpeakerNamePass` when
-/// one is given, resolves with `SpeakerNameResolver` and writes the result through `saveSpeakerNames`, whose SQL
+/// one is given, resolves with `SpeakerNameResolver` and writes the result through `resolveSpeakerNames`, whose SQL
 /// guard never overwrites a name the user gave or confirmed, the owner's own speaker or a value of a newer build.
 ///
 /// Where it runs (F1): at the start of a notes job (`NotesService`), before the notes' transcript is built and
@@ -26,8 +25,9 @@ extension MeetingsStore: SpeakerNameStore {}
 ///
 /// The model may read for a minute, and the user may rename, confirm, refuse or merge speakers meanwhile. So the
 /// pass gets the transcript of the moment it starts, and the resolution is made on the meeting as it is after the
-/// pass: the speakers and their names are read again, the pass's evidence is mapped onto the fresh transcript by
-/// its segments, and only then is anything written. A read that fails writes nothing.
+/// pass: the document, the speakers' names and their evidence are read inside one write transaction, the pass's
+/// evidence is mapped onto that transcript by its segments, and only then is anything written. A user write
+/// therefore lands either entirely before the resolution sees the meeting or entirely after it was written.
 ///
 /// - Only a `diarized` meeting is named: `channels` speakers are tracks ("Ja", "Inni"), `none` has none.
 /// - An `applied` name becomes the speaker's `label`, which the transcript and the notes read. A `suggested` name
@@ -77,6 +77,32 @@ enum MeetingSpeakerNames {
         }
     }
 
+    /// The plan a resolution hands to the store: the document, the speakers and the evidence as the transaction reads
+    /// them, and what to write for them. Only a `Sendable` closure can run inside the store's transaction.
+    typealias ResolvePlan =
+        @Sendable (
+            MeetingDocument, [MeetingsStore.SpeakerNameState], [MeetingsStore.StoredNameEvidence]
+        ) throws -> Plan
+
+    /// What a resolution writes, decided inside the store's transaction: the speakers' new names and the meeting's
+    /// evidence, with the counts the report shows (never a name). `MeetingsStore.applySpeakerNames` does the write.
+    struct Plan: Equatable, Sendable {
+        /// The speakers of the meeting the plan was made on.
+        var speakers = 0
+        var updates: [MeetingsStore.SpeakerNameUpdate] = []
+        var evidence: [MeetingsStore.StoredNameEvidence] = []
+        /// Names shown as labels, per source (`NameSource.rawValue`).
+        var applied: [String: Int] = [:]
+        /// Names waiting as "Marek?", per source.
+        var suggested: [String: Int] = [:]
+    }
+
+    /// What the store wrote: the speakers it changed and the plan it wrote.
+    struct WriteResult: Equatable, Sendable {
+        let written: Set<Int64>
+        let plan: Plan
+    }
+
     /// Resolves and writes the names of `document`'s meeting. `pass` is the conversation source; `nil` runs only the
     /// sources without a model. Returns `nil` when the meeting is not diarized (nothing is read or written then).
     @concurrent
@@ -86,123 +112,44 @@ enum MeetingSpeakerNames {
     ) async -> Report? {
         guard document.speakerMode == .diarized, !document.speakers.isEmpty else { return nil }
         var report = Report(speakers: document.speakers.count)
-        guard let pass else {
-            guard let snapshot = Snapshot(store: store, meetingID: document.id) else {
-                report.writeFailure = .stateRead
-                return report
-            }
-            report.speakers = snapshot.document.speakers.count
-            return resolveAndWrite(
-                store: store, snapshot: snapshot, evidence: [], selfName: selfName,
-                conversationAnswered: false, report: report)
-        }
 
         // The transcript the model reads carries the default numbered labels ("Mówca N"), never a name a run or
         // the user gave: the prompt says a label is never a name, and a name in a label would make the answer
         // ambiguous. The answer's labels are mapped back to speakers after the pass, by segment.
         let before = Snapshot(document: document)
-        report.pass = await pass.run(segments: before.passSegments, conditions: conditions)
-        // No answer says nothing about the transcript: the names the meeting had stay.
-        guard report.pass.status != .failed, !Task.isCancelled else { return report }
+        var answered: [NameEvidence] = []
+        var conversationAnswered = false
+        if let pass {
+            report.pass = await pass.run(segments: before.passSegments, conditions: conditions)
+            // No answer says nothing about the transcript: the names the meeting had stay.
+            guard report.pass.status != .failed, !Task.isCancelled else { return report }
+            answered = report.pass.accepted
+            conversationAnswered = report.pass.status == .answered
+        }
 
         // The meeting as it is now: the user may have renamed, confirmed, refused or merged speakers while the
-        // model was reading. The resolution below is made on this state, never on the snapshot from before.
-        guard let snapshot = Snapshot(store: store, meetingID: document.id) else {
-            report.writeFailure = .stateRead
-            return report
-        }
-        report.speakers = snapshot.document.speakers.count
-        let evidence = snapshot.remapping(report.pass.accepted, from: before)
-        return resolveAndWrite(
-            store: store, snapshot: snapshot, evidence: evidence, selfName: selfName,
-            conversationAnswered: report.pass.status == .answered, report: report)
-    }
-
-    /// Resolves `snapshot`'s speakers and writes the result. `evidence` is already mapped onto `snapshot`'s
-    /// transcript. A read that fails before the write leaves everything as it was: the stored evidence is only
-    /// replaced by `saveSpeakerNames` after it was read.
-    private static func resolveAndWrite(
-        store: any SpeakerNameStore, snapshot: Snapshot, evidence: [NameEvidence], selfName: String,
-        conversationAnswered: Bool, report initial: Report
-    ) -> Report {
-        var report = initial
-        let byID = snapshot.statesByID
-        let clusters = snapshot.document.speakers.map { cluster(for: $0, state: byID[$0.id]) }
-        // Without an answer the conversation's own names are not this run's to change.
-        let writable = Set(
-            snapshot.document.speakers.filter { speaker in
-                guard let state = byID[speaker.id], isWritable(state) else { return false }
-                return conversationAnswered || state.source != .transcript
-            }.map(\.id))
-        let resolutions = SpeakerNameResolver.resolve(
-            SpeakerNameRequest(
-                mode: .diarized, clusters: clusters, selfName: selfName, evidence: evidence,
-                segmentClusters: snapshot.segmentClusters))
-
-        // The labels of the speakers left without a name, in the order `SpeakerAssigner` numbers them.
-        let defaults = defaultLabels(
-            for: snapshot.document,
-            reverting: Set(
-                resolutions.filter { $0.status != .applied || $0.name == nil }.map { Int64($0.cluster) }
-                    .filter(writable.contains)))
-
-        var updates: [MeetingsStore.SpeakerNameUpdate] = []
-        var fresh: [MeetingsStore.StoredNameEvidence] = []
-        for resolution in resolutions {
-            let speakerID = Int64(resolution.cluster)
-            guard writable.contains(speakerID) else { continue }
-            let label = snapshot.labels[speakerID] ?? ""
-            if resolution.status == .applied, let name = resolution.name {
-                updates.append(
-                    .init(
-                        speakerID: speakerID, label: name, source: resolution.source, status: .applied,
-                        suggestedName: nil))
-                report.applied[resolution.source.rawValue, default: 0] += 1
-            } else if let suggestion = resolution.suggestedName {
-                updates.append(
-                    .init(
-                        speakerID: speakerID, label: defaults[speakerID] ?? label, source: resolution.source,
-                        status: .suggested, suggestedName: suggestion))
-                report.suggested[resolution.source.rawValue, default: 0] += 1
-            } else {
-                // No name: the default label, the state a fresh speaker has.
-                updates.append(
-                    .init(
-                        speakerID: speakerID, label: defaults[speakerID] ?? label, source: .default,
-                        status: .confirmed, suggestedName: nil))
-            }
-            for item in resolution.evidence where item.source != .me {
-                fresh.append(
-                    .init(
-                        speakerID: speakerID, source: item.source, name: item.name, kind: item.kind,
-                        segmentID: item.segment.flatMap { snapshot.segmentIDs[$0] }, startMs: item.startMs,
-                        endMs: item.endMs, strength: item.strength))
-            }
-        }
-
-        // `saveSpeakerNames` replaces the meeting's evidence: the rows of the speakers this run does not write (a
-        // name the user confirmed keeps where it came from) stay, pointed again at their speaker by their segment
-        // when a new speaker plan left them without one. A read error aborts the write — the save would delete the
-        // evidence it could not see — and the notes go on with the names the meeting had.
-        let kept: [MeetingsStore.StoredNameEvidence]
+        // model was reading. The store reads the document, the speakers and their evidence and writes the
+        // resolution in one transaction, so a user write is either seen by the plan or lands after it.
+        let resolution = Resolution(
+            before: before, evidence: answered, selfName: selfName, conversationAnswered: conversationAnswered)
         do {
-            kept = try store.nameEvidence(meetingID: snapshot.document.id).compactMap {
-                stored -> MeetingsStore.StoredNameEvidence? in
-                guard stored.source != .me,
-                    let speaker = stored.speakerID ?? stored.segmentID.flatMap({ snapshot.segmentSpeakers[$0] }),
-                    byID[speaker] != nil, !writable.contains(speaker)
-                else { return nil }
-                var item = stored
-                item.speakerID = speaker
-                return item
+            guard
+                let result = try store.resolveSpeakerNames(
+                    meetingID: document.id,
+                    { document, states, stored in
+                        resolution.plan(document: document, states: states, stored: stored)
+                    })
+            else {
+                report.writeFailure = .stateRead
+                return report
             }
-        } catch {
-            report.writeFailure = .evidenceRead
-            return report
-        }
-        do {
-            try store.saveSpeakerNames(updates, evidence: kept + fresh, meetingID: snapshot.document.id)
+            report.speakers = result.plan.speakers
+            report.applied = result.plan.applied
+            report.suggested = result.plan.suggested
             report.written = true
+        } catch MeetingsStore.ResolveError.evidenceRead {
+            // The save would delete the evidence it could not see: leave everything as it was.
+            report.writeFailure = .evidenceRead
         } catch {
             report.writeFailure = .save
         }
@@ -286,8 +233,9 @@ enum MeetingSpeakerNames {
     }
 
     /// The label the name pass reads for each speaker: the default numbered label by the speaker's place among the
-    /// speakers other than the owner's (`SpeakerAssigner`'s order), never a name. The owner's speaker keeps its
-    /// stored label, as the notes always show it ("Ja", never `selfName`).
+    /// speakers other than the owner's (`SpeakerAssigner`'s order), never a name. The owner's speaker reads the
+    /// default label too (`SpeakerLabels.me`, "Ja"), never a name it was renamed to: the prompt says a label is
+    /// never a name, and the notes always show the owner as "Ja" rather than `selfName`.
     static func passLabels(for document: MeetingDocument) -> [Int: String] {
         var first: [Int64: Int] = [:]
         for segment in document.segments {
@@ -302,9 +250,98 @@ enum MeetingSpeakerNames {
             result[Int(speaker.id)] = SpeakerLabels.numbered(index + 1)
         }
         for speaker in document.speakers where speaker.isSelf {
-            result[Int(speaker.id)] = speaker.label
+            result[Int(speaker.id)] = SpeakerLabels.me
         }
         return result
+    }
+}
+
+// MARK: - The resolution of one refresh
+
+extension MeetingSpeakerNames {
+    /// One refresh's resolution: the transcript before the pass (whose labels its answer refers to), the evidence
+    /// the pass brought back and the settings it needs. `plan` runs inside the store's write transaction, on the
+    /// meeting as it is then; it is pure and synchronous, so nothing can move under it.
+    fileprivate struct Resolution: Sendable {
+        let before: Snapshot
+        let evidence: [NameEvidence]
+        let selfName: String
+        let conversationAnswered: Bool
+
+        /// The names to write for the meeting the transaction read. The evidence of the speakers this run does not
+        /// write (a name the user confirmed keeps where it came from) stays, pointed again at its speaker by its
+        /// segment when a new speaker plan left it without one.
+        func plan(
+            document: MeetingDocument, states: [MeetingsStore.SpeakerNameState],
+            stored: [MeetingsStore.StoredNameEvidence]
+        ) -> Plan {
+            let snapshot = Snapshot(document: document, states: states)
+            let evidence = snapshot.remapping(self.evidence, from: before)
+            let byID = snapshot.statesByID
+            let clusters = document.speakers.map { MeetingSpeakerNames.cluster(for: $0, state: byID[$0.id]) }
+            // Without an answer the conversation's own names are not this run's to change.
+            let writable = Set(
+                document.speakers.filter { speaker in
+                    guard let state = byID[speaker.id], MeetingSpeakerNames.isWritable(state) else { return false }
+                    return conversationAnswered || state.source != .transcript
+                }.map(\.id))
+            let resolutions = SpeakerNameResolver.resolve(
+                SpeakerNameRequest(
+                    mode: .diarized, clusters: clusters, selfName: selfName, evidence: evidence,
+                    segmentClusters: snapshot.segmentClusters))
+
+            // The labels of the speakers left without a name, in the order `SpeakerAssigner` numbers them.
+            let defaults = MeetingSpeakerNames.defaultLabels(
+                for: document,
+                reverting: Set(
+                    resolutions.filter { $0.status != .applied || $0.name == nil }.map { Int64($0.cluster) }
+                        .filter(writable.contains)))
+
+            var plan = Plan(speakers: document.speakers.count)
+            var fresh: [MeetingsStore.StoredNameEvidence] = []
+            for resolution in resolutions {
+                let speakerID = Int64(resolution.cluster)
+                guard writable.contains(speakerID) else { continue }
+                let label = snapshot.labels[speakerID] ?? ""
+                if resolution.status == .applied, let name = resolution.name {
+                    plan.updates.append(
+                        .init(
+                            speakerID: speakerID, label: name, source: resolution.source, status: .applied,
+                            suggestedName: nil))
+                    plan.applied[resolution.source.rawValue, default: 0] += 1
+                } else if let suggestion = resolution.suggestedName {
+                    plan.updates.append(
+                        .init(
+                            speakerID: speakerID, label: defaults[speakerID] ?? label, source: resolution.source,
+                            status: .suggested, suggestedName: suggestion))
+                    plan.suggested[resolution.source.rawValue, default: 0] += 1
+                } else {
+                    // No name: the default label, the state a fresh speaker has.
+                    plan.updates.append(
+                        .init(
+                            speakerID: speakerID, label: defaults[speakerID] ?? label, source: .default,
+                            status: .confirmed, suggestedName: nil))
+                }
+                for item in resolution.evidence where item.source != .me {
+                    fresh.append(
+                        .init(
+                            speakerID: speakerID, source: item.source, name: item.name, kind: item.kind,
+                            segmentID: item.segment.flatMap { snapshot.segmentIDs[$0] }, startMs: item.startMs,
+                            endMs: item.endMs, strength: item.strength))
+                }
+            }
+            let kept: [MeetingsStore.StoredNameEvidence] = stored.compactMap { storedRow in
+                guard storedRow.source != .me,
+                    let speaker = storedRow.speakerID ?? storedRow.segmentID.flatMap({ snapshot.segmentSpeakers[$0] }),
+                    byID[speaker] != nil, !writable.contains(speaker)
+                else { return nil }
+                var item = storedRow
+                item.speakerID = speaker
+                return item
+            }
+            plan.evidence = kept + fresh
+            return plan
+        }
     }
 }
 
@@ -312,9 +349,9 @@ enum MeetingSpeakerNames {
 
 extension MeetingSpeakerNames {
     /// One meeting as a refresh sees it: the speakers with their stored names, the transcript in time order with
-    /// the clusters its segments belong to, and the labels the pass reads. Built from a document (the transcript the
-    /// pass gets) or from the store (the state the resolution is made on).
-    fileprivate struct Snapshot {
+    /// the clusters its segments belong to, and the labels the pass reads. Internal (not a contract) so the
+    /// evidence remapping can be tested on its own, without a pass or a store.
+    struct Snapshot {
         let document: MeetingDocument
         let statesByID: [Int64: MeetingsStore.SpeakerNameState]
         /// The transcript in time order; the pass's evidence indexes these.
@@ -357,18 +394,8 @@ extension MeetingSpeakerNames {
             numbered = MeetingSpeakerNames.passLabels(for: document)
         }
 
-        /// The meeting and its speakers as the store holds them now; `nil` when the meeting is gone (deleted or
-        /// trashed) or the rows cannot be read — nothing is written then.
-        init?(store: any SpeakerNameStore, meetingID: Int64) {
-            guard let document = try? store.loadDocument(id: meetingID, includingTrashed: false),
-                !document.speakers.isEmpty
-            else { return nil }
-            guard let states = try? store.speakerNameStates(meetingID: meetingID) else { return nil }
-            self.init(document: document, states: states)
-        }
-
         /// The transcript the name pass reads: the default numbered labels, never a name the user or an earlier run
-        /// gave. The owner's speaker keeps its stored label.
+        /// gave. The owner's speaker reads "Ja".
         var passSegments: [NameSegment] {
             ordered.enumerated().map { index, segment in
                 let label = segment.speakerID.flatMap { numbered[Int($0)] } ?? "?"
@@ -380,17 +407,18 @@ extension MeetingSpeakerNames {
         /// The pass's evidence, pointed at this snapshot's transcript. A quote is followed by its segment: after a
         /// merge the segment belongs to another speaker and the evidence follows it. A vocative or an announcement
         /// names the speaker of the segment right after the quote, followed by that segment too. Evidence whose
-        /// segment is gone is dropped.
+        /// segment or speaker is gone is dropped: a label without its speaker would name nobody (or, worse, whoever
+        /// has that label now).
         func remapping(_ evidence: [NameEvidence], from before: Snapshot) -> [NameEvidence] {
             evidence.compactMap { item in
                 var item = item
                 guard let oldIndex = item.segment else {
                     // Evidence without a quote (another source than the conversation) is followed by its label.
-                    if let speaker = item.speaker.flatMap({ before.speakerID(forPassLabel: $0) }),
+                    guard
+                        let speaker = item.speaker.flatMap({ before.speakerID(forPassLabel: $0) }),
                         let label = labels[speaker]
-                    {
-                        item.speaker = label
-                    }
+                    else { return nil }
+                    item.speaker = label
                     return item
                 }
                 guard let segmentID = before.segmentIDs[oldIndex], let index = indexBySegmentID[segmentID] else {

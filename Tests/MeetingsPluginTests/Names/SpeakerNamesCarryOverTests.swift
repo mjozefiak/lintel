@@ -235,6 +235,36 @@ import Testing
         let labels = MeetingSpeakerNames.defaultLabels(for: doc, reverting: [2])
         #expect(labels[2] == "Mówca 2")
     }
+
+    @Test func thePassReadsTheOwnersLabelNeverAName() {
+        // The owner renamed their own speaker ("To ja", then a name): the pass must still read "Ja", the prompt
+        // says a label is never a name.
+        let doc = document(
+            [speaker(1, "Zofia Wysocka", isSelf: true), speaker(2, "Mówca 1")], firsts: [1: 0, 2: 1_000])
+        #expect(MeetingSpeakerNames.passLabels(for: doc)[1] == SpeakerLabels.me)
+        #expect(MeetingSpeakerNames.Snapshot(document: doc).passSegments.first?.speaker == SpeakerLabels.me)
+    }
+
+    @Test func evidenceWhoseSpeakerIsGoneIsDropped() {
+        let before = document(
+            [speaker(1, "Ja", isSelf: true), speaker(2, "Mówca 1"), speaker(3, "Mówca 2")],
+            firsts: [1: 0, 2: 1_000, 3: 2_000])
+        // The meeting after the pass: "Mówca 2" is gone (a new speaker plan, or a merge into another speaker).
+        let after = document([speaker(1, "Ja", isSelf: true), speaker(2, "Mówca 1")], firsts: [1: 0, 2: 1_000])
+        let evidence = NameEvidence(
+            source: .calendar, name: "Marek", speaker: "Mówca 2", kind: nil, segment: nil, startMs: nil, endMs: nil,
+            strength: 1, confidence: nil)
+        let from = MeetingSpeakerNames.Snapshot(document: before)
+        let to = MeetingSpeakerNames.Snapshot(document: after)
+
+        // A label without its speaker would name nobody: the evidence is dropped, never kept with the pass's label.
+        #expect(to.remapping([evidence], from: from).isEmpty)
+
+        // A speaker that is still there keeps its evidence, under the label it has now.
+        var kept = evidence
+        kept.speaker = "Mówca 1"
+        #expect(to.remapping([kept], from: from).map(\.speaker) == ["Mówca 1"])
+    }
 }
 
 /// How the pass reports its end, and the time limit around the open of the writer.

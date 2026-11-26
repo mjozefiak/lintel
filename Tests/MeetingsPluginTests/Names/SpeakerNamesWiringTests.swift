@@ -776,8 +776,12 @@ final class TraceLog: Sendable {
 }
 
 /// A store whose evidence read fails: everything else goes to the real one. The refresh must abort the write when
-/// it cannot see the rows the save would delete.
+/// it cannot see the rows the save would delete. The evidence table is moved out of the way for the resolution, so
+/// the failure happens inside the real transaction, right after the speakers are read.
 private final class FailingEvidenceReads: SpeakerNameStore, @unchecked Sendable {
+    private static let evidence = "meeting_name_evidence"
+    private static let moved = "meeting_name_evidence_unreadable"
+
     let base: MeetingsStore
 
     init(base: MeetingsStore) { self.base = base }
@@ -786,18 +790,17 @@ private final class FailingEvidenceReads: SpeakerNameStore, @unchecked Sendable 
         try base.loadDocument(id: id, includingTrashed: includingTrashed)
     }
 
-    func speakerNameStates(meetingID: Int64) throws -> [MeetingsStore.SpeakerNameState] {
-        try base.speakerNameStates(meetingID: meetingID)
-    }
-
-    func nameEvidence(meetingID: Int64) throws -> [MeetingsStore.StoredNameEvidence] {
-        throw MeetingsStoreError.closed
-    }
-
-    @discardableResult
-    func saveSpeakerNames(
-        _ updates: [MeetingsStore.SpeakerNameUpdate], evidence: [MeetingsStore.StoredNameEvidence], meetingID: Int64
-    ) throws -> Set<Int64> {
-        try base.saveSpeakerNames(updates, evidence: evidence, meetingID: meetingID)
+    func resolveSpeakerNames(meetingID: Int64, _ plan: MeetingSpeakerNames.ResolvePlan) throws
+        -> MeetingSpeakerNames.WriteResult?
+    {
+        try base.write { db in
+            try db.execute(sql: "ALTER TABLE \(Self.evidence) RENAME TO \(Self.moved)")
+        }
+        defer {
+            try? base.write { db in
+                try db.execute(sql: "ALTER TABLE \(Self.moved) RENAME TO \(Self.evidence)")
+            }
+        }
+        return try base.resolveSpeakerNames(meetingID: meetingID, plan)
     }
 }
