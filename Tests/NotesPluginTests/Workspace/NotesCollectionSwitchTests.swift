@@ -43,19 +43,21 @@ private struct SwitchRig {
 @MainActor
 @Suite("Explorer: Notes / Dictations switch")
 struct NotesCollectionSwitchTests {
-    @Test("the explorer starts on Notes and the switch lists the other list; the status line follows")
+    @Test("the explorer starts on All notes and a sidebar click lists one collection; the status line follows")
     func switching() async {
         let rig = SwitchRig()
         await rig.model.refresh()
-        #expect(rig.model.collection == .notes)
-        #expect(rig.model.statusSummary == "2 notes")
+        #expect(rig.model.collection == .all)
+        #expect(rig.model.rows.map(\.id.key.rawValue) == ["meetings:a", "dictation:s/0", "dictation:s/1", "meetings:b"])
+        #expect(rig.model.statusSummary == "4 notes")
         await rig.model.setCollection(.dictations)
         #expect(rig.model.collection == .dictations)
         #expect(rig.model.rows.map(\.id.key.rawValue) == ["dictation:s/0", "dictation:s/1"])
         #expect(rig.model.total == 2)
         #expect(rig.model.statusSummary == "2 dictations")
-        await rig.model.setCollection(.notes)
+        await rig.model.setCollection(.meetings)
         #expect(rig.model.rows.map(\.id.key.rawValue) == ["meetings:a", "meetings:b"])
+        #expect(rig.model.statusSummary == "2 meetings")
     }
 
     @Test("a switch drops the old rows at once, so a dictation never shows in the notes list")
@@ -72,6 +74,8 @@ struct NotesCollectionSwitchTests {
         let rig = SwitchRig()
         rig.model.searchText = "pricing"
         await rig.model.runSearch()
+        #expect(rig.model.rows.map(\.id.key.rawValue) == ["meetings:a", "dictation:s/1"])
+        await rig.model.setCollection(.meetings)
         #expect(rig.model.rows.map(\.id.key.rawValue) == ["meetings:a"])
         await rig.model.setCollection(.dictations)
         #expect(rig.model.isSearching)
@@ -97,7 +101,7 @@ struct NotesCollectionSwitchTests {
     func errorsStayInTheirList() async {
         let rig = SwitchRig()
         rig.dictation.behavior = .throwsError
-        await rig.model.refresh()
+        await rig.model.setCollection(.meetings)
         #expect(rig.model.unavailable.isEmpty)
         await rig.model.setCollection(.dictations)
         #expect(rig.model.unavailable.map(\.pluginID) == ["dictation"])
@@ -122,28 +126,29 @@ struct NotesCollectionSwitchTests {
         gate.hold(next: 1)
         let slow = Task { await rig.model.setCollection(.dictations) }
         await gate.held.wait()
-        await rig.model.setCollection(.notes)
+        await rig.model.setCollection(.meetings)
         gate.release()
         await slow.value
-        #expect(rig.model.collection == .notes)
+        #expect(rig.model.collection == .meetings)
         #expect(rig.model.rows.map(\.id.key.rawValue) == ["meetings:a", "meetings:b"])
     }
 
-    @Test("opening a dictation by route (the history's Open in Lintel) switches to Dictations and opens it")
-    func routeOpensDictation() async {
+    @Test("opening a note by route that the shown collection does not list moves the list to All notes, unsaved")
+    func routeOpensNoteOutsideTheCollection() async {
         let rig = SwitchRig()
-        await rig.model.refresh()
+        await rig.model.setCollection(.meetings)
         let key = Fixtures.key("dictation", "s/1")
         #expect(rig.model.handle(NoteRoute.route(for: key)))
-        #expect(rig.model.collection == .dictations)
+        #expect(rig.model.collection == .all)
         #expect(rig.model.currentID == .live(key))
         // The list is read in the background; wait for it without polling.
         await waitUntil { rig.model.loadState == .loaded }
-        #expect(rig.model.rows.map(\.id.key.rawValue) == ["dictation:s/0", "dictation:s/1"])
+        #expect(rig.model.rows.count == 4)
+        #expect(rig.model.explorer.selection == .live(key))
         #expect(rig.model.tabs.tabs.first?.kind == .dictation)
-        // Opening a meeting goes back to Notes; both tabs stay open.
+        // A note the collection lists changes nothing; both tabs stay open.
         #expect(rig.model.handle(NoteRoute.route(for: Fixtures.key("meetings", "a"))))
-        #expect(rig.model.collection == .notes)
+        #expect(rig.model.collection == .all)
         #expect(rig.model.tabs.tabs.count == 2)
     }
 
