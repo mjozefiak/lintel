@@ -4141,6 +4141,24 @@
         }
       }
     },
+    "Get Whisper to transcribe %@" : {
+      "comment" : "Settings → Meetings and Dictation banner detail: a listed language needs the Whisper model, which is not installed; the argument is the language's name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get Whisper to transcribe %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pobierz Whisper, aby transkrybować %@"
+          }
+        }
+      }
+    },
     "Speech model: %@." : {
       "comment" : "Settings → Dictation and Meetings banner detail when the feature is ready: the speech model's name",
       "extractionState" : "manual",

@@ -66,6 +66,9 @@ public final class MeetingsPlugin: LintelPlugin {
     /// Where app activations are posted (tests use their own centre).
     var appActivationCenter: NotificationCenter = .default
     private var activationObserver: AppActivationObserver?
+    /// Listens to the shared "Languages I speak" while active: a change may switch the engine of the next
+    /// recording, so the banner and `modelUsage` are read again.
+    private var languageChanges: Task<Void, Never>?
 
     /// The shell builds the plugin from its type; `MeetingsSystem.standard` is `live` in the app.
     public convenience init(context: PluginContext) {
@@ -177,6 +180,12 @@ public final class MeetingsPlugin: LintelPlugin {
         activationObserver = AppActivationObserver(center: appActivationCenter) {
             Task { await model.refreshStatus() }
         }
+        let languages = context.speechLanguages.changes
+        let resultsChanged = context.resultsChanged
+        languageChanges?.cancel()
+        languageChanges = Task {
+            for await _ in languages { resultsChanged() }
+        }
     }
 
     /// Switches the plugin off. A recording in progress is finished first, for at most the controller's
@@ -190,6 +199,8 @@ public final class MeetingsPlugin: LintelPlugin {
         defer { noteChanges.finishAll() }
         activationObserver?.stop()
         activationObserver = nil
+        languageChanges?.cancel()
+        languageChanges = nil
         stopDetector()
         // A running notes job is cancelled and puts its status back before the library can close.
         await notes.shutDown()
