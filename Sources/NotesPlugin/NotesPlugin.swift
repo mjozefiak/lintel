@@ -97,6 +97,9 @@ public final class NotesPlugin: LintelPlugin {
             title: LocalizedStringResource("Notes", comment: "Main window section title"),
             symbolName: "note.text",
             order: Self.manifest.order,
+            sidebar: WorkspaceSidebar(makeView: { [self] context in
+                AnyView(NotesSidebarBlock(model: workspace, context: context))
+            }),
             makeView: { [self] in AnyView(NotesSectionView(model: workspace)) },
             handleRoute: { [self] route in workspace.handle(route) },
             willHide: { [self] in await documents.flushAll() },
