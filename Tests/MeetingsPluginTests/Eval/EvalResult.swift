@@ -83,9 +83,21 @@ struct EvalResult: Codable, Equatable, Sendable {
     /// Additive and optional: the capture counters of the run (numbers only), including the voice activity
     /// detector statistics. Written only when the run had them.
     var capture: CaptureCounters?
+    /// Additive and optional (spec 2026-11-25-meeting-speaker-names, step 0.1): the name each speaker label ended
+    /// with, for `scripts/meeting-eval/score.py` (`speakerNames`). Absent until the app names speakers (F1).
+    var speakerNames: [SpeakerName]?
+
+    /// One speaker label and the real name shown for it. `source`: default, self, user, platform, calendar,
+    /// transcript; `status`: confirmed, applied, suggested. Carries a name, so it never goes to logs or traces.
+    struct SpeakerName: Codable, Equatable, Sendable {
+        var label: String
+        var name: String
+        var source: String
+        var status: String
+    }
 
     private enum CodingKeys: String, CodingKey {
-        case schema, recording, audioSeconds, config, asr, diarization, notes, capture
+        case schema, recording, audioSeconds, config, asr, diarization, notes, capture, speakerNames
     }
 
     init(
@@ -110,6 +122,7 @@ struct EvalResult: Codable, Equatable, Sendable {
         diarization = try container.decodeIfPresent(Diarization.self, forKey: .diarization)
         notes = try container.decodeIfPresent(Notes.self, forKey: .notes)
         capture = try container.decodeIfPresent(CaptureCounters.self, forKey: .capture)
+        speakerNames = try container.decodeIfPresent([SpeakerName].self, forKey: .speakerNames)
     }
 
     /// The optional sections are always written, as `null` when absent (the scorer reads the keys directly).
@@ -131,6 +144,7 @@ struct EvalResult: Codable, Equatable, Sendable {
             try container.encodeNil(forKey: .notes)
         }
         try container.encodeIfPresent(capture, forKey: .capture)
+        try container.encodeIfPresent(speakerNames, forKey: .speakerNames)
     }
 }
 
