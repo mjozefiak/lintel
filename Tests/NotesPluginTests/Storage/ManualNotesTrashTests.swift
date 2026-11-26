@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import LintelCore
 import LintelKit
 import Synchronization
 import Testing

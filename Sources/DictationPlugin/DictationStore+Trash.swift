@@ -1,39 +1,13 @@
 import Foundation
 import GRDB
+import LintelCore
 
-/// How `dictation_entry.deleted_at` is written and compared (notes explorer spec, Deletion lifecycle).
-///
-/// The column is a REAL in Unix seconds. A bulk move stamps every row with one value and `restoreBatch` finds
-/// the batch by equality, so one conversion rules every write and every comparison: the time is rounded to a
-/// whole microsecond, stored as `micros / 1e6` and compared through `CAST(ROUND(deleted_at * 1e6) AS INTEGER)`.
-/// A stamp read back after the database is reopened therefore equals the one written. (Meetings has the same
-/// rule in its own copy: plugins never import each other.)
-enum TrashStamp {
-    /// How long a row stays in Recently deleted.
-    static let retention: TimeInterval = 30 * 24 * 60 * 60
-
-    /// The SQL expression that reads a stamp column as whole microseconds.
-    static let microsSQL = "CAST(ROUND(deleted_at * 1000000) AS INTEGER)"
-
-    static func micros(_ date: Date) -> Int64 {
-        Int64((date.timeIntervalSince1970 * 1_000_000).rounded())
-    }
-
-    /// The value the column holds for these microseconds.
-    static func column(micros: Int64) -> Double { Double(micros) / 1_000_000 }
-
-    static func micros(column: Double) -> Int64 { Int64((column * 1_000_000).rounded()) }
-
-    static func date(micros: Int64) -> Date { Date(timeIntervalSince1970: column(micros: micros)) }
-
-    static func date(column: Double) -> Date { date(micros: micros(column: column)) }
-
+/// Dictation's retention limit on top of the shared stamp rule (`LintelCore.TrashStamp`).
+extension TrashStamp {
     /// When an entry deleted at `deletedAt` is gone for good: the earlier of 30 days after the delete and the
     /// entry's retention limit (`createdAt` + `retentionDays`; 0 means no limit, so only the 30 days count).
     static func purgeAt(deletedAt: Date, createdAt: Date, retentionDays: Int) -> Date {
-        let thirty = deletedAt.addingTimeInterval(retention)
-        guard retentionDays > 0 else { return thirty }
-        return min(thirty, createdAt.addingTimeInterval(Double(retentionDays) * 24 * 60 * 60))
+        purgeAt(deletedAt: deletedAt, limitStart: createdAt, retentionDays: retentionDays)
     }
 }
 
@@ -91,27 +65,42 @@ extension DictationStore {
         }
     }
 
+    /// What `restoreReporting(ids:)` did.
+    struct RestoreResult: Sendable, Equatable {
+        /// The ids that no longer exist.
+        var missing: Set<Int64> = []
+        /// How many entries left Recently deleted now (a live one, or one already restored, does not count).
+        var restored = 0
+    }
+
     /// Puts these entries back (a live one is left alone) and returns the ids that no longer exist. Takes any
     /// number of ids; the caller's chunking (500) only bounds a transaction.
     @discardableResult
     func restore(ids: [Int64]) throws -> Set<Int64> {
-        guard !ids.isEmpty else { return [] }
+        try restoreReporting(ids: ids).missing
+    }
+
+    /// `restore(ids:)` that also says how many entries it actually put back, so a source announces a change only
+    /// when something changed.
+    func restoreReporting(ids: [Int64]) throws -> RestoreResult {
+        guard !ids.isEmpty else { return RestoreResult() }
         return try write { db in
-            var missing = Set<Int64>()
+            var result = RestoreResult()
             for id in ids {
                 let exists =
                     try Bool.fetchOne(
                         db, sql: "SELECT EXISTS (SELECT 1 FROM dictation_entry WHERE id = ?)", arguments: [id])
                     ?? false
                 guard exists else {
-                    missing.insert(id)
+                    result.missing.insert(id)
                     continue
                 }
                 try db.execute(
                     sql: "UPDATE dictation_entry SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
                     arguments: [id])
+                result.restored += db.changesCount
             }
-            return missing
+            return result
         }
     }
 

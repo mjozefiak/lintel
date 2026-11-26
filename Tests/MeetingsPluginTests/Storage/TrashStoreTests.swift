@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import LintelCore
 import LintelPersistence
 import LintelTestSupport
 import Testing

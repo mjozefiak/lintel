@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import LintelCore
 
 /// One row of the meeting library list: what the list shows, without the transcript or the notes.
 struct MeetingLibraryEntry: Sendable, Equatable {

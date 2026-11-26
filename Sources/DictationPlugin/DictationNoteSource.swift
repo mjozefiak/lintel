@@ -300,17 +300,23 @@ extension DictationNoteSource: NoteSourceTrash {
         let (wanted, foreign) = rows(of: keys, storeID: storeID)
         let ids = Array(wanted.keys)
         var missing = Set<Int64>()
+        var restored = 0
         for start in stride(from: 0, to: ids.count, by: Self.trashChunk) {
             let chunk = Array(ids[start..<min(start + Self.trashChunk, ids.count)])
-            missing.formUnion(try await Self.restoreChunk(store: store, ids: chunk))
+            let result = try await Self.restoreChunk(store: store, ids: chunk)
+            missing.formUnion(result.missing)
+            restored += result.restored
         }
-        if !ids.isEmpty { history.announceChange() }
+        // Only a restore that put something back is a change (a live or purged key announces nothing).
+        if restored > 0 { history.announceChange() }
         return foreign.union(missing.compactMap { wanted[$0] })
     }
 
     @concurrent
-    private static func restoreChunk(store: DictationStore, ids: [Int64]) async throws -> Set<Int64> {
-        try store.restore(ids: ids)
+    private static func restoreChunk(store: DictationStore, ids: [Int64]) async throws
+        -> DictationStore.RestoreResult
+    {
+        try store.restoreReporting(ids: ids)
     }
 
     func restoreBatch(deletedAt: Date) async throws -> Int {

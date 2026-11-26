@@ -292,6 +292,32 @@ struct MeetingNoteSourceTrashContractTests {
         _ = try await rig.source.trashed(after: nil, limit: 10)
         #expect(!announced())
     }
+
+    @Test func aRestoreThatPutsNothingBackAnnouncesNothing() async throws {
+        let rig = try await TrashRig()
+        let live = try rig.key("plain")
+        var seen = rig.changes.get()
+        func announced() -> Bool {
+            defer { seen = rig.changes.get() }
+            return rig.changes.get() > seen
+        }
+        // A live meeting, a key of another plugin, a key that never existed and an empty list: nothing came back.
+        try await rig.source.restore([live])
+        #expect(!announced())
+        let foreign = NoteKey(pluginID: "dictation", id: "1")
+        let unknown = NoteKey(pluginID: rig.source.pluginID, id: "never-existed")
+        #expect(try await rig.source.restore([foreign, unknown]) == [foreign, unknown])
+        #expect(!announced())
+        try await rig.source.restore([])
+        #expect(!announced())
+        // A second restore of a meeting that is already back is not a change either; the first one is.
+        try await rig.source.trash(live)
+        #expect(announced())
+        try await rig.source.restore([live])
+        #expect(announced())
+        try await rig.source.restore([live])
+        #expect(!announced())
+    }
 }
 
 /// The fields Meetings fills for the explorer: `taskCount`, `liveSince` and `writer`.

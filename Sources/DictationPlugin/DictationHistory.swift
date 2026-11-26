@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import LintelCore
 import LintelKit
 import LintelPersistence
 import Observation

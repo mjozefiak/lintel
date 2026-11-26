@@ -334,6 +334,32 @@ struct DictationNoteSourceTrashContractTests {
         #expect(await iterator.next() != nil)
     }
 
+    @Test func aRestoreThatPutsNothingBackAnnouncesNothing() async throws {
+        let rig = try TrashRig()
+        let live = try rig.key("plain")
+        var seen = rig.changes.value
+        func announced() -> Bool {
+            defer { seen = rig.changes.value }
+            return rig.changes.value > seen
+        }
+        // A live entry, a key of another plugin, a key that never existed and an empty list: nothing came back.
+        try await rig.source.restore([live])
+        #expect(!announced())
+        let foreign = NoteKey(pluginID: "meetings", id: "1")
+        let unknown = NoteKey(pluginID: rig.source.pluginID, id: "9999")
+        _ = try await rig.source.restore([foreign, unknown])
+        #expect(!announced())
+        try await rig.source.restore([])
+        #expect(!announced())
+        // A second restore of an entry that is already back is not a change either; the first one is.
+        try await rig.source.trash(live)
+        #expect(announced())
+        try await rig.source.restore([live])
+        #expect(announced())
+        try await rig.source.restore([live])
+        #expect(!announced())
+    }
+
     @Test func aHistoryThatIsNotOpenThrowsAndNeverReadsAnEmptyAnswer() async throws {
         let rig = try TrashRig()
         let key = try rig.key("plain")

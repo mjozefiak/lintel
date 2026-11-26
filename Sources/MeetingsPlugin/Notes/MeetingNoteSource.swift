@@ -346,11 +346,15 @@ extension MeetingNoteSource: NoteSourceTrash {
         let uuids = keys.filter { $0.pluginID == pluginID && !$0.id.isEmpty }.map(\.id)
         let foreign = Set(keys.filter { $0.pluginID != pluginID || $0.id.isEmpty })
         var missing = Set<String>()
+        var restored = 0
         for start in stride(from: 0, to: uuids.count, by: Self.trashChunk) {
             let chunk = Array(uuids[start..<min(start + Self.trashChunk, uuids.count)])
-            missing.formUnion(try await Task.detached { try store.restore(uuids: chunk) }.value)
+            let result = try await Task.detached { try store.restoreReporting(uuids: chunk) }.value
+            missing.formUnion(result.missing)
+            restored += result.restored
         }
-        if !uuids.isEmpty {
+        // Only a restore that put something back is a change (a live or purged key announces nothing).
+        if restored > 0 {
             await MainActor.run { library.refreshCount() }
             changed()
         }

@@ -1,39 +1,13 @@
 import Foundation
 import GRDB
+import LintelCore
 
-/// How `meeting.deleted_at` is written and compared (notes explorer spec, Deletion lifecycle).
-///
-/// The column is a REAL in Unix seconds. A bulk move stamps every row with one value and `restoreBatch` finds
-/// the batch by equality, so one conversion rules every write and every comparison: the time is rounded to a
-/// whole microsecond, stored as `micros / 1e6` and compared through `CAST(ROUND(deleted_at * 1e6) AS INTEGER)`.
-/// A stamp read back after the database is reopened therefore equals the one written (the Double ulp at this
-/// magnitude, about 0.24 µs, is far below the half microsecond the rounding tolerates).
-enum TrashStamp {
-    /// How long a row stays in Recently deleted.
-    static let retention: TimeInterval = 30 * 24 * 60 * 60
-
-    /// The SQL expression that reads a stamp column as whole microseconds.
-    static let microsSQL = "CAST(ROUND(deleted_at * 1000000) AS INTEGER)"
-
-    static func micros(_ date: Date) -> Int64 {
-        Int64((date.timeIntervalSince1970 * 1_000_000).rounded())
-    }
-
-    /// The value the column holds for these microseconds.
-    static func column(micros: Int64) -> Double { Double(micros) / 1_000_000 }
-
-    static func micros(column: Double) -> Int64 { Int64((column * 1_000_000).rounded()) }
-
-    static func date(micros: Int64) -> Date { Date(timeIntervalSince1970: column(micros: micros)) }
-
-    static func date(column: Double) -> Date { date(micros: micros(column: column)) }
-
+/// Meetings' retention limit on top of the shared stamp rule (`LintelCore.TrashStamp`).
+extension TrashStamp {
     /// When a row deleted at `deletedAt` is gone for good: the earlier of 30 days after the delete and the row's
     /// retention limit (`startedAt` + `retentionDays`; 0 keeps everything, so only the 30 days count).
     static func purgeAt(deletedAt: Date, startedAt: Date, retentionDays: Int) -> Date {
-        let thirty = deletedAt.addingTimeInterval(retention)
-        guard retentionDays > 0 else { return thirty }
-        return min(thirty, startedAt.addingTimeInterval(Double(retentionDays) * 24 * 60 * 60))
+        purgeAt(deletedAt: deletedAt, limitStart: startedAt, retentionDays: retentionDays)
     }
 }
 
@@ -118,26 +92,41 @@ extension MeetingsStore {
         }
     }
 
+    /// What `restoreReporting(uuids:)` did.
+    struct RestoreResult: Sendable, Equatable {
+        /// The `uuid`s that no longer exist.
+        var missing: Set<String> = []
+        /// How many rows left Recently deleted now (a live one, or one already restored, does not count).
+        var restored = 0
+    }
+
     /// Puts these meetings back (a live one is left alone) and returns the `uuid`s that no longer exist. Takes
     /// any number of ids; the caller's chunking (500) only bounds a transaction.
     @discardableResult
     func restore(uuids: [String]) throws -> Set<String> {
-        guard !uuids.isEmpty else { return [] }
+        try restoreReporting(uuids: uuids).missing
+    }
+
+    /// `restore(uuids:)` that also says how many rows it actually put back, so a source announces a change only
+    /// when something changed.
+    func restoreReporting(uuids: [String]) throws -> RestoreResult {
+        guard !uuids.isEmpty else { return RestoreResult() }
         return try write { db in
-            var missing = Set<String>()
+            var result = RestoreResult()
             for uuid in uuids {
                 let exists =
                     try Bool.fetchOne(
                         db, sql: "SELECT EXISTS (SELECT 1 FROM meeting WHERE uuid = ?)", arguments: [uuid]) ?? false
                 guard exists else {
-                    missing.insert(uuid)
+                    result.missing.insert(uuid)
                     continue
                 }
                 try db.execute(
                     sql: "UPDATE meeting SET deleted_at = NULL WHERE uuid = ? AND deleted_at IS NOT NULL",
                     arguments: [uuid])
+                result.restored += db.changesCount
             }
-            return missing
+            return result
         }
     }
 

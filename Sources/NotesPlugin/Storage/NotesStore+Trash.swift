@@ -1,33 +1,7 @@
 import Foundation
 import GRDB
+import LintelCore
 import LintelKit
-
-/// How `note_doc.deleted_at` is written and compared (notes explorer spec, Deletion lifecycle), the same
-/// conversion as Meetings' and Dictation's: the time is rounded to a whole microsecond, stored as `micros / 1e6`
-/// (Unix seconds) and compared through `CAST(ROUND(deleted_at * 1e6) AS INTEGER)`, so a stamp read back after the
-/// database is reopened equals the one written and a bulk move's stamp names exactly its batch.
-enum TrashStamp {
-    /// How long a manual note stays in Recently deleted before `applyRetention` purges it.
-    static let retention: TimeInterval = 30 * 24 * 60 * 60
-
-    /// The SQL expression that reads `deleted_at` as whole microseconds.
-    static let microsSQL = "CAST(ROUND(deleted_at * 1000000) AS INTEGER)"
-
-    static func micros(_ date: Date) -> Int64 {
-        Int64((date.timeIntervalSince1970 * 1_000_000).rounded())
-    }
-
-    static func column(micros: Int64) -> Double { Double(micros) / 1_000_000 }
-
-    static func micros(column: Double) -> Int64 { Int64((column * 1_000_000).rounded()) }
-
-    static func date(micros: Int64) -> Date { Date(timeIntervalSince1970: column(micros: micros)) }
-
-    static func date(column: Double) -> Date { date(micros: micros(column: column)) }
-
-    /// When a manual note deleted at `deletedAt` is purged. Notes keeps notes forever, so only the 30 days count.
-    static func purgeAt(deletedAt: Date) -> Date { deletedAt.addingTimeInterval(retention) }
-}
 
 /// One manual note in Recently deleted. Holds the title: never logged.
 struct TrashedManualNote: Sendable, Equatable {

@@ -1,4 +1,5 @@
 import Foundation
+import LintelCore
 import os
 
 /// Applies the retention policy at activation and every hour: meetings older than `plugins.meetings
