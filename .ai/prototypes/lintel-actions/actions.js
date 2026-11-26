@@ -361,7 +361,7 @@
     return `<div class="ev"><span class="who">${esc(label)}</span><span class="q">${S.lang === 'pl' ? '„' : '“'}${esc(a.q)}”</span>${S.screen === 'note' ? `<button class="link" data-tr="${id}">${c.a.showTr}</button>` : ''}</div>`;
   }
   const field = (id, key, val, ph, req) => `<input class="in2 ${req ? 'req' : ''}" data-edit="${id}" data-key="${key}" value="${esc(val)}" placeholder="${esc(ph || '')}" aria-label="${esc(ph || key)}">`;
-  const area = (id, key, val, rows) => `<textarea class="in2" data-edit="${id}" data-key="${key}" rows="${rows || 7}" aria-label="${key}">${esc(val)}</textarea>`;
+  const area = (id, key, val, rows) => `<textarea class="in2 ${(rows || 7) <= 3 ? 'short' : ''}" data-edit="${id}" data-key="${key}" rows="${rows || 7}" aria-label="${key}">${esc(val)}</textarea>`;
   const people = (list, ph, req) => `<div class="chips ${req ? 'req' : ''}">${list.map(([n, m]) => `<span class="pchip">${esc(n)} <span class="em">${esc(m)}</span><button class="iconbtn" style="width:18px;height:18px" aria-label="Remove ${esc(n)}">${ic('x')}</button></span>`).join('')}<input placeholder="${esc(ph)}" aria-label="${esc(ph)}"></div>`;
 
   function form(c, id, a) {
@@ -375,9 +375,9 @@
     if (a.type === 'event') {
       return `<div class="fg"><span class="k">${k.title}</span>${field(id, 'title', a.title)}
         <span class="k">${k.when}</span><div class="two">${pop(a.when)}${pop(a.time)}</div>
-        ${a.mine ? '' : `<span class="k">${k.guests}</span>${people(a.guests, c.a.addGuest)}<span class="k">${k.where}</span><div class="two">${pop(a.where)}</div>`}
+        ${a.mine ? '' : `<span class="k">${k.guests}</span>${people(a.guests, c.a.addGuest)}${S.mail === 'nomail' ? '' : `<span class="k">${k.where}</span><div class="two">${pop(a.where)}</div>`}`}
         ${a.desc ? `<span class="k top">${k.desc}</span>${area(id, 'desc', a.desc, 3)}` : ''}
-        <span class="k">${k.cal}</span><div class="two">${pop(a.cal)}</div></div>`;
+        <span class="k">${k.cal}</span><div class="two">${pop(S.mail === 'nomail' && !a.mine ? t().set.macCal[0] : a.cal)}</div></div>`;
     }
     if (a.type === 'jira') {
       const who = a.unsure ? whoName(id, a) || '' : a.assignee;
