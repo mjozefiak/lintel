@@ -216,7 +216,9 @@ struct AppEnvironment {
             dataRoot: root,
             cachesRoot: root.appending(path: "Caches", directoryHint: .isDirectory),
             settings: settings,
-            keychain: InMemoryKeychainClient(),
+            keychain: options.persistentSettings
+                ? QAFileKeychainClient(url: root.appending(path: QAFileKeychainClient.fileName))
+                : InMemoryKeychainClient(),
             pasteboardName: NSPasteboard.Name("com.lintelapp.qa.\(ProcessInfo.processInfo.processIdentifier)"),
             usage: openRanking(in: root),
             registersGlobalHotkeys: false,
