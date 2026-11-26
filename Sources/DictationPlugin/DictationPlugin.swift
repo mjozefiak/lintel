@@ -49,7 +49,7 @@ public final class DictationPlugin: LintelPlugin {
     /// The built-in formatting model, loaded on demand and freed after the keep-warm time.
     private let builtInLLM: KeepWarmRuntime
     private let hud: DictationHUDPanel
-    private let settingsModel: DictationSettingsModel
+    let settingsModel: DictationSettingsModel
     #if DEBUG
     private var qaHUD: DictationHUDQA?
     /// `qa dictation play` (`DictationQAPlayback`): the WAV file played instead of the microphone, and the HUD wrapper.
@@ -114,10 +114,18 @@ public final class DictationPlugin: LintelPlugin {
                 },
                 keepWarm: { settings.keepWarm }, lease: .shared)
         let workspace = context.workspace
+        #if DEBUG
+        // The pane and the banner of a `--qa` run read the permission as granted too, and never show the prompt.
+        let settingsAuthorizer: any MicrophoneAuthorizer =
+            context.settings.bool(DictationQAPlayback.settingName, default: false)
+            ? DictationQAAuthorizer(playback: DictationQAPlayback(), base: authorizer, isQARun: true) : authorizer
+        #else
+        let settingsAuthorizer = authorizer
+        #endif
         settingsModel = DictationSettingsModel(
             package: ModelCatalog.package(id: settings.speechModelID) ?? ModelCatalog.parakeetUltra, manager: models,
             settings: settings,
-            authorizer: authorizer,
+            authorizer: settingsAuthorizer,
             pickFolder: { Self.chooseModelFolder() },
             openURL: { url in Task { try? await workspace.open(url) } })
         // The banner reads the model's place and the microphone; a change makes the shell read it again.
@@ -225,7 +233,9 @@ public final class DictationPlugin: LintelPlugin {
         #if DEBUG
         let qaPlayback = qaPlayback
         let qaRecorder = qaRecorder
-        let authorizer: any MicrophoneAuthorizer = DictationQAAuthorizer(playback: qaPlayback, base: self.authorizer)
+        let isQARun = context.settings.bool(DictationQAPlayback.settingName, default: false)
+        let authorizer: any MicrophoneAuthorizer = DictationQAAuthorizer(
+            playback: qaPlayback, base: self.authorizer, isQARun: isQARun)
         let hud: any HUDPresenter = qaRecorder ?? self.hud
         #else
         let authorizer = self.authorizer
@@ -239,7 +249,7 @@ public final class DictationPlugin: LintelPlugin {
                 makeSession: { folder, onEvent in
                     #if DEBUG
                     let audio: any AudioInput =
-                        qaPlayback.url.map { WAVFileAudioInput(url: $0) }
+                        qaPlayback.input(isQARun: isQARun)
                         ?? MicrophoneCapture(deviceUID: settings.inputDevice, deviceName: settings.inputDeviceName)
                     #else
                     let audio: any AudioInput = MicrophoneCapture(

@@ -1,5 +1,6 @@
 import AppKit
 import LintelKit
+import LintelSpeech
 import os
 
 @main
@@ -132,6 +133,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         if let options = try QAOptions.parse(ProcessInfo.processInfo.arguments) {
             qaOptions = options
+            // Before any plugin starts: a QA run never opens the real microphone, tap or tone player.
+            RealAudioGuard.forbid()
             if let appearance = options.appearance {
                 NSApp.appearance = NSAppearance(named: appearance.name)
             }
