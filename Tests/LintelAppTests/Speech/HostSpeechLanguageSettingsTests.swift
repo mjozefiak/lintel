@@ -214,6 +214,8 @@ import Testing
     // MARK: Wiring
 
     @MainActor @Test func everyPluginContextSharesTheOneSetting() async throws {
+        // Like every shell test that builds an environment: no real HUD, microphone or Core Audio.
+        QuietMeetings.install()
         let name = "lintel-speech-languages-\(UUID().uuidString)"
         let root = FileManager.default.temporaryDirectory.appending(path: name, directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: root) }
