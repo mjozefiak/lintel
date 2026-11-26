@@ -13,13 +13,14 @@ enum OnboardingGoalChoice: String, CaseIterable, Sendable {
         self = stored.flatMap(Self.init(rawValue:)) ?? .both
     }
 
-    /// Whether the choice shows a step that serves `goal`. A step with no goal serves every choice, and "Both"
-    /// shows every step, including one whose goal this build does not know.
+    /// Whether the choice shows a step that serves `goal`. A narrowed choice hides only the steps of the other
+    /// goal on the goal page; a step with no goal, or with a goal the page does not offer, serves every choice
+    /// (`OnboardingGoal` is an open set and an unknown value is ignored), so its plugin is never switched off.
     func shows(_ goal: OnboardingGoal?) -> Bool {
         switch self {
         case .both: true
-        case .dictation: goal == nil || goal == .dictation
-        case .meetingNotes: goal == nil || goal == .meetingNotes
+        case .dictation: goal != .meetingNotes
+        case .meetingNotes: goal != .dictation
         }
     }
 
@@ -250,9 +251,9 @@ struct OnboardingFlow {
         moveOn()
     }
 
-    /// Back: one page back, never before the goal page.
+    /// Back: one page back, never before the goal page, and nothing once the flow is finished.
     mutating func back() {
-        guard index > 0 else { return }
+        guard !isComplete, index > 0 else { return }
         index -= 1
     }
 

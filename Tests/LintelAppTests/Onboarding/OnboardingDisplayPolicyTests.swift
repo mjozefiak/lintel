@@ -55,15 +55,21 @@ import Testing
         #expect(OnboardingDisplayPolicy.closingWrites(settings: pinned).isEmpty)
     }
 
-    @Test func aFirstLaunchThatEndedWithoutClosingShowsTheFlowAgain() throws {
-        // Every launch since v0.1 creates `ranking.sqlite`, so its presence must not make a new install look
-        // old: the policy never consults it.
-        let root = FileManager.default.temporaryDirectory.appending(path: "onboarding-policy-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: root) }
-        try Data().write(to: root.appending(path: "ranking.sqlite"))
+    /// A new install whose first launch ended mid-flow (quit, crash or logout before the window closed): it left
+    /// the goal page, so the goal is stored, and it may have finished a step, so `completedSteps` is stored too.
+    /// It is not an old install and sees the flow again on the next launch, for every goal and with either old key.
+    @Test(arguments: OnboardingGoalChoice.allCases)
+    func aFirstLaunchThatEndedWithoutClosingShowsTheFlowAgain(goal: OnboardingGoalChoice) {
+        let leftTheGoalPage = InMemorySettingsStore()
+        let write = OnboardingDisplayPolicy.goalWrite(goal)
+        leftTheGoalPage.setValue(write.value, forKey: write.key)
+        #expect(OnboardingDisplayPolicy.decide(settings: leftTheGoalPage) == .showFlow)
 
-        #expect(OnboardingDisplayPolicy.decide(settings: InMemorySettingsStore()) == .showFlow)
+        leftTheGoalPage.setValue(.stringArray(["dictation.setup"]), forKey: SettingsKeys.onboardingCompletedSteps)
+        #expect(OnboardingDisplayPolicy.decide(settings: leftTheGoalPage) == .showFlow)
+
+        leftTheGoalPage.setValue(.bool(true), forKey: SettingsKeys.onboardingShortcutCompleted)
+        #expect(OnboardingDisplayPolicy.decide(settings: leftTheGoalPage) == .showFlow)
     }
 
     @Test func theGoalIsRememberedAndReadBack() {

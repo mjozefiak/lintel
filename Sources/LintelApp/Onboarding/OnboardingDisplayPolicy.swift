@@ -22,9 +22,15 @@ enum OnboardingDisplayPolicy {
     /// What this launch does. A stored `flowVersion` decides first: any stored value (the old screen's `1`, this
     /// flow's `2`, or a newer build's) never shows the flow and is never rewritten. Without it, an install that
     /// answered the old welcome screen (`app.onboarding.shortcutCompleted` or `app.onboarding.completedSteps`
-    /// stored) is pinned to `1`; anything else is a new install and shows the flow. `ranking.sqlite` is
-    /// deliberately not consulted: every launch creates it, and a first launch that ended without closing the
-    /// window must show the flow again.
+    /// stored) and has never chosen a goal (`app.onboarding.goal` absent) is pinned to `1`; anything else shows
+    /// the flow.
+    ///
+    /// The goal is what tells the two apart: the shell writes it (also for "Both") when the user leaves the goal
+    /// page, which comes before every step that writes `completedSteps`. So a new install whose first launch
+    /// ended mid-flow (a step finished, then quit, crash or logout before the window closed) has a goal stored
+    /// and sees the flow again, while an install that only ran the old welcome screen has none and is pinned
+    /// once, on the first launch of this build. `ranking.sqlite` is deliberately not consulted: every launch
+    /// creates it.
     static func decide(settings: any SettingsStore) -> Decision {
         if storedFlowVersion(settings) != nil {
             return .hide
@@ -32,7 +38,8 @@ enum OnboardingDisplayPolicy {
         let answeredOldWelcome =
             settings.value(forKey: SettingsKeys.onboardingShortcutCompleted) != nil
             || settings.value(forKey: SettingsKeys.onboardingCompletedSteps) != nil
-        return answeredOldWelcome ? .hideAndPinLegacyFlow : .showFlow
+        let choseGoal = settings.value(forKey: SettingsKeys.onboardingGoal) != nil
+        return answeredOldWelcome && !choseGoal ? .hideAndPinLegacyFlow : .showFlow
     }
 
     /// The writes a decision makes: `flowVersion = 1` for `.hideAndPinLegacyFlow`, so the pin happens once, and
@@ -66,7 +73,9 @@ enum OnboardingDisplayPolicy {
         return OnboardingGoalChoice(stored: raw)
     }
 
-    /// The write that records the chosen goal.
+    /// The write that records the chosen goal. The shell applies it when the user leaves the goal page, for
+    /// every choice including "Both" and before any step is recorded in `completedSteps`: `decide` relies on it
+    /// to tell an interrupted first run of this flow from an install that only ran the old welcome screen.
     static func goalWrite(_ choice: OnboardingGoalChoice) -> OnboardingSettingWrite {
         OnboardingSettingWrite(key: SettingsKeys.onboardingGoal, value: .string(choice.rawValue))
     }

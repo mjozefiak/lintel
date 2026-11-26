@@ -179,6 +179,33 @@ import Testing
         #expect(flow.current?.id == "privacy")
     }
 
+    @Test func backDoesNothingOnceTheFlowIsFinished() {
+        var flow = OnboardingFlow()
+        while flow.current != nil {
+            flow.advance()
+        }
+        #expect(flow.isComplete)
+        flow.back()
+        #expect(flow.isComplete)
+        #expect(flow.current == nil)
+    }
+
+    /// `OnboardingGoal` is an open set: a goal the goal page does not offer is ignored, so its step is shown for
+    /// every choice and its plugin is never switched off.
+    @Test(arguments: OnboardingGoalChoice.allCases)
+    func aStepWithAGoalThePageDoesNotOfferServesEveryChoice(choice: OnboardingGoalChoice) {
+        let plugins =
+            Self.corePlugins + [
+                OnboardingPluginSteps(
+                    pluginID: "future",
+                    steps: [Self.step("future.setup", title: "Future", goal: OnboardingGoal(rawValue: "somethingNew"))])
+            ]
+        let flow = OnboardingFlow(plugins: plugins, goal: choice)
+        #expect(flow.pages.map(\.id).contains("future.setup"))
+        #expect(
+            !OnboardingFlow.switchWrites(for: choice, plugins: plugins).map(\.key).contains("plugins.future.enabled"))
+    }
+
     @Test func escapeAsksBeforeClosingOnlyWhileADownloadRuns() {
         var flow = OnboardingFlow()
         #expect(flow.escapeAction == .closeWindow)
