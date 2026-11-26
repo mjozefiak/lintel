@@ -65,3 +65,7 @@ From the 2026-11-23 brainstorm (not asked again): actions before chat; approval 
 ## Evidence limits
 
 The prototype is HTML that represents native controls, so fonts and controls are approximate. Checked in Chrome: light and dark, EN and PL, layouts A/B/C, every state, and the approve, undo, dismiss, restore and speaker-choice flows. Not checked: XL text on every state, VoiceOver, Increase Contrast. Competitor UIs were not inspected directly, only their documentation (see the research file).
+
+## Process note (om-mockup-prototype)
+
+The brief asks for a prototype in the style of the accepted app design, in `.ai/prototypes/lintel-actions/`, so this prototype departs from the skill's defaults on purpose: it uses the brand tokens instead of a neutral wireframe, and a single folder instead of `revision-NNN` with `prototype.json`. Each iteration is a commit on `docs/actions-prototype`. The toolbar's **Reset** button returns to the start of the selected state and clears your edits. Synthetic panels were not used: the owner is the reviewer. Every simulated value is fictional and is not research evidence.

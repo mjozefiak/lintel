@@ -540,7 +540,7 @@
       <label>${b.state}</label>${seg('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline', 'graduate'].map((k) => [k, b[k]]))}
       <label>${b.mail}</label>${seg('mail', [['acct', b.acct], ['mcp', b.mcp], ['nomail', b.nomail]])}
       <label>${b.theme}</label>${seg('theme', [['light', b.light], ['dark', b.dark]])}<label>${b.lang}</label>${seg('lang', [['en', 'EN'], ['pl', 'PL']])}
-      ${seg('ts', [['m', 'M'], ['l', 'L'], ['xl', 'XL']])}</div>`;
+      ${seg('ts', [['m', 'M'], ['l', 'L'], ['xl', 'XL']])}<button type="button" class="sk-seg" style="background:none;color:#F1EEE9;padding:3px 9px" data-act="reset">Reset</button></div>`;
   }
   function syncURL() {
     const p = new URLSearchParams();
@@ -610,6 +610,7 @@
     else if (a === 'reconnect') { S.st[id] = 'ready'; if (id === 'a3') { S.st.a1 = S.st.a1 === 'expired' ? 'ready' : S.st.a1; S.st.a2 = S.st.a2 === 'expired' ? 'ready' : S.st.a2; } render(); }
     else if (a === 'component') { S.component = S.lang === 'pl' ? 'Umowy' : 'Contracts'; render(); }
     else if (a === 'grad') { S.grad = false; render(); }
+    else if (a === 'reset') { clearInterval(timer); clearTimeout(timer); S.edits = {}; S.hlq = ''; S.item = 'nordlys'; S.tab = S.layout === 'inline' ? 'notes' : 'actions'; S.open = S.state === 'errors' || S.state === 'offline' ? 'a3' : 'a1'; applyState(); render(); const st = document.querySelector('[role=status]'); if (st) st.focus(); }
   });
   document.addEventListener('input', (e) => {
     const el = e.target;
