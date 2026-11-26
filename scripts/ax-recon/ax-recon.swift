@@ -2,7 +2,7 @@
 // 2026-11-25-meeting-speaker-names, step 0.2). A tool for developers, outside the app and outside the
 // SwiftPM graph: build it with build.sh. It never runs in a release build.
 //
-// Privacy: by default it prints structure only (roles, counts, text lengths). Text values are printed only
+// Privacy: by default it prints structure only (roles, counts, text and identifier lengths). Text values are printed only
 // with --show-text, which is for a test meeting with fictional names. `webareas` prints only the host of each
 // AXWebArea URL (never tab titles, paths or page text).
 import AppKit
@@ -58,7 +58,7 @@ func walk(
         if out {
             var line = String(repeating: "  ", count: depth) + role
             if let sub = str(el, kAXSubroleAttribute) { line += "/" + sub }
-            if let id = str(el, kAXIdentifierAttribute), !id.isEmpty { line += " id=\(id.prefix(40))" }
+            if let id = str(el, kAXIdentifierAttribute), !id.isEmpty { line += showText ? " id=\(id.prefix(40))" : " id(\(id.count))" }
             for (k, v) in parts {
                 guard let v, !v.isEmpty else { continue }
                 line += showText ? " \(k)=\"\(v.prefix(80))\"" : " \(k)(\(v.count))"
@@ -133,8 +133,9 @@ case "manual":
     let app = AXUIElementCreateApplication(pid)
     switch args[2] {
     case "get": print(getManual(app).map { $0 ? "on" : "off" } ?? "unset")
-    case "on": print(setManual(app, true) == .success ? "ok" : "failed(\(setManual(app, true).rawValue))")
-    case "off": print(setManual(app, false) == .success ? "ok" : "failed(\(setManual(app, false).rawValue))")
+    case "on", "off":
+        let result = setManual(app, args[2] == "on")
+        print(result == .success ? "ok" : "failed(\(result.rawValue))")
     case "enhanced-on": print(setFlag(app, "AXEnhancedUserInterface", true).rawValue)
     case "enhanced-off": print(setFlag(app, "AXEnhancedUserInterface", false).rawValue)
     default: usage()
@@ -181,6 +182,7 @@ case "sample":
         let rest = 1.0 / hz - Date().timeIntervalSince(t0)
         if rest > 0 { Thread.sleep(forTimeInterval: rest) }
     }
+    guard !times.isEmpty else { print("walks=0"); exit(1) }
     let sorted = times.sorted()
     let mean = { (a: [Double]) in a.isEmpty ? 0 : a.reduce(0, +) / Double(a.count) }
     print("walks=\(times.count) nodes=\(nodes) walkMs median=\(Int(sorted[sorted.count / 2])) max=\(Int(sorted.last ?? 0)) appCpuMean=\(String(format: "%.1f", mean(cpus)))%")

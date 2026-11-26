@@ -317,6 +317,26 @@ class SpeakerNameMetricTests(unittest.TestCase):
         out = score.score_recording(res, refs)
         self.assertEqual(out["speakerNames"]["states"]["applied"]["namedWords"], 4)
         self.assertNotIn("Anna", score.render_score({"recordings": {"x": out}, "problems": []}))
+        self.assertNotIn("Anna", json.dumps(out, ensure_ascii=False))
+
+    def test_split_cluster_with_the_right_name_is_accurate(self):
+        segs = [sseg(0, 5000, "a b", "Mówca 1"), sseg(5000, 10000, "c d", "Mówca 2"),
+                sseg(10000, 20000, "e f g h", "Mówca 3")]
+        rep = score.speaker_names(segs, self.TURNS, self.names(
+            ("Mówca 1", "Anna", "transcript", "applied"), ("Mówca 2", "Anna", "user", "confirmed")))
+        ap = rep["states"]["applied"]
+        self.assertEqual((ap["namedWords"], ap["accuracy"], ap["falseName"]), (4, 1.0, 0.0))
+
+    def test_diarization_error_inside_a_named_cluster_is_not_a_false_name(self):
+        segs = [sseg(0, 12500, "a b c d e", "Mówca 1"), sseg(12500, 20000, "f g h", "Mówca 2")]
+        rep = score.speaker_names(segs, self.TURNS, self.names(("Mówca 1", "Anna", "transcript", "applied")))
+        self.assertEqual(rep["states"]["applied"]["falseName"], 0.0)
+
+    def test_default_placeholder_is_not_a_name_and_odd_sources_are_not_echoed(self):
+        rep = score.speaker_names(self.SEGS, self.TURNS, self.names(
+            ("Rozmówca 1", "Rozmówca 1", "default", "applied"), ("Rozmówca 2", "Marek", "Marek Sawicki", "applied")))
+        self.assertEqual(rep["states"]["applied"]["namedWords"], 4)
+        self.assertEqual(rep["sources"], {"other": 1})
 
 
 class SpeakerMetricTests(unittest.TestCase):

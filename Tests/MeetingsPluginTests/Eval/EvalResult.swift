@@ -87,7 +87,8 @@ struct EvalResult: Codable, Equatable, Sendable {
     /// with, for `scripts/meeting-eval/score.py` (`speakerNames`). Absent until the app names speakers (F1).
     var speakerNames: [SpeakerName]?
 
-    /// One speaker label and the real name shown for it. `source`: default, self, user, platform, calendar,
+    /// One speaker label and the real name shown for it. `label` is the segment `speaker` label ("Ja", "Inni",
+    /// "Mówca N"), which is how the scorer joins names to words. `source`: default, self, user, platform, calendar,
     /// transcript; `status`: confirmed, applied, suggested. Carries a name, so it never goes to logs or traces.
     struct SpeakerName: Codable, Equatable, Sendable {
         var label: String

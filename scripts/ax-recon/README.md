@@ -14,5 +14,6 @@ ax-recon manual <pid> get|on|off|enhanced-on|enhanced-off
 ```
 
 Privacy: by default `tree` prints structure and text lengths only. `--show-text` is only for a test meeting with
-fictional names (never for the owner's real browser or real meetings). `webareas` prints hosts only.
+fictional names, in a separate Chrome with a throwaway `--user-data-dir` profile (never the owner's real
+browser or real meetings: the tab strip shows real tab titles). `tree` prints identifiers as lengths too. `webareas` prints hosts only.
 Results from the recon are in `docs/meeting-window-ax-recon.md`.

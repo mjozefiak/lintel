@@ -459,18 +459,34 @@ def name_matches(shown, ref_name):
 
 
 NAME_STATES = ("applied", "suggested")
+NAME_SOURCES = ("self", "user", "platform", "calendar", "transcript")
+
+
+def majority_ref(pairs):
+    """Cluster -> the reference speaker with the most co-occurring words (many-to-one: a cluster split from
+    one person maps to that person too). Ties go to the first name in sort order."""
+    counts = {}
+    for cluster, ref in pairs:
+        counts.setdefault(cluster, {})
+        counts[cluster][ref] = counts[cluster].get(ref, 0) + 1
+    return {c: sorted(refs.items(), key=lambda kv: (-kv[1], kv[0]))[0][0] for c, refs in counts.items()}
 
 
 def speaker_names(segments, turns, names):
     """Speaker-name metrics (spec 2026-11-25-meeting-speaker-names, step 0.1); None without turns.
 
     `names` is the result's `speakerNames`: [{label, name, source, status}] with status `applied`,
-    `suggested` (or `confirmed`, counted with `applied`). Clusters are mapped to reference speakers like
-    in `speaker_report`. Per state, over the counted words (words inside a known reference turn):
+    `suggested` (or `confirmed`, counted with `applied`). `label` must be the segment `speaker` label the
+    harness writes ("Ja", "Inni", "Mówca N"), not a name: a run whose segments already carry names (the
+    SPEAKER_NAMES oracle experiment) joins nothing and reports zero coverage. Rows with source `default`
+    (the "Mówca N" placeholder) are not real names and are skipped. Each cluster is mapped to the reference
+    speaker with the largest time overlap (spec, Plan pomiaru), so diarization errors stay in
+    `wrongSpeakerWordShare` and are not counted again as false names. Per state, over the counted words
+    (words inside a known reference turn):
       coverage      share of words whose cluster shows a real name in that state
-      accuracy      share of those words whose name matches the mapped reference speaker
+      accuracy      share of those words whose name matches the cluster's reference speaker
       falseName     1 - accuracy (None when no words carry a name: nothing false was shown)
-    Never returns any text, only counts and shares.
+    Never returns any text, only counts and shares (sources outside NAME_SOURCES count as `other`).
     """
     turns = valid_turns(turns)
     if not turns:
@@ -478,6 +494,8 @@ def speaker_names(segments, turns, names):
     by_label = {}
     for n in names or []:
         if not isinstance(n, dict) or not _is_known(n.get("name")) or not _is_known(n.get("label")):
+            continue
+        if n.get("source") == "default":
             continue
         status = "applied" if n.get("status") == "confirmed" else n.get("status")
         if status in NAME_STATES:
@@ -487,17 +505,17 @@ def speaker_names(segments, turns, names):
         covered, ref = ref_speaker_at(turns, ms)
         if covered and ref is not None:
             pairs.append((cluster, ref))
-    mapping = map_clusters(pairs)
+    mapping = majority_ref(pairs)
     total = len(pairs)
     out = {"countedWords": total, "states": {}, "sources": {}}
     for state in NAME_STATES:
         shown = right = 0
-        for cluster, ref in pairs:
+        for cluster, _ in pairs:
             entry = by_label.get(cluster)
             if entry is None or entry[1] != state:
                 continue
             shown += 1
-            if cluster in mapping and mapping[cluster] == ref and name_matches(entry[0], ref):
+            if name_matches(entry[0], mapping[cluster]):
                 right += 1
         out["states"][state] = {
             "namedWords": shown,
@@ -507,7 +525,7 @@ def speaker_names(segments, turns, names):
             "namedSpeakers": sum(1 for v in by_label.values() if v[1] == state),
         }
     for _, (_, state, source) in by_label.items():
-        key = source if isinstance(source, str) else "unknown"
+        key = source if source in NAME_SOURCES else "other"
         out["sources"][key] = out["sources"].get(key, 0) + 1
     return out
 
