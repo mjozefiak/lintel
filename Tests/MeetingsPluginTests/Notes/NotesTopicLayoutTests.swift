@@ -137,6 +137,20 @@ import Testing
         #expect(named.verdict.topics.map(\.name) == ["Ustalenie numer1"])
     }
 
+    @Test func theFirstWordOfANameIsCheckedLikeTheFirstWordOfAPointsText() {
+        // "Ustalenia" is capitalised for being first and shares its stem with the points' "Ustalenie".
+        let audited = guardrail.auditedVerifyReduce(
+            NotesReduceOutput(topics: [topic("Ustalenia i tematy", "p1", "p2")]), points: findings(2),
+            durationMs: 3_600_000)
+        #expect(audited.audit.topicNameRefused == 0)
+        #expect(audited.verdict.topics.map(\.name) == ["Ustalenia i tematy"])
+        // A first word the points do not back is still refused.
+        let refused = guardrail.auditedVerifyReduce(
+            NotesReduceOutput(topics: [topic("Kampania i ustalenie", "p1", "p2")]), points: findings(2),
+            durationMs: 3_600_000)
+        #expect(refused.audit.topicNameRefused == 1)
+    }
+
     @Test func theTopicLimitFollowsTheLengthOfTheMeetingAndATopicHoldsSixPoints() {
         let points = findings(24)
         let topics = (0..<6).map { index in
@@ -267,6 +281,18 @@ import Testing
         #expect(markdown == expected)
         let shown = NotesComposer.shownKeyPoints(of: verdict, labels: .polish, durationMs: 30 * 60_000)
         #expect(shown.map { $0.points.map(\.id) } == [["p1", "p2"], ["p4", "p5"], ["p3", "p6"]])
+    }
+
+    @Test func otherAloneGetsTheCodesHeading() {
+        let singles = NotesGuard.ReduceVerdict(
+            decisions: [], tasks: [], questions: [], summary: nil, summaryReplaced: false, rejectedIDs: 0,
+            topics: (1...7).map { .init(name: "Temat \($0)", points: [point("p\($0)", .summary, "Punkt \($0).")]) })
+        let markdown = NotesComposer.markdown(
+            verdict: singles, participants: [], labels: .polish, durationMs: 30 * 60_000)
+        #expect(markdown.hasPrefix("### Omówione tematy\n\n- Punkt 1.\n"))
+        #expect(!markdown.contains("### Inne") && !markdown.contains("Punkt 7."))
+        let shown = NotesComposer.shownKeyPoints(of: singles, labels: .polish, durationMs: 30 * 60_000)
+        #expect(shown.map(\.name) == ["Omówione tematy"] && shown[0].points.count == 6 && !shown[0].isOther)
     }
 
     @Test func aShortMeetingIsOneListWithoutTopicHeadings() {

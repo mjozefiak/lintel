@@ -49,7 +49,8 @@ struct NotesReduceOutput: Equatable, Sendable {
 ///   `NotesLayout.maxTopics` topics of at most `NotesLayout.maxPointsPerTopic` points).
 /// - A topic name is model text: it is kept only when it passes the checks of the paragraph against the material
 ///   of that topic's own points (no name, number, date or negation they lack, the language of the transcript,
-///   at most `maxTopicNameWords` words); a refused name sends its points to the closing "Other" topic.
+///   at most `maxTopicNameWords` words; its first word is checked like the first word of a point's text); a
+///   refused name sends its points to the closing "Other" topic.
 /// - The paragraph is kept only when it passes every check of `summaryIsFaithful`; otherwise the sentences that
 ///   each pass those checks on their own are kept when at least two and half of the words remain
 ///   (`salvagedSentences`); failing that there is no paragraph. What is kept is cut to its first whole sentences
@@ -1080,7 +1081,10 @@ struct NotesGuard: Sendable {
     func topicNameRefusal(_ name: String, points: [NotesPoint]) -> SummaryRefusal? {
         if name.count > 200 { return .tooLong }
         if name.split(whereSeparator: \.isWhitespace).count > Self.maxTopicNameWords { return .tooManyWords }
-        return textRefusal(name, material: summaryMaterial(points: points))
+        // A name is a heading: its first word is capitalised for being first, so it passes like the first word
+        // of a point's text (a word of four letters or more that shares a stem with the topic's material); a name
+        // the points do not have is still refused, at the start or later.
+        return textRefusal(name, material: summaryMaterial(points: points), strictStart: false)
     }
 
     /// The first whole sentences of `text` that fit the intro's limits (`NotesLayout.maxIntroSentences` and
@@ -1180,13 +1184,13 @@ struct NotesGuard: Sendable {
     }
 
     /// The language, negation and name/number checks of `summaryRefusal` (the length limits are not part of it).
-    private func textRefusal(_ text: String, material: SummaryMaterial) -> SummaryRefusal? {
+    private func textRefusal(_ text: String, material: SummaryMaterial, strictStart: Bool = true) -> SummaryRefusal? {
         let textLanguage = NotesLanguage.dominant(in: text)
         if language != .unknown, textLanguage != .unknown, textLanguage != language { return .languageChanged }
         if NotesText.words(text).contains(where: { Self.negations.contains($0) }), !material.hasNegation {
             return .negation
         }
-        return Self.faithfulnessRefusal(text, vocabulary: material.vocabulary, strictStart: true)
+        return Self.faithfulnessRefusal(text, vocabulary: material.vocabulary, strictStart: strictStart)
     }
 
     /// The sentences of a refused paragraph that each pass the checks of `summaryRefusal` on their own, in their

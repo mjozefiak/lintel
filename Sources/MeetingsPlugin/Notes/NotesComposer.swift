@@ -60,12 +60,32 @@ enum NotesComposer {
         verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels, durationMs: Int? = nil
     ) -> String {
         NotesLayoutComposer.markdown(
-            layout: layout(of: verdict, participants: participants, labels: labels), durationMs: durationMs,
-            labels: labels)
+            layout: layout(of: verdict, participants: participants, labels: labels, durationMs: durationMs),
+            durationMs: durationMs, labels: labels)
     }
 
+    /// The layout with the topics `shownKeyPoints` gives, so the Markdown shows exactly those points.
     static func layout(
-        of verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels
+        of verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels, durationMs: Int? = nil
+    ) -> NotesLayout {
+        var layout = unarranged(verdict, participants: participants, labels: labels)
+        layout.topics = shownKeyPoints(of: verdict, labels: labels, durationMs: durationMs).map {
+            .init(name: $0.name, points: $0.points.map(\.text), isOther: $0.isOther)
+        }
+        return layout
+    }
+
+    /// The topics with the verified points `markdown` shows, in the order it shows them (the arrangement of
+    /// `NotesLayout.shownTopics`: the short-meeting list, one-point topics joined into "Other").
+    static func shownKeyPoints(
+        of verdict: NotesGuard.ReduceVerdict, labels: Labels, durationMs: Int?
+    ) -> [NotesGuard.ReduceVerdict.Topic] {
+        let short = unarranged(verdict, participants: [], labels: labels).isShortMeeting(durationMs: durationMs)
+        return shown(verdict, labels: labels, short: short)
+    }
+
+    private static func unarranged(
+        _ verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels
     ) -> NotesLayout {
         NotesLayout(
             intro: shownSummary(of: verdict),
@@ -77,17 +97,21 @@ enum NotesComposer {
             openQuestions: verdict.questions.map(\.text), participants: participants)
     }
 
-    /// The topics with the verified points `markdown` shows, in the order it shows them (the arrangement of
-    /// `NotesLayout.shownTopics`: the short-meeting list, one-point topics joined into "Other").
-    static func shownKeyPoints(
-        of verdict: NotesGuard.ReduceVerdict, labels: Labels, durationMs: Int?
+    private static func shown(
+        _ verdict: NotesGuard.ReduceVerdict, labels: Labels, short: Bool
     ) -> [NotesGuard.ReduceVerdict.Topic] {
-        let topics = named(verdict.topics, labels: labels)
-        let short = layout(of: verdict, participants: [], labels: labels).isShortMeeting(durationMs: durationMs)
-        return NotesLayout.arranged(
-            topics.map { (name: $0.name, isOther: $0.isOther, points: $0.points) }, short: short
+        var topics = NotesLayout.arranged(
+            named(verdict.topics, labels: labels).map { (name: $0.name, isOther: $0.isOther, points: $0.points) },
+            short: short
         )
-        .map { .init(name: $0.name, points: $0.points, isOther: $0.isOther) }
+        .map { NotesGuard.ReduceVerdict.Topic(name: $0.name, points: $0.points, isOther: $0.isOther) }
+        // "Other" alone is not a topic layout (every named topic was refused or held one point): its points get
+        // the code's heading, like the findings without a name.
+        if topics.count == 1, topics[0].isOther {
+            topics[0].name = labels.keyPoints
+            topics[0].isOther = false
+        }
+        return topics
     }
 
     /// A topic without a name gets the code's heading, so a meeting that is not short has no list outside every
