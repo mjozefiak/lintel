@@ -24,8 +24,14 @@ import Testing
     }
 
     @Test func manyOmittedWordsAreTold() {
-        let result = refusal(quote: "we should move week of the month", text: "The release moves.")
+        // Two content words only: too few to anchor the quote (rules `g1`), so the miss is still reported.
+        let result = refusal(quote: "we should move of the month", text: "The release moves.")
         #expect(result == .init(.quoteNotInTranscript, detail: .quoteOmittedWords))
+    }
+
+    @Test func manyOmittedWordsWithEnoughContentWordsAreAnchored() {
+        // Before rules `g1` this quote was refused as `quoteOmittedWords`; its three content words now anchor it.
+        #expect(refusal(quote: "we should move week of the month", text: "The release moves.") == nil)
     }
 
     @Test func aQuoteAcrossASpeakerChangeIsTold() {

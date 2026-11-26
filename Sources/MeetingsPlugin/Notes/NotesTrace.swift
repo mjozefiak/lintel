@@ -202,7 +202,8 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
     /// `reasons`, one level down: the rule behind `unsupportedDetail` and the kind of miss behind
     /// `quoteNotInTranscript` (schema 6; empty in older traces).
     var details: [NotesGuard.DropDetail: Int] = [:]
-    /// Quotes the guard anchored to a shorter stretch of the transcript (reserved, always 0 until the S1 phase).
+    /// Verified points whose quote the guard anchored to a shorter fragment of the transcript (`NotesGuard`, rules
+    /// `g1`; always 0 in older traces).
     var reanchored = 0
     var downgraded: Int
     /// Tasks whose person is the speaker, given by the guard (a count; empty trace field reads as 0).
@@ -272,6 +273,7 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
         details = verdict.details
         downgraded = verdict.downgraded
         ownerFromSpeaker = verdict.ownerFromSpeaker
+        reanchored = verdict.reanchored
     }
 }
 

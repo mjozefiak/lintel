@@ -86,6 +86,10 @@ enum NotesFailure: Error, Equatable {
 /// taken as a result) and, when the prompt does not fit the context, one split into halves. Whatever cannot be
 /// done leaves the notes `partial`, never wrong.
 struct NotesPipeline: Sendable {
+    /// What the notes store as `notes_prompt_version`: the prompt version and the version of the guard's point
+    /// rules (`6+g1`), because a change of the rules changes the notes as a new prompt does (BC §5).
+    static let storedPromptVersion = "\(NotesPrompt.version)+\(NotesGuard.rulesVersion)"
+
     struct Configuration: Sendable {
         var chunkTokens = TranscriptChunker.defaultChunkTokens
         var reduceInputTokens = 4500
@@ -145,7 +149,7 @@ struct NotesPipeline: Sendable {
             let result = NotesResult(
                 status: .ok, markdown: nil, droppedCount: 0, failedChunks: [], chunkCount: 0, verifiedPointCount: 0,
                 reduceFailed: false, summaryReplaced: false, rejectedIDs: 0, language: verifier.language,
-                promptVersion: String(NotesPrompt.version))
+                promptVersion: Self.storedPromptVersion)
             recorder?.finish(result)
             return result
         }
@@ -194,7 +198,7 @@ struct NotesPipeline: Sendable {
                 status: status, markdown: markdown, droppedCount: dropped, failedChunks: failed,
                 chunkCount: chunks.count, verifiedPointCount: points, reduceFailed: reduceFailed,
                 summaryReplaced: replaced, rejectedIDs: rejected, language: verifier.language,
-                promptVersion: String(NotesPrompt.version), downgradedCount: downgraded,
+                promptVersion: Self.storedPromptVersion, downgradedCount: downgraded,
                 backfilledCount: backfilled, points: kept, keyPoints: keyPoints)
         }
         if failedWhole == chunks.count { return result(status: .failed, markdown: nil) }

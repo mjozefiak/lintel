@@ -93,7 +93,10 @@ struct NotesGuard: Sendable {
 
     /// The version of the point rules, recorded in the trace and in `notes_prompt_version` once a rule changes
     /// (spec `2026-11-25-meeting-notes-structure`: `g1` after S1 and S2, `g2` after S3). `g0` is the rules before it.
-    static let rulesVersion = "g0"
+    /// `g1`: a quote that neither matches literally nor with gaps is anchored to the shortest fragment of one
+    /// sentence that holds most of its content words (`anchor`), and the first word of a summary point may be a
+    /// common word written in lowercase elsewhere in the transcript (`isCommonWord`).
+    static let rulesVersion = "g1"
 
     /// What `applyingVerifications` changed (counts only).
     struct VerifierEffect: Equatable, Sendable {
@@ -112,6 +115,8 @@ struct NotesGuard: Sendable {
         /// Tasks whose person the model left empty and the guard filled with the speaker of a first person
         /// singular quote. A count only, never a name.
         var ownerFromSpeaker = 0
+        /// Verified points whose quote was anchored to a shorter fragment of the transcript (`anchor`).
+        var reanchored = 0
     }
 
     struct ReduceVerdict: Equatable, Sendable {
@@ -145,6 +150,8 @@ struct NotesGuard: Sendable {
     private let utteranceRanges: [Range<Int>]
     private let speakerNames: [String]
     private let nameCandidates: Vocabulary
+    /// Words the transcript writes in lowercase inside a sentence (not as its first word): common words (S2).
+    private let lowercaseWords: Vocabulary
     /// The dominant language of the whole transcript.
     let language: NotesLanguage
 
@@ -212,6 +219,8 @@ struct NotesGuard: Sendable {
             names.append(words[index])
         }
         nameCandidates = Vocabulary(words: names, numbers: [])
+        lowercaseWords = Vocabulary(
+            words: words.indices.filter { !capitalised[$0] && !starts[$0] }.map { words[$0] }, numbers: [])
     }
 
     // MARK: After MAP
@@ -222,12 +231,14 @@ struct NotesGuard: Sendable {
         var details: [DropDetail: Int] = [:]
         var downgraded = 0
         var ownerFromSpeaker = 0
+        var reanchored = 0
         for point in points {
             switch verify(point) {
             case .success(let outcome):
                 verified.append(outcome.point)
                 if outcome.downgraded { downgraded += 1 }
                 if outcome.ownerFromSpeaker { ownerFromSpeaker += 1 }
+                if outcome.reanchored { reanchored += 1 }
             case .failure(let refusal):
                 reasons[refusal.reason, default: 0] += 1
                 if let detail = refusal.detail { details[detail, default: 0] += 1 }
@@ -235,7 +246,7 @@ struct NotesGuard: Sendable {
         }
         return PointVerdict(
             verified: verified, dropped: points.count - verified.count, reasons: reasons, details: details,
-            downgraded: downgraded, ownerFromSpeaker: ownerFromSpeaker)
+            downgraded: downgraded, ownerFromSpeaker: ownerFromSpeaker, reanchored: reanchored)
     }
 
     /// Why one point is refused: the reason and, for two of them, the rule or kind of miss behind it.
@@ -251,6 +262,13 @@ struct NotesGuard: Sendable {
     /// The reason and detail the guard gives one point, or nil when it passes (measurement only).
     func refusal(of point: NotesPoint) -> Refusal? {
         if case .failure(let refusal) = verify(point) { return refusal }
+        return nil
+    }
+
+    /// The point as the guard keeps it (the transcript's quote, utterance and sentence) and whether its quote was
+    /// anchored, or nil when it is refused (measurement only).
+    func kept(_ point: NotesPoint) -> (point: NotesPoint, reanchored: Bool)? {
+        if case .success(let outcome) = verify(point) { return (outcome.point, outcome.reanchored) }
         return nil
     }
 
@@ -299,6 +317,9 @@ struct NotesGuard: Sendable {
         /// How many leading quote words the range matches: all of them, or fewer when a literal quote ran on
         /// past a sentence end and only its first sentence was matched.
         var quoteCount: Int
+        /// The quote was anchored to this fragment (`anchor`): every later check reads the fragment's words, not
+        /// the model's quote.
+        var reanchored = false
     }
 
     /// The fewest quote words a match needs unless it is a whole utterance (`quoteTooShort`).
@@ -309,6 +330,8 @@ struct NotesGuard: Sendable {
         var downgraded = false
         /// Set when the person is the speaker, given by the guard (`ownerFromSpeaker`).
         var ownerFromSpeaker = false
+        /// Set when the quote was anchored to a fragment of the transcript (`anchor`).
+        var reanchored = false
     }
 
     private func verify(_ point: NotesPoint) -> Result<Outcome, Refusal> {
@@ -318,11 +341,19 @@ struct NotesGuard: Sendable {
         guard !point.text.isEmpty else { return .failure(Refusal(.emptyText)) }
 
         let allQuoteWords = NotesText.words(strippingLinePrefix(point.quote))
-        guard !allQuoteWords.isEmpty, let match = find(allQuoteWords, near: point.timeMs) else {
+        guard !allQuoteWords.isEmpty,
+            let match = find(allQuoteWords, near: point.timeMs) ?? anchor(allQuoteWords, near: point.timeMs)
+        else {
             return .failure(Refusal(.quoteNotInTranscript, detail: missKind(of: allQuoteWords)))
         }
         // Only the matched part of the quote counts from here on (all of it, unless it was cut at a sentence end).
-        let quoteWords = Array(allQuoteWords.prefix(match.quoteCount))
+        // An anchored quote counts only as the transcript's fragment: the words the model changed or added are gone.
+        let quoteWords = match.reanchored ? Array(words[match.range]) : Array(allQuoteWords.prefix(match.quoteCount))
+        // A point must not rest on a word of its quote that the anchoring left out ("the marketing budget" for
+        // "the sales budget"): the quote is then treated as not found.
+        if match.reanchored, usesDroppedQuoteWord(point.text, quote: allQuoteWords, fragment: quoteWords) {
+            return .failure(Refusal(.quoteNotInTranscript, detail: missKind(of: allQuoteWords)))
+        }
         guard quoteWords.count >= Self.minimumQuoteWords || match.wholeUtterance else {
             return .failure(Refusal(.quoteTooShort))
         }
@@ -338,6 +369,7 @@ struct NotesGuard: Sendable {
         let covered = Set(match.range.map { wordUtterance[$0] }).sorted()
         let excerpt = self.excerpt(of: match.range)
         var outcome = Outcome(point: point)
+        outcome.reanchored = match.reanchored
         outcome.point.timeMs = utterances[covered[0]].startMs
         outcome.point.speaker = utterances[covered[0]].speaker
         outcome.point.utterance = covered[0]
@@ -367,13 +399,26 @@ struct NotesGuard: Sendable {
             }
         case .decision: break
         }
-        let vocabulary = Vocabulary(
-            words: covered.flatMap { Array(words[utteranceRanges[$0]]) }
-                + covered.flatMap { NotesText.words(utterances[$0].speaker) },
-            numbers: covered.flatMap {
-                NotesText.numberUnits(utterances[$0].text) + NotesText.linkUnits(utterances[$0].text)
-            })
-        if let rule = Self.faithfulnessRefusal(outcome.point.text, vocabulary: vocabulary, strictStart: false) {
+        // An anchored point is checked against its fragment only: a detail from the rest of a long sentence of
+        // the recognizer does not support it. Any other point, as before, against its utterances.
+        let vocabulary =
+            match.reanchored
+            ? Vocabulary(
+                words: quoteWords + NotesText.words(utterances[covered[0]].speaker),
+                numbers: NotesText.numberUnits(excerpt) + NotesText.linkUnits(excerpt))
+            : Vocabulary(
+                words: covered.flatMap { Array(words[utteranceRanges[$0]]) }
+                    + covered.flatMap { NotesText.words(utterances[$0].speaker) },
+                numbers: covered.flatMap {
+                    NotesText.numberUnits(utterances[$0].text) + NotesText.linkUnits(utterances[$0].text)
+                })
+        // Only a summary point's first word may be a common word that stands in lowercase elsewhere (S2):
+        // decisions and tasks have no drift check behind them.
+        let commonFirstWord: ((String) -> Bool)? =
+            outcome.point.kind == .summary ? { self.isCommonWord($0) } : nil
+        if let rule = Self.faithfulnessRefusal(
+            outcome.point.text, vocabulary: vocabulary, strictStart: false, commonFirstWord: commonFirstWord)
+        {
             return .failure(Refusal(.unsupportedDetail, detail: DropDetail(rawValue: rule.rawValue)))
         }
         // A point must not turn a negation around: "nie zatwierdzamy" restated as "zatwierdzono", or the other
@@ -524,6 +569,115 @@ struct NotesGuard: Sendable {
             }
         }
         return nil
+    }
+
+    // MARK: Anchoring a quote the model changed (S1)
+
+    /// The share of a quote's content words an anchored fragment must hold, in the quote's order (80 %, rounded
+    /// up, at least `minimumQuoteWords`).
+    static let anchorShare = (covered: 4, of: 5)
+    /// How many words an anchored fragment may be longer than the model's quote.
+    static let anchorExtraWords = 3
+    /// How far (ms) the fragment's utterance may start from the time the model gave the point.
+    static let anchorWindowMs = 60_000
+
+    /// The words of a quote that carry its content: four letters or more and not a function word
+    /// (`notContentWords`), as `quoteCoverage` counts them.
+    private static func contentWords(of quote: [String]) -> [String] {
+        quote.filter { $0.count >= 4 && !notContentWords.contains($0) }
+    }
+
+    /// When neither a literal match nor one with gaps places the quote (the model changed a word or left out
+    /// more than `maxSkippedTranscriptWords`), the shortest fragment of ONE sentence (so one speaker) that holds
+    /// at least `anchorShare` of the quote's content words in the quote's order, is at most
+    /// `anchorExtraWords` longer than the quote and lies within `anchorWindowMs` of the model's time. The
+    /// fragment, never its whole sentence, becomes the point's quote and every later check reads it.
+    /// A fragment is refused when a word it holds beyond the quote's is a negation, a number, a word with a
+    /// digit or a capitalised name the quote does not have (the rule for skipped words, `canSkip`), and when its
+    /// sentence holds a negation outside it ("we are not going to approve the budget" anchored as "approve the
+    /// budget"). Ties: the shortest, then the one with more of the quote's words, then the nearest in time.
+    private func anchor(_ quote: [String], near time: Int) -> Match? {
+        let content = Self.contentWords(of: quote)
+        let share = (content.count * Self.anchorShare.covered + Self.anchorShare.of - 1) / Self.anchorShare.of
+        let required = max(Self.minimumQuoteWords, share)
+        guard content.count >= required else { return nil }
+        let maxLength = quote.count + Self.anchorExtraWords
+        var best: (range: Range<Int>, matched: Int, distance: Int)?
+        for start in words.indices where content.contains(where: { NotesText.wordsMatch(words[start], $0) }) {
+            let distance = abs(utterances[wordUtterance[start]].startMs - time)
+            guard distance <= Self.anchorWindowMs else { continue }
+            let sentence = sentenceRanges[wordSentence[start]]
+            let limit = min(sentence.upperBound, start + maxLength)
+            // The longest common subsequence of `content` and the words from `start`, extended one word at a time.
+            var row = Array(repeating: 0, count: content.count + 1)
+            for end in start..<limit {
+                var diagonal = 0
+                for index in 1...content.count {
+                    let above = row[index]
+                    row[index] =
+                        NotesText.wordsMatch(words[end], content[index - 1])
+                        ? diagonal + 1 : max(row[index], row[index - 1])
+                    diagonal = above
+                }
+                guard row[content.count] >= required else { continue }
+                let range = start..<(end + 1)
+                if isAcceptableAnchor(range, quote: quote, sentence: sentence) {
+                    let candidate = (range: range, matched: row[content.count], distance: distance)
+                    if let current = best {
+                        let shorter = range.count < current.range.count
+                        let sameLength = range.count == current.range.count
+                        let better =
+                            shorter
+                            || (sameLength
+                                && (candidate.matched, -candidate.distance) > (current.matched, -current.distance))
+                        if better { best = candidate }
+                    } else {
+                        best = candidate
+                    }
+                }
+                break
+            }
+        }
+        guard let best else { return nil }
+        return Match(range: best.range, wholeUtterance: false, quoteCount: quote.count, reanchored: true)
+    }
+
+    /// The fragment's words beyond the quote's could each be skipped (`canSkip`), and its sentence has no
+    /// negation outside it.
+    private func isAcceptableAnchor(_ range: Range<Int>, quote: [String], sentence: Range<Int>) -> Bool {
+        for index in range where !quote.contains(where: { NotesText.wordsMatch($0, words[index]) }) {
+            guard canSkip(index, quote: quote) else { return false }
+        }
+        for index in sentence where !range.contains(index) && Self.negations.contains(words[index]) {
+            return false
+        }
+        return true
+    }
+
+    /// The text uses a word of the model's quote that the anchored fragment does not hold (three letters or
+    /// more, not a function word): the point rests on what the model changed, not on what was said.
+    private func usesDroppedQuoteWord(_ text: String, quote: [String], fragment: [String]) -> Bool {
+        let dropped = quote.filter { word in
+            word.count >= 3 && !Self.notContentWords.contains(word)
+                && !fragment.contains(where: { NotesText.wordsMatch($0, word) })
+        }
+        guard !dropped.isEmpty else { return false }
+        return NotesText.words(text).contains { word in
+            dropped.contains(where: { NotesText.wordsMatch($0, word) })
+                && !fragment.contains(where: { NotesText.wordsMatch($0, word) })
+        }
+    }
+
+    // MARK: A common word at the start of a summary point (S2)
+
+    /// The first word of a summary point is a common word, not a name: the transcript writes it in lowercase
+    /// inside a sentence, never capitalised inside a sentence (`nameCandidates` holds those, and the words of
+    /// the speakers' real names), and it is no word of a speaker's label.
+    private func isCommonWord(_ word: String) -> Bool {
+        guard lowercaseWords.contains(word), !nameCandidates.containsName(word) else { return false }
+        return !speakerNames.contains { label in
+            NotesText.words(label).contains { NotesText.wordsMatch($0, word) || NotesText.namesMatch($0, word) }
+        }
     }
 
     /// The kind of miss behind a quote that `find` did not place (measurement only; it runs for refused points).
@@ -712,11 +866,15 @@ struct NotesGuard: Sendable {
     }
 
     /// `isFaithful` with the reason it refuses (the first rule that fails), or nil when the text is faithful.
-    static func faithfulnessRefusal(_ text: String, vocabulary: Vocabulary, strictStart: Bool) -> SummaryRefusal? {
+    /// `commonFirstWord` (a summary point's text only) lets the text's very first word pass when it says the word is
+    /// a common word, not a name (`isCommonWord`); a capitalised word anywhere else is checked as before.
+    static func faithfulnessRefusal(
+        _ text: String, vocabulary: Vocabulary, strictStart: Bool, commonFirstWord: ((String) -> Bool)? = nil
+    ) -> SummaryRefusal? {
         for unit in NotesText.numberUnits(text) + NotesText.linkUnits(text) where !vocabulary.numbers.contains(unit) {
             return .unsupportedNumber
         }
-        for token in NotesText.tokens(text) {
+        for (position, token) in NotesText.tokens(text).enumerated() {
             let word = token.word
             if word.contains(where: \.isNumber) { continue }
             if NotesText.isNumberWord(word) {
@@ -732,6 +890,7 @@ struct NotesGuard: Sendable {
             guard token.startsSentence else { return .unsupportedCapitalised }
             if sentenceStarters.contains(word) { continue }
             if !strictStart, word.count >= 4, vocabulary.sharesStem(word) { continue }
+            if position == 0, let commonFirstWord, commonFirstWord(word) { continue }
             return .unsupportedSentenceStart
         }
         return nil
