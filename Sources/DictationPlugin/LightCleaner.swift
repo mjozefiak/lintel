@@ -11,6 +11,9 @@ import Foundation
 /// - The comma that belonged to the filler goes with it; when the word before it already ends with a comma the two are
 ///   one pair ("is, um, on" → "is on"), a comma before a filler that ends the sentence is replaced by the sentence's
 ///   full stop, and the next word gets a capital letter when the (capitalised) filler started a sentence.
+/// - A capitalised filler is removed only at the start of a sentence (the start of the text or after `.?!`): the engine
+///   capitalises what starts a sentence, so a capital in the middle is a name or an acronym ("UM", "ERM", "Eee") and
+///   stays.
 /// - It never removes a repetition, a false start or a real word ("no", "więc", "jakby", "tak" are not fillers here;
 ///   Standard handles them), never touches a digit, and keeps every word of the user's vocabulary.
 struct LightCleaner: TextFormatter {
@@ -53,7 +56,12 @@ struct LightCleaner: TextFormatter {
         var carriedSpace: String?
         var capitalizeNext = false
         for token in tokens {
-            guard let filler = Self.filler(token.text, protected: protected) else {
+            // The engine capitalises a filler that starts a sentence: that is the signal. A capital in the middle of a
+            // sentence is a name or an acronym ("UM", "Eee"), so such a token stays like any other word.
+            let atSentenceStart = output.last.map { Self.endsSentence($0.text) } ?? true
+            guard let filler = Self.filler(token.text, protected: protected),
+                !filler.startsWithCapital || atSentenceStart
+            else {
                 var kept = token
                 if let carriedSpace { kept.space = carriedSpace }
                 carriedSpace = nil
@@ -62,9 +70,7 @@ struct LightCleaner: TextFormatter {
                 output.append(kept)
                 continue
             }
-            // The engine capitalises a filler that starts a sentence: that is the signal. A capital in the middle of a
-            // sentence is a name, and what follows it stays as it is.
-            if filler.startsWithCapital, output.last.map({ Self.endsSentence($0.text) }) ?? true {
+            if filler.startsWithCapital {
                 capitalizeNext = true
             }
             // "is, um, on" → "is on": the filler's own comma and the one before it are one pair, so neither stays.

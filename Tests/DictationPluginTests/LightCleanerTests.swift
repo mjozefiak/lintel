@@ -83,14 +83,26 @@ import Testing
         #expect(clean("Yyy, eee.") == "")
     }
 
+    @Test func aCapitalisedFillerInTheMiddleOfASentenceIsAName() {
+        // The engine capitalises what starts a sentence, so a capital mid-sentence is a name or an acronym and stays.
+        #expect(clean("Spotkanie z Eee jest jutro.") == "Spotkanie z Eee jest jutro.")
+        #expect(clean("Rozmowa z UM o podatku.") == "Rozmowa z UM o podatku.")
+        #expect(clean("The plan z ERM needs a name.") == "The plan z ERM needs a name.")
+        // A lowercase filler in the same place goes.
+        #expect(clean("Spotkanie z eee jest jutro.") == "Spotkanie z jest jutro.")
+        // At the start of a sentence the capitalised filler is removed and the next word takes the capital.
+        #expect(clean("Spotkanie jest. Um, potem idziemy.") == "Spotkanie jest. Potem idziemy.")
+    }
+
     @Test func aVocabularyWordIsNeverRemovedOrChanged() {
         // The user's own term "Eee" (and the spoken variant "yhm") stays, case-insensitively.
         #expect(clean("Spotkanie z Eee jest jutro.", protecting: ["Eee"]) == "Spotkanie z Eee jest jutro.")
         #expect(clean("Powiedz yhm, że tak.", protecting: ["yhm system"]) == "Powiedz yhm, że tak.")
         // The word after a removed filler keeps its own spelling when it is a term ("iPhone", not "IPhone").
         #expect(clean("Yyy iphone jest nowy.", protecting: ["iPhone"]) == "iphone jest nowy.")
-        // Without the term, the same text loses its filler.
-        #expect(clean("Spotkanie z Eee jest jutro.") == "Spotkanie z jest jutro.")
+        // A lowercase filler is protected too: with the term it stays, without it the same text loses it.
+        #expect(clean("Spotkanie z eee jest jutro.", protecting: ["eee"]) == "Spotkanie z eee jest jutro.")
+        #expect(clean("Spotkanie z eee jest jutro.") == "Spotkanie z jest jutro.")
     }
 
     @Test func itAlwaysFormatsAndNeverFails() async throws {
@@ -103,11 +115,11 @@ import Testing
     @Test func theVocabularyIsReadForEveryChunk() async throws {
         let terms = TermBox()
         let cleaner = LightCleaner(protectedWords: { terms.value })
-        let before = try await cleaner.format(chunk: "Z Eee jest.", previousContext: nil)
-        terms.value = ["Eee"]
-        let after = try await cleaner.format(chunk: "Z Eee jest.", previousContext: nil)
-        #expect(before.text == "Z jest.")
-        #expect(after.text == "Z Eee jest.")
+        let before = try await cleaner.format(chunk: "Zjadłem, yyy, obiad.", previousContext: nil)
+        terms.value = ["yyy"]
+        let after = try await cleaner.format(chunk: "Zjadłem, yyy, obiad.", previousContext: nil)
+        #expect(before.text == "Zjadłem obiad.")
+        #expect(after.text == "Zjadłem, yyy, obiad.")
     }
 
     @Test func fillerProcessingIsFast() {
