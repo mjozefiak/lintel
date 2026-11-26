@@ -279,6 +279,13 @@ Outside the phases: the owner's decision on A3 (model assist for Light), taken f
 2. Measure Standard and Full on FLEURS PL/EN (and on the corpus if A14 is approved): p50 and p90 from release, the level's quality targets, the provider's failures. Table in `docs/perf.md` and the PR body.
 3. Propose `ProviderLevels.offered`. The owner confirms it on the PR.
 
+   **Result (2026-11-26, Claude Code 2.1.332, sonnet, FLEURS PL/EN 60 + 60, Standard v2 and Full v1; table in `docs/perf.md`):**
+   latency from release p50/p90 Standard 2.31/3.25 s (PL) and 2.19/3.23 s (EN), Full 2.37/3.19 s and 2.52/3.12 s; 0 provider
+   failures in 240 requests. Standard fails its 2 s gate (101 of 120 dictations over it), Full passes its 6 s gate (0 over)
+   and every Full check FLEURS carries (0 invented layout, 0 lost numbers, 0 short items broken, fewer lost content words
+   than Standard). Proposed `ProviderLevels.offered = [.full]`, once Full is offered (Phase 2) and its corpus targets are
+   measured on the provider (A14) or waived by the owner.
+
 ### Phase 5 — provider source
 
 1. `LintelProviders`: `ProviderFeatureID.dictationCleanup`; `ProviderGate` lanes (`background` by default, `interactive`). Tests:

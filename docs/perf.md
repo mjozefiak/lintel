@@ -195,6 +195,42 @@ and filled in then; nothing here is estimated.
 | Resident memory with the built-in 4B model loaded / after keep-warm unload | ≈ 3.3 GB / back to the baseline | – | Manual (Activity Monitor) |
 | Time of one chunk request | printed by `LINTEL_LLM_URL=… swift test --filter CleanupFixtureTests/realServer` | – | Manual |
 
+### Cleanup levels on the external provider (spec `2026-11-25-dictation-cleanup-levels`, Phase 4)
+
+Measured on 2026-11-26 with `scripts/dictation-eval/run.sh --source provider` (one run of each row, never in CI):
+Claude Code 2.1.332, `--model sonnet` (the CLI reported `claude-sonnet-5-5`), the isolation flags of ADR 0011, a
+subscription login, Apple M4 Max (128 GB), macOS 27.0.1. Prompts: Standard v2, Full v1 (`CleanupPrompt.version(for:)`,
+the head of PR #337). Input: FLEURS PL and EN, 60 items each, from the stored raw transcripts; the replay length of each
+item is its recording (`--audio`, no estimate). Only FLEURS text was sent; the owner's corpus was not (spec A14).
+Latency is from the key release to the last chunk back, with the CLI's process start in every request; the speech
+engine's time for the last segment is not included. Every FLEURS item is one chunk (under 60 words), so the number is
+the time of one request that starts at the release. Percentiles are nearest-rank (`provider_summary.py`).
+
+| Level | Limit from release | FLEURS | p50 | p90 | max | Over the limit | Provider failures | Guard fallbacks | WER (raw / built-in / provider) |
+|---|---|---|---|---|---|---|---|---|---|
+| Standard | 2 s (A10) | PL | 2.31 s | 3.25 s | 3.93 s | 56 of 60 | 0 | 1 (`tooLong`) | 6.5 / 6.9 / 6.7 % |
+| Standard | 2 s (A10) | EN | 2.19 s | 3.23 s | 3.35 s | 45 of 60 | 0 | 1 (`newNumber`) | 6.3 / 6.1 / 6.1 % |
+| Full | 6 s (A11) | PL | 2.37 s | 3.19 s | 4.68 s | 0 of 60 | 0 | 0 | 6.5 / 7.2 / 6.4 % |
+| Full | 6 s (A11) | EN | 2.52 s | 3.12 s | 4.31 s | 0 of 60 | 0 | 1 (`newNumber`) | 6.3 / 6.7 / 6.2 % |
+
+Full's checks on the same FLEURS output (`check_full.py`, provider Full against provider Standard): 0 invented greetings or
+sign-offs, 0 lost numbers, 0 short items with a line break, lost content words PL 4 items (7 stems) against Standard's 5
+(10), EN 0 against 1. The built-in model's Full on FLEURS (PR #337) lost content words in 12 PL and 4 EN items.
+
+Reading:
+
+- **Standard fails the latency gate**: p90 3.2 s against 2 s, and even p50 is over 2 s; 101 of 120 dictations would be
+  pasted raw at the limit. Its FLEURS WER holds D2's target (raw + 0.3 pt). A CLI request costs about 2 s before the
+  model writes anything, so no prompt change brings Standard under 2 s on this path.
+- **Full passes the latency gate** (p90 3.2 s against 6 s, no dictation over the limit) and every Full check FLEURS can
+  carry. Full's other targets (self-corrections, terms, `chat`/`code` WER, greeting alone, paragraphs) exist only on the
+  owner's corpus, which was not sent; FLEURS has no mails, lists or self-corrections.
+- Proposed `ProviderLevels.offered = [.full]` (the spec's expectation), for the owner to confirm on the Phase 4 PR, on two
+  conditions: Full itself is offered (PR #337, `fullIsOffered`), and Full's corpus targets are either measured on the
+  provider (needs the owner's consent, A14) or waived. Nothing in the product reads this value yet (Phase 5).
+- Limits: one run, one model (sonnet), one network; no multi-chunk dictation in FLEURS, so the queue in the gate behind
+  an earlier chunk is covered only by the offline tests; the account's load at the time is unknown.
+
 ### Context (ADR 0010, epic DICT)
 
 Budgets of ADR 0010. Nothing is measured yet: the code does not exist. DICT-2.7 measures the first two rows,
