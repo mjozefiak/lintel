@@ -653,6 +653,23 @@ final class CloseRecorder: NSObject, NSWindowDelegate {
     }
 }
 
+/// A 1x1 pixel for a loader that only has to return *something*: a test about where the work runs should not also
+/// need AppKit to rasterize a symbol.
+private nonisolated func testIconPixel() -> CGImage? {
+    guard
+        let context = CGContext(
+            data: nil,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+    else { return nil }
+    return context.makeImage()
+}
+
 @Suite struct ShellPhase1Tests {
     @Test func menuWithShellActionsOpensThePanelAndSettings() {
         let menu = NSMenu()
@@ -678,13 +695,41 @@ final class CloseRecorder: NSObject, NSWindowDelegate {
         #expect(configuration.promptsUserIfNeeded)
     }
 
+    /// The subject is where the work runs: `image(for:)` must call the loader off the main thread. The loader is
+    /// injected, so the assertion does not depend on AppKit rasterizing a symbol, and it does not depend on
+    /// `NSCache` still holding the entry afterwards: the cache evicts under memory pressure, which is what made the
+    /// old `cached` check flake in a full-suite run (#284).
     @Test func iconsLoadOffTheMainThread() async throws {
+        let threads = Mutex<[Bool]>([])
+        let cache = IconCache { _ in
+            threads.withLock { $0.append(Thread.isMainThread) }
+            return testIconPixel()
+        }
+        let image = await cache.image(for: .symbol("star"))
+        #expect(image != nil)
+        #expect(threads.withLock { $0 } == [false], "one load for one miss, off the main thread")
+    }
+
+    /// A miss loads the icon and keeps it, so the next row that draws the same icon finds it without a load
+    /// (`LauncherView` reads `cached(_:)` first). `NSCache` may drop an entry at any time, so an eviction between
+    /// the store and the check gets another attempt; a cache that never stores fails every attempt.
+    @Test func aLoadedIconIsKeptInTheMemoryCache() async throws {
+        let cache = IconCache { _ in testIconPixel() }
+        var kept = false
+        for _ in 0..<3 where !kept {
+            let image = await cache.image(for: .symbol("star"))
+            kept = image != nil && cache.cached(.symbol("star")) === image
+        }
+        #expect(kept, "the loaded icon is in the memory cache")
+    }
+
+    /// The live loader end to end: AppKit rasterizes a real symbol without touching the main thread.
+    @Test func theProductionLoaderRasterizesASymbol() async throws {
         let before = IconLoader.mainThreadLoads.withLock { $0 }
         let cache = IconCache(diskDirectory: nil)
         let image = await cache.image(for: .symbol("star"))
         #expect(image != nil)
-        #expect(cache.cached(.symbol("star")) != nil)
-        #expect(IconLoader.mainThreadLoads.withLock { $0 } == before)
+        #expect(IconLoader.mainThreadLoads.withLock { $0 } == before, "no load on the main thread")
     }
 
     @Test func appIconsAreCachedOnDiskByPathAndDate() throws {
