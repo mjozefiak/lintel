@@ -33,7 +33,7 @@ struct DictationGalleryTests {
         let source = Set(scenes[1].states.map(\.id))
         #expect(
             source == [
-                "this-mac-standard", "this-mac-add-provider", "claude-standard", "claude-full",
+                "this-mac-standard", "my-server-no-provider", "claude-standard", "claude-full",
                 "claude-heavier-model", "claude-signed-out", "claude-not-installed", "claude-checking",
                 "claude-full-falls-back-to-this-mac", "claude-full-falls-back-to-nothing",
             ])
@@ -68,7 +68,10 @@ struct DictationGalleryTests {
                 try GalleryRenderer.pngData(try await GalleryRenderer.render(state, Self.lightM)))
             #expect(first[state.id] == again, "\(state.id) draws differently the second time")
         }
-        #expect(Set(first.values).count == first.count, "two states draw the same picture")
+        let grouped = Dictionary(grouping: first, by: { $0.value }).filter { $0.value.count > 1 }.map {
+            $0.value.map(\.key).sorted()
+        }
+        #expect(grouped.isEmpty, "two states draw the same picture: \(grouped)")
     }
 
     @Test("no golden image of this plugin belongs to a state that no longer exists, and every state has its goldens")

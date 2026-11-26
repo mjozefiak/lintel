@@ -145,10 +145,10 @@ private struct TidySourceGalleryPane: View {
             state(
                 "this-mac-standard",
                 "This Mac at Standard, Claude ready: the menu lists This Mac, My server and Claude."
-            ) { model(level: "standard", source: "server", server: true, check: .known(.ready)) },
+            ) { model(level: "standard", source: "builtIn", check: .known(.ready)) },
             state(
-                "this-mac-add-provider",
-                "This Mac at Standard, no provider ready: the menu has “Add a provider…” disabled and no Claude."
+                "my-server-no-provider",
+                "My server at Standard, no provider ready: the menu has “Add a provider…” disabled and no Claude."
             ) { model(level: "standard", source: "server", server: true, check: .known(.notInstalled)) },
             state(
                 "claude-standard",
