@@ -72,6 +72,8 @@ private final class RepairEngine: SpeechEngine {
     private let reply: @Sendable (Int) -> TranscriptSegment
     private let onCall: @Sendable (Int) async -> Void
     let gate = Gate()
+    /// Closed = `load` does not return (a slow first load of the model).
+    let loadGate = Gate()
     let parkAbove: Int
 
     init(
@@ -89,7 +91,10 @@ private final class RepairEngine: SpeechEngine {
     var parked: Bool { state.withLock { $0.parked } }
     var isLoaded: Bool { state.withLock { $0.loaded } }
 
-    func load(modelFolder: URL) async throws { state.withLock { $0.loaded = true } }
+    func load(modelFolder: URL) async throws {
+        await loadGate.pass()
+        state.withLock { $0.loaded = true }
+    }
 
     func transcribe(_ samples: [Float]) async throws -> TranscriptSegment {
         try await transcribe(samples, options: .none)
@@ -164,7 +169,8 @@ private final class RepairRig: Sendable {
     func repair(
         engine: RepairEngine, kind: RepairSpeech.Kind = .whisper, modelInstalled: Bool = true,
         identifier: TableIdentifier? = nil, clock: RepairClock = RepairClock(),
-        sleep: @escaping @Sendable (Duration) async throws -> Void = { _ in }
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { _ in },
+        loadTimer: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     ) -> LanguageRepair {
         let folder = directory.url.appending(path: "model")
         let opened = opened
@@ -177,7 +183,7 @@ private final class RepairRig: Sendable {
             openTrack: { _, channel in
                 opened.append(channel)
                 return IndexedTrack(seconds: 24)
-            }, now: { clock.now() }, sleep: sleep)
+            }, now: { clock.now() }, sleep: sleep, loadTimer: loadTimer)
     }
 
     func finalizer(enabled: Bool, folder: URL?, diarizer: ScriptedDiarizer, repair: LanguageRepair)
@@ -343,6 +349,24 @@ private func samples(_ milliseconds: Int) -> Int { milliseconds * AudioFormat.sa
         #expect(engine.calls.isEmpty)
         #expect(try rig.text(1) == "Thank you.")
         await other.release()
+    }
+
+    @Test func aModelLoadThatTakesLongerThanTheTimeLimitIsGivenUpOnAndItsLeaseIsReleasedWhenItEnds() async throws {
+        let rig = try RepairRig([
+            (.mic, 0, 6_000, words("a")), (.mic, 6_500, 7_000, "Thank you."), (.mic, 8_000, 14_000, words("b")),
+        ])
+        let engine = RepairEngine()
+        engine.loadGate.close()
+        // The timer fires at once: the load is still running.
+        let report = await rig.repair(engine: engine, loadTimer: { _ in }).run(meetingID: rig.meetingID, uuid: rig.uuid)
+
+        #expect(report == LanguageRepairReport(suspect: 1, replaced: 0, kept: 0, stop: .timeLimit))
+        #expect(engine.calls.isEmpty)
+        #expect(try rig.text(1) == "Thank you.")
+        // The load ends later: nobody holds the lease any more.
+        engine.loadGate.open()
+        for _ in 0..<200 where await rig.lease.activeLeases != 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(await rig.lease.activeLeases == 0)
     }
 
     @Test func theTimeLimitStopsTheStageAndKeepsTheRest() async throws {

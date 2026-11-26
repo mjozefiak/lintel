@@ -88,6 +88,8 @@ struct LanguageRepair: Sendable {
     let openTrack: @Sendable (UUID, AudioChannel) throws -> any AudioSampleSource
     let now: @Sendable () -> ContinuousClock.Instant
     let sleep: @Sendable (Duration) async throws -> Void
+    /// Times the model load (real time even when a test makes `sleep` instant: the load is real concurrency).
+    let loadTimer: @Sendable (Duration) async throws -> Void
     let timeLimit: Duration
     let busyWait: Duration
     let logger: Logger
@@ -99,6 +101,7 @@ struct LanguageRepair: Sendable {
         openTrack: @escaping @Sendable (UUID, AudioChannel) throws -> any AudioSampleSource,
         now: @escaping @Sendable () -> ContinuousClock.Instant = { .now },
         sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        loadTimer: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         timeLimit: Duration = Self.timeLimit, busyWait: Duration = Self.busyWait,
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "meetings")
     ) {
@@ -110,6 +113,7 @@ struct LanguageRepair: Sendable {
         self.openTrack = openTrack
         self.now = now
         self.sleep = sleep
+        self.loadTimer = loadTimer
         self.timeLimit = timeLimit
         self.busyWait = busyWait
         self.logger = logger
@@ -223,9 +227,7 @@ struct LanguageRepair: Sendable {
             if Task.isCancelled { return .failure(.cancelled) }
             let started = now()
             do {
-                let acquired = try await lease.acquire(
-                    modelID: setup.modelID, folder: setup.folder, engine: setup.engine, priority: .background,
-                    keepWarm: { Self.keepWarm })
+                guard let acquired = try await boundedAcquire(setup) else { return .failure(.timeLimit) }
                 return .success((acquired, started))
             } catch ModelLeaseError.busy {
                 guard waited < busyWait else { return .failure(.busy) }
@@ -240,6 +242,76 @@ struct LanguageRepair: Sendable {
             } catch {
                 return .failure(.noModel)
             }
+        }
+    }
+
+    /// Takes the lease but gives up after `timeLimit`: a model load cannot be interrupted (the first Whisper load
+    /// took 143 s in the step 2.5 measurement), and `ready` must not wait for it. The load goes on in the
+    /// background and the lease it ends with is released at once, so nothing stays held. `nil` = gave up.
+    /// A refusal (`busy`, no model) is thrown as it is.
+    private func boundedAcquire(_ setup: RepairSpeech) async throws -> SpeechLease? {
+        let state = AcquireRace()
+        let lease = self.lease
+        let timerSleep = loadTimer
+        let limit = timeLimit
+        let (outcomes, continuation) = AsyncStream<AcquireRace.Outcome>.makeStream()
+        let loading = Task {
+            do {
+                let acquired = try await lease.acquire(
+                    modelID: setup.modelID, folder: setup.folder, engine: setup.engine, priority: .background,
+                    keepWarm: { Self.keepWarm })
+                if state.deliver() {
+                    continuation.yield(.acquired(acquired))
+                } else {
+                    await acquired.release()
+                }
+            } catch {
+                if state.deliver() { continuation.yield(.failed(error)) }
+            }
+            continuation.finish()
+        }
+        let timer = Task {
+            try? await timerSleep(limit)
+            if state.expire() { continuation.yield(.timedOut) }
+            continuation.finish()
+        }
+        defer { timer.cancel() }
+        let first: AcquireRace.Outcome? = await withTaskCancellationHandler {
+            var iterator = outcomes.makeAsyncIterator()
+            return await iterator.next()
+        } onCancel: {
+            _ = state.expire()  // a lease that arrives later is released, never delivered
+            loading.cancel()
+            continuation.finish()
+        }
+        switch first {
+        case .acquired(let acquired): return acquired
+        case .failed(let error): throw error
+        case .timedOut: return nil
+        case nil: throw CancellationError()
+        }
+    }
+
+    /// Decides which of "the lease arrived" and "the time ran out" wins; the loser is dropped.
+    private final class AcquireRace: @unchecked Sendable {
+        enum Outcome: @unchecked Sendable {
+            case acquired(SpeechLease)
+            case failed(any Error)
+            case timedOut
+        }
+        private let lock = NSLock()
+        private var decided = false
+
+        /// `true` when the caller's result is the first one.
+        func deliver() -> Bool { decide() }
+        func expire() -> Bool { decide() }
+
+        private func decide() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            if decided { return false }
+            decided = true
+            return true
         }
     }
 
