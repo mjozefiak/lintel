@@ -28,13 +28,15 @@ final class NotesSettingsModel {
     private(set) var space: ModelSpaceCheck?
 
     @ObservationIgnored private let settings: MeetingsSettings
-    @ObservationIgnored private let service: NotesService
+    @ObservationIgnored private let service: any ProviderNotesControl
     @ObservationIgnored private let manager: ModelManager
     @ObservationIgnored private let lease: LLMLease
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var downloadGeneration = 0
 
-    init(settings: MeetingsSettings, service: NotesService, manager: ModelManager, lease: LLMLease = .shared) {
+    init(
+        settings: MeetingsSettings, service: any ProviderNotesControl, manager: ModelManager, lease: LLMLease = .shared
+    ) {
         self.settings = settings
         self.service = service
         self.manager = manager

@@ -94,7 +94,7 @@ final class NotesBoard: Sendable {
 ///
 /// The transcript and the notes never reach a log: only counts and statuses do.
 @MainActor
-final class NotesService {
+final class NotesService: ProviderNotesControl {
     struct Dependencies {
         var library: MeetingsLibrary
         var settings: MeetingsSettings

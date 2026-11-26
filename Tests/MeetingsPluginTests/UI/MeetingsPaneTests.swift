@@ -71,7 +71,8 @@ import Testing
         }
         #expect(source.contains("\"Privacy and data\", comment:"))
         // The notes model is a choice here; its download lives in Models (no "Download (≈ …)" card).
-        #expect(source.contains("ProviderChoiceModel.surfacesProvider("))
+        // The provider sections are one view (`NotesWrittenBySections`, which asks `surfacesProvider`), shared with the gallery.
+        #expect(source.contains("NotesWrittenBySections("))
         #expect(!source.contains("Download ("))
         #expect(!source.contains("Try it on an example"))
     }

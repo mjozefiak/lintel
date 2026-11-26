@@ -92,6 +92,35 @@ jobs:
         timeout-minutes: 16
         run: scripts/test-with-watchdog.sh --limit 800 --name test -- swift test
 
+      # The design gallery's golden images (spec 2026-11-23-swiftui-design-gallery). Right after "Test", whose debug
+      # build the app bundle reuses, before the Thread Sanitizer builds. It must not hide the steps after it, so it
+      # does not fail the job here (`continue-on-error`): the step "Fail on gallery differences" at the end does. Both
+      # languages come from the app bundle, the build the owner approves (it has the accent colour and the compiled
+      # string catalog that `swift test` lacks); the language is a property of the process (`-AppleLanguages`). A
+      # change of the renderer fingerprint (macOS build, Xcode) fails here on every open PR until the goldens are
+      # recorded again (gallery-goldens.yml).
+      - name: Gallery snapshots
+        id: gallery
+        continue-on-error: true
+        timeout-minutes: 8
+        env:
+          LINTEL_SNAPSHOT_ARTIFACTS: ${{ runner.temp }}/gallery-diffs
+        run: |
+          set -euo pipefail
+          LINTEL_GALLERY_XCODE="$(xcodebuild -version | tr '\n' ' ')"
+          export LINTEL_GALLERY_XCODE
+          started=$SECONDS
+          CONFIGURATION=debug scripts/make-app.sh
+          echo "make-app: $((SECONDS - started)) s"
+          status=0
+          for language in en pl; do
+            dist/Lintel-QA.app/Contents/MacOS/Lintel-QA --qa \
+              --qa-gallery-compare Tests/MeetingsPluginTests/Gallery/Goldens --qa-gallery-language "$language" \
+              -AppleLanguages "($language)" -AppleLocale "$language" || status=1
+          done
+          echo "gallery step: $((SECONDS - started)) s"
+          exit "$status"
+
       # The sanitizer build has its own scratch path, so it never overwrites the plain build in .build and both are
       # cached as they are.
       - name: Restore the Thread Sanitizer build cache
@@ -115,6 +144,22 @@ jobs:
       - name: Format lint
         timeout-minutes: 3
         run: swift format lint --strict -r Sources Tests
+
+      # `actual.png`, `diff.png` and `fingerprint.json` of the pictures that differ, only on a failure.
+      - name: Upload gallery diffs
+        if: ${{ !cancelled() && steps.gallery.outcome != 'success' && steps.gallery.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gallery-diffs
+          path: ${{ runner.temp }}/gallery-diffs
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail on gallery differences
+        if: ${{ !cancelled() && steps.gallery.outcome != 'success' && steps.gallery.outcome != 'skipped' }}
+        run: |
+          echo "The step 'Gallery snapshots' did not pass: pictures differ from the goldens (artifact gallery-diffs), or the app did not build."
+          exit 1
 
       # A hung test run leaves stack samples and the names of the unfinished tests here (never test output).
       - name: Upload watchdog diagnostics

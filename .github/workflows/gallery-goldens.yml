@@ -1,0 +1,119 @@
+name: Gallery goldens
+
+# Records the design gallery on the CI runner (spec .ai/specs/2026-11-23-swiftui-design-gallery.md, Q3): the FULL matrix
+# as a contact sheet for the owner's approval, and the golden PNGs of the CI subset from the SAME render. Text drawing
+# depends on the macOS build and the Xcode SDK, so goldens recorded anywhere else would give red CI.
+#
+# Manual only, no secrets, never pushes: it uploads the artifact `gallery-record-<run id>`; the author (or an agent)
+# commits the golden PNGs from it onto the PR branch. A change of the golden images needs the PR's "Golden changes"
+# section and `needs-qa`; nobody records new goldens just to make a test pass.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scene:
+        description: "Limit the full-matrix sheet to one scene id (the goldens always cover every scene)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gallery-goldens-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    name: Record gallery goldens
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 5
+        with:
+          submodules: true
+
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        timeout-minutes: 5
+        with:
+          xcode-version: latest-stable
+
+      # The renderer fingerprint: macOS build (read by the app) and this line (the Xcode build; a new SDK can change
+      # SwiftUI's layout through "linked on or after" behaviour). It goes into goldens.json.
+      - name: Toolchain
+        timeout-minutes: 2
+        run: |
+          echo "DEVELOPER_DIR=$(xcode-select -p)" >> "$GITHUB_ENV"
+          echo "LINTEL_GALLERY_XCODE=$(xcodebuild -version | tr '\n' ' ')" >> "$GITHUB_ENV"
+          xcodebuild -version
+          sw_vers
+
+      # Both languages come from the app bundle, the build the owner approves and CI compares (the accent colour and the
+      # compiled string catalog are only there); the language is a property of the process (Q11).
+      - name: Record the goldens and export the full matrix
+        timeout-minutes: 20
+        env:
+          LINTEL_GALLERY_RUN: ${{ github.run_id }}
+          SCENE: ${{ inputs.scene }}
+        run: |
+          set -euo pipefail
+          CONFIGURATION=debug scripts/make-app.sh
+          app="dist/Lintel-QA.app/Contents/MacOS/Lintel-QA"
+          goldens="Tests/MeetingsPluginTests/Gallery/Goldens"
+          for language in en pl; do
+            "$app" --qa --qa-gallery-record "$goldens" --qa-gallery-language "$language" \
+              -AppleLanguages "($language)" -AppleLocale "$language"
+          done
+          if [ -n "$SCENE" ]; then
+            scripts/gallery-export.sh "$RUNNER_TEMP/gallery-sheet" --no-build --scene "$SCENE"
+          else
+            scripts/gallery-export.sh "$RUNNER_TEMP/gallery-sheet" --no-build
+          fi
+
+      - name: Collect
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/gallery-record"
+          mkdir -p "$out"
+          cp -R Tests/MeetingsPluginTests/Gallery/Goldens "$out/goldens"
+          cp -R "$RUNNER_TEMP/gallery-sheet" "$out/sheet"
+          cat "$out/goldens/goldens.json" | head -20
+
+      - name: Upload the sheet and the goldens
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gallery-record-${{ github.run_id }}
+          path: ${{ runner.temp }}/gallery-record
+          if-no-files-found: error
+          retention-days: 30
+
+      # The goldens and the sheet are two renders of the same code: they must be the same pictures, or the owner would
+      # approve something the goldens do not guard. After the upload, so a mismatch still leaves the artifact to look at.
+      - name: Check the goldens against the sheet
+        run: |
+          set -euo pipefail
+          goldens="Tests/MeetingsPluginTests/Gallery/Goldens"
+          sheet="$RUNNER_TEMP/gallery-sheet"
+          compared=0
+          mismatches=0
+          for golden in "$goldens"/*/*@*.png; do
+            scene="$(basename "$(dirname "$golden")")"
+            name="$(basename "$golden" .png)"
+            state="${name%@*}"
+            variant="${name#*@}"
+            [ -d "$sheet/$scene" ] || continue
+            compared=$((compared + 1))
+            if ! cmp -s "$golden" "$sheet/$scene/$state/$variant.png"; then
+              echo "::error::golden $scene/$state@$variant differs from the contact sheet's picture"
+              mismatches=$((mismatches + 1))
+            fi
+          done
+          echo "compared $compared goldens with the sheet, $mismatches differ"
+          if [ -z "${SCENE:-}" ] && [ "$compared" -eq 0 ]; then
+            echo "::error::no golden was compared"
+            exit 1
+          fi
+          [ "$mismatches" -eq 0 ]
+        env:
+          SCENE: ${{ inputs.scene }}

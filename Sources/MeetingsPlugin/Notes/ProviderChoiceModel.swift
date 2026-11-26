@@ -57,7 +57,7 @@ final class ProviderChoiceModel {
     let descriptors: [ProviderDescriptor]
 
     @ObservationIgnored private let settings: MeetingsSettings
-    @ObservationIgnored private let service: NotesService
+    @ObservationIgnored private let service: any ProviderNotesControl
     @ObservationIgnored private let probe: @MainActor @Sendable (ProviderDescriptor) async -> ProviderStatusReport
     @ObservationIgnored private let tryOutRun: @MainActor @Sendable (ProviderID, String) async -> TryOutResult
     @ObservationIgnored private let openURL: @MainActor (URL) -> Void
@@ -76,7 +76,7 @@ final class ProviderChoiceModel {
     @ObservationIgnored private var tryTask: Task<Void, Never>?
 
     init(
-        settings: MeetingsSettings, service: NotesService,
+        settings: MeetingsSettings, service: any ProviderNotesControl,
         descriptors: [ProviderDescriptor] = MeetingsSettings.knownProviders,
         probe: @escaping @MainActor @Sendable (ProviderDescriptor) async -> ProviderStatusReport,
         tryOut: @escaping @MainActor @Sendable (ProviderID, String) async -> TryOutResult,
