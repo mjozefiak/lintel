@@ -29,6 +29,8 @@ struct MeetingsRuntime: Sendable {
     /// Where a speech package is, with the folder the user chose for it (`nil` = the download). Tests replace it,
     /// so the engine choice runs without model files.
     var locateSpeech: @Sendable (ModelPackage, URL?) async -> ModelLocation
+    /// The lease every speech engine of this runtime goes through. Tests replace it to arrange a warm model.
+    var lease: SpeechEngineLease = .shared
     /// Whether the session starts the microphone again when it stops (off in a `--qa` run, whose track never ends).
     var retriesMicrophone = true
 
@@ -122,7 +124,8 @@ struct MeetingsRuntime: Sendable {
         let languages = speechLanguages
         let runtime = self
         let repair = LanguageRepair(
-            store: store, speech: { await runtime.repairSpeech() }, hints: { languages.current().languages },
+            store: store, speech: { await runtime.repairSpeech() }, lease: lease,
+            hints: { languages.current().languages },
             openTrack: LanguageRepair.spoolOpener(spool: spool, keys: keys), logger: logger)
         return MeetingFinalizer(
             store: store, keys: keys, spool: spool, isEnabled: { settings.diarization },
@@ -133,19 +136,34 @@ struct MeetingsRuntime: Sendable {
             }, languageRepair: repair, logger: logger)
     }
 
-    /// The language repair's model: Whisper when it is installed (it can be pinned to a language), else Parakeet
-    /// (a script hint only). A custom folder counts only for the model chosen in Settings, as everywhere else.
+    /// The language repair's model: a model already in memory wins, because taking a cold one loads it and the
+    /// lease counts the whole load, so a dictation on another model gets "speech model busy" until it ends (the
+    /// first Whisper load took 143 s in the step 2.5 measurement, issue #315). Whisper before Parakeet among the
+    /// warm ones: it can be pinned to a language and checks its own confidence. With none warm, Parakeet: taking it
+    /// never makes a Parakeet dictation wait for a model it does not need, where a cold Whisper would. Whisper stays
+    /// the only option when Parakeet is not installed. A custom folder counts only for the model chosen in Settings,
+    /// as everywhere else.
     func repairSpeech() async -> RepairSpeech? {
-        let candidates: [(ModelPackage, RepairSpeech.Kind)] = [
+        let candidates: [(package: ModelPackage, kind: RepairSpeech.Kind)] = [
             (ModelCatalog.whisperLargeV3Turbo, .whisper), (ModelCatalog.parakeetUltra, .parakeet),
         ]
-        for (package, kind) in candidates {
-            if let folder = await location(of: package).folder {
-                return RepairSpeech(
-                    kind: kind, modelID: package.id, folder: folder, engine: makeEngine(modelID: package.id))
+        var installed: [(package: ModelPackage, kind: RepairSpeech.Kind, folder: URL)] = []
+        for candidate in candidates {
+            if let folder = await location(of: candidate.package).folder {
+                installed.append((candidate.package, candidate.kind, folder))
             }
         }
-        return nil
+        var picked = installed.last
+        for candidate in installed {
+            if await lease.isWarm(modelID: candidate.package.id, folder: candidate.folder) {
+                picked = candidate
+                break
+            }
+        }
+        guard let picked else { return nil }
+        return RepairSpeech(
+            kind: picked.kind, modelID: picked.package.id, folder: picked.folder,
+            engine: makeEngine(modelID: picked.package.id))
     }
 
     /// The two tracks of a recording. A recording of the system audio only gets a microphone that never starts: the

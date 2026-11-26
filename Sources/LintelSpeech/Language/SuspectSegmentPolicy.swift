@@ -40,6 +40,17 @@ public struct SuspectSegmentPolicy: Sendable {
             && !BackChannelPhrases.isBackChannel(segment.text, language: dominant)
     }
 
+    /// Why `text`, a new decoding of a suspect segment, may not replace the original. A closed code, so the repair
+    /// can count the refusals without keeping any text (tuning input for the Whisper thresholds, step 2.5).
+    public enum ReplacementRefusal: String, CaseIterable, Sendable {
+        /// Its script (or no letters at all) is not a script the profile has.
+        case script
+        /// A back-channel or hallucination phrase of some language.
+        case phrase
+        /// The identifier places it confidently in a language outside the profile.
+        case outsideProfile
+    }
+
     /// Whether `text`, a new decoding of a suspect segment, may replace the original. All must hold:
     /// it is not empty, its script is a script of the profile, it is on no back-channel or hallucination list of
     /// any language (Whisper pinned to Polish answers noise with Polish filler, which would "agree" with the
@@ -48,11 +59,16 @@ public struct SuspectSegmentPolicy: Sendable {
     ///
     /// The decoder's own confidence (`noSpeechProb`, `avgLogProb`) is the repair's check, not this one.
     public func acceptsReplacement(_ text: String, profile: LanguageProfile) -> Bool {
-        guard let script = TextScript.dominant(in: text), profile.scripts().contains(script) else { return false }
+        replacementRefusal(text, profile: profile) == nil
+    }
+
+    /// The same rule as `acceptsReplacement`, saying which condition refused the text (`nil` = it may replace).
+    public func replacementRefusal(_ text: String, profile: LanguageProfile) -> ReplacementRefusal? {
+        guard let script = TextScript.dominant(in: text), profile.scripts().contains(script) else { return .script }
         if BackChannelPhrases.isBackChannelInAnyLanguage(text) || BackChannelPhrases.isHallucination(text) {
-            return false
+            return .phrase
         }
-        return !isConfidentlyOutside(text, profile: profile.languages())
+        return isConfidentlyOutside(text, profile: profile.languages()) ? .outsideProfile : nil
     }
 
     /// No hints are passed on purpose: a hint is a prior in favour of the profile's languages and, on the short

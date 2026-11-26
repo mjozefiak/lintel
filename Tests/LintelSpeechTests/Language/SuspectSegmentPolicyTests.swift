@@ -133,6 +133,24 @@ import Testing
         // Nothing known about the text: it passes too (the other three conditions already held).
         #expect(policy.acceptsReplacement("Nieznane zdanie", profile: polishWithEnglish))
     }
+
+    /// The refusal carries the same rule as a closed code, for the repair's counts (issue #315): what
+    /// `acceptsReplacement` refuses gets a reason, and what it accepts gets none.
+    @Test func aRefusedReplacementSaysWhichConditionRefusedIt() {
+        let identifier = FakeIdentifier(answers: ["Guten Abend zusammen": LanguageGuess(code: "de", confidence: 0.95)])
+        let policy = SuspectSegmentPolicy(identifier: identifier)
+        #expect(policy.replacementRefusal("Дякую за увагу", profile: polishWithEnglish) == .script)
+        #expect(policy.replacementRefusal("", profile: polishWithEnglish) == .script)
+        #expect(policy.replacementRefusal("Thank you.", profile: polishWithEnglish) == .phrase)
+        #expect(policy.replacementRefusal("Guten Abend zusammen", profile: polishWithEnglish) == .outsideProfile)
+        #expect(policy.replacementRefusal("Wieczór dobry", profile: polishWithEnglish) == nil)
+        #expect(policy.replacementRefusal("Follow-up", profile: polishWithEnglish) == nil)
+        // Every refusal code is reachable, so none is dead and the repair's counts cover the rule.
+        let refused = ["Дякую", "Thank you.", "Guten Abend zusammen"].compactMap {
+            policy.replacementRefusal($0, profile: polishWithEnglish)
+        }
+        #expect(Set(refused) == Set(SuspectSegmentPolicy.ReplacementRefusal.allCases))
+    }
 }
 
 @Suite struct BackChannelPhrasesTests {

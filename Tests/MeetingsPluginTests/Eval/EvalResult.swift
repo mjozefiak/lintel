@@ -91,6 +91,9 @@ struct EvalResult: Codable, Equatable, Sendable {
             var redecoded: Int
             var replaced: Int
             var kept: Int
+            /// `LanguageRepairReport.Kept` counts (`noSpeech`, `lowConfidence`, `outsideProfile`, ...): what the
+            /// Whisper thresholds are tuned on (issue #315).
+            var keptReasons: [String: Int]
             var skipped: Int
             /// `LanguageRepairReport.Stop` (`none`, `busy`, `timeLimit`, `noProfile`, ...).
             var stop: String

@@ -67,7 +67,10 @@ enum LanguageEval {
             repair: repair.map { run in
                 EvalResult.Language.Repair(
                     engine: run.engine, suspect: run.report.suspect, redecoded: run.report.replaced + run.report.kept,
-                    replaced: run.report.replaced, kept: run.report.kept, skipped: run.report.skipped,
+                    replaced: run.report.replaced, kept: run.report.kept,
+                    keptReasons: run.report.keptReasons.reduce(into: [String: Int]()) {
+                        $0[$1.key.rawValue] = $1.value
+                    }, skipped: run.report.skipped,
                     stop: run.report.stop.rawValue, seconds: run.seconds, beforeReadySeconds: run.beforeReadySeconds,
                     peakFootprintMB: run.peakFootprintMB, requests: tally.counts(.repair),
                     changedSegments: run.changed.count)

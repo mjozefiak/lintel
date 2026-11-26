@@ -37,14 +37,65 @@ struct LanguageRepairReport: Equatable, Sendable {
         case cancelled
     }
 
+    /// Why a re-decoded segment kept its text. A closed code (issue #315): the step 2.5 measurement kept 16 of 19
+    /// suspect segments with no reason, and the Whisper thresholds cannot be tuned without them.
+    enum Kept: String, CaseIterable, Sendable {
+        /// The decode came back with nothing.
+        case empty
+        /// The decoder returned the text the segment already had.
+        case same
+        /// Longer than `SuspectSegmentPolicy.maximumSeconds` **and** than `maximumWords`: never rewritten. Only the
+        /// guard in `refusal` reports it (a segment that is suspect was short), so it is never seen from `run`.
+        case long
+        /// Whisper: `noSpeechProb` at or above `LanguageRepair.maximumNoSpeechProb`.
+        case noSpeech
+        /// Whisper: `avgLogProb` below `LanguageRepair.minimumAvgLogProb`.
+        case lowConfidence
+        /// Whisper answered without `noSpeechProb` / `avgLogProb`: nothing to check it with.
+        case noConfidence
+        /// The new text's script is not one the profile has (`SuspectSegmentPolicy.ReplacementRefusal.script`).
+        case script
+        /// A back-channel or hallucination phrase of some language (`.phrase`).
+        case phrase
+        /// The identifier places it confidently in a language outside the profile (`.outsideProfile`).
+        case outsideProfile
+        /// The row could not be written.
+        case notSaved
+    }
+
     var suspect = 0
     var replaced = 0
-    /// Decoded again, and the new text was refused (or was the same).
+    /// Decoded again, and the new text was refused (or was the same). The sum of `keptReasons`.
     var kept = 0
+    /// How many re-decoded segments kept their text, by reason.
+    var keptReasons: [Kept: Int] = [:]
     var stop = Stop.none
+
+    init(
+        suspect: Int = 0, replaced: Int = 0, kept: Int = 0, keptReasons: [Kept: Int] = [:], stop: Stop = .none
+    ) {
+        self.suspect = suspect
+        self.replaced = replaced
+        self.kept = kept
+        self.keptReasons = keptReasons
+        self.stop = stop
+    }
+
+    /// Counts one re-decoded segment that kept its text.
+    mutating func keep(_ reason: Kept) {
+        kept += 1
+        keptReasons[reason, default: 0] += 1
+    }
 
     /// Suspect segments that were not decoded again (busy, time limit, a `.spool` answer, unreadable audio).
     var skipped: Int { max(0, suspect - replaced - kept) }
+
+    /// `keptReasons` as the log line spells it, in a fixed order (`empty=1,noSpeech=15`); `none` when nothing was
+    /// kept.
+    var keptReasonsLine: String {
+        let counted = Kept.allCases.compactMap { reason in keptReasons[reason].map { "\(reason.rawValue)=\($0)" } }
+        return counted.isEmpty ? "none" : counted.joined(separator: ",")
+    }
 }
 
 /// The finalization repair of the spec (`2026-11-23-automatic-language-detection`, "Meetings, Parakeet" item 4):
@@ -133,7 +184,7 @@ struct LanguageRepair: Sendable {
     func run(meetingID: Int64, uuid: UUID) async -> LanguageRepairReport {
         let report = await repair(meetingID: meetingID, uuid: uuid)
         logger.notice(
-            "languageRepair.suspect=\(report.suspect, privacy: .public) replaced=\(report.replaced, privacy: .public) kept=\(report.kept, privacy: .public) skipped=\(report.skipped, privacy: .public) stop=\(report.stop.rawValue, privacy: .public)"
+            "languageRepair.suspect=\(report.suspect, privacy: .public) replaced=\(report.replaced, privacy: .public) kept=\(report.kept, privacy: .public) keptReasons=\(report.keptReasonsLine, privacy: .public) skipped=\(report.skipped, privacy: .public) stop=\(report.stop.rawValue, privacy: .public)"
         )
         return report
     }
@@ -429,8 +480,8 @@ struct LanguageRepair: Sendable {
             return nil
         }
         let text = decoded.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard accepts(text, decoded, for: target.segment, context) else {
-            report.kept += 1
+        if let refusal = refusal(text, decoded, for: target.segment, context) {
+            report.keep(refusal)
             return nil
         }
         do {
@@ -438,23 +489,31 @@ struct LanguageRepair: Sendable {
             report.replaced += 1
         } catch {
             logger.error("languageRepair: a repaired segment could not be saved")
-            report.kept += 1
+            report.keep(.notSaved)
         }
         return nil
     }
 
-    /// The four conditions of the spec, and a last guard that a long segment is never rewritten.
-    private func accepts(_ text: String, _ decoded: TranscriptSegment, for original: StoredSegment, _ context: Context)
-        -> Bool
-    {
-        guard !text.isEmpty, text != original.text,
-            SuspectSegmentPolicy.isShort(ProfileSegment(text: original.text, duration: original.duration))
-        else { return false }
-        if context.kind == .whisper {
-            guard let noSpeech = decoded.noSpeechProb, let logProb = decoded.avgLogProb,
-                noSpeech < Self.maximumNoSpeechProb, logProb >= Self.minimumAvgLogProb
-            else { return false }
+    /// The four conditions of the spec, and a last guard that a long segment is never rewritten; `nil` when the
+    /// new text may replace the old one.
+    private func refusal(
+        _ text: String, _ decoded: TranscriptSegment, for original: StoredSegment, _ context: Context
+    ) -> LanguageRepairReport.Kept? {
+        guard !text.isEmpty else { return .empty }
+        guard text != original.text else { return .same }
+        guard SuspectSegmentPolicy.isShort(ProfileSegment(text: original.text, duration: original.duration)) else {
+            return .long
         }
-        return context.policy.acceptsReplacement(text, profile: context.profile)
+        if context.kind == .whisper {
+            guard let noSpeech = decoded.noSpeechProb, let logProb = decoded.avgLogProb else { return .noConfidence }
+            guard noSpeech < Self.maximumNoSpeechProb else { return .noSpeech }
+            guard logProb >= Self.minimumAvgLogProb else { return .lowConfidence }
+        }
+        switch context.policy.replacementRefusal(text, profile: context.profile) {
+        case .script: return .script
+        case .phrase: return .phrase
+        case .outsideProfile: return .outsideProfile
+        case nil: return nil
+        }
     }
 }
