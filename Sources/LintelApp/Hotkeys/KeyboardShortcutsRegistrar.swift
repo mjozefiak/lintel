@@ -125,8 +125,8 @@ final class PreviewHotkeyRegistrar: HotkeyRegistrar {
 /// answers `eventHotKeyExistsErr` to both, which is what a second of Lintel's own commands on one key looks like.
 /// So the probe registers exclusively, and KeyboardShortcuts then registers the chosen key plain as always.
 nonisolated enum CarbonHotkeyProbe {
-    /// "LINT", so a probe that leaked a registration would still be recognisable in a log. KeyboardShortcuts
-    /// ignores a hot key event with another signature, so a press in the instant of a probe runs nothing.
+    /// "LINT", so a probe that leaked a registration would still be recognisable in a log, and KeyboardShortcuts
+    /// ignores its hot key events (it matches its own signature).
     private static let signature = OSType(0x4C49_4E54)
 
     static func canRegister(_ shortcut: HotkeyShortcut) -> Bool {
