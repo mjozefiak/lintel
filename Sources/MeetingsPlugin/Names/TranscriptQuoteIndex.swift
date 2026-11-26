@@ -24,7 +24,7 @@ struct TranscriptQuoteIndex: Sendable {
     }
 
     /// The kind of miss behind a quote the index could not place (measurement only; never any text).
-    enum Miss: String, Sendable, CaseIterable, Codable {
+    enum Miss: String, Sendable {
         /// The quote's words follow each other only across a change of speaker.
         case speakerChange
         /// The quote matches a stretch of the transcript except for one word that differs.
@@ -40,8 +40,8 @@ struct TranscriptQuoteIndex: Sendable {
     let words: [String]
     let capitalised: [Bool]
     let startsSentence: [Bool]
-    let charStart: [Int]
-    let charEnd: [Int]
+    private let charStart: [Int]
+    private let charEnd: [Int]
     /// The segment each word belongs to.
     let wordSegment: [Int]
     /// The sentence each word belongs to.

@@ -596,9 +596,9 @@ final class NotesService: ProviderNotesControl {
         // `notesEnabled` is "a notes job runs", not the switch: this job loads the model anyway, also for a
         // "Regenerate" with the switch off (orchestrator decision 2026-11-26). With the switch off no automatic job
         // is queued, so no model is loaded for names alone.
+        // A `channels` meeting never gets here: `refresh` names only a diarized one.
         let conditions = SpeakerNamePass.Conditions(
-            notesEnabled: true, namesFromConversation: settings.namesFromConversation,
-            isChannelMeeting: document.speakerMode == .channels)
+            notesEnabled: true, namesFromConversation: settings.namesFromConversation)
         var configuration = SpeakerNamePass.Configuration()
         deps.configureNames(&configuration)
         let pass = SpeakerNamePass(
@@ -613,7 +613,7 @@ final class NotesService: ProviderNotesControl {
         guard let report else { return document }
         deps.trace?(.speakerNames(report.trace))
         deps.logger.notice(
-            "Speaker names: pass \(report.pass.status.rawValue, privacy: .public), \(report.applied.values.reduce(0, +), privacy: .public) applied, \(report.suggested.values.reduce(0, +), privacy: .public) suggested, \(report.pass.elapsedMs, privacy: .public) ms"
+            "Speaker names: pass \(report.pass.status.rawValue, privacy: .public), \(report.applied.values.reduce(0, +), privacy: .public) applied, \(report.suggested.values.reduce(0, +), privacy: .public) suggested, \(report.pass.elapsedMs, privacy: .public) ms, write \(report.written ? "written" : report.writeFailure?.rawValue ?? "none", privacy: .public)"
         )
         guard report.written else { return document }
         return (try? await MeetingLibraryIO.document(store: store, id: id)) ?? document

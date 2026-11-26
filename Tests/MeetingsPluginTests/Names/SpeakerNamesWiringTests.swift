@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import LintelKit
 import LintelSpeech
 import LintelTestSupport
@@ -65,7 +66,8 @@ enum NamesWiring {
     /// A `ready` meeting with `lines`, given speakers by a speaker plan (as the finalizer does).
     @MainActor
     static func addMeeting(
-        _ rig: NotesServiceRig, mode: SpeakerMode = .diarized, lines: [(speaker: Int, text: String)] = lines
+        _ rig: NotesServiceRig, mode: SpeakerMode = .diarized, lines: [(speaker: Int, text: String)] = lines,
+        plan: [SpeakerPlan.Speaker] = NamesWiring.speakers
     ) async throws -> Int64 {
         let lines = lines.map { ($0.speaker, $0.text) }
         return try await rig.perform { store in
@@ -75,15 +77,32 @@ enum NamesWiring {
             var assignments: [Int64: Int] = [:]
             for (index, line) in lines.enumerated() {
                 let segment = try store.insertSegment(
-                    meetingID: id, channel: speakers[line.0].channel, startMs: index * 10_000 + 5_000,
+                    meetingID: id, channel: plan[line.0].channel, startMs: index * 10_000 + 5_000,
                     endMs: index * 10_000 + 9_000, text: line.1)
                 assignments[segment] = line.0
             }
             try store.applySpeakerPlan(
-                SpeakerPlan(mode: mode, speakers: speakers, assignments: assignments), meetingID: id,
+                SpeakerPlan(mode: mode, speakers: plan, assignments: assignments), meetingID: id,
                 diarizationModelID: nil)
             return id
         }
+    }
+
+    /// The labels of the transcript lines a names request carried (the excerpts), in order.
+    static func excerptLabels(_ call: ScriptedLLM.Call) -> [String] {
+        (call.messages.last?.content ?? "").split(separator: "\n").compactMap { line in
+            line.firstMatch(of: #/^\[\d+:\d\d\] ([^:]+): /#).map { String($0.1) }
+        }
+    }
+
+    /// Every request of the name pass, in order.
+    static func namesCalls(_ llm: ScriptedLLM) -> [ScriptedLLM.Call] {
+        llm.calls.filter { isNames($0.messages) }
+    }
+
+    /// The labels of the speakers in a document, by speaker id (the test's own ids, never shown anywhere).
+    static func labels(of document: MeetingDocument) -> [Int64: String] {
+        Dictionary(document.speakers.map { ($0.id, $0.label) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// The speaker labels the notes' MAP requests carried (`[mm:ss] Label: text`).
@@ -514,5 +533,271 @@ final class TraceLog: Sendable {
         #expect(process.contentRuns == 0)
         #expect(W.namesRequests(rig.llm) == 1)
         #expect(try W.state(rig, id, speaker: 1).label == "Zofia")
+    }
+
+    // MARK: A decision made while the model reads
+
+    @Test func aRejectionDuringThePassKeepsTheNameAway() async throws {
+        let storeBox = Shared<MeetingsStore?>(nil)
+        let passes = Mutex(0)
+        let rejected = Mutex<Int64?>(nil)
+        let rig = try NotesServiceRig(
+            settings: W.settings(),
+            handler: W.handler {
+                let pass = passes.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if pass == 2, let store = storeBox.get(), let speaker = rejected.withLock({ $0 }) {
+                    _ = try store.rejectSuggestedName(speakerID: speaker, name: "Bogdan")
+                }
+                return .done(NamesWiring.answer)
+            })
+        await rig.start()
+        storeBox.update { $0 = rig.store }
+        let id = try await W.addMeeting(rig)
+        rig.service.meetingBecameReady(id)
+        #expect(await rig.settle())
+        let bogdan = try W.state(rig, id, speaker: 2)
+        #expect(bogdan.suggestedName == "Bogdan")
+        rejected.withLock { $0 = bogdan.speakerID }
+
+        // "To nie Bogdan" lands while the second pass is reading: the resolution must see it and never offer the
+        // name again.
+        rig.service.regenerate(id)
+        #expect(await rig.settle())
+        #expect(W.namesRequests(rig.llm) == 2)
+        let after = try W.state(rig, id, speaker: 2)
+        #expect(after.suggestedName == nil)
+        #expect(after.rejectedNames == ["Bogdan"])
+        #expect(after.label == "Mówca 2")
+    }
+
+    @Test func aRenameDuringThePassReservesTheNameForItsSpeaker() async throws {
+        let storeBox = Shared<MeetingsStore?>(nil)
+        let passes = Mutex(0)
+        let renamed = Mutex<Int64?>(nil)
+        let answer = """
+            [{"speaker": "Mówca 1", "name": "Marek", "kind": "introduction", "quote": "nazywam się Marek", \
+            "confidence": "high"}]
+            """
+        let rig = try NotesServiceRig(
+            settings: W.settings(),
+            handler: W.handler {
+                let pass = passes.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if pass == 1, let store = storeBox.get(), let speaker = renamed.withLock({ $0 }) {
+                    try store.renameSpeaker(speaker, label: "Marek")
+                }
+                return .done(answer)
+            })
+        await rig.start()
+        storeBox.update { $0 = rig.store }
+        let id = try await W.addMeeting(
+            rig, lines: [(1, "Dzień dobry, nazywam się Marek."), (2, "Cześć, zaczynamy spotkanie.")])
+        let second = try W.state(rig, id, speaker: 2)
+        renamed.withLock { $0 = second.speakerID }
+
+        // The user names the second speaker "Marek" while the pass is reading; the name found in the first
+        // speaker's words must not be applied to it.
+        rig.service.meetingBecameReady(id)
+        #expect(await rig.settle())
+        #expect(try W.state(rig, id, speaker: 1).label == "Mówca 1")
+        #expect(try W.state(rig, id, speaker: 1).suggestedName == nil)
+        #expect(try W.state(rig, id, speaker: 2).label == "Marek")
+        #expect(try W.state(rig, id, speaker: 2).source == .user)
+    }
+
+    @Test func aMergeDuringThePassNumbersTheSpeakersOfTheNewSet() async throws {
+        let plan: [SpeakerPlan.Speaker] = [
+            .init(label: SpeakerLabels.me, isSelf: true, channel: .mic),
+            .init(label: SpeakerLabels.numbered(1), isSelf: false, channel: .system),
+            .init(label: SpeakerLabels.numbered(2), isSelf: false, channel: .system),
+            .init(label: SpeakerLabels.numbered(3), isSelf: false, channel: .system),
+        ]
+        let storeBox = Shared<MeetingsStore?>(nil)
+        let merge = Shared<(source: Int64, target: Int64, meeting: Int64)?>(nil)
+        let passes = Mutex(0)
+        let first = """
+            [
+              {"speaker": "Mówca 1", "name": "Zofia", "kind": "introduction", "quote": "nazywam się Zofia", \
+            "confidence": "high"},
+              {"speaker": "Mówca 2", "name": "Anna", "kind": "introduction", "quote": "jestem Anna", \
+            "confidence": "high"}
+            ]
+            """
+        let rig = try NotesServiceRig(
+            settings: W.settings(),
+            handler: W.handler {
+                let pass = passes.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if pass == 1 { return .done(first) }
+                if let store = storeBox.get(), let plan = merge.get() {
+                    try store.mergeSpeaker(plan.source, into: plan.target, meetingID: plan.meeting)
+                }
+                return .done("[]")
+            })
+        await rig.start()
+        storeBox.update { $0 = rig.store }
+        let id = try await W.addMeeting(
+            rig,
+            lines: [
+                (1, "Dzień dobry, nazywam się Zofia."), (2, "Cześć, jestem Anna."),
+                (3, "Zaczynamy od budżetu."),
+            ], plan: plan)
+        rig.service.meetingBecameReady(id)
+        #expect(await rig.settle())
+        let states = try rig.store.speakerNameStates(meetingID: id)
+        #expect(states.count == 4)
+        #expect(states[1].label == "Zofia")
+        #expect(states[2].label == "Anna")
+        merge.update { $0 = (states[1].speakerID, states[2].speakerID, id) }
+
+        // The first and the second speaker are one person now, and the answer names nobody: the reverted name takes
+        // the number of the new set (the order of first appearance), never the one from before the pass.
+        rig.service.regenerate(id)
+        #expect(await rig.settle())
+        let labels = W.labels(of: try rig.document(id))
+        #expect(!labels.values.contains("Zofia"))
+        #expect(!labels.values.contains("Anna"))
+        #expect(labels[states[2].speakerID] == "Mówca 1")
+        #expect(labels[states[3].speakerID] == "Mówca 3")
+        #expect(labels[states[0].speakerID] == SpeakerLabels.me)
+    }
+
+    @Test func aMergeDuringThePassFollowsTheSegments() async throws {
+        let storeBox = Shared<MeetingsStore?>(nil)
+        let merge = Shared<(source: Int64, target: Int64, meeting: Int64)?>(nil)
+        let passes = Mutex(0)
+        let answer = """
+            [{"speaker": "Mówca 1", "name": "Zofia", "kind": "introduction", "quote": "nazywam się Zofia", \
+            "confidence": "high"}]
+            """
+        let rig = try NotesServiceRig(
+            settings: W.settings(),
+            handler: W.handler {
+                let pass = passes.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if pass == 1, let store = storeBox.get(), let plan = merge.get() {
+                    try store.mergeSpeaker(plan.source, into: plan.target, meetingID: plan.meeting)
+                }
+                return .done(answer)
+            })
+        await rig.start()
+        storeBox.update { $0 = rig.store }
+        let id = try await W.addMeeting(
+            rig, lines: [(1, "Dzień dobry, nazywam się Zofia."), (2, "Cześć, zaczynamy spotkanie.")])
+        let states = try rig.store.speakerNameStates(meetingID: id)
+        merge.update { $0 = (states[1].speakerID, states[2].speakerID, id) }
+
+        // The speaker who introduced themselves is merged into the other one while the model reads: the name found
+        // in that segment belongs to the speaker who owns it now.
+        rig.service.meetingBecameReady(id)
+        #expect(await rig.settle())
+        let labels = W.labels(of: try rig.document(id))
+        #expect(labels[states[2].speakerID] == "Zofia")
+        #expect(!labels.values.contains("Mówca 1"))
+        let evidence = try rig.store.nameEvidence(meetingID: id)
+        #expect(!evidence.isEmpty)
+        #expect(evidence.allSatisfy { $0.speakerID != nil })
+        #expect(evidence.allSatisfy { $0.speakerID == states[2].speakerID })
+        #expect(W.notesLabels(rig.llm).contains("Zofia"))
+    }
+
+    // MARK: The pass never reads a name as a label
+
+    @Test func aRegenerationSendsNumberedLabelsNeverTheStoredNames() async throws {
+        let rig = try NotesServiceRig(settings: W.settings(), handler: W.answering())
+        await rig.start()
+        let id = try await W.addMeeting(rig)
+        rig.service.meetingBecameReady(id)
+        #expect(await rig.settle())
+        let zofia = try W.state(rig, id, speaker: 1)
+        try await rig.perform { try $0.renameSpeaker(zofia.speakerID, label: "Zofia Wysocka") }
+
+        rig.service.regenerate(id)
+        #expect(await rig.settle())
+        let calls = W.namesCalls(rig.llm)
+        #expect(calls.count == 2)
+        let labels = W.excerptLabels(calls[1])
+        #expect(!labels.isEmpty)
+        #expect(!labels.contains("Zofia Wysocka"))
+        #expect(labels.allSatisfy { $0 == SpeakerLabels.me || $0.hasPrefix(SpeakerLabels.numberedPrefix) })
+        // The answer still lands: the suggestion of the second speaker comes back.
+        #expect(try W.state(rig, id, speaker: 2).suggestedName == "Bogdan")
+        // The user's own name is untouched by the resolution.
+        #expect(try W.state(rig, id, speaker: 1).label == "Zofia Wysocka")
+        #expect(try W.state(rig, id, speaker: 1).source == .user)
+    }
+
+    // MARK: A read that fails writes nothing
+
+    @Test func anEvidenceReadErrorAbortsTheNameWrite() async throws {
+        let rig = try NotesServiceRig(settings: W.settings(), handler: W.answering())
+        await rig.start()
+        let id = try await W.addMeeting(rig)
+        let states = try rig.store.speakerNameStates(meetingID: id)
+        let named = states[1]
+        // The user names the first speaker and its evidence points where the name came from; that row is one the
+        // next refresh does not write and must keep.
+        try await rig.perform { store in
+            try store.renameSpeaker(named.speakerID, label: "Zofia Wysocka")
+            try store.saveSpeakerNames(
+                [],
+                evidence: [
+                    .init(
+                        speakerID: named.speakerID, source: .transcript, name: "Zofia", kind: .introduction,
+                        segmentID: nil, startMs: nil, endMs: nil, strength: 1)
+                ], meetingID: id)
+        }
+
+        let report = try #require(
+            await MeetingSpeakerNames.refresh(
+                store: FailingEvidenceReads(base: rig.store), document: try rig.document(id),
+                selfName: NamesWiring.owner, pass: nil, conditions: .init()))
+
+        #expect(report.writeFailure == .evidenceRead)
+        #expect(!report.written)
+        let kept = try await rig.perform { store in
+            try store.read { db in
+                try Int.fetchOne(
+                    db, sql: "SELECT COUNT(*) FROM meeting_name_evidence WHERE meeting_id = ?", arguments: [id]) ?? 0
+            }
+        }
+        #expect(kept == 1)
+        #expect(try W.state(rig, id, speaker: 1).label == "Zofia Wysocka")
+    }
+}
+
+/// A store whose evidence read fails: everything else goes to the real one. The refresh must abort the write when
+/// it cannot see the rows the save would delete.
+private final class FailingEvidenceReads: SpeakerNameStore, @unchecked Sendable {
+    let base: MeetingsStore
+
+    init(base: MeetingsStore) { self.base = base }
+
+    func loadDocument(id: Int64, includingTrashed: Bool) throws -> MeetingDocument? {
+        try base.loadDocument(id: id, includingTrashed: includingTrashed)
+    }
+
+    func speakerNameStates(meetingID: Int64) throws -> [MeetingsStore.SpeakerNameState] {
+        try base.speakerNameStates(meetingID: meetingID)
+    }
+
+    func nameEvidence(meetingID: Int64) throws -> [MeetingsStore.StoredNameEvidence] {
+        throw MeetingsStoreError.closed
+    }
+
+    @discardableResult
+    func saveSpeakerNames(
+        _ updates: [MeetingsStore.SpeakerNameUpdate], evidence: [MeetingsStore.StoredNameEvidence], meetingID: Int64
+    ) throws -> Set<Int64> {
+        try base.saveSpeakerNames(updates, evidence: evidence, meetingID: meetingID)
     }
 }
