@@ -7,24 +7,27 @@ import Testing
     @Test func noDocOrScriptDeletesTheRealAppsDefaultsDomain() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
-        let pattern = try Regex(#"defaults\s+delete\s+com\.lintelapp\.Lintel(?!\.QA)"#)
+        let pattern = try Regex(#"defaults\s+delete\s+["']?com\.lintelapp\.Lintel(?!\.QA)"#)
+        // The one allowed mention is the warning in docs/qa.md that names the forbidden command.
+        let allowed = "(without `.QA`)"
         var offenders: [String] = []
-        for folder in ["docs", "scripts"] {
-            let base = root.appending(path: folder)
-            guard let files = FileManager.default.enumerator(at: base, includingPropertiesForKeys: nil) else {
-                continue
+        var scanned = 0
+        let targets = ["docs", "scripts", ".ai", "AGENTS.md", "SDLC.md"]
+        for target in targets {
+            let base = root.appending(path: target)
+            var urls: [URL] = [base]
+            if let files = FileManager.default.enumerator(at: base, includingPropertiesForKeys: nil) {
+                urls = files.compactMap { $0 as? URL }
             }
-            for case let url as URL in files {
-                guard ["md", "sh", "zsh", "yml"].contains(url.pathExtension),
-                    url.lastPathComponent != "DocsQADefaultsTests.swift",
-                    let text = try? String(contentsOf: url, encoding: .utf8)
-                else { continue }
-                for line in text.split(separator: "\n") where line.contains(pattern) {
-                    let isWarning = line.contains("never run") || line.contains("Warning")
-                    if !isWarning { offenders.append(url.lastPathComponent) }
+            for url in urls {
+                guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+                scanned += 1
+                for line in text.split(separator: "\n") where line.contains(pattern) && !line.contains(allowed) {
+                    offenders.append(url.lastPathComponent)
                 }
             }
         }
+        #expect(scanned > 0)
         #expect(offenders.isEmpty, "real-app defaults delete in: \(offenders)")
     }
 }
