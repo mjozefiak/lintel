@@ -48,7 +48,10 @@ Any `--qa…` argument turns QA mode on:
 
 AppKit itself may still write window and status-item state to the app's own defaults domain; since round 16 that is `com.lintelapp.Lintel.QA` for a bundle built with `CONFIGURATION=debug`, never the real `com.lintelapp.Lintel`.
 If that domain did not exist before a QA session, remove it afterwards with
-`defaults delete com.lintelapp.Lintel`.
+`defaults delete com.lintelapp.Lintel.QA`.
+
+**Warning:** never run `defaults delete com.lintelapp.Lintel` (without `.QA`) as QA cleanup. That is the real app's
+domain and the command erases the owner's settings. `DocsQADefaultsTests` fails when `docs/`, `scripts/`, `.ai/`, `AGENTS.md` or `SDLC.md` contain it.
 
 ### Which plugins are on
 
