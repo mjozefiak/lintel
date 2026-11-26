@@ -10,7 +10,7 @@ section (pre-releases use `x.y.z-beta.N`).
 
 - Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
 
-- Dictation: a **Full** level of Tidy up my text (email layout, paragraphs for a long dictation, smoother style) is built and tested but not offered yet; it appears in the popup when it passes its quality checks.
+- Dictation: a **Full** level of Tidy up my text (email layout, paragraphs for a long dictation, smoother style) is built and tested but not offered yet (a second round of its instructions keeps corrections at Standard's level and lays out a greeting and sign-off whenever you say them, but two quality checks are still short); it appears in the popup when it passes its quality checks.
 
 ### Changed
 

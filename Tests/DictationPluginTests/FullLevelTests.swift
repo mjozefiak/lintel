@@ -13,16 +13,16 @@ import Testing
             .map { "[\($0.role)]\n\($0.content)" }.joined(separator: "\n\n") + "\n"
         if ProcessInfo.processInfo.environment["LINTEL_RECORD_SNAPSHOT"] != nil {
             let source = URL(filePath: #filePath).deletingLastPathComponent()
-                .appending(path: "Fixtures/cleanup/prompt-full-v1.txt")
+                .appending(path: "Fixtures/cleanup/prompt-full-v2.txt")
             try rendered.write(to: source, atomically: true, encoding: .utf8)
         }
-        let url = try #require(Bundle.module.url(forResource: "Fixtures/cleanup/prompt-full-v1", withExtension: "txt"))
+        let url = try #require(Bundle.module.url(forResource: "Fixtures/cleanup/prompt-full-v2", withExtension: "txt"))
         let expected = try String(contentsOf: url, encoding: .utf8)
         #expect(
             rendered == expected,
             "The Full prompt changed. Bump CleanupPrompt.fullVersion, update the snapshot and note it in the release notes."
         )
-        #expect(CleanupPrompt.version(for: .full) == 1)
+        #expect(CleanupPrompt.version(for: .full) == 2)
     }
 
     @Test func standardIsUntouchedAndStillTheDefault() {
@@ -37,16 +37,65 @@ import Testing
         #expect(CleanupPrompt.system(for: .light) == CleanupPrompt.system)
     }
 
-    @Test func fullHasItsOwnRulesThatKeepEveryDetail() {
+    @Test func fullKeepsStandardsRulesThatProtectTheWords() {
         let full = CleanupPrompt.system(for: .full)
         #expect(full != CleanupPrompt.system)
         #expect(full.contains("never a request"))
-        #expect(full.contains("Never change, drop or add a number"))
+        #expect(full.contains("Never change a number, unit, date, time, amount, name or any other detail."))
+        #expect(full.contains("Change as little as possible."))
         #expect(full.contains("Never write a greeting"))
         // Standard's "do not fix style" must not survive in the Full text, where it would contradict the style rule.
         #expect(!full.contains("Do not fix grammar"))
         #expect(
-            CleanupPrompt.examples(for: .full).count == CleanupPrompt.examples.count + CleanupPrompt.fullExamples.count)
+            CleanupPrompt.examples(for: .full).count
+                == CleanupPrompt.examples.count + CleanupPrompt.fullExamples.count
+                + CleanupPrompt.fullClosingExamples.count)
+    }
+
+    @Test func theSelfCorrectionExamplesComeLastAndStandardsInTheMiddle() {
+        let all = CleanupPrompt.examples(for: .full)
+        #expect(
+            all.suffix(CleanupPrompt.fullClosingExamples.count).map(\.input)
+                == CleanupPrompt.fullClosingExamples.map(\.input))
+        let middle = all.dropFirst(CleanupPrompt.fullExamples.count).prefix(CleanupPrompt.examples.count)
+        #expect(middle.map(\.input) == CleanupPrompt.examples.map(\.input))
+        // Each closing example takes something back, and the output keeps only the correction.
+        for example in CleanupPrompt.fullClosingExamples {
+            #expect(
+                ["czekaj", "albo jednak", "a właściwie"].contains { example.input.contains($0) },
+                "\(example.input.prefix(30))"
+            )
+        }
+    }
+
+    /// Owner decision 2026-11-26 (question 8 of the review of #337): the layout follows what was said, not how long the
+    /// message is, so a short greeting and sign-off are laid out and a message with neither stays one line.
+    @Test func theLayoutRuleDoesNotDependOnTheLengthOfTheBody() {
+        let full = CleanupPrompt.system(for: .full)
+        #expect(full.contains("whatever the length of the message"))
+        #expect(!full.contains("at least two sentences"))
+        #expect(!full.contains("(about 25 words or more) between them"))
+        // Paragraphs still start only from a longer text.
+        #expect(full.contains("about 40 words or more"))
+        #expect(full.contains("Never split a text of fewer than about 25 words into paragraphs"))
+    }
+
+    @Test func aSentenceIsSplitOnlyFromAboutThirtyWordsAndAnOddWordIsKept() {
+        let full = CleanupPrompt.system(for: .full)
+        #expect(full.contains("split a sentence of more than about 30 words"))
+        #expect(full.contains("A shorter sentence stays as it is."))
+        #expect(full.contains("write it as it stands"))
+    }
+
+    @Test func numbersAreDigitsInTheRuleAndInEveryExample() {
+        let full = CleanupPrompt.system(for: .full)
+        #expect(full.contains("\"three days\" is \"3 days\""))
+        // The example that kept "three" as a word against this rule (review of #337, minor) is gone.
+        for example in CleanupPrompt.examples(for: .full) {
+            #expect(!example.output.contains("three days"), "\(example.output.prefix(40))")
+        }
+        let outputs = CleanupPrompt.fullExamples.map(\.output)
+        #expect(outputs.contains { $0.contains("like 3 days") })
     }
 
     @Test func theFullExamplesCoverMailParagraphsAndAShortLine() {
@@ -59,17 +108,23 @@ import Testing
             outputs.contains {
                 !$0.hasPrefix("W zeszłym tygodniu") ? false : $0.components(separatedBy: "\n\n").count == 3
             })
-        // The short chats, one with a greeting and thanks, stay one line.
-        for input in [
-            "cześć będę za dziesięć minut weź mi proszę kawę dzięki", "hey are you free at three I need five minutes",
+        // A short message WITH a greeting or a sign-off is laid out, whatever its length.
+        for (input, prefix, suffix) in [
+            ("dzień dobry chciałbym zapytać o status zamówienia numer siedem", "Dzień dobry,\n\n", "numer 7."),
+            ("hi Dan the printer is jammed again can you look at it thanks Eva", "Hi Dan,\n\n", "Thanks,\nEva"),
         ] {
+            let example = CleanupPrompt.fullExamples.first { $0.input == input }
+            #expect(example?.output.hasPrefix(prefix) == true && example?.output.hasSuffix(suffix) == true)
+        }
+        // A short message with neither stays one line.
+        for input in ["będę za dziesięć minut weź mi proszę kawę", "are you free at three I need five minutes"] {
             let example = CleanupPrompt.fullExamples.first { $0.input == input }
             #expect(example != nil && example?.output.contains("\n") == false)
         }
     }
 
     @Test func everyFullExampleIsAcceptedByTheFullGuard() {
-        for example in CleanupPrompt.fullExamples {
+        for example in CleanupPrompt.fullExamples + CleanupPrompt.fullClosingExamples {
             let verdict = FormatterGuard.check(input: example.input, output: example.output, level: .full)
             #expect(verdict == .accepted(example.output), "\(example.input.prefix(30)): \(verdict)")
         }
