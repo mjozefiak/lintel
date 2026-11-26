@@ -3,9 +3,9 @@ import SwiftUI
 /// What the goal page shows: the rail and the choice (default Both).
 public nonisolated struct OnboardingGoalState: Equatable, Sendable {
     public var rail: OnboardingStepRailState
-    public var selection: OnboardingGoalChoice
+    public var selection: OnboardingGoalOption
 
-    public init(rail: OnboardingStepRailState, selection: OnboardingGoalChoice = .both) {
+    public init(rail: OnboardingStepRailState, selection: OnboardingGoalOption = .both) {
         self.rail = rail
         self.selection = selection
     }
@@ -16,13 +16,13 @@ public nonisolated struct OnboardingGoalState: Equatable, Sendable {
 /// the shell turns a choice into plugin switches.
 public struct OnboardingGoalPage: View {
     private let state: OnboardingGoalState
-    private let onSelect: (OnboardingGoalChoice) -> Void
+    private let onSelect: (OnboardingGoalOption) -> Void
     private let onPrimary: () -> Void
     @Environment(\.lintelTextSize) private var textSize
 
     public init(
         _ state: OnboardingGoalState,
-        onSelect: @escaping (OnboardingGoalChoice) -> Void = { _ in },
+        onSelect: @escaping (OnboardingGoalOption) -> Void = { _ in },
         onPrimary: @escaping () -> Void = {}
     ) {
         self.state = state
@@ -36,7 +36,7 @@ public struct OnboardingGoalPage: View {
             primaryTitle: state.selection.primaryTitle, showsBack: false, onPrimary: onPrimary
         ) {
             VStack(spacing: 10) {
-                ForEach(OnboardingGoalChoice.allCases) { choice in
+                ForEach(OnboardingGoalOption.allCases) { choice in
                     option(choice)
                 }
             }
@@ -54,7 +54,7 @@ public struct OnboardingGoalPage: View {
             localized: "You can change this later in Settings.", comment: "Onboarding goal page line under the heading")
     }
 
-    private func option(_ choice: OnboardingGoalChoice) -> some View {
+    private func option(_ choice: OnboardingGoalOption) -> some View {
         let selected = choice == state.selection
         return Button {
             onSelect(choice)

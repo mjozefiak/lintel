@@ -52,20 +52,20 @@ import Testing
     }
 
     @Test func eachGoalNamesItsButton() {
-        #expect(OnboardingGoalChoice.both.primaryTitle == "Set Up Both")
-        #expect(OnboardingGoalChoice.dictation.primaryTitle == "Set Up Dictation")
-        #expect(OnboardingGoalChoice.meetingNotes.primaryTitle == "Set Up Meeting Notes")
-        #expect(Set(OnboardingGoalChoice.allCases.map(\.primaryTitle)).count == 3)
+        #expect(OnboardingGoalOption.both.primaryTitle == "Set Up Both")
+        #expect(OnboardingGoalOption.dictation.primaryTitle == "Set Up Dictation")
+        #expect(OnboardingGoalOption.meetingNotes.primaryTitle == "Set Up Meeting Notes")
+        #expect(Set(OnboardingGoalOption.allCases.map(\.primaryTitle)).count == 3)
     }
 
     @Test func theGoalChoicesAreTheThreeOfTheSpecWithBothFirstChosenByDefault() {
-        #expect(OnboardingGoalChoice.allCases == [.dictation, .meetingNotes, .both])
-        #expect(OnboardingGoalChoice.allCases.map(\.rawValue) == ["dictation", "meetingNotes", "both"])
+        #expect(OnboardingGoalOption.allCases == [.dictation, .meetingNotes, .both])
+        #expect(OnboardingGoalOption.allCases.map(\.rawValue) == ["dictation", "meetingNotes", "both"])
         let state = OnboardingGoalState(rail: OnboardingStepRailState(titles: Self.titles, currentIndex: 0))
         #expect(state.selection == .both)
-        #expect(OnboardingGoalChoice.dictation.title == "Type what I say")
-        #expect(OnboardingGoalChoice.meetingNotes.title == "Write my meeting notes")
-        #expect(OnboardingGoalChoice.both.title == "Both")
+        #expect(OnboardingGoalOption.dictation.title == "Type what I say")
+        #expect(OnboardingGoalOption.meetingNotes.title == "Write my meeting notes")
+        #expect(OnboardingGoalOption.both.title == "Both")
     }
 
     @Test func theNextButtonsNameTheStepThatComesNext() {

@@ -33,7 +33,7 @@ import SwiftUI
     // MARK: goal
 
     static var goal: GalleryScene {
-        func state(_ id: String, _ summary: String, _ choice: OnboardingGoalChoice) -> GalleryState {
+        func state(_ id: String, _ summary: String, _ choice: OnboardingGoalOption) -> GalleryState {
             GalleryState(id: id, summary: summary, presentation: window) {
                 AnyView(OnboardingGoalPage(OnboardingGoalState(rail: rail(current: 0), selection: choice)))
             }

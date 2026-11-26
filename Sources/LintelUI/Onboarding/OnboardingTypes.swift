@@ -17,8 +17,10 @@ public nonisolated enum OnboardingLayout {
 }
 
 /// What the user wants Lintel to do (step 1). The page draws the three choices; what a choice turns on or off is
-/// the shell's business, never the view's. Raw values are the spec's `app.onboarding.goal` values.
-public nonisolated enum OnboardingGoalChoice: String, CaseIterable, Identifiable, Sendable {
+/// the shell's business, never the view's. Raw values are the spec's `app.onboarding.goal` values. Named apart from
+/// the shell's `OnboardingGoalChoice` (`LintelApp`, the flow): a `LintelApp` type of the same name would shadow this
+/// one there, so the shell maps its choice onto this option when it draws the page.
+public nonisolated enum OnboardingGoalOption: String, CaseIterable, Identifiable, Sendable {
     case dictation
     case meetingNotes
     case both

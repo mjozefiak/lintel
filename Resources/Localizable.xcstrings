@@ -28400,7 +28400,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lintel nie usłyszał dźwięku testowego. Zwiększ głośność albo wybierz głośniki, a potem kliknij Sprawdź ponownie."
+            "value" : "Lintel nie słyszy dźwięku testowego. Zwiększ głośność albo wybierz głośniki, a potem kliknij Sprawdź ponownie."
           }
         }
       }
