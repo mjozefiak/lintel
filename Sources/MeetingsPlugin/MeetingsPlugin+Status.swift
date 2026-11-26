@@ -87,7 +87,8 @@ extension MeetingsPlugin {
         deniedPermissions: Int = 0,
         usesWhisperInstead: Bool = false,
         missingWhisperLanguage: String? = nil,
-        locale: Locale = .current,
+        // The language Lintel's interface is shown in, as the Languages sheet names languages, not the Mac's region.
+        locale: Locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en"),
         localNotesLine: Bool = false,
         allowMicrophone: @escaping @MainActor @Sendable () async -> Void,
         retryLibrary: @escaping @MainActor @Sendable () async -> Void
