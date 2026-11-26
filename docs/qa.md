@@ -51,7 +51,7 @@ If that domain did not exist before a QA session, remove it afterwards with
 `defaults delete com.lintelapp.Lintel.QA`.
 
 **Warning:** never run `defaults delete com.lintelapp.Lintel` (without `.QA`) as QA cleanup. That is the real app's
-domain and the command erases the owner's settings. `DocsQADefaultsTests` fails when `docs/` or `scripts/` contain it.
+domain and the command erases the owner's settings. `DocsQADefaultsTests` fails when `docs/`, `scripts/`, `.ai/`, `AGENTS.md` or `SDLC.md` contain it.
 
 ### Which plugins are on
 
