@@ -15,6 +15,9 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ### Fixed
 
+- Settings → Features no longer says "All set" while a feature that is on still needs something: the banner names those features, the same ones that have a dot in the sidebar.
+- Settings → Features → Result order lists only the features that are on, so a new install does not show a list for a launcher that is off.
+- The feature switches in Settings → Features respond to VoiceOver's activate action and to Switch Control, like the other switches.
 - A meeting that was waiting for the notes model is no longer forgotten when Lintel restarts: it still says that its notes need the model, and it gets its notes when the model is downloaded.
 
 ## [0.1.0-beta.1] - 2026-11-22

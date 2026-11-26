@@ -545,7 +545,7 @@ final class AppCoordinator {
                 ShellPaneBanners.general(
                     shortcut: hotkeys.mainShortcut?.displayString, launcherIsActive: hotkeys.isMainShortcutActive)
             },
-            SettingsShellPane.features.rawValue: { ShellPaneBanners.features(host: host) },
+            SettingsShellPane.features.rawValue: { ShellPaneBanners.features(host: host, reader: reader) },
             SettingsShellPane.permissions.rawValue: {
                 ShellPaneBanners.permissions(host: host, reader: reader)
             },

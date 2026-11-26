@@ -4105,6 +4105,24 @@
         }
       }
     },
+    "Open %@ in the sidebar to finish setting up." : {
+      "comment" : "Settings → Features banner detail: the features whose panes have something to do",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open %@ in the sidebar to finish setting up."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otwórz w panelu bocznym: %@, aby dokończyć konfigurację."
+          }
+        }
+      }
+    },
     "Some features are off." : {
       "comment" : "Settings → Features banner detail",
       "extractionState" : "manual",
