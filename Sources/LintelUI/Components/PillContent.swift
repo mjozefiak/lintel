@@ -1,4 +1,4 @@
-import CoreGraphics
+import SwiftUI
 
 /// What a HUD pill says (spec `2026-11-25-minimal-hud`, "The pill family"): a pure value the plugins build from their
 /// own state (`HUDState.pill`, `MeetingHUDState.pill`, `SuggestionPrompt.pill`) and `LintelPill` draws. It holds
