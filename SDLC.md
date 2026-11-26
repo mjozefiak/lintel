@@ -106,7 +106,7 @@ Before mutating an issue or PR, an agent claims it. GitHub ownership is the crea
 
 `in-progress` means **actively working**. A run that finished its work and reported it, but still owes the CI-result follow-up, swaps `in-progress` for `ci-monitoring`; that label is not a claim and blocks nobody. Both are released when the work ends, on success and on failure alike.
 
-**Recovery.** A stalled claim is retired by stopping the runner and adding the human-only `claim-reset` label in GitHub: the next run audits that event and competes for a new lock. Removing `in-progress` alone does not clear a lock. The `refs/om-locks/*` refs are created and deleted with the owner's account through git over HTTPS (`gh auth git-credential` with the Lintel `gh` configuration); a stalled lock may also be deleted by the owner with `git push origin :refs/om-locks/<kind>-<number>`.
+**Recovery.** A stalled claim is retired by stopping the runner and adding the human-only `claim-reset` label in GitHub: the next run audits that event and competes for a new lock. Removing `in-progress` alone does not clear a lock. The `refs/om-locks/*` refs are created through the REST API and deleted through git over HTTPS, both with the owner's account: the git credential helper is `gh auth git-credential`, which answers with whatever `gh` configuration the environment selects, so every agent run exports the Lintel one (`GH_CONFIG_DIR=$HOME/.config/gh-lintel`); without it the default `gh` account answers and **release-lock** fails, leaving the lock behind; a stalled lock may also be deleted by the owner with `git push origin :refs/om-locks/<kind>-<number>`.
 
 ### Reporting is decoupled from CI
 
