@@ -251,7 +251,8 @@ enum SpeakerNamesSeed {
         let rig = try await SpeakerNamesSourceRig()
         try rig.store.write { db in
             try db.execute(
-                sql: "UPDATE meeting_speaker SET name_status = 'pending' WHERE id = ?", arguments: [rig.ids.bartek])
+                sql: "UPDATE meeting_speaker SET name_status = 'pending', suggested_name = 'Bartosz' WHERE id = ?",
+                arguments: [rig.ids.bartek])
             try db.execute(
                 sql: "UPDATE meeting_speaker SET suggested_name = ? WHERE id = ?",
                 arguments: ["\u{200B} ", rig.ids.second])
@@ -283,6 +284,11 @@ enum SpeakerNamesSeed {
         await #expect(throws: MeetingEdits.Failure.notFound) {
             try await rig.source.rejectSpeakerName(rig.key, speakerID: String(rig.ids.third), name: "Marek")
         }
+        await #expect(throws: MeetingEdits.Failure.notFound) {
+            try await rig.source.rejectSpeakerName(rig.key, speakerID: String(rig.ids.second), name: "Mariusz")
+        }
+        #expect(try rig.store.speakerNameStates(meetingID: rig.meetingID)[2].rejectedNames.isEmpty)
+        #expect(try rig.store.speakerNameStates(meetingID: rig.meetingID)[2].suggestedName == "Marek")
         #expect(try await rig.source.content(for: rig.key)?.summary.state == .ready)
     }
 
