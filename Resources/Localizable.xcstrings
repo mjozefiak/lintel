@@ -27630,6 +27630,834 @@
           }
         }
       }
+    },
+    "Your words stay on this Mac" : {
+      "comment" : "Onboarding privacy page heading",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your words stay on this Mac"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twoje słowa zostają na tym Macu"
+          }
+        }
+      }
+    },
+    "This is how Lintel works, from the first day." : {
+      "comment" : "Onboarding privacy page line",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is how Lintel works, from the first day."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tak Lintel działa od pierwszego dnia."
+          }
+        }
+      }
+    },
+    "Recordings, notes and dictations are saved on this Mac, encrypted." : {
+      "comment" : "Onboarding privacy point 1",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recordings, notes and dictations are saved on this Mac, encrypted."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nagrania, notatki i dyktowania są zapisywane na tym Macu, zaszyfrowane."
+          }
+        }
+      }
+    },
+    "Nothing is sent anywhere. Later you can choose Claude to write notes; Lintel asks first." : {
+      "comment" : "Onboarding privacy point 2",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing is sent anywhere. Later you can choose Claude to write notes; Lintel asks first."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nic nie jest nigdzie wysyłane. Później możesz wybrać Claude do pisania notatek; Lintel najpierw zapyta."
+          }
+        }
+      }
+    },
+    "No account and no sign-up." : {
+      "comment" : "Onboarding privacy point 3",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No account and no sign-up."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bez konta i bez rejestracji."
+          }
+        }
+      }
+    },
+    "When you record a meeting, tell the other people. Lintel reminds you." : {
+      "comment" : "Onboarding privacy page: the consent reminder for meetings",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you record a meeting, tell the other people. Lintel reminds you."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gdy nagrywasz spotkanie, uprzedź rozmówców. Lintel Ci o tym przypomni."
+          }
+        }
+      }
+    },
+    "Your words, on this Mac." : {
+      "comment" : "Onboarding rail: the line under the app name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your words, on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twoje słowa, na tym Macu."
+          }
+        }
+      }
+    },
+    "Type what I say" : {
+      "comment" : "Onboarding goal choice: dictation",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type what I say"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pisać to, co mówię"
+          }
+        }
+      }
+    },
+    "Write my meeting notes" : {
+      "comment" : "Onboarding goal choice: meeting notes",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write my meeting notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pisać notatki ze spotkań"
+          }
+        }
+      }
+    },
+    "Both" : {
+      "comment" : "Onboarding goal choice: dictation and meeting notes",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Both"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jedno i drugie"
+          }
+        }
+      }
+    },
+    "Hold a key and talk. Your words appear in any app." : {
+      "comment" : "Onboarding goal choice: what dictation does",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold a key and talk. Your words appear in any app."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przytrzymaj klawisz i mów. Słowa pojawią się w każdej aplikacji."
+          }
+        }
+      }
+    },
+    "Lintel listens to your calls and writes the notes." : {
+      "comment" : "Onboarding goal choice: what meeting notes do",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel listens to your calls and writes the notes."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel słucha rozmów i pisze notatki."
+          }
+        }
+      }
+    },
+    "You can turn either one off later." : {
+      "comment" : "Onboarding goal choice: both features, reversible",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can turn either one off later."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Każde z nich wyłączysz później."
+          }
+        }
+      }
+    },
+    "Set Up Dictation" : {
+      "comment" : "Onboarding goal page button for the dictation goal",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Dictation"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skonfiguruj dyktowanie"
+          }
+        }
+      }
+    },
+    "Set Up Meeting Notes" : {
+      "comment" : "Onboarding goal page button for the meeting notes goal",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Meeting Notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skonfiguruj notatki ze spotkań"
+          }
+        }
+      }
+    },
+    "Set Up Both" : {
+      "comment" : "Onboarding goal page button when both goals are chosen",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Both"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skonfiguruj jedno i drugie"
+          }
+        }
+      }
+    },
+    "Next: Allow Access" : {
+      "comment" : "Onboarding privacy page button",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next: Allow Access"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dalej: zezwól na dostęp"
+          }
+        }
+      }
+    },
+    "Next: Try Dictation" : {
+      "comment" : "Onboarding access page button before the dictation step",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next: Try Dictation"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dalej: wypróbuj dyktowanie"
+          }
+        }
+      }
+    },
+    "Next: First Meeting" : {
+      "comment" : "Onboarding access page button before the meeting step",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next: First Meeting"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dalej: pierwsze spotkanie"
+          }
+        }
+      }
+    },
+    "Your goal" : {
+      "comment" : "Onboarding step name in the rail",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your goal"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twój cel"
+          }
+        }
+      }
+    },
+    "Privacy" : {
+      "comment" : "Onboarding step name in the rail",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prywatność"
+          }
+        }
+      }
+    },
+    "Access" : {
+      "comment" : "Onboarding step name in the rail",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dostęp"
+          }
+        }
+      }
+    },
+    "Try dictation" : {
+      "comment" : "Onboarding step name in the rail",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try dictation"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wypróbuj dyktowanie"
+          }
+        }
+      }
+    },
+    "First meeting" : {
+      "comment" : "Onboarding step name in the rail",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First meeting"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pierwsze spotkanie"
+          }
+        }
+      }
+    },
+    "Getting dictation ready" : {
+      "comment" : "Onboarding step rail: the speech download is running",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Getting dictation ready"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przygotowuję dyktowanie"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld" : {
+      "comment" : "Onboarding: the position in the steps, e.g. Step 3 of 5",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step %lld of %lld"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Krok %lld z %lld"
+          }
+        }
+      }
+    },
+    "done" : {
+      "comment" : "Onboarding rail, spoken: the step is finished",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "done"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gotowy"
+          }
+        }
+      }
+    },
+    "current" : {
+      "comment" : "Onboarding rail, spoken: the step the user is on",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "current"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bieżący"
+          }
+        }
+      }
+    },
+    "not yet" : {
+      "comment" : "Onboarding rail, spoken: a later step",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "not yet"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jeszcze nie"
+          }
+        }
+      }
+    },
+    "To hear you when you dictate or record." : {
+      "comment" : "Onboarding: why the microphone is needed",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To hear you when you dictate or record."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aby słyszeć Cię podczas dyktowania i nagrywania."
+          }
+        }
+      }
+    },
+    "Type into other apps" : {
+      "comment" : "Permission name for Accessibility",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type into other apps"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pisz w innych aplikacjach"
+          }
+        }
+      }
+    },
+    "So your words appear where your cursor is." : {
+      "comment" : "Onboarding: why Accessibility is needed",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So your words appear where your cursor is."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aby Twoje słowa pojawiały się tam, gdzie kursor."
+          }
+        }
+      }
+    },
+    "Hear other people in a call" : {
+      "comment" : "Permission name for System Audio Recording",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hear other people in a call"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Słysz innych w rozmowie"
+          }
+        }
+      }
+    },
+    "So notes include what the others say." : {
+      "comment" : "Onboarding: why System Audio Recording is needed",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So notes include what the others say."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aby notatki obejmowały to, co mówią inni."
+          }
+        }
+      }
+    },
+    "What would you like Lintel to do?" : {
+      "comment" : "Onboarding goal page heading",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What would you like Lintel to do?"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "W czym Lintel ma Ci pomagać?"
+          }
+        }
+      }
+    },
+    "You can change this later in Settings." : {
+      "comment" : "Onboarding goal page line under the heading",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can change this later in Settings."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zmienisz to później w Ustawieniach."
+          }
+        }
+      }
+    },
+    "Lintel needs your OK for a few things" : {
+      "comment" : "Onboarding access page heading",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel needs your OK for a few things"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel potrzebuje Twojej zgody na kilka rzeczy"
+          }
+        }
+      }
+    },
+    "macOS asks you to confirm each one." : {
+      "comment" : "Onboarding access page line",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS asks you to confirm each one."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS poprosi o potwierdzenie każdej z nich."
+          }
+        }
+      }
+    },
+    "You can skip any of these and allow them later in Settings → Privacy & data." : {
+      "comment" : "Onboarding access page: nothing here is forced",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can skip any of these and allow them later in Settings → Privacy & data."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Każdą z nich możesz pominąć i włączyć później w Ustawieniach → Prywatność i dane."
+          }
+        }
+      }
+    },
+    "Needs your OK" : {
+      "comment" : "Onboarding permission state: not allowed yet",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs your OK"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wymaga Twojej zgody"
+          }
+        }
+      }
+    },
+    "Not needed now" : {
+      "comment" : "Onboarding permission state: the chosen goal does not use it",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not needed now"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teraz niepotrzebne"
+          }
+        }
+      }
+    },
+    "Allow" : {
+      "comment" : "Onboarding button that asks for a permission",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zezwól"
+          }
+        }
+      }
+    },
+    "Lintel couldn't hear the test sound. Turn up the volume or pick your speakers, then Check Again." : {
+      "comment" : "Onboarding: the call audio check did not hear the sound",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel couldn't hear the test sound. Turn up the volume or pick your speakers, then Check Again."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel nie usłyszał dźwięku testowego. Zwiększ głośność albo wybierz głośniki, a potem kliknij Sprawdź ponownie."
+          }
+        }
+      }
+    },
+    "Move Lintel to Applications first" : {
+      "comment" : "Onboarding access page: Lintel runs from the disk image, so grants would be lost",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move Lintel to Applications first"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Najpierw przenieś aplikację Lintel do folderu Aplikacje"
+          }
+        }
+      }
+    },
+    "macOS remembers your choices only for the copy in Applications." : {
+      "comment" : "Onboarding access page: why the move comes first",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS remembers your choices only for the copy in Applications."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS zapamiętuje Twoje wybory tylko dla kopii w folderze Aplikacje."
+          }
+        }
+      }
+    },
+    "Move to Applications" : {
+      "comment" : "Onboarding button that moves the app to Applications",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move to Applications"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przenieś do folderu Aplikacje"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
