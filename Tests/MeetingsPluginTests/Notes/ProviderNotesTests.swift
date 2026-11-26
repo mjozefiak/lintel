@@ -219,7 +219,7 @@ import Testing
         #expect(record.provider == "claude-code")
         #expect(record.providerModel == "sonnet")
         #expect(record.model == nil, "notes_model is NULL for a provider")
-        #expect(record.promptVersion == "whole1+cli1")
+        #expect(record.promptVersion == "whole2+cli1")
         let notes = try #require(try rig.document(id).notesMarkdown)
         #expect(notes.contains("Budżet marketingowy"))
         #expect(rig.llm.calls.isEmpty, "the built-in model was not used")
