@@ -224,10 +224,12 @@ struct NotePreviewView: View {
             let text =
                 canRetry
                 ? String(
-                    localized: "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. Try again, or read the transcript.",
+                    localized:
+                        "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. Try again, or read the transcript.",
                     comment: "Preview: the notes failed and can be written again")
                 : String(
-                    localized: "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. You can read the transcript.",
+                    localized:
+                        "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. You can read the transcript.",
                     comment: "Preview: the notes failed and cannot be written from here")
             var result = Problem(message: text, failed: model.previewRetryFailed)
             if canRetry {
