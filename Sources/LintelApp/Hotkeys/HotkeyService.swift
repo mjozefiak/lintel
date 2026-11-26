@@ -17,6 +17,12 @@ protocol HotkeyRegistrar: AnyObject {
     /// Registers Escape without modifiers until the claim is released. An inactive claim when the system
     /// (or another app) refuses.
     func claimEscape(_ action: @escaping @MainActor () -> Void) -> EscapeKeyClaim
+
+    /// Whether the system would accept `shortcut` right now. A registration is attempted and given back at once,
+    /// so nothing is left registered. Carbon reports no error for a combination another app holds without
+    /// `kEventHotKeyExclusive` (both apps then get the key), so this refuses only what would fail for Lintel: a
+    /// combination one of Lintel's own commands holds, or a refusal by the system.
+    func canRegister(_ shortcut: HotkeyShortcut) -> Bool
 }
 
 /// A shortcut's storage name. KeyboardShortcuts keeps it under `KeyboardShortcuts_<rawValue>`, and the
@@ -61,6 +67,14 @@ final class HotkeyService {
     @ObservationIgnored private var onMainShortcut: (@MainActor () -> Void)?
     /// Whether Spotlight (or another symbolic hotkey) holds Command-Space right now.
     private(set) var spotlightHoldsCommandSpace = false
+    /// What the shell did the one time it applied each command's default shortcut, keyed by command id. A value for
+    /// the Try dictation step (a fallback line such as "⌥ Space is used by another app, so Lintel uses ⌃⌥D"); no
+    /// view reads it yet.
+    private(set) var commandDefaultOutcomes: [String: CommandDefaultOutcome] = [:]
+    /// Command ids whose shortcut the user reported as doing nothing ("It didn't work"). macOS does not report a key
+    /// another app holds without the exclusive option, so a report is the only sign of that conflict. Kept in memory
+    /// for the Try dictation step and Settings; no view reads it yet.
+    private(set) var commandsReportedNotWorking: Set<String> = []
 
     init(
         registrar: any HotkeyRegistrar,
@@ -141,12 +155,17 @@ final class HotkeyService {
     }
 
     /// Registers the shortcuts of active plugins' commands and drops those of commands that are gone. A
-    /// command's default shortcut is applied once; after that the stored value (possibly none) is kept.
+    /// command's default shortcut is applied once; after that the stored value (possibly none) is kept. When the
+    /// shortcut already stored — a recorded one, or one an earlier build applied — the shell changes nothing.
+    ///
+    /// - Parameter occupied: the shortcuts the system holds, beyond Spotlight and the Finder search window
+    ///   (`SymbolicHotkeys.systemShortcuts`). A command's default on one of them is not applied.
     ///
     /// A command with `onKeyEvent` gets both phases through `deliver`, called synchronously from the
     /// registrar's event stream; any other command calls `perform` on key-down.
     func syncCommands(
         _ commands: [PluginCommand],
+        occupied: Set<HotkeyShortcut> = [],
         perform: @escaping @MainActor (PluginCommand) -> Void,
         deliver: @escaping @MainActor (PluginCommand, KeyPhase) -> Void = { _, _ in }
     ) {
@@ -159,7 +178,9 @@ final class HotkeyService {
                 if registrar.shortcut(for: name) == nil,
                     let shortcut = command.defaultShortcut.flatMap(HotkeyShortcut.init)
                 {
-                    registrar.setShortcut(shortcut, for: name)
+                    registerDefault(
+                        shortcut, fallback: command.fallbackShortcut.flatMap(HotkeyShortcut.init),
+                        for: name, commandID: command.id, occupied: occupied)
                 }
                 applied.insert(command.id)
             }
@@ -174,6 +195,43 @@ final class HotkeyService {
         }
         commandNames = active
         settings.setValue(.stringArray(applied.sorted()), forKey: SettingsKeys.commandShortcutDefaultsApplied)
+    }
+
+    /// Applies a command's default once: the default itself, its declared fallback when the default is taken, or
+    /// nothing. The outcome is kept for the Try dictation step.
+    private func registerDefault(
+        _ shortcut: HotkeyShortcut,
+        fallback: HotkeyShortcut?,
+        for name: HotkeyName,
+        commandID: String,
+        occupied: Set<HotkeyShortcut>
+    ) {
+        let outcome = CommandDefaultPolicy.decide(
+            default: shortcut, fallback: fallback, occupied: occupied,
+            canRegister: { [registrar] in registrar.canRegister($0) })
+        if let chosen = outcome.shortcut {
+            registrar.setShortcut(chosen, for: name)
+        }
+        commandDefaultOutcomes[commandID] = outcome
+        switch outcome {
+        case .applied:
+            break
+        case .fellBack(let to, let requested, let reason):
+            logger.notice(
+                "Command \(commandID, privacy: .public) default \(requested.displayString, privacy: .public) fell back to \(to.displayString, privacy: .public) (\(reason.rawValue, privacy: .public))"
+            )
+        case .unavailable(let requested, let reason):
+            logger.notice(
+                "Command \(commandID, privacy: .public) default \(requested.displayString, privacy: .public) is unavailable (\(reason.rawValue, privacy: .public))"
+            )
+        }
+    }
+
+    /// The user reported that a command's shortcut did nothing ("It didn't work"). The report is the only sign of a
+    /// key another app holds without `kEventHotKeyExclusive`, which macOS does not refuse and does not report.
+    func reportShortcutDidNotWork(_ commandID: String) {
+        guard commandsReportedNotWorking.insert(commandID).inserted else { return }
+        logger.notice("Command \(commandID, privacy: .public) shortcut reported as not working")
     }
 
     func shortcut(for name: HotkeyName) -> HotkeyShortcut? {
@@ -238,6 +296,10 @@ final class InMemoryHotkeyRegistrar: HotkeyRegistrar {
     /// Tests set this to false to simulate another app holding Escape.
     var escapeAvailable = true
     private(set) var escapeReleases = 0
+    /// Shortcuts the system refuses, as a Carbon registration would.
+    var refusedShortcuts: Set<HotkeyShortcut> = []
+    /// Every shortcut asked about through `canRegister`, in order.
+    private(set) var registrationProbes: [HotkeyShortcut] = []
     /// How often each name's key was given back (`removeHandler`).
     private(set) var releases: [HotkeyName: Int] = [:]
 
@@ -269,5 +331,10 @@ final class InMemoryHotkeyRegistrar: HotkeyRegistrar {
             self.escapeAction = nil
             self.escapeReleases += 1
         }
+    }
+
+    func canRegister(_ shortcut: HotkeyShortcut) -> Bool {
+        registrationProbes.append(shortcut)
+        return !refusedShortcuts.contains(shortcut)
     }
 }

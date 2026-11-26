@@ -754,7 +754,8 @@ run only for the detection itself (use the QA data root so the library is isolat
 - A browser (Meet): no pill until the browser's bundle ID (for example `com.google.Chrome`) is added in the pane.
 - Bluetooth headset: the call app is detected both with the headset and the built-in microphone; a headset switching
   from A2DP to HFP does not make a second pill in the same call.
-- Dictation (⌃⌥D) and recording a meeting never make a pill. Leaving and rejoining a call gives one new pill.
+- Dictation (⌥ Space on a fresh profile; ⌃⌥D after a fallback) and recording a meeting never make a pill. Leaving
+  and rejoining a call gives one new pill.
 - Muted app: "Don't ask for this app" stops pills for it; Settings → Meetings lists it and "Ask again" brings it back.
 - After a recording started from a pill: leave the call and stay quiet; about 60 s later the pill asks "End the
   recording?" (End recording / Keep recording); it never ends the recording by itself.
@@ -931,6 +932,8 @@ grant after every rebuild.
 12. **Visual and accessibility pass** in light/dark and S–XL text: HUD, meeting window, library list mode and
     preview, Settings → Meetings (audio, models, notes, suggestions, privacy), onboarding step
     `meetings.setup`, Permissions row with the "Test" accessory; VoiceOver, keyboard-only, Reduce Motion.
-13. **Shortcuts.** ⌃⌥M (VoiceOver modifier clash), ⌃⌥D; the status-bar menu entries.
+13. **Shortcuts.** ⌃⌥M (VoiceOver modifier clash), ⌥ Space and its ⌃⌥D fallback (a QA profile applies the defaults
+    afresh each launch, so it shows ⌥ Space; to see the fallback, put ⌥ Space on a symbolic hot key in System
+    Settings → Keyboard → Keyboard Shortcuts); the status-bar menu entries.
 14. **Known unrelated flake:** `AppsPluginTests` `SuggestionsLifecycleTests/theSeedWaitsForTheFirstFinishedScan`
     depends on live Spotlight on the test machine.

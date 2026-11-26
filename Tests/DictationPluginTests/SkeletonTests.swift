@@ -20,7 +20,9 @@ import Testing
         let command = try #require(plugin.commands.first)
         #expect(command.id == "dictation.record")
         #expect(command.onKeyEvent != nil)
-        #expect(command.defaultShortcut == KeyShortcut(key: "d", modifiers: [.control, .option]))
+        // Owner decision 7 of the onboarding spec: ⌥ Space for a new install, ⌃⌥D as the shell's fallback.
+        #expect(command.defaultShortcut == KeyShortcut(key: " ", modifiers: .option))
+        #expect(command.fallbackShortcut == KeyShortcut(key: "d", modifiers: [.control, .option]))
         #expect(plugin.requiredPermissions == [.microphone, .accessibility])
     }
 }

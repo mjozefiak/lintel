@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Foundation
 import KeyboardShortcuts
 import LintelKit
@@ -65,6 +66,10 @@ final class KeyboardShortcutsRegistrar: HotkeyRegistrar {
         CarbonEscapeRegistration.claim(action)
     }
 
+    func canRegister(_ shortcut: HotkeyShortcut) -> Bool {
+        CarbonHotkeyProbe.canRegister(shortcut)
+    }
+
     func removeHandler(for name: HotkeyName) {
         // Cancelling ends the event stream and removes the handler. KeyboardShortcuts 1.10.0 does not give the key
         // back then (the name stays in its handler table), and `setShortcut` registers a shortcut that has no handler
@@ -104,6 +109,30 @@ final class PreviewHotkeyRegistrar: HotkeyRegistrar {
     /// QA mode never takes the tester's Escape key.
     func claimEscape(_ action: @escaping @MainActor () -> Void) -> EscapeKeyClaim { .inactive }
 
+    func canRegister(_ shortcut: HotkeyShortcut) -> Bool { memory.canRegister(shortcut) }
+
     func removeHandler(for name: HotkeyName) {}
 }
 #endif
+
+/// Whether the system would accept a hot key: the call KeyboardShortcuts makes, attempted and given back at once.
+///
+/// The spike of onboarding step 4.2 measured what Carbon reports: a combination another app holds **without**
+/// `kEventHotKeyExclusive` registers with `noErr`, and both apps then receive the key, so that conflict cannot be
+/// detected (the Try dictation step handles it with "It didn't work"); one another app holds **exclusively** also
+/// registers with `noErr` here, and the key then reaches only that app; and a combination this process already
+/// holds answers `eventHotKeyExistsErr`, which is what a second of Lintel's own commands on one key looks like.
+nonisolated enum CarbonHotkeyProbe {
+    /// "LINT", so a probe that leaked a registration would still be recognisable in a log.
+    private static let signature = OSType(0x4C49_4E54)
+
+    static func canRegister(_ shortcut: HotkeyShortcut) -> Bool {
+        var reference: EventHotKeyRef?
+        let status = RegisterEventHotKey(
+            UInt32(shortcut.carbonKeyCode), UInt32(shortcut.carbonModifiers),
+            EventHotKeyID(signature: signature, id: 0),
+            GetEventDispatcherTarget(), 0, &reference)
+        if let reference { UnregisterEventHotKey(reference) }
+        return status == noErr
+    }
+}

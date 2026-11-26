@@ -200,6 +200,19 @@ private func results(_ query: String, sections: [[String]], source: FixedSource)
         #expect(SymbolicHotkeys.occupiedShortcuts(hotkeys) == [.commandSpace])
     }
 
+    @Test func systemShortcutsIncludeEveryOtherEnabledSymbolicHotkey() {
+        let hotkeys: [String: Any] = [
+            // "Select the previous input source", moved to ⌥ Space by hand.
+            "61": entry(enabled: true, keyCode: kVK_Space, flags: 1 << 19),
+            "64": entry(enabled: false, keyCode: kVK_Space, flags: 1 << 20),
+            "65": entry(enabled: false, keyCode: kVK_Space, flags: 0),
+        ]
+        #expect(SymbolicHotkeys.systemShortcuts(hotkeys) == [.optionSpace])
+        // The main shortcut's set stays about Spotlight and the Finder search window only.
+        #expect(SymbolicHotkeys.occupiedShortcuts(hotkeys).isEmpty)
+        #expect(SymbolicHotkeys.systemShortcuts(nil) == [.commandSpace, .optionCommandSpace])
+    }
+
     @Test func eventFlagsConvertToCarbonModifiers() {
         let flags = (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20)
         #expect(HotkeyShortcut.carbonModifiers(fromEventFlags: flags) == shiftKey | controlKey | optionKey | cmdKey)
@@ -300,6 +313,90 @@ private func results(_ query: String, sections: [[String]], source: FixedSource)
     @Test func commandNamesAreValidShortcutNames() {
         #expect(HotkeyName.main.rawValue == "mainHotkey")
         #expect(HotkeyName.command("clipboard.history").rawValue == "command_clipboard_history")
+    }
+}
+
+/// The onboarding spec's dictation default (step 4.2): ⌥ Space for a command whose default was never applied,
+/// ⌃⌥D when the key is taken, and the outcome kept for the Try dictation step.
+@Suite struct CommandDefaultShortcutTests {
+    private let name = HotkeyName.command("dictation.record")
+    private let controlOptionD = HotkeyShortcut(carbonKeyCode: kVK_ANSI_D, carbonModifiers: controlKey | optionKey)
+
+    private func makeRig() -> HotkeyServiceTests.Rig {
+        HotkeyServiceTests.Rig(occupied: [])
+    }
+
+    private func dictation() -> PluginCommand {
+        PluginCommand(
+            id: "dictation.record",
+            title: "Dictate",
+            defaultShortcut: KeyShortcut(key: " ", modifiers: .option),
+            fallbackShortcut: KeyShortcut(key: "d", modifiers: [.control, .option]))
+    }
+
+    @Test func aNeverAppliedDefaultIsApplied() {
+        let rig = makeRig()
+        rig.service.syncCommands([dictation()]) { _ in }
+        #expect(rig.registrar.shortcuts[name] == .optionSpace)
+        #expect(rig.service.commandDefaultOutcomes["dictation.record"] == .applied(.optionSpace))
+        #expect(
+            rig.settings.value(forKey: SettingsKeys.commandShortcutDefaultsApplied)
+                == .stringArray(["dictation.record"]))
+    }
+
+    @Test func aShortcutThatIsAlreadyStoredIsKept() {
+        let rig = makeRig()
+        rig.registrar.setShortcut(controlOptionD, for: name)
+        rig.service.syncCommands([dictation()]) { _ in }
+        #expect(rig.registrar.shortcuts[name] == controlOptionD)
+        #expect(rig.service.commandDefaultOutcomes["dictation.record"] == nil)
+
+        // An id already marked as applied is never touched again, even when it holds no shortcut.
+        let cleared = makeRig()
+        cleared.settings.setValue(
+            .stringArray(["dictation.record"]), forKey: SettingsKeys.commandShortcutDefaultsApplied)
+        cleared.service.syncCommands([dictation()]) { _ in }
+        #expect(cleared.registrar.shortcuts[name] == nil)
+        #expect(cleared.service.commandDefaultOutcomes["dictation.record"] == nil)
+    }
+
+    @Test func aRefusedDefaultFallsBackToTheDeclaredShortcut() {
+        let rig = makeRig()
+        rig.registrar.refusedShortcuts = [.optionSpace]
+        rig.service.syncCommands([dictation()]) { _ in }
+        #expect(rig.registrar.shortcuts[name] == controlOptionD)
+        #expect(
+            rig.service.commandDefaultOutcomes["dictation.record"]
+                == .fellBack(to: controlOptionD, requested: .optionSpace, because: .registrarRefused))
+    }
+
+    @Test func aSymbolicHotkeyOnTheDefaultFallsBackWithoutAskingTheRegistrarForIt() {
+        let rig = makeRig()
+        rig.service.syncCommands([dictation()], occupied: [.optionSpace]) { _ in }
+        #expect(rig.registrar.shortcuts[name] == controlOptionD)
+        #expect(
+            rig.service.commandDefaultOutcomes["dictation.record"]
+                == .fellBack(to: controlOptionD, requested: .optionSpace, because: .systemHoldsIt))
+        // A key the system takes would register without an error, so it is not probed at all.
+        #expect(rig.registrar.registrationProbes == [controlOptionD])
+    }
+
+    @Test func nothingIsRegisteredWhenTheFallbackIsTakenToo() {
+        let rig = makeRig()
+        rig.service.syncCommands([dictation()], occupied: [.optionSpace, controlOptionD]) { _ in }
+        #expect(rig.registrar.shortcuts[name] == nil)
+        #expect(
+            rig.service.commandDefaultOutcomes["dictation.record"]
+                == .unavailable(requested: .optionSpace, because: .systemHoldsIt))
+    }
+
+    @Test func aDidNotWorkReportIsKeptForTheLaterView() {
+        let rig = makeRig()
+        #expect(rig.service.commandsReportedNotWorking.isEmpty)
+        rig.service.reportShortcutDidNotWork("dictation.record")
+        rig.service.reportShortcutDidNotWork("dictation.record")
+        #expect(rig.service.commandsReportedNotWorking == ["dictation.record"])
+        #expect(rig.service.commandDefaultOutcomes.isEmpty)
     }
 }
 
