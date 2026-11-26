@@ -4,11 +4,11 @@ import Testing
 
 @testable import MeetingsPlugin
 
-/// The topic layout of the built-in track (spec `2026-11-25-meeting-notes-structure`, F4): REDUCE v7 answers with an
-/// intro and `TOPIC: name | ids`, the guard checks the topics and their names, and the composer writes the shared
-/// `NotesLayout`.
+/// The topic layout of the built-in track (spec `2026-11-25-meeting-notes-structure`, F4): REDUCE v7 answers with
+/// `TOPIC: name | ids` and no intro (owner decision 2026-11-26), the guard checks the topics and their names, and
+/// the composer writes the shared `NotesLayout`.
 @Suite struct NotesTopicParserTests {
-    @Test func theIntroTheTopicsAndTheSectionsAreRead() throws {
+    @Test func theTopicsAndTheSectionsAreReadAndAStrayIntroIsIgnored() throws {
         let output = try #require(
             NotesParser.parseReduce(
                 """
@@ -21,7 +21,6 @@ import Testing
                 TASKS: -
                 QUESTIONS: p6
                 """))
-        #expect(output.summary == "Zespół omówił budżet. Plan jest gotowy.")
         #expect(
             output.topics == [
                 .init(name: "Budżet marketingu", ids: ["p1", "p3", "p4"]),
@@ -33,7 +32,6 @@ import Testing
     @Test func theOldFormatIsOneTopicWithoutAName() throws {
         let output = try #require(
             NotesParser.parseReduce("SUMMARY: Krótko.\nDECISIONS: -\nTASKS: -\nFINDINGS: p2, p1\nQUESTIONS: -"))
-        #expect(output.summary == "Krótko.")
         #expect(output.topics == [.init(name: nil, ids: ["p2", "p1"])])
     }
 
@@ -197,31 +195,6 @@ import Testing
         #expect(verdict.topics.map(\.name) == ["Ustalenie numer1", nil, "Ustalenie numer4"])
         #expect(verdict.topics[1].points.map(\.id) == ["p3", "p6"])
     }
-
-    @Test func theIntroIsCutToItsFirstThreeSentencesAndSeventyWords() {
-        let sentences = [
-            "Spotkanie dotyczyło budżetu na przyszły kwartał.", "Marek wyśle ofertę do klienta w piątek.",
-            "Ewa przygotuje umowę.", "Kto zajmie się fakturami od dostawcy?",
-        ]
-        let audited = guardrail.auditedVerifyReduce(
-            NotesReduceOutput(decisions: ["p1"], summary: sentences.joined(separator: " ")),
-            points: GuardFixtures.verified)
-        #expect(audited.verdict.summary == sentences.prefix(3).joined(separator: " "))
-        #expect(audited.audit.summaryOrigin == .model)
-        #expect(!audited.verdict.summaryReplaced)
-
-        let wordy = Array(repeating: "budżetu", count: 40).joined(separator: " ")
-        #expect(
-            NotesGuard.introPrefix(of: "Spotkanie dotyczyło \(wordy). Drugie \(wordy).")
-                == "Spotkanie dotyczyło \(wordy).")
-        let refused = guardrail.auditedVerifyReduce(
-            NotesReduceOutput(
-                summary: "Spotkanie " + Array(repeating: "budżetu", count: 75).joined(separator: " ") + "."),
-            points: GuardFixtures.verified)
-        #expect(refused.verdict.summary == nil)
-        #expect(refused.verdict.summaryReplaced)
-        #expect(refused.audit.summaryRefusal == .tooManyWords)
-    }
 }
 
 @Suite struct NotesTopicComposerTests {
@@ -238,8 +211,7 @@ import Testing
                     person: "Julia", due: "piątek"),
                 point("t2", .task, "Poprosić o zwrot za październik."),
             ],
-            questions: [], summary: "Zespół omówił przejście na nowego kuriera.", summaryReplaced: false,
-            rejectedIDs: 0,
+            questions: [], rejectedIDs: 0,
             topics: [
                 .init(
                     name: "Opóźnienia dostaw",
@@ -260,12 +232,10 @@ import Testing
             ])
     }
 
-    @Test func aLongMeetingHasTheIntroTheTopicsAndTheSectionsInOrder() {
+    @Test func aLongMeetingHasTheTopicsAndTheSectionsInOrderAndNoIntro() {
         let markdown = NotesComposer.markdown(
             verdict: verdict, participants: ["Hanna", "Mówca 2"], labels: .polish, durationMs: 30 * 60_000)
         let expected = """
-            Zespół omówił przejście na nowego kuriera.
-
             ### Opóźnienia dostaw
 
             - Paczki docierają po pięciu dniach.
@@ -301,7 +271,7 @@ import Testing
 
     @Test func otherAloneGetsTheCodesHeading() {
         let singles = NotesGuard.ReduceVerdict(
-            decisions: [], tasks: [], questions: [], summary: nil, summaryReplaced: false, rejectedIDs: 0,
+            decisions: [], tasks: [], questions: [], rejectedIDs: 0,
             topics: (1...7).map { .init(name: "Temat \($0)", points: [point("p\($0)", .summary, "Punkt \($0).")]) })
         let markdown = NotesComposer.markdown(
             verdict: singles, participants: [], labels: .polish, durationMs: 30 * 60_000)
@@ -317,7 +287,7 @@ import Testing
         #expect(!markdown.contains("### Opóźnienia dostaw") && !markdown.contains("### Topics discussed"))
         #expect(!markdown.contains("### Other"))
         let lines = markdown.split(separator: "\n").map(String.init)
-        #expect(lines.first == "Zespół omówił przejście na nowego kuriera.")
+        #expect(lines.first?.hasPrefix("- ") == true)
         #expect(lines.prefix { !$0.hasPrefix("#") }.filter { $0.hasPrefix("- ") }.count == 6)
         #expect(markdown.contains("### Decisions") && markdown.contains("### Next steps"))
         #expect(markdown.contains("owner\\: Julia, due\\: piątek"))
@@ -375,7 +345,9 @@ import Testing
             model: rig.model, configuration: .init(), trace: { log.add($0) }, verifier: nil)
         let result = try await pipeline.run(utterances: Self.utterances(), durationMs: 30 * 60_000)
         let markdown = try #require(result.markdown)
-        #expect(markdown.hasPrefix("Zespół omówił sprawy firmy.\n\n### Kampania i klienci\n"))
+        // The note starts with the first topic: the intro the model wrote anyway is not shown.
+        #expect(markdown.hasPrefix("### Kampania i klienci\n"))
+        #expect(!markdown.contains("Zespół omówił"))
         #expect(markdown.contains("### Dostawca i kadry") && markdown.contains("### Inne"))
         #expect(!markdown.contains("Kowalski") && !markdown.contains("### Magazyn"))
         #expect(result.keyPoints.map(\.id) == ["p1", "p2", "p3", "p7", "p8", "p6", "p4", "p5"])

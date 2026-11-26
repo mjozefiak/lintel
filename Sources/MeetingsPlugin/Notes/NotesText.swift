@@ -326,23 +326,6 @@ enum NotesText {
         return seconds * 1000
     }
 
-    /// The text up to and including its first sentence end, capped at `limit` characters at a word boundary.
-    static func firstSentence(_ text: String, limit: Int = 240) -> String {
-        let flat = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        var end = flat.endIndex
-        var index = flat.startIndex
-        while index < flat.endIndex {
-            let character = flat[index]
-            let next = flat.index(after: index)
-            if ".!?".contains(character), next == flat.endIndex || flat[next].isWhitespace {
-                end = next
-                break
-            }
-            index = next
-        }
-        return truncated(String(flat[flat.startIndex..<end]), limit: limit)
-    }
-
     /// At most `limit` characters, cut at a word boundary.
     static func truncated(_ text: String, limit: Int) -> String {
         guard text.count > limit else { return text }

@@ -31,7 +31,7 @@ import Testing
     @Test func aReduceThatForgetsDecisionsAndTasksDoesNotLoseThemButQuestionsStayOut() async throws {
         let rig = NotesRig { _, messages, _ in
             if NotesFake.isReduce(messages) {
-                return .done("SUMMARY: Spotkanie o budżecie.\nDECISIONS: -\nTASKS: -\nQUESTIONS: -")
+                return .done("DECISIONS: -\nTASKS: -\nQUESTIONS: -")
             }
             return .done(NotesFake.answer(messages))
         }
@@ -42,22 +42,6 @@ import Testing
         #expect(markdown.contains("### Podjęte decyzje"))
         #expect(markdown.contains("### Następne kroki"))
         #expect(!markdown.contains("### Otwarte kwestie"))
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func twoSummariesThatDoNotFitTogetherEndTheMergeInsteadOfLoopingForever() async throws {
-        let long = Array(repeating: "budżet", count: 40).joined(separator: " ")
-        let rig = NotesRig { _, messages, _ in
-            if NotesFake.isReduce(messages) { return .done(NotesFake.reduceAnswer(messages, summary: long + ".")) }
-            if NotesFake.isSummary(messages) { return .done("SUMMARY: \(long).") }
-            return .done(NotesFake.answer(messages))
-        }
-        let result = try await rig.pipeline({ $0.reduceInputTokens = 60 }).run(utterances: decisionLines(count: 8))
-        #expect(result.status == .partial)
-        #expect(result.reduceFailed)
-        #expect(result.verifiedPointCount == 8)
-        let markdown = try #require(result.markdown)
-        for number in 0..<8 { #expect(markdown.contains("numer \(number) harmonogramu")) }
     }
 
     // MARK: Token limit of a retry

@@ -7,10 +7,11 @@ import LintelCore
 /// - the headings of the sections, the participants and the person and due-date wording are the code's own;
 /// - every bullet is a verified point's text (checked against its quote; a point that failed is not shown), without
 ///   a time; a next step is a checklist item with its owner and due date when they were said; the order is the
-///   intro, the topics, Decisions made, Next steps, Open questions, Participants;
-/// - the intro and the topic names are the only free model wording, and only after `NotesGuard` found no name,
-///   number, date or negation in them that the verified material lacks (a paraphrase is possible); they are never
-///   composed from points or quotes. Findings without a name (the old `FINDINGS` list, or the code's order when
+///   topics, Decisions made, Next steps, Open questions, Participants (no intro: the model writes none, owner
+///   decision 2026-11-26);
+/// - the topic names are the only free model wording, and only after `NotesGuard` found no name, number, date or
+///   negation in them that the verified material lacks (a paraphrase is possible); they are never composed from
+///   points or quotes. Findings without a name (the old `FINDINGS` list, or the code's order when
 ///   REDUCE failed) get the code's heading `Labels.keyPoints`;
 /// - everything goes through `NotesMarkdown`, the same allow-list renderer the export uses, so no image, link,
 ///   HTML or network resource can appear, and a leading `#`, `-` or `1.` of the paragraph cannot become a
@@ -21,7 +22,6 @@ import LintelCore
 /// opened or sent.
 enum NotesComposer {
     struct Labels: Sendable, Equatable {
-        var summary: String
         var keyPoints: String
         var decisions: String
         var tasks: String
@@ -36,13 +36,13 @@ enum NotesComposer {
         var otherTopic: String
 
         static let polish = Labels(
-            summary: "Podsumowanie", keyPoints: "Omówione tematy", decisions: "Decyzje", tasks: "Zadania",
-            questions: "Otwarte kwestie", participants: "Uczestnicy", person: "osoba", due: "termin",
+            keyPoints: "Omówione tematy", decisions: "Decyzje", tasks: "Zadania", questions: "Otwarte kwestie",
+            participants: "Uczestnicy", person: "osoba", due: "termin",
             nothing: "W nagraniu nie znaleziono decyzji, zadań ani otwartych kwestii.",
             decisionsMade: "Podjęte decyzje", nextSteps: "Następne kroki", otherTopic: "Inne")
         static let english = Labels(
-            summary: "Summary", keyPoints: "Topics discussed", decisions: "Decisions", tasks: "Action items",
-            questions: "Open questions", participants: "Participants", person: "owner", due: "due",
+            keyPoints: "Topics discussed", decisions: "Decisions", tasks: "Action items", questions: "Open questions",
+            participants: "Participants", person: "owner", due: "due",
             nothing: "No decisions, action items or open questions were found in the recording.",
             decisionsMade: "Decisions", nextSteps: "Next steps", otherTopic: "Other")
 
@@ -88,7 +88,7 @@ enum NotesComposer {
         _ verdict: NotesGuard.ReduceVerdict, participants: [String], labels: Labels
     ) -> NotesLayout {
         NotesLayout(
-            intro: shownSummary(of: verdict),
+            intro: nil,
             topics: named(verdict.topics, labels: labels).map {
                 .init(name: $0.name, points: $0.points.map(\.text), isOther: $0.isOther)
             },
@@ -124,12 +124,6 @@ enum NotesComposer {
             if topic.name == nil, !topic.isOther { topic.name = labels.keyPoints }
             return topic
         }
-    }
-
-    /// The paragraph `markdown` shows as the intro; `nil` when it shows none.
-    static func shownSummary(of verdict: NotesGuard.ReduceVerdict) -> String? {
-        guard let summary = verdict.summary.map({ inertParagraph(flat($0)) }), !summary.isEmpty else { return nil }
-        return summary
     }
 
     /// The paragraph without a leading marker that the renderer would read as a heading, a list or a quote.

@@ -25,9 +25,6 @@ final class NotesTraceLog: Sendable {
     var reduce: NotesTraceReduce? {
         all.lazy.compactMap { if case .reduce(let reduce) = $0 { reduce } else { nil } }.first
     }
-    var summary: NotesTraceSummary? {
-        all.lazy.compactMap { if case .summary(let summary) = $0 { summary } else { nil } }.first
-    }
     var balance: NotesTrace.Balance { NotesTrace.balance(of: all) }
 }
 
@@ -57,7 +54,7 @@ final class NotesTraceLog: Sendable {
     private static let misfilingReduce: ScriptedLLM.Handler = { _, messages, _ in
         guard NotesFake.isReduce(messages) else { return .done(NotesFake.answer(messages)) }
         return .done(
-            "SUMMARY: Spotkanie dotyczyło budżetu.\nDECISIONS: p2, p99\nTASKS: p5\nFINDINGS: p1\nQUESTIONS: -")
+            "DECISIONS: p2, p99\nTASKS: p5\nFINDINGS: p1\nQUESTIONS: -")
     }
 
     private struct Scenario {
@@ -202,7 +199,7 @@ final class NotesTraceLog: Sendable {
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(NotesTraceVerification.self, from: unknown)
         }
-        #expect(NotesTrace.schemaVersion == 6)
+        #expect(NotesTrace.schemaVersion == 7)
     }
 
     @Test func theDetailsAndTheReservedFieldsAreCountsAndAnOlderTraceDecodesWithoutThem() throws {
@@ -324,7 +321,6 @@ final class NotesTraceLog: Sendable {
         #expect(reduce.decisions == 1 && reduce.tasks == 1 && reduce.questions == 0)
         #expect(reduce.keyPoints == 1)
         #expect(reduce.batches == 1 && reduce.sectionRequests == 1 && !reduce.reduceFailed)
-        #expect(log.summary == NotesTraceSummary(origin: .model, present: true, shown: true, sourceIDs: []))
         #expect(log.all.last == .finished(status: .ok, verified: 5, rendered: 3, notRendered: 2))
 
         // The composer shows what the trace says it shows.
@@ -334,16 +330,11 @@ final class NotesTraceLog: Sendable {
         #expect(!markdown.contains("bez zmian"))
     }
 
-    @Test func aRefusedSummaryIsNotComposedFromTheSummaryPoints() async throws {
+    @Test func aParagraphTheModelWritesAnywayIsNotShownAndTheTraceHasNoSummary() async throws {
         let log = NotesTraceLog()
         let (result, _) = try await run(scenarios()[2], trace: log)
-        #expect(result.summaryReplaced)
-        let summary = try #require(log.summary)
-        #expect(summary.origin == .refused)
-        #expect(!summary.present && !summary.shown)
-        #expect(summary.sourceIDs.isEmpty)
         let markdown = try #require(result.markdown)
-        #expect(!markdown.contains("Podsumowanie"))
+        #expect(!markdown.contains("Kowalski") && !markdown.contains("Podsumowanie"))
         let points = log.points
         #expect(points["p1"]?.fate == .notRendered(.notChosen))
         #expect(points["p1"]?.misfiledInto == [.questions])
@@ -351,23 +342,6 @@ final class NotesTraceLog: Sendable {
         #expect(log.reduce?.rejectedUnknown == 1)
         #expect(log.reduce?.rejectedWrongSection == 2)
         #expect(log.balance.isBalanced)
-    }
-
-    @Test func aSummaryPointTheModelsParagraphRepeatsIsShownInTheSummary() async throws {
-        let log = NotesTraceLog()
-        // The fake REDUCE writes the first summary point's sentence as its paragraph, word for word.
-        let (result, _) = try await run(scenarios()[0], trace: log)
-        let summary = try #require(log.summary)
-        #expect(summary.origin == .model)
-        #expect(summary.shown)
-        let points = log.points
-        #expect(points["p1"]?.kind == .summary)
-        #expect(points["p1"]?.fate == .rendered(.summary, via: .modelSummary))
-        #expect(log.reduce?.keyPoints == 0)
-        #expect(result.keyPoints.isEmpty)
-        #expect(log.balance.isBalanced)
-        let markdown = try #require(result.markdown)
-        #expect(!markdown.contains("### Omówione tematy"))
     }
 
     @Test func overlappingChunksShowTheDeduplication() async throws {
@@ -396,7 +370,7 @@ final class NotesTraceLog: Sendable {
         let reduce = try #require(log.reduce)
         #expect(reduce.batches > 3)
         #expect(reduce.sectionRequests == log.requests.filter { $0.stage == .sections }.count)
-        #expect(reduce.summaryMergeRequests >= 1)
+        #expect(log.requests.allSatisfy { $0.stage != .topics })
         #expect(log.points.values.allSatisfy { $0.fate == .rendered(.decisions, via: .reduce) })
         #expect(log.points.count == result.verifiedPointCount)
         #expect(log.balance.isBalanced)
@@ -412,9 +386,8 @@ final class NotesTraceLog: Sendable {
         #expect(request.pointIDs == ["p1", "p2", "p3", "p4"])
         #expect(log.reduce?.codeOrderBatches == 1)
         #expect(log.reduce?.reduceFailed == true)
-        #expect(log.summary?.origin == .absent)
         let points = log.points
-        // Without REDUCE nothing is composed (no paragraph), but the first topics are kept so that a meeting of
+        // Without REDUCE nothing is composed, but the first topics are kept so that a meeting of
         // findings only does not read as empty (the code-order fallback of `NotesPipeline.codeOrder`).
         #expect(points["p1"]?.fate == .rendered(.keyPoints, via: .codeOrder))
         #expect(points["p2"]?.fate == .rendered(.decisions, via: .codeOrder))
@@ -442,7 +415,7 @@ final class NotesTraceLog: Sendable {
     }
 
     /// MAP gives a summary point for every line and one more whose quote nobody said (the last, so `p7`);
-    /// REDUCE lists nothing and writes `paragraph`.
+    /// REDUCE lists the six that were said as findings and also writes `paragraph`, which is ignored.
     private static func summaryOnly(paragraph: String) -> ScriptedLLM.Handler {
         { _, messages, _ in
             if NotesFake.isMap(messages) {
@@ -455,7 +428,7 @@ final class NotesTraceLog: Sendable {
             }
             if NotesFake.isReduce(messages) {
                 return .done(
-                    "SUMMARY: \(paragraph)\nDECISIONS: -\nTASKS: -\nFINDINGS: p1, p2, p3, p4, p5, p6\nQUESTIONS: -")
+                    "INTRO: \(paragraph)\nDECISIONS: -\nTASKS: -\nFINDINGS: p1, p2, p3, p4, p5, p6\nQUESTIONS: -")
             }
             return .done(NotesFake.answer(messages))
         }
@@ -493,39 +466,11 @@ final class NotesTraceLog: Sendable {
             ])
         #expect(!markdown.contains("fuzj"))
         #expect(!markdown.contains("### Podjęte decyzje"))
-        #expect(log.summary?.origin == .model)
         #expect(log.points.values.allSatisfy { $0.fate == .rendered(.keyPoints, via: .reduce) })
         #expect(log.reduce?.keyPoints == 6)
         let balance = log.balance
         #expect(balance.isBalanced)
         #expect(balance.verified == 6 && balance.rendered == 6 && balance.notRendered == 0 && balance.unexplained == 0)
-    }
-
-    /// The model's paragraph is refused and nothing is composed in its place: the notes have no summary, and the
-    /// findings REDUCE chose stand as topics.
-    @Test func aRefusedParagraphLeavesNoSummaryAndTheChosenFindingsAsTopics() async throws {
-        let log = NotesTraceLog()
-        let (result, _) = try await run(
-            Scenario(
-                utterances: podcast(), handler: Self.summaryOnly(paragraph: "Kowalski zgodził się na 50 tysięcy.")),
-            trace: log)
-        #expect(result.summaryReplaced)
-        #expect(log.summary?.origin == .refused)
-        #expect(log.summary?.sourceIDs == [])
-        #expect(result.keyPoints.map(\.id) == ["p1", "p2", "p3", "p4", "p5", "p6"])
-        let markdown = try #require(result.markdown)
-        #expect(!markdown.contains("Podsumowanie"))
-        #expect(Self.keyPointLines(markdown).count == 6)
-        #expect(markdown.components(separatedBy: "Klienci chwalą nową aplikację mobilną.").count == 2)
-        #expect(!markdown.contains("fuzj"))
-        let points = log.points
-        for id in ["p1", "p2", "p3", "p4", "p5", "p6"] {
-            #expect(points[id]?.fate == .rendered(.keyPoints, via: .reduce), "\(id)")
-        }
-        let balance = log.balance
-        #expect(balance.isBalanced)
-        #expect(balance.verified == 6 && balance.rendered == 6 && balance.unexplained == 0)
-        #expect(log.all.last == .finished(status: .ok, verified: 6, rendered: 6, notRendered: 0))
     }
 
     // MARK: Attempts

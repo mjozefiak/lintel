@@ -12,7 +12,7 @@ typealias NotesTraceSink = @Sendable (NotesTraceEvent) -> Void
 /// Privacy: an event holds only what the code assigns or counts: chunk ids (`c1`, `c1.2`), point ids (`p12`,
 /// assigned by the code, and only of points the code made), kinds, counts, utterance times in milliseconds,
 /// token estimates and limits, flags and enum reasons. Never transcript text, a quote, a point's text, a
-/// person, a due date, a speaker, the summary or the notes, and never an id the model wrote that is not one of
+/// person, a due date, a speaker or the notes, and never an id the model wrote that is not one of
 /// the points (those are only counted).
 enum NotesTrace {
     /// Bumped when an event or a field changes meaning or goes away (adding one does not). 2: the verified
@@ -31,8 +31,12 @@ enum NotesTrace {
     /// `NotesTraceVerification.details` splits `unsupportedDetail` and `quoteNotInTranscript` by rule (a
     /// measurement, nothing changes in the notes), and the fields of later phases are reserved and zero until
     /// their phase: `NotesTraceVerification.reanchored`, `NotesTraceReduce.layout` (topics, points per topic,
-    /// `topicNameRefused`, `notChosen`, `cutByLimit`) and `started.rulesVersion` (`NotesGuard.rulesVersion`).
-    static let schemaVersion = 6
+    /// `topicNameRefused`, `notChosen`, `cutByLimit`) and `started.rulesVersion` (`NotesGuard.rulesVersion`). 7 (prompt 7 without an intro, owner decision 2026-11-26): the built-in
+    /// track writes no intro, so the `summary` event (`NotesTraceSummary`), the `summaryMerge` request stage,
+    /// `NotesTraceReduce.summaryMergeRequests`, `.summaryMergesGivenUp` and `.summaryReplaced` are gone, and
+    /// `Route.modelSummary` and `Loss.summaryNotShown` are no longer produced (they stay so an older trace can be
+    /// read).
+    static let schemaVersion = 7
 
     /// The points of `verified` that the deduplication took out, in their order.
     static func removedIDs(from verified: [NotesPoint], kept: [NotesPoint]) -> [String] {
@@ -100,11 +104,10 @@ enum NotesTraceEvent: Equatable, Sendable, Codable {
     case verified(NotesTraceVerification)
     /// After `NotesPipeline.deduplicated`: the ids it took out, and the ids that go on, in time order.
     case deduplicated(removedIDs: [String], keptIDs: [String])
-    /// One REDUCE request (sections) or summary merge request.
+    /// One REDUCE request (sections) or topic merge request.
     case reduceRequest(NotesTraceReduceRequest)
     /// The whole of REDUCE and of `NotesGuard.verifyReduce`.
     case reduce(NotesTraceReduce)
-    case summary(NotesTraceSummary)
     /// The fate of one verified point, in time order.
     case point(NotesTracePoint)
     case finished(status: NotesResult.Status, verified: Int, rendered: Int, notRendered: Int)
@@ -298,7 +301,7 @@ struct NotesTraceVerifier: Equatable, Sendable, Codable {
 
 struct NotesTraceReduceRequest: Equatable, Sendable, Codable {
     enum Stage: String, Sendable, Codable {
-        case sections, summaryMerge
+        case sections
         /// The merge of the topics of several batches (prompt 7); `pointIDs` are the points of the topics sent.
         case topics
     }
@@ -308,12 +311,12 @@ struct NotesTraceReduceRequest: Equatable, Sendable, Codable {
         case split
         /// The request failed; the batch's points went into the sections in code order (`reduceFailed`).
         case codeOrder
-        /// A summary merge failed; the paragraph is composed from the points (`reduceFailed`).
+        /// A topic merge failed; the batches' topics stay as they are (`reduceFailed`).
         case failed
     }
 
     var stage: Stage
-    /// Points (sections) or partial summaries (merge) in the request.
+    /// Points (sections) or topics (merge) in the request.
     var inputs: Int
     /// The points of a sections request.
     var pointIDs: [String]
@@ -325,9 +328,6 @@ struct NotesTraceReduce: Equatable, Sendable, Codable {
     /// Batches of the first level (1 when the points fit one request).
     var batches = 0
     var sectionRequests = 0
-    var summaryMergeRequests = 0
-    /// Summary merges given up without a request (two partial summaries did not fit together).
-    var summaryMergesGivenUp = 0
     var codeOrderBatches = 0
     /// Generation requests sent by REDUCE and the merges, and the answers of them cut off by the limit.
     var generationRequests = 0
@@ -349,7 +349,6 @@ struct NotesTraceReduce: Equatable, Sendable, Codable {
     var nearDuplicatesSkipped = 0
     /// The findings shown (since prompt 7, the points of every topic shown).
     var keyPoints = 0
-    var summaryReplaced = false
     /// The topic layout (schema 6; zeros before prompt 7); nil in older traces.
     var layout: NotesTraceLayout? = NotesTraceLayout()
 }
@@ -368,19 +367,6 @@ struct NotesTraceLayout: Equatable, Sendable, Codable {
     /// Verified `SUM` points REDUCE put under a topic and the limits cut: the number of topics, the points per topic,
     /// the size of "Other".
     var cutByLimit = 0
-}
-
-struct NotesTraceSummary: Equatable, Sendable, Codable {
-    var origin: NotesGuard.ReduceAudit.SummaryOrigin
-    /// The verdict has a paragraph, and the composer shows it.
-    var present: Bool
-    var shown: Bool
-    /// Always empty since schema 5: the paragraph is never composed from points.
-    var sourceIDs: [String]
-    var sourceStartMs: Int?
-    var sourceEndMs: Int?
-    /// Why the model's paragraph was refused (a rule, never text); nil for older traces and for no refusal.
-    var refusal: NotesGuard.SummaryRefusal?
 }
 
 struct NotesTracePoint: Equatable, Sendable, Codable {
@@ -413,8 +399,8 @@ struct NotesTracePoint: Equatable, Sendable, Codable {
         case backfilled
         /// Schema 4 and older: a summary point whose first sentence is in the paragraph composed by the code.
         case composedSummary
-        /// A summary point whose whole text is a sentence of the model's (or salvaged) paragraph, so it is not
-        /// listed again among the key points.
+        /// Schema 6 and older: a summary point whose whole text is a sentence of the model's (or salvaged)
+        /// paragraph, so it was not listed again among the key points.
         case modelSummary
         /// Schema 4 and older: a summary point the code listed among the key points.
         case listedByCode
@@ -427,7 +413,7 @@ struct NotesTracePoint: Equatable, Sendable, Codable {
         /// Schema 1 only: a summary point that is not among the first four sources of the composed paragraph.
         /// Not produced since schema 2, where the point is a key point.
         case summaryKindNotInComposedParagraph
-        /// A source of the composed paragraph, but the composer shows no paragraph.
+        /// Schema 6 and older: a summary point that is a sentence of the paragraph, but the composer showed none.
         case summaryNotShown
         /// REDUCE left it out (or put it in another section) and the guard did not add it back because this
         /// point, of the same kind, is in its section and near-duplicates it (`NotesGuard.nearDuplicate`).
@@ -488,7 +474,6 @@ final class NotesTraceRecorder: Sendable {
         state.withLock { state in
             switch stage {
             case .sections: state.reduce.sectionRequests += 1
-            case .summaryMerge: state.reduce.summaryMergeRequests += 1
             // Counted by its `reduceRequest` event and in `generationRequests`; the reduce event has no field for it.
             case .topics: break
             }
@@ -505,16 +490,11 @@ final class NotesTraceRecorder: Sendable {
                     stage: stage, inputs: inputs, pointIDs: pointIDs, attempts: attempts, outcome: outcome)))
     }
 
-    func summaryMergeGivenUp() {
-        state.withLock { $0.reduce.summaryMergesGivenUp += 1 }
-    }
-
-    /// The `reduce`, `summary` and `point` events, once the structure is verified.
+    /// The `reduce` and `point` events, once the structure is verified.
     /// `shownKeyPoints` are the topics as the composer shows them (`NotesComposer.shownKeyPoints`).
     func reduced(
         points: [NotesPoint], proposed: [NotesPoint], verdict: NotesGuard.ReduceVerdict,
-        audit: NotesGuard.ReduceAudit, shownKeyPoints: [NotesGuard.ReduceVerdict.Topic], reduceFailed: Bool,
-        summaryShown: Bool
+        audit: NotesGuard.ReduceAudit, shownKeyPoints: [NotesGuard.ReduceVerdict.Topic], reduceFailed: Bool
     ) {
         let shownIDs = Set(shownKeyPoints.flatMap(\.points).map(\.id))
         let (reduce, codeOrderIDs) = state.withLock { state -> (NotesTraceReduce, Set<String>) in
@@ -529,25 +509,16 @@ final class NotesTraceRecorder: Sendable {
             state.reduce.backfilled = verdict.backfilled
             state.reduce.nearDuplicatesSkipped = audit.nearDuplicateOf.count
             state.reduce.keyPoints = shownIDs.count
-            state.reduce.summaryReplaced = verdict.summaryReplaced
             state.reduce.layout = Self.layout(
-                points: points, verdict: verdict, audit: audit, shown: shownKeyPoints, codeOrderIDs: state.codeOrderIDs,
-                summaryShown: summaryShown)
+                points: points, verdict: verdict, audit: audit, shown: shownKeyPoints, codeOrderIDs: state.codeOrderIDs)
             return (state.reduce, state.codeOrderIDs)
         }
         emit(.reduce(reduce))
 
-        emit(
-            .summary(
-                NotesTraceSummary(
-                    origin: audit.summaryOrigin, present: verdict.summary != nil, shown: summaryShown,
-                    sourceIDs: [], sourceStartMs: nil, sourceEndMs: nil, refusal: audit.summaryRefusal)))
-
         let proposedKinds = Dictionary(proposed.map { ($0.id, $0.kind) }, uniquingKeysWith: { first, _ in first })
         for point in points {
             let fate = Self.fate(
-                of: point, verdict: verdict, audit: audit, shownIDs: shownIDs, codeOrderIDs: codeOrderIDs,
-                summaryShown: summaryShown)
+                of: point, verdict: verdict, audit: audit, shownIDs: shownIDs, codeOrderIDs: codeOrderIDs)
             state.withLock { state in
                 if case .rendered = fate { state.rendered += 1 } else { state.notRendered += 1 }
             }
@@ -572,7 +543,7 @@ final class NotesTraceRecorder: Sendable {
     /// choose or the limits cut.
     static func layout(
         points: [NotesPoint], verdict: NotesGuard.ReduceVerdict, audit: NotesGuard.ReduceAudit,
-        shown: [NotesGuard.ReduceVerdict.Topic], codeOrderIDs: Set<String>, summaryShown: Bool
+        shown: [NotesGuard.ReduceVerdict.Topic], codeOrderIDs: Set<String>
     ) -> NotesTraceLayout {
         var layout = NotesTraceLayout()
         layout.topics = shown.filter { $0.name != nil || $0.isOther }.count
@@ -581,8 +552,7 @@ final class NotesTraceRecorder: Sendable {
         let shownIDs = Set(shown.flatMap(\.points).map(\.id))
         for point in points where point.kind == .summary {
             let outcome = Self.fate(
-                of: point, verdict: verdict, audit: audit, shownIDs: shownIDs, codeOrderIDs: codeOrderIDs,
-                summaryShown: summaryShown)
+                of: point, verdict: verdict, audit: audit, shownIDs: shownIDs, codeOrderIDs: codeOrderIDs)
             switch outcome {
             case .notRendered(.notChosen): layout.notChosen += 1
             case .notRendered(.overLimit) where !point.text.hasSuffix("?"): layout.cutByLimit += 1
@@ -593,11 +563,10 @@ final class NotesTraceRecorder: Sendable {
     }
 
     /// Read from the verdict, the guard's audit and the topics as shown: the composer shows every point of
-    /// `shownIDs`, `decisions`, `tasks` and `questions` as a bullet and nothing else, and the paragraph when
-    /// `NotesComposer.shownSummary` has one.
+    /// `shownIDs`, `decisions`, `tasks` and `questions` as a bullet and nothing else.
     static func fate(
         of point: NotesPoint, verdict: NotesGuard.ReduceVerdict, audit: NotesGuard.ReduceAudit,
-        shownIDs: Set<String>, codeOrderIDs: Set<String>, summaryShown: Bool
+        shownIDs: Set<String>, codeOrderIDs: Set<String>
     ) -> NotesTracePoint.Fate {
         guard let section = NotesTracePoint.Section(kind: point.kind) else {
             if shownIDs.contains(point.id) {
@@ -605,9 +574,6 @@ final class NotesTraceRecorder: Sendable {
             }
             // Under a topic in the verdict but not shown: the arrangement's limit of "Other".
             if verdict.keyPoints.contains(where: { $0.id == point.id }) { return .notRendered(.overLimit) }
-            if audit.inModelParagraph.contains(point.id) {
-                return summaryShown ? .rendered(.summary, via: .modelSummary) : .notRendered(.summaryNotShown)
-            }
             if let other = audit.nearDuplicateOf[point.id] { return .notRendered(.nearDuplicateInSection(of: other)) }
             if audit.findingsOverLimit.contains(point.id) { return .notRendered(.overLimit) }
             return .notRendered(.notChosen)
@@ -633,4 +599,3 @@ final class NotesTraceRecorder: Sendable {
 extension NotesPointKind: Codable {}
 extension NotesResult.Status: Codable {}
 extension NotesGuard.DropReason: Codable {}
-extension NotesGuard.ReduceAudit.SummaryOrigin: Codable {}

@@ -79,16 +79,14 @@ import Testing
         SUM | 02:15 | "Ja mogę pomóc przy nagłośnieniu" | Pomoc przy nagłośnieniu.
         """
 
-    /// REDUCE the way a small model does it: every point of a kind in its section, a paragraph that is mostly
-    /// right. The FINDINGS line exists only from prompt version 5.
+    /// REDUCE the way a small model does it: every point of a kind in its section, and an intro it writes although
+    /// the prompt does not ask for one (it is ignored).
     static let handler: ScriptedLLM.Handler = { _, messages, _ in
         if NotesFake.isMap(messages) { return .done(mapAnswer) }
         guard NotesFake.isReduce(messages) else { return .done(NotesFake.answer(messages)) }
         return .done(
             NotesFake.reduceAnswer(
-                messages,
-                summary: "Mamy budżet festynu i podział prac. Budżet to osiem tysięcy."
-            ))
+                messages, strayIntro: "Mamy budżet festynu i podział prac. Budżet to osiem tysięcy."))
     }
 
     private func notes() async throws -> (markdown: String, utterances: [NotesUtterance]) {
@@ -116,7 +114,7 @@ import Testing
     @Test func theNotesAreASummaryNotAListOfQuotes() async throws {
         let (markdown, _) = try await notes()
         // Sections in the order of the layout; a meeting of two minutes is short, so its findings are one list
-        // without a topic heading, under the intro.
+        // without a topic heading, at the top: there is no intro.
         let headings = ["Podjęte decyzje", "Następne kroki", "Otwarte kwestie", "Uczestnicy"]
         let positions = headings.map { markdown.range(of: "### \($0)")?.lowerBound }
         #expect(!positions.contains { $0 == nil }, "\(markdown)")
@@ -127,7 +125,8 @@ import Testing
         let firstHeading = lines.firstIndex { $0.hasPrefix("#") } ?? lines.count
         let findings = lines[..<firstHeading].filter { $0.hasPrefix("- ") }
         #expect(!findings.isEmpty, "\(markdown)")
-        #expect(lines.first == "Mamy budżet festynu i podział prac. Budżet to osiem tysięcy.")
+        #expect(lines.first?.hasPrefix("- ") == true, "\(markdown)")
+        #expect(!markdown.contains("Mamy budżet festynu"))
 
         // Nothing from the microphone talk, the fragments or the bare question stands among the findings.
         #expect(!markdown.contains("mikrofon"))
@@ -151,8 +150,8 @@ import Testing
         // "Ktoś ma problem z mikrofonem" drifted from its quote; the quote is not shown in its place either.
         #expect(!markdown.contains("Ktoś ma problem"))
         #expect(!markdown.contains("zacina mikrofon"))
-        // The summary is the model's paragraph; nothing is composed from quotes.
-        #expect(markdown.contains("Mamy budżet festynu i podział prac."))
+        // Nothing is composed from quotes, and the paragraph the model wrote anyway is not shown.
+        #expect(!markdown.contains("Mamy budżet festynu i podział prac."))
     }
 
     private static func section(_ heading: String, in markdown: String, bullets: Bool = false) -> String {

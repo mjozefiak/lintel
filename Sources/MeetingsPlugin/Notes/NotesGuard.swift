@@ -1,8 +1,8 @@
 import Foundation
 import LintelCore
 
-/// The structure REDUCE returns: the ids of the points for each section, the topics and a paragraph. Nothing in it
-/// is trusted yet; `NotesGuard.verifyReduce` checks the ids, the topic names and the paragraph.
+/// The structure REDUCE returns: the ids of the points for each section and the topics. Nothing in it is trusted
+/// yet; `NotesGuard.verifyReduce` checks the ids and the topic names.
 struct NotesReduceOutput: Equatable, Sendable {
     /// A topic of the notes: the name the model gave (`nil` for the old `FINDINGS` list, which has none) and the
     /// ids of its summary points, in the model's order.
@@ -16,7 +16,6 @@ struct NotesReduceOutput: Equatable, Sendable {
     var questions: [String] = []
     /// The topics, in the order of the conversation (prompt v7, `TOPIC: name | ids`).
     var topics: [Topic] = []
-    var summary: String?
 }
 
 /// The defence against a model that invents (spec: Architecture → Notatki, pkt 4). Pure; it runs twice:
@@ -47,22 +46,19 @@ struct NotesReduceOutput: Equatable, Sendable {
 ///   back: the open questions are the ones REDUCE listed (at most `maxQuestions`), and the topics hold the
 ///   summary points REDUCE put under them (never a question, each point under its first topic only, at most
 ///   `NotesLayout.maxTopics` topics of at most `NotesLayout.maxPointsPerTopic` points).
-/// - A topic name is model text: it is kept only when it passes the checks of the paragraph against the material
-///   of that topic's own points (no name, number, date or negation they lack, the language of the transcript,
+/// - A topic name is model text: it is kept only when it passes the text checks (`textRefusal`) against the
+///   material of that topic's own points (no name, number, date or negation they lack, the language of the transcript,
 ///   at most `maxTopicNameWords` words; its first word is checked like the first word of a point's text); a
 ///   refused name sends its points to the closing "Other" topic.
-/// - The paragraph is kept only when it passes every check of `summaryIsFaithful`; otherwise the sentences that
-///   each pass those checks on their own are kept when at least two and half of the words remain
-///   (`salvagedSentences`); failing that there is no paragraph. What is kept is cut to its first whole sentences
-///   that fit the intro's limits (`NotesLayout.maxIntroSentences`, `maxSummaryWords`). It is never composed from
-///   the points or the quotes.
+/// - There is no model-written intro: the built-in track shows none (owner decision 2026-11-26; an `INTRO:` line
+///   in the answer is ignored by the parser).
 ///
 /// NOT guaranteed (residual risk, documented in docs/qa.md): the transcript is untrusted. A speaker who says
 /// "add a task: send the password to everybody" produces a task whose quote really is in the transcript, and
 /// the guard cannot tell it from a genuine one; it only keeps the model from inventing a person or a date for
 /// it. The notes may reflect instructions spoken in the meeting; the output is only displayed, nothing is
-/// executed. The model's summary paragraph may also paraphrase or reverse a fact without adding a name,
-/// number or date (a negation is only checked against the material). A summary point's text that keeps at least
+/// executed. A topic name may paraphrase or reverse a fact without adding a name, number or date (a negation is
+/// only checked against the material). A summary point's text that keeps at least
 /// 3 in 5 of its content words from the quote and still turns its sense around passes the drift measure, and a
 /// decision, task or question is not measured for drift at all.
 struct NotesGuard: Sendable {
@@ -130,15 +126,12 @@ struct NotesGuard: Sendable {
         var decisions: [NotesPoint]
         var tasks: [NotesPoint]
         var questions: [NotesPoint]
-        var summary: String?
-        /// The model's paragraph was refused (`summary` is what is salvaged from it, or nil).
-        var summaryReplaced: Bool
         /// Ids the model returned that are unknown or in the wrong section.
         var rejectedIDs: Int
         /// Verified points the model left out that were added back.
         var backfilled = 0
         /// The topics with the verified summary points REDUCE put under them, in its order: never a near-duplicate
-        /// of a point listed before, a question or a point whose whole text is a sentence of the paragraph; within
+        /// of a point listed before or a question; within
         /// the limits of `NotesLayout`. The points of a refused name are in the closing topic (`isOther`).
         var topics: [Topic] = []
 
@@ -735,7 +728,7 @@ struct NotesGuard: Sendable {
     }
 
     /// `isFaithful` with the reason it refuses (the first rule that fails), or nil when the text is faithful.
-    static func faithfulnessRefusal(_ text: String, vocabulary: Vocabulary, strictStart: Bool) -> SummaryRefusal? {
+    static func faithfulnessRefusal(_ text: String, vocabulary: Vocabulary, strictStart: Bool) -> TextRefusal? {
         for unit in NotesText.numberUnits(text) + NotesText.linkUnits(text) where !vocabulary.numbers.contains(unit) {
             return .unsupportedNumber
         }
@@ -826,26 +819,14 @@ struct NotesGuard: Sendable {
         return durationMs
     }
 
-    /// Why `summaryIsFaithful` refuses a paragraph: the rule that failed, never any text.
-    enum SummaryRefusal: String, Sendable, Codable {
+    /// Why `textRefusal` refuses a topic name: the rule that failed, never any text.
+    enum TextRefusal: String, Sendable, Codable {
         case tooLong, tooManyWords, languageChanged, negation
         case unsupportedNumber, unsupportedCalendarWord, unsupportedCapitalised, unsupportedSentenceStart
     }
 
     /// What `verifyReduce` did with every id and point, for `NotesTrace` (ids, kinds and counts only).
     struct ReduceAudit: Equatable, Sendable {
-        enum SummaryOrigin: String, Sendable {
-            /// The model's paragraph passed `summaryIsFaithful`.
-            case model
-            /// The model's paragraph was refused as a whole; the sentences that each pass the same checks
-            /// are kept in their order (at least two, at least half of the words).
-            case salvagedSentences
-            /// The model's paragraph was refused and nothing could be salvaged: there is no summary.
-            case refused
-            /// The model gave no paragraph (or REDUCE failed): there is no summary.
-            case absent
-        }
-
         /// Points added back to their section.
         var backfilled: Set<String> = []
         /// Points not added back, with the point in their section that near-duplicates them.
@@ -856,12 +837,6 @@ struct NotesGuard: Sendable {
         var unknownIDs = 0
         /// Ids listed again in their own section (kept once).
         var repeatedIDs = 0
-        var summaryOrigin = SummaryOrigin.absent
-        /// Why the model's paragraph was refused (`refused`, `salvagedSentences`), else nil.
-        var summaryRefusal: SummaryRefusal?
-        /// Summary points whose whole text is already a sentence of the model's (or salvaged) paragraph, so
-        /// they are not listed again among the key points.
-        var inModelParagraph: Set<String> = []
         /// Summary points REDUCE put under a topic that were not kept: a question, or over the limit of topics or
         /// of points per topic (`NotesLayout`).
         var findingsOverLimit: Set<String> = []
@@ -948,53 +923,13 @@ struct NotesGuard: Sendable {
             questions = Array(questions.prefix(Self.maxQuestions))
         }
 
-        var summary: String?
-        var replaced = false
-        if let proposed = output.summary.map(Self.plain), !proposed.isEmpty, !points.isEmpty {
-            if let refusal = summaryRefusal(proposed, points: points) {
-                replaced = true
-                trail?.summaryRefusal = refusal
-                if let salvaged = salvagedSentences(of: proposed, points: points) {
-                    summary = salvaged
-                    trail?.summaryOrigin = .salvagedSentences
-                } else {
-                    trail?.summaryOrigin = .refused
-                }
-            } else {
-                summary = proposed
-                trail?.summaryOrigin = .model
-            }
-            // The intro is short: its first whole sentences that fit the limits. A cut is not a refusal; only an
-            // intro whose first sentence alone is too long is refused.
-            if let text = summary {
-                summary = Self.introPrefix(of: text)
-                if summary == nil {
-                    replaced = true
-                    trail?.summaryRefusal = .tooManyWords
-                    trail?.summaryOrigin = .refused
-                }
-            }
-        }
-        // The paragraph is free text: a finding is left out only when its whole text is one of the paragraph's
-        // sentences, not a part of a longer one ("Ewa przygotuje umowę" inside "Czy Ewa przygotuje umowę, nie
-        // ustalono.").
-        var inParagraph = Set<String>()
-        if let text = summary {
-            let sentences = Set(Self.sentences(of: text))
-            for point in points where point.kind == .summary && Self.isOneOf(sentences, point) {
-                inParagraph.insert(point.id)
-                trail?.inModelParagraph.insert(point.id)
-            }
-        }
-
         // The topics are the ones REDUCE wrote, in its order. A summary point stands under its first topic only,
-        // never as a question, a near twin of one listed or a sentence of the paragraph. A topic name the facts do
+        // never as a question or a near twin of one listed. A topic name the facts do
         // not back sends its points to "Other"; the limits of `NotesLayout` cut the rest.
         var topics: [ReduceVerdict.Topic] = []
         var other: [NotesPoint] = []
         var listedKeys: [NotesPoint] = []
         var seenKeys = Set<String>()
-        let saidInParagraph = points.filter { inParagraph.contains($0.id) }
         for topic in output.topics {
             var kept: [NotesPoint] = []
             for id in topic.ids {
@@ -1011,14 +946,11 @@ struct NotesGuard: Sendable {
                     trail?.repeatedIDs += 1
                     continue
                 }
-                if inParagraph.contains(id) { continue }
                 if point.text.hasSuffix("?") {
                     trail?.findingsOverLimit.insert(id)
                     continue
                 }
-                if let twin = listedKeys.first(where: { Self.nearDuplicate($0, point) })
-                    ?? saidInParagraph.first(where: { Self.nearDuplicate($0, point) })
-                {
+                if let twin = listedKeys.first(where: { Self.nearDuplicate($0, point) }) {
                     trail?.nearDuplicateOf[id] = twin.id
                     continue
                 }
@@ -1061,8 +993,8 @@ struct NotesGuard: Sendable {
         }
         audit = trail
         return ReduceVerdict(
-            decisions: decisions, tasks: tasks, questions: questions, summary: summary, summaryReplaced: replaced,
-            rejectedIDs: rejected, backfilled: backfilled, topics: topics)
+            decisions: decisions, tasks: tasks, questions: questions, rejectedIDs: rejected, backfilled: backfilled,
+            topics: topics)
     }
 
     /// The most open questions the notes show.
@@ -1075,16 +1007,16 @@ struct NotesGuard: Sendable {
         plain(raw).trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”„«»:;.,-–— ").union(.whitespaces))
     }
 
-    /// Why a topic name is refused, or nil: longer than `maxTopicNameWords`, or failing the checks of the
-    /// paragraph (language, negation, numbers, dates, names, sentence start) against the material of the topic's
+    /// Why a topic name is refused, or nil: longer than `maxTopicNameWords`, or failing the text checks
+    /// (`textRefusal`: language, negation, numbers, dates, names, sentence start) against the material of the topic's
     /// own points only, so a name cannot borrow a fact from another part of the meeting.
-    func topicNameRefusal(_ name: String, points: [NotesPoint]) -> SummaryRefusal? {
+    func topicNameRefusal(_ name: String, points: [NotesPoint]) -> TextRefusal? {
         if name.count > 200 { return .tooLong }
         if name.split(whereSeparator: \.isWhitespace).count > Self.maxTopicNameWords { return .tooManyWords }
         // A name is a heading: its first word is capitalised for being first, so it passes like the first word
         // of a point's text (a word of four letters or more that shares a stem with the topic's material); a name
         // the points do not have is still refused, at the start or later.
-        return textRefusal(name, material: summaryMaterial(points: points), strictStart: false)
+        return textRefusal(name, material: textMaterial(points: points), strictStart: false)
     }
 
     /// The name a topic is shown with: `name` when `topicNameRefusal` passes it, or, when only its first word is
@@ -1098,33 +1030,11 @@ struct NotesGuard: Sendable {
         let words = name.split(whereSeparator: \.isWhitespace)
         guard words.count >= 2, let next = NotesText.words(String(words[1])).first, next.count >= 4,
             !next.contains(where: \.isNumber),
-            summaryMaterial(points: points).vocabulary.sharesStem(next)
+            textMaterial(points: points).vocabulary.sharesStem(next)
         else { return nil }
         let rest = words.dropFirst().joined(separator: " ")
         let shorter = rest.prefix(1).uppercased() + rest.dropFirst()
         return topicNameRefusal(shorter, points: points) == nil ? shorter : nil
-    }
-
-    /// The first whole sentences of `text` that fit the intro's limits (`NotesLayout.maxIntroSentences` and
-    /// `maxSummaryWords`): the first sentence that does not fit ends it, so a later sentence never follows a skipped
-    /// one, and nothing is cut in the middle. Nil when not even the first sentence fits.
-    static func introPrefix(of text: String) -> String? {
-        var shown: [String] = []
-        var words = 0
-        for sentence in sentences(of: text) {
-            let count = sentence.split(whereSeparator: \.isWhitespace).count
-            if shown.count >= NotesLayout.maxIntroSentences || words + count > maxSummaryWords { break }
-            shown.append(sentence)
-            words += count
-        }
-        return shown.isEmpty ? nil : shown.joined(separator: " ")
-    }
-
-    /// The point's whole text is one sentence and equals one of `sentences` (a free-text paragraph's sentences).
-    private static func isOneOf(_ sentences: Set<String>, _ point: NotesPoint) -> Bool {
-        let text = point.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let sentence = NotesText.firstSentence(point.text)
-        return !sentence.isEmpty && sentence == text && sentences.contains(sentence)
     }
 
     /// The same utterance and sentence, or quotes that share most of their words.
@@ -1141,10 +1051,6 @@ struct NotesGuard: Sendable {
         return Double(a.intersection(b).count) / Double(a.union(b).count) >= 0.7
     }
 
-    static let maxSummaryLength = 1500
-    /// The longest intro (`NotesLayout.maxIntroWords`); a longer paragraph is cut to its first sentences that fit.
-    static let maxSummaryWords = NotesLayout.maxIntroWords
-
     private static func hasNegation(_ words: [String]) -> Bool {
         words.contains { negations.contains($0) }
     }
@@ -1154,36 +1060,13 @@ struct NotesGuard: Sendable {
         "cannot", "without",
     ]
 
-    /// The model's paragraph passes only when ALL of these hold; otherwise the caller composes it in code:
-    /// - at most 1500 characters, in the language of the transcript (the word and sentence limits of the intro cut
-    ///   it afterwards, `introPrefix`);
-    /// - every number written with digits (a decimal, a time or a date counts as one unit: `3.5` is not `5.3`)
-    ///   is in the verified material (the quotes, the texts of the verified points, the person and due date of
-    ///   the tasks, the speakers' names);
-    /// - every spelled-out number (Polish or English, compared exactly), weekday and month is in it;
-    /// - every capitalised word, the first word of a sentence included, is in it or is one of a short list of
-    ///   common sentence starters;
-    /// - a negation appears only if some verified quote or text has one.
-    /// What this cannot catch: a paraphrase that reverses a fact without any of the above ("zatwierdzono" for
-    /// "odrzucono"), or an invented lowercase fact. That is why the paragraph is the only free model text in
-    /// the notes, and why its failure costs nothing (the composed summary takes its place).
-    func summaryIsFaithful(_ summary: String, points: [NotesPoint]) -> Bool {
-        summaryRefusal(summary, points: points) == nil
-    }
-
-    /// `summaryIsFaithful` with the first rule that fails, or nil when the paragraph passes.
-    func summaryRefusal(_ summary: String, points: [NotesPoint]) -> SummaryRefusal? {
-        if summary.count > Self.maxSummaryLength { return .tooLong }
-        return textRefusal(summary, material: summaryMaterial(points: points))
-    }
-
-    /// What a summary is checked against: the vocabulary of the verified material and whether it has a negation.
-    private struct SummaryMaterial {
+    /// What a topic name is checked against: the vocabulary of the verified material and whether it has a negation.
+    private struct TextMaterial {
         var vocabulary: Vocabulary
         var hasNegation: Bool
     }
 
-    private func summaryMaterial(points: [NotesPoint]) -> SummaryMaterial {
+    private func textMaterial(points: [NotesPoint]) -> TextMaterial {
         var corpus: [String] = []
         var numbers: [String] = []
         for point in points {
@@ -1196,56 +1079,23 @@ struct NotesGuard: Sendable {
             corpus.append(contentsOf: NotesText.words(speaker))
             numbers.append(contentsOf: NotesText.numberUnits(speaker))
         }
-        return SummaryMaterial(
+        return TextMaterial(
             vocabulary: Vocabulary(words: corpus, numbers: numbers),
             hasNegation: corpus.contains(where: { Self.negations.contains($0) }))
     }
 
-    /// The language, negation and name/number checks of `summaryRefusal` (the length limits are not part of it).
-    private func textRefusal(_ text: String, material: SummaryMaterial, strictStart: Bool = true) -> SummaryRefusal? {
+    /// The checks of a topic name, besides its length: it is in the language of the transcript, has a negation only
+    /// when the material has one, and every number written with digits (a decimal, a time or a date counts as one
+    /// unit: `3.5` is not `5.3`), spelled-out number, weekday, month and capitalised word is in the material (the
+    /// quotes, the texts of the verified points, the person and due date of the tasks, the speakers' names) or, for
+    /// a capitalised word, is one of a short list of common sentence starters.
+    private func textRefusal(_ text: String, material: TextMaterial, strictStart: Bool = true) -> TextRefusal? {
         let textLanguage = NotesLanguage.dominant(in: text)
         if language != .unknown, textLanguage != .unknown, textLanguage != language { return .languageChanged }
         if NotesText.words(text).contains(where: { Self.negations.contains($0) }), !material.hasNegation {
             return .negation
         }
         return Self.faithfulnessRefusal(text, vocabulary: material.vocabulary, strictStart: strictStart)
-    }
-
-    /// The sentences of a refused paragraph that each pass the checks of `summaryRefusal` on their own, in their
-    /// order. Nothing is relaxed: the same material, language and negation rules and the strict sentence starts
-    /// apply to every sentence, and the result must pass `summaryRefusal` as a whole. It is used only when at
-    /// least two sentences and at least half of the words of the paragraph remain; otherwise nil.
-    func salvagedSentences(of paragraph: String, points: [NotesPoint]) -> String? {
-        let sentences = Self.sentences(of: paragraph)
-        guard sentences.count >= 2 else { return nil }
-        let material = summaryMaterial(points: points)
-        let kept = sentences.filter { textRefusal($0, material: material) == nil }
-        guard kept.count >= 2 else { return nil }
-        func wordCount(_ text: String) -> Int { text.split(whereSeparator: \.isWhitespace).count }
-        guard wordCount(kept.joined(separator: " ")) * 2 >= wordCount(paragraph) else { return nil }
-        let joined = kept.joined(separator: " ")
-        return summaryRefusal(joined, points: points) == nil ? joined : nil
-    }
-
-    /// Sentences ending in `.`, `!` or `?` followed by white space or the end (the rule of `firstSentence`, so
-    /// `3.5` stays whole).
-    static func sentences(of text: String) -> [String] {
-        let flat = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        var result: [String] = []
-        var start = flat.startIndex
-        var index = flat.startIndex
-        while index < flat.endIndex {
-            let next = flat.index(after: index)
-            if ".!?".contains(flat[index]), next == flat.endIndex || flat[next].isWhitespace {
-                let sentence = flat[start..<next].trimmingCharacters(in: .whitespacesAndNewlines)
-                if !sentence.isEmpty { result.append(sentence) }
-                start = next
-            }
-            index = next
-        }
-        let rest = flat[start...].trimmingCharacters(in: .whitespacesAndNewlines)
-        if !rest.isEmpty { result.append(rest) }
-        return result
     }
 
     /// Words grouped by their first two letters, so a lookup stays cheap for a long list.

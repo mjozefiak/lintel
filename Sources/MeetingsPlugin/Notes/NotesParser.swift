@@ -97,15 +97,15 @@ enum NotesParser {
 
     // MARK: REDUCE
 
-    /// The REDUCE answer: `INTRO:` (or the older `SUMMARY:`), `TOPIC: name | ids` lines, `DECISIONS:`, `TASKS:`,
-    /// `QUESTIONS:`. The older `FINDINGS:` list is still read, as one topic without a name, so an answer in the old
-    /// format is not lost.
+    /// The REDUCE answer: `TOPIC: name | ids` lines, `DECISIONS:`, `TASKS:`, `QUESTIONS:`. The older `FINDINGS:` list
+    /// is still read, as one topic without a name, so an answer in the old format is not lost. A paragraph the model
+    /// writes anyway (`INTRO:`, the older `SUMMARY:`) is ignored: the built-in track shows no intro (owner decision
+    /// 2026-11-26).
     static func parseReduce(_ raw: String) -> NotesReduceOutput? {
         let cleaned = NotesText.clean(raw)
         var output = NotesReduceOutput()
         var recognised = false
         var current: Key?
-        var summaryLines: [String] = []
 
         for rawLine in cleaned.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = stripBullet(String(rawLine)).trimmingCharacters(in: .whitespaces)
@@ -114,19 +114,17 @@ enum NotesParser {
                 current = .topic
                 output.topics.append(topic)
             } else if let (key, value) = keyLine(line) {
-                recognised = true
+                // An answer that is only an ignored paragraph has nothing to use: the request is tried again.
+                recognised = recognised || key != .ignored
                 current = key
                 switch key {
-                case .summary: summaryLines = value.isEmpty ? [] : [value]
                 case .decisions: output.decisions.append(contentsOf: ids(in: value))
                 case .tasks: output.tasks.append(contentsOf: ids(in: value))
                 case .questions: output.questions.append(contentsOf: ids(in: value))
                 case .findings: output.topics.append(.init(name: nil, ids: ids(in: value)))
                 case .topic, .ignored: break
                 }
-            } else if current == .summary, !line.isEmpty {
-                summaryLines.append(line)
-            } else if let current, current != .summary, current != .ignored {
+            } else if let current, current != .ignored {
                 // A list that continues on the next line.
                 switch current {
                 case .decisions: output.decisions.append(contentsOf: ids(in: line))
@@ -140,14 +138,7 @@ enum NotesParser {
         }
         guard recognised else { return nil }
         output.topics = output.topics.filter { !$0.ids.isEmpty }
-        let summary = summaryLines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-        output.summary = summary.isEmpty || summary == "-" ? nil : summary
         return output
-    }
-
-    /// `SUMMARY: …` (or `INTRO: …`) of the merge of partial summaries.
-    static func parseSummary(_ raw: String) -> String? {
-        parseReduce(raw)?.summary
     }
 
     /// The `TOPIC: name | t1, t3` lines of the merge of the topics of several REDUCE batches; nil when there is
@@ -159,15 +150,14 @@ enum NotesParser {
         return topics.isEmpty ? nil : topics
     }
 
-    private enum Key { case summary, decisions, tasks, questions, findings, topic, ignored }
+    private enum Key { case decisions, tasks, questions, findings, topic, ignored }
 
     private static let keys: [(names: [String], key: Key)] = [
-        (["summary", "intro", "podsumowanie", "wstęp", "wstep"], .summary),
+        (["summary", "intro", "podsumowanie", "wstęp", "wstep", "participants", "uczestnicy"], .ignored),
         (["decisions", "decyzje"], .decisions),
         (["tasks", "zadania", "action items"], .tasks),
         (["questions", "open questions", "pytania", "otwarte pytania"], .questions),
         (["findings", "topics", "key points", "ustalenia", "omowione tematy", "omówione tematy"], .findings),
-        (["participants", "uczestnicy"], .ignored),
     ]
 
     /// `TOPIC: name | ids` (also `TEMAT:`). Without the bar, the name is the text before the first id. The name

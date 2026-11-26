@@ -372,30 +372,32 @@ import Testing
     }
 }
 
-@Suite struct NotesSummaryGuardTests {
+/// The text checks of a topic name (the checks that once guarded the model's intro): a name that has a name, a
+/// number or a negation its own points lack is refused.
+@Suite struct NotesTopicNameGuardTests {
     let guardrail = NotesGuard(utterances: GuardFixtures.transcript())
     let points = GuardFixtures.verified
 
-    private func faithful(_ summary: String) -> Bool {
-        guardrail.summaryIsFaithful(summary, points: points)
+    private func faithful(_ name: String) -> Bool {
+        guardrail.topicNameRefusal(name, points: points) == nil
     }
 
     @Test(
-        "A sentence-start name, a spelled-out number or a recombined number is refused",
+        "A name that starts with a name, a spelled-out number or a recombined number is refused",
         arguments: [
-            "Kowalski zatwierdził budżet.",
-            "Nowak zgodził się na budżet marketingowy.",
-            "Pięćdziesiąt tysięcy złotych zatwierdzono.",
-            "Budżet wynosi sto tysięcy złotych.",
-            "Budżet wynosi czterdzieści tysięcy złotych.",
-            "Budżet zatwierdzono 5 listopada.",
-            "Spotkanie trwało 3.5 godziny.",
-            "Nie zatwierdzono budżetu marketingowego.",
-            "Acme zatwierdziło budżet.",
-            "The team approved the budget.",
+            "Kowalski zatwierdził budżet",
+            "Nowak zgodził się na budżet marketingowy",
+            "Pięćdziesiąt tysięcy złotych zatwierdzono",
+            "Budżet wynosi sto tysięcy złotych",
+            "Budżet wynosi czterdzieści tysięcy złotych",
+            "Budżet zatwierdzono 5 listopada",
+            "Spotkanie trwało 3.5 godziny",
+            "Nie zatwierdzono budżetu marketingowego",
+            "Acme zatwierdziło budżet",
+            "The team approved the budget",
         ])
-    func refused(summary: String) {
-        #expect(!faithful(summary))
+    func refused(name: String) {
+        #expect(!faithful(name))
     }
 
     @Test func aDecimalIsOneUnitSoItsDigitsCannotBeRecombined() {
@@ -411,58 +413,47 @@ import Testing
             time: 9000)
         let verified = verifier.verifyPoints([point]).verified
         #expect(verified.count == 1)
-        #expect(verifier.summaryIsFaithful("Budżet wzrośnie o 3.5 procent.", points: verified))
-        #expect(!verifier.summaryIsFaithful("Budżet wzrośnie o 5.3 procent.", points: verified))
-        #expect(!verifier.summaryIsFaithful("Budżet wzrośnie o 3 procent.", points: verified))
-        #expect(!verifier.summaryIsFaithful("Budżet wzrośnie o 5 procent.", points: verified))
+        #expect(verifier.topicNameRefusal("Budżet wzrośnie o 3.5 procent", points: verified) == nil)
+        #expect(verifier.topicNameRefusal("Budżet wzrośnie o 5.3 procent", points: verified) != nil)
+        #expect(verifier.topicNameRefusal("Budżet wzrośnie o 3 procent", points: verified) != nil)
+        #expect(verifier.topicNameRefusal("Budżet wzrośnie o 5 procent", points: verified) != nil)
     }
 
-    @Test func aSummaryBuiltFromTheVerifiedMaterialPasses() {
-        #expect(faithful("Spotkanie dotyczyło budżetu na przyszły kwartał."))
-        #expect(faithful("Zespół zatwierdził budżet, a Marek wyśle ofertę do klienta w piątek, Ewa przygotuje umowę."))
-        #expect(faithful("Oferta zostanie wysłana w piątku."))
-        #expect(faithful("Budżet marketingowy wynosi czterdzieści tysięcy złotych.") == false)
-        #expect(faithful("Budżet marketingowy wynosi czterdziestu tysięcy złotych."))
+    @Test func aNameBuiltFromTheVerifiedMaterialPasses() {
+        #expect(faithful("Budżet na przyszły kwartał"))
+        #expect(faithful("Oferta zostanie wysłana w piątku"))
+        #expect(faithful("Budżet marketingowy wynosi czterdzieści tysięcy złotych") == false)
+        #expect(faithful("Budżet marketingowy wynosi czterdziestu tysięcy złotych"))
     }
 
-    @Test func theUnverifiedTextOfAPointDoesNotWidenWhatASummaryMayContain() {
-        // The model's text of a point is not part of what the summary is checked against.
+    @Test func theUnverifiedTextOfAPointDoesNotWidenWhatANameMayContain() {
+        // A point the guard removed for its invented detail is not part of the material, so its names and numbers
+        // cannot back a topic name.
         let verdict = guardrail.verifyPoints([
             GuardFixtures.point(
                 "p1", .decision, quote: "Zatwierdzamy budżet marketingowy", text: "Budżet 5 mln dla Kowalskiego.",
                 time: 21_000)
         ])
-        #expect(!guardrail.summaryIsFaithful("Kowalski dostał 5 mln.", points: verdict.verified))
+        #expect(guardrail.topicNameRefusal("Kowalski dostał 5 mln", points: verdict.verified) != nil)
     }
 
-    @Test func aTooLongParagraphIsRefused() {
-        let long = Array(repeating: "budżet", count: 400).joined(separator: " ") + "."
-        #expect(!faithful(long))
-        // A paragraph within the character limit passes the check and is cut to the intro afterwards.
-        #expect(NotesGuard.introPrefix(of: Array(repeating: "budżet", count: 80).joined(separator: " ") + ".") == nil)
+    @Test func aTooLongNameIsRefused() {
+        let long = Array(repeating: "budżet", count: 9).joined(separator: " ")
+        #expect(guardrail.topicNameRefusal(long, points: points) == .tooManyWords)
     }
 
-    @Test func aSummaryThatIsRefusedIsNotShownAndNothingTakesItsPlace() {
-        let verdict = guardrail.verifyReduce(
-            NotesReduceOutput(decisions: ["p1"], summary: "Kowalski zatwierdził budżet."), points: points)
-        #expect(verdict.summaryReplaced)
-        #expect(verdict.summary == nil)
-    }
-
-    @Test func aSummaryCannotRenderAsAHeadingOrAList() {
+    /// A name is shown as a heading, so it cannot start a heading, a list or a quote of its own.
+    @Test func aTopicNameCannotRenderAsAHeadingOrAList() {
         for hostile in ["# Transcript", "- punkt", "1. punkt", "> cytat", "## ### - * hack", "* * *"] {
-            #expect(!NotesComposer.inertParagraph(hostile).hasPrefix("#"))
-            let verdict = guardrail.verifyReduce(NotesReduceOutput(summary: nil), points: points)
-            var changed = verdict
-            changed.summary = hostile
-            let markdown = NotesComposer.markdown(verdict: changed, participants: [], labels: .polish)
-            #expect(!markdown.contains("\n# "))
-            // The intro is the first line, without a heading of its own; when nothing of it is left, the notes
-            // start with the code's first section.
-            let first = markdown.split(separator: "\n").first.map(String.init) ?? ""
-            #expect(
-                first == "### Podjęte decyzje"
-                    || (!first.hasPrefix("#") && !first.hasPrefix("-") && !first.hasPrefix("1.")), "\(hostile)")
+            let point = GuardFixtures.point("p5", .summary, quote: "q", text: "Punkt.")
+            var verdict = guardrail.verifyReduce(NotesReduceOutput(), points: points)
+            verdict.topics = [.init(name: hostile, points: [point, point])]
+            let markdown = NotesComposer.markdown(
+                verdict: verdict, participants: [], labels: .polish, durationMs: 30 * 60_000)
+            #expect(!markdown.contains("\n# "), "\(hostile)")
+            for line in markdown.split(separator: "\n") where line.hasPrefix("#") {
+                #expect(line.hasPrefix("### ") && !line.dropFirst(4).hasPrefix("#"), "\(hostile): \(line)")
+            }
         }
     }
 }
@@ -472,8 +463,7 @@ import Testing
 
     @Test func aVerifiedDecisionOrTaskTheModelLeftOutIsAddedBack() {
         let verdict = guardrail.verifyReduce(
-            NotesReduceOutput(decisions: ["p1"], tasks: [], questions: [], summary: nil), points: GuardFixtures.verified
-        )
+            NotesReduceOutput(decisions: ["p1"], tasks: [], questions: []), points: GuardFixtures.verified)
         #expect(verdict.tasks.map(\.id) == ["p2", "p3"])
         // A question REDUCE did not list stays out.
         #expect(verdict.questions.isEmpty)

@@ -250,22 +250,19 @@ import Testing
         #expect(result.verifiedPointCount == 12)
         let calls = rig.llm.calls
         let reduces = calls.filter { NotesFake.isReduce($0.messages) }
-        let merges = calls.filter { NotesFake.isSummary($0.messages) }
         #expect(reduces.count > 3)
-        #expect(!merges.isEmpty)
         // Every batch fits the reduce budget (with the fake's tiny lines, a few points each).
         #expect(reduces.allSatisfy { NotesFake.lastUser($0.messages).split(separator: "\n").count <= 6 })
         // Nothing was lost on the way.
         let markdown = try #require(result.markdown)
         for number in 0..<12 { #expect(markdown.contains("Zatwierdzamy punkt numer \(number) harmonogramu projektu.")) }
-        #expect(markdown.contains("Spotkanie dotyczyło zatwierdzania punktów harmonogramu."))
     }
 
     @Test func aSmallMapOutputNeedsOnlyOneReduce() async throws {
         let rig = NotesRig()
         _ = try await rig.pipeline().run(utterances: decisionLines(count: 12))
         #expect(rig.llm.calls.filter { NotesFake.isReduce($0.messages) }.count == 1)
-        #expect(rig.llm.calls.filter { NotesFake.isSummary($0.messages) }.isEmpty)
+        #expect(rig.llm.calls.filter { NotesFake.isTopics($0.messages) }.isEmpty)
     }
 
     @Test func aReducePromptThatDoesNotFitIsSplitIntoBatches() async throws {
@@ -314,15 +311,14 @@ import Testing
         let rig = NotesRig { _, messages, _ in
             guard NotesFake.isReduce(messages) else { return .done(NotesFake.answer(messages)) }
             return .done(
-                "SUMMARY: Kowalski zgodził się na 50 tysięcy.\nDECISIONS: p2, p99\nTASKS: p3, p2\nQUESTIONS: p4, p1")
+                "INTRO: Kowalski zgodził się na 50 tysięcy.\nDECISIONS: p2, p99\nTASKS: p3, p2\nQUESTIONS: p4, p1")
         }
         let result = try await rig.pipeline().run(utterances: NotesFixtures.meeting())
-        #expect(result.summaryReplaced)
         #expect(result.rejectedIDs == 3)
         let markdown = try #require(result.markdown)
         #expect(!markdown.contains("Kowalski"))
         #expect(!markdown.contains("p99"))
-        // No summary is composed in place of the refused one.
+        // The model's paragraph is ignored, and nothing is composed in its place.
         #expect(!markdown.contains("### Podsumowanie"))
         #expect(!markdown.contains("Przejdźmy do budżetu"))
     }

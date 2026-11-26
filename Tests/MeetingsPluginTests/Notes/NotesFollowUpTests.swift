@@ -61,7 +61,6 @@ import Testing
         #expect(output.questions.count == NotesGuard.maxQuestions)
         #expect(output.questions.contains("q11"))
         #expect(output.decisions == ["d1"] && output.tasks == ["t1"])
-        #expect(output.summary == nil)
     }
 
     @Test func aReduceThatFailsLeavesTopicsFromTheMiddleOfTheMeeting() async throws {
@@ -93,12 +92,12 @@ import Testing
         let seen = Mutex2()
         let rig = NotesRig { call, messages, _ in
             if NotesFake.isMap(messages) { return .done(NotesFake.mapAnswer(messages)) }
-            guard NotesFake.isReduce(messages) else { return .done("SUMMARY: x") }
+            guard NotesFake.isReduce(messages) else { return .done("NONE") }
             seen.add(NotesFake.lastUser(messages))
             if NotesFake.lastUser(messages).contains(NotesPrompt.formatReminder) {
-                return .done(NotesFake.reduceAnswer(messages, summary: "Spotkanie dotyczyło zatwierdzania punktów."))
+                return .done(NotesFake.reduceAnswer(messages))
             }
-            return .cutOff("SUMMARY: loop\nDECISIONS: p1, p1, p1, p1")
+            return .cutOff("INTRO: loop\nDECISIONS: p1, p1, p1, p1")
         }
         let result = try await rig.pipeline().run(utterances: decisionLines(count: 3))
         #expect(result.status == .ok)
@@ -250,12 +249,12 @@ import Testing
         let seen = Mutex2()
         let rig = NotesRig(contextLength: 2000) { _, messages, _ in
             if NotesFake.isMap(messages) { return .done(NotesFake.mapAnswer(messages)) }
-            guard NotesFake.isReduce(messages) else { return .done("SUMMARY: x") }
+            guard NotesFake.isReduce(messages) else { return .done("NONE") }
             seen.add(NotesFake.lastUser(messages))
             if NotesFake.lastUser(messages).contains(NotesPrompt.formatReminder) {
-                return .done(NotesFake.reduceAnswer(messages, summary: "Spotkanie dotyczyło zatwierdzania punktów."))
+                return .done(NotesFake.reduceAnswer(messages))
             }
-            return .cutOff("SUMMARY: loop")
+            return .cutOff("INTRO: loop")
         }
         let result = try await rig.pipeline().run(utterances: decisionLines(count: 3))
         #expect(!result.reduceFailed)

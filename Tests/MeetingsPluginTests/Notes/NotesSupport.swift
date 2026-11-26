@@ -99,12 +99,11 @@ func notesEventually(_ condition: @Sendable () -> Bool) async {
 /// answer in the old format.
 extension NotesReduceOutput {
     init(
-        decisions: [String] = [], tasks: [String] = [], questions: [String] = [], keyPoints: [String],
-        summary: String? = nil
+        decisions: [String] = [], tasks: [String] = [], questions: [String] = [], keyPoints: [String]
     ) {
         self.init(
             decisions: decisions, tasks: tasks, questions: questions,
-            topics: keyPoints.isEmpty ? [] : [.init(name: nil, ids: keyPoints)], summary: summary)
+            topics: keyPoints.isEmpty ? [] : [.init(name: nil, ids: keyPoints)])
     }
 
     /// The ids of every topic, in order.

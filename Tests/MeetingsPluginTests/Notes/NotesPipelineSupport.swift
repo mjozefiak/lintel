@@ -22,7 +22,6 @@ enum NotesFake {
     static func isTopics(_ messages: [ChatMessage]) -> Bool {
         messages.first.map { NotesPrompt.isTopicsSystem($0.content) } ?? false
     }
-    static func isSummary(_ messages: [ChatMessage]) -> Bool { messages.first?.content == NotesPrompt.summarySystem }
 
     /// The `[mm:ss] Speaker: text` lines of the request.
     static func transcriptLines(_ messages: [ChatMessage]) -> [(time: String, text: String)] {
@@ -50,10 +49,11 @@ enum NotesFake {
         return lines.isEmpty ? "NONE" : lines.joined(separator: "\n")
     }
 
-    /// The v7 answer: the intro, one topic with every summary point (named with the first two words of its first
-    /// point, so the guard finds the name in the topic's own points) and the sections. `oldFormat` answers in the
-    /// format of prompt 6 (`SUMMARY:` and `FINDINGS:`), which the parser still reads.
-    static func reduceAnswer(_ messages: [ChatMessage], summary: String? = nil, oldFormat: Bool = false) -> String {
+    /// The v7 answer: one topic with every summary point (named with the first two words of its first point, so
+    /// the guard finds the name in the topic's own points) and the sections. `strayIntro` adds an `INTRO:` line, as
+    /// a model may write one although the prompt does not ask for it (the parser ignores it). `oldFormat` answers in
+    /// the format of prompt 6 (`SUMMARY:` and `FINDINGS:`), which the parser still reads.
+    static func reduceAnswer(_ messages: [ChatMessage], strayIntro: String? = nil, oldFormat: Bool = false) -> String {
         var decisions: [String] = []
         var tasks: [String] = []
         var questions: [String] = []
@@ -71,14 +71,12 @@ enum NotesFake {
             default: break
             }
         }
-        let paragraph =
-            summary ?? firstSummary.map { NotesText.firstSentence($0) } ?? "Spotkanie dotyczyło kilku spraw."
         func list(_ ids: [String]) -> String { ids.isEmpty ? "-" : ids.joined(separator: ", ") }
         if oldFormat {
             return
-                "SUMMARY: \(paragraph)\nDECISIONS: \(list(decisions))\nTASKS: \(list(tasks))\nFINDINGS: \(list(findings))\nQUESTIONS: \(list(questions))"
+                "SUMMARY: Spotkanie dotyczyło kilku spraw.\nDECISIONS: \(list(decisions))\nTASKS: \(list(tasks))\nFINDINGS: \(list(findings))\nQUESTIONS: \(list(questions))"
         }
-        var lines = ["INTRO: \(paragraph)"]
+        var lines = strayIntro.map { ["INTRO: \($0)"] } ?? []
         if let first = firstSummary, !findings.isEmpty {
             let name = first.split(separator: " ").prefix(2).joined(separator: " ")
                 .trimmingCharacters(in: .punctuationCharacters)
@@ -92,7 +90,7 @@ enum NotesFake {
         if isMap(messages) { return mapAnswer(messages) }
         if isReduce(messages) { return reduceAnswer(messages) }
         if isTopics(messages) { return "TOPIC: Spotkanie | t1" }
-        return "INTRO: Spotkanie dotyczyło zatwierdzania punktów harmonogramu."
+        return "NONE"
     }
 
     static var standard: ScriptedLLM.Handler {
