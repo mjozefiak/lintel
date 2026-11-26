@@ -96,6 +96,11 @@ private final class GalleryRecorder: LiveRecorder, @unchecked Sendable {
     environment.canCreateNotes = true
     environment.dictationShortcut = { scenario.dictationShortcut }
     if scenario.canRetry { environment.liveRecorder = { GalleryRecorder() } }
+    if scenario.sources == .slowText {
+        // The read never ends while the picture is taken: with the usual budget it would turn into "couldn't read
+        // this note" part-way through a recording, so the golden and the contact sheet could differ.
+        environment.contentBudget = .seconds(3600)
+    }
     if scenario.sources == .withManualNote {
         environment.overlayHeads = { id in id.key == GalleryManualNote.key ? [GalleryManualNote.head] : [] }
     }
