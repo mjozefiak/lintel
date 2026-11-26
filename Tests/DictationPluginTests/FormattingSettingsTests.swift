@@ -23,14 +23,14 @@ import Testing
 
     @Test func formattingIsOffByDefault() {
         let (model, settings) = model(transport: ScriptedTransport(.content("x")))
-        #expect(model.mode == .raw)
+        #expect(model.choice == .off)
         #expect(settings.mode == .raw)
         #expect(settings.llmTarget == nil)
     }
 
     @Test func switchingItOnTakesTheFirstServerAndModel() async {
         let (model, settings) = model(transport: listing())
-        model.mode = .cleanup
+        model.choice = .standard
         await model.refresh()
         #expect(model.endpoints.map(\.name) == ["Ollama", "LM Studio"])
         #expect(settings.mode == .cleanup)
@@ -40,7 +40,7 @@ import Testing
 
     @Test func choosingAnotherServerPicksItsModel() async throws {
         let (model, settings) = model(transport: listing())
-        model.mode = .cleanup
+        model.choice = .standard
         await model.refresh()
         model.chooseEndpoint(try #require(URL(string: "http://127.0.0.1:1234")))
         #expect(settings.llmTarget?.model == "lm")
@@ -223,7 +223,7 @@ import Testing
     @Test func choosingTheBuiltInSourceIsStoredAndNeedsTheDownload() async throws {
         let (model, settings, directory) = try make()
         defer { withExtendedLifetime(directory) {} }
-        model.mode = .cleanup
+        model.choice = .standard
         model.source = .builtIn
         await model.refreshBuiltIn()
         #expect(settings.llmSource == .builtIn)
