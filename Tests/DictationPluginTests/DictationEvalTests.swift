@@ -50,7 +50,10 @@ import Testing
 
     private static let environment = ProcessInfo.processInfo.environment
 
-    @Test(.enabled(if: environment["LINTEL_DICTATION_EVAL_INPUT"] != nil))
+    @Test(
+        .enabled(
+            if: environment["LINTEL_DICTATION_EVAL_INPUT"] != nil
+                && environment["LINTEL_DICTATION_EVAL_SOURCE"] != "provider"))
     func cleansRawTranscripts() async throws {
         let input = try #require(Self.environment["LINTEL_DICTATION_EVAL_INPUT"])
         let output = try #require(Self.environment["LINTEL_DICTATION_EVAL_OUT"])
@@ -92,13 +95,7 @@ import Testing
                     accepted: result.accepted))
         }
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        let data = try lines.map { try encoder.encode($0) }.reduce(into: Data()) {
-            $0.append($1)
-            $0.append(0x0A)
-        }
-        try data.write(to: URL(fileURLWithPath: output), options: .atomic)
+        try Self.write(lines, to: URL(fileURLWithPath: output))
         // Free the model before the process exits: ggml asserts at exit while a Metal residency set is alive.
         await runtime?.unload()
         print("[dictation-eval] \(lines.count) records, app \(app), fallbacks \(lines.map(\.fellBack).reduce(0, +))")
@@ -130,17 +127,7 @@ import Testing
             }
             let piece = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if result.outcome == .formatted, chunk.text != result.text {
-                let inWords = max(1, SpokenNumbers.wordCount(in: chunk.text))
-                let kind: String
-                switch Removals.kind(of: chunk.text) {
-                case .none: kind = "none"
-                case .minor: kind = "minor"
-                case .correction: kind = "correction"
-                }
-                accepted.append(
-                    ChunkStat(
-                        kind: kind, inWords: inWords,
-                        ratio: Double(SpokenNumbers.wordCount(in: piece)) / Double(inWords)))
+                accepted.append(stat(chunk: chunk.text, piece: piece))
             }
             guard !piece.isEmpty else { continue }
             if !text.isEmpty { text += paragraphBreak ? "\n\n" : " " }
@@ -150,7 +137,31 @@ import Testing
         return (text, chunks.count, otherFallbacks, rejections, accepted)
     }
 
-    private static func records(at url: URL) throws -> [(id: String, output: String)] {
+    /// What the speaker said in a chunk the model's answer was used for, and the output/input word ratio.
+    static func stat(chunk: String, piece: String) -> ChunkStat {
+        let inWords = max(1, SpokenNumbers.wordCount(in: chunk))
+        let kind: String
+        switch Removals.kind(of: chunk) {
+        case .none: kind = "none"
+        case .minor: kind = "minor"
+        case .correction: kind = "correction"
+        }
+        let outWords = SpokenNumbers.wordCount(in: piece.trimmingCharacters(in: .whitespacesAndNewlines))
+        return ChunkStat(kind: kind, inWords: inWords, ratio: Double(outWords) / Double(inWords))
+    }
+
+    /// One JSON object per line, keys sorted, written atomically.
+    static func write<Row: Encodable>(_ lines: [Row], to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let data = try lines.map { try encoder.encode($0) }.reduce(into: Data()) {
+            $0.append($1)
+            $0.append(0x0A)
+        }
+        try data.write(to: url, options: .atomic)
+    }
+
+    static func records(at url: URL) throws -> [(id: String, output: String)] {
         struct Row: Decodable {
             var id: String
             var output: String

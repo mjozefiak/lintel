@@ -47,10 +47,11 @@ import Testing
 
     @Test func onlyMeetingsPluginAndItsTestsDependOnIt() throws {
         let manifest = try String(contentsOf: Self.root.appending(path: "Package.swift"), encoding: .utf8)
-        // Its own declaration, its test target, `MeetingsPlugin` (the notes provider, A5b), and the two test targets
-        // that build a plugin with a fake runner (`MeetingsPluginTests`, `LintelAppTests`).
+        // Its own declaration, its test target, `MeetingsPlugin` (the notes provider, A5b), the two test targets
+        // that build a plugin with a fake runner (`MeetingsPluginTests`, `LintelAppTests`) and `DictationPluginTests`
+        // (the provider measurement of the dictation cleanup levels, Phase 4; the plugin itself stays without it).
         let mentions = manifest.components(separatedBy: "\"LintelProviders\"").count - 1
-        #expect(mentions == 5)
+        #expect(mentions == 6)
         let plugin = try targetText("MeetingsPlugin")
         #expect(plugin.contains("\"LintelProviders\""))
         for name in [

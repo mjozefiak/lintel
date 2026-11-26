@@ -2,8 +2,14 @@
 # Cleans raw dictation transcripts offline with the app's cleanup path and a real GGUF model, and writes a
 # JSONL the benchmark scorer reads (see README.md).
 # Usage: run.sh --input <raw.jsonl> --out <result.jsonl> [--level light|standard|full] [--model <model.gguf>]
-#        [--app <label>]
+#        [--source local|provider] [--audio <folder>] [--app <label>]
 # --level standard (default) and full need --model; light runs LightCleaner alone, no model.
+# --source provider (spec 2026-11-25, Phase 4) sends every chunk to the external provider through ProviderRunner with
+# the real Claude Code CLI, replays the session's chunk times and records the latency from the key release. Off unless
+# LINTEL_DICTATION_EVAL_PROVIDER=claude-code and LINTEL_DICTATION_EVAL_PROVIDER_MODEL are set; Standard and Full only,
+# no --model. The text leaves the Mac: give it public text only (FLEURS), never the owner's corpus without consent.
+# --audio: a folder with <id>.wav (or .flac, .m4a) for each item, so the replay knows the length of the dictation;
+# without it the length is estimated at 150 words a minute.
 # Exit codes: 0 ok, 2 usage/input error, 4 test failure, 5 build failure.
 # Builds DictationPluginTests in release (`swift test -c release` fails to link other plugin tests) and runs
 # ONLY DictationEvalTests through the Swift Testing helper, so no other suite shares the process.
@@ -11,7 +17,7 @@ set -euo pipefail
 
 die() { printf 'run.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
 
-input="" out="" model="" app="" level="standard"
+input="" out="" model="" app="" level="standard" source="local" audio=""
 while [[ $# -gt 0 ]]; do
   [[ $# -ge 2 ]] || die "missing value for $1"
   case "$1" in
@@ -20,24 +26,43 @@ while [[ $# -gt 0 ]]; do
     --model) model="$2" ;;
     --app) app="$2" ;;
     --level) level="$2" ;;
+    --source) source="$2" ;;
+    --audio) audio="$2" ;;
     *) die "unknown argument: $1" ;;
   esac
   shift 2
 done
-case "$level" in
-  light) ;;
-  standard) [[ -n "$model" ]] || die "--level standard needs --model" ;;
-  full) [[ -n "$model" ]] || die "--level full needs --model" ;;
-  *) die "--level must be light, standard or full" ;;
+case "$source" in
+  local)
+    case "$level" in
+      light) ;;
+      standard) [[ -n "$model" ]] || die "--level standard needs --model" ;;
+      full) [[ -n "$model" ]] || die "--level full needs --model" ;;
+      *) die "--level must be light, standard or full" ;;
+    esac
+    test_filter='EvalTests/cleansRawTranscripts'
+    ;;
+  provider)
+    [[ "${LINTEL_DICTATION_EVAL_PROVIDER:-}" == "claude-code" ]] ||
+      die "--source provider needs LINTEL_DICTATION_EVAL_PROVIDER=claude-code (the text is sent to Anthropic)"
+    [[ -n "${LINTEL_DICTATION_EVAL_PROVIDER_MODEL:-}" ]] ||
+      die "--source provider needs LINTEL_DICTATION_EVAL_PROVIDER_MODEL (sonnet, opus, ...)"
+    [[ "$level" == "standard" || "$level" == "full" ]] || die "--source provider measures --level standard or full"
+    [[ -z "$model" ]] || die "--source provider takes no --model"
+    test_filter='ProviderEvalRun/cleansWithProvider'
+    ;;
+  *) die "--source must be local or provider" ;;
 esac
 [[ -n "$input" && -n "$out" ]] || die "required: --input --out"
 [[ -f "$input" ]] || die "input not found: $input"
 [[ -z "$model" || -f "$model" ]] || die "model not found: $model"
+[[ -z "$audio" || -d "$audio" ]] || die "audio folder not found: $audio"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
 input="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
 [[ -z "$model" ]] || model="$(cd "$(dirname "$model")" && pwd)/$(basename "$model")"
+[[ -z "$audio" ]] || audio="$(cd "$audio" && pwd)"
 mkdir -p "$(dirname "$out")"
 out="$(cd "$(dirname "$out")" && pwd)/$(basename "$out")"
 
@@ -64,12 +89,14 @@ rc=0
 env LINTEL_DICTATION_EVAL_INPUT="$input" \
   LINTEL_DICTATION_EVAL_OUT="$out" \
   LINTEL_DICTATION_EVAL_LEVEL="$level" \
+  LINTEL_DICTATION_EVAL_SOURCE="$source" \
+  ${audio:+LINTEL_DICTATION_EVAL_AUDIO_DIR="$audio"} \
   ${model:+LINTEL_DICTATION_EVAL_MODEL="$model"} \
   ${app:+LINTEL_DICTATION_EVAL_APP="$app"} \
   DYLD_FRAMEWORK_PATH="$platform/Library/Frameworks" \
   DYLD_LIBRARY_PATH="$platform/usr/lib" \
   "$stage/eval-runner" --test-bundle-path "$stage/eval.xctest/Contents/MacOS/DictationPluginTests" \
-  --testing-library swift-testing --filter 'EvalTests/cleansRawTranscripts' >"$log" 2>&1 || rc=$?
+  --testing-library swift-testing --filter "$test_filter" >"$log" 2>&1 || rc=$?
 
 grep -E 'dictation-eval|✘|Test run with' "$log" | cut -c1-200 >&2 || true
 if [[ $rc -ne 0 ]]; then
