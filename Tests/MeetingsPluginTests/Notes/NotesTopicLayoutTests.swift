@@ -361,6 +361,42 @@ import Testing
         #expect(log.balance.rendered == 8 && log.balance.unexplained == 0)
     }
 
+    /// Every one-point topic joins "Other", which shows six: the points it cannot take are counted as cut by the
+    /// limit in the trace, so nothing disappears from the counts (issue #304).
+    @Test func thePointsAFullOtherCannotTakeAreCountedAsCutByLimit() async throws {
+        let log = NotesTraceLog()
+        let rig = NotesRig { _, messages, _ in
+            if NotesFake.isMap(messages) { return .done(Self.mapAll(messages)) }
+            if NotesFake.isReduce(messages) {
+                return .done(
+                    """
+                    TOPIC: Kampania | p1
+                    TOPIC: Klienci | p2
+                    TOPIC: Konkurencja | p3
+                    TOPIC: Zespół | p4
+                    TOPIC: Serwer | p5
+                    TOPIC: Magazyn | p6
+                    TOPIC: Dostawca | p7
+                    TOPIC: Dział | p8
+                    TOPIC: Raport | p9, p10
+                    TOPIC: Faktury | p11, p12
+                    DECISIONS: -
+                    TASKS: -
+                    QUESTIONS: -
+                    """)
+            }
+            return .done(NotesFake.answer(messages))
+        }
+        let pipeline = NotesPipeline(
+            model: rig.model, configuration: .init(), trace: { log.add($0) }, verifier: nil)
+        let result = try await pipeline.run(utterances: Self.utterances(), durationMs: 60 * 60_000)
+        #expect(log.reduce?.layout?.topics == 3)
+        #expect(log.reduce?.layout?.cutByLimit == 2)
+        #expect(result.keyPoints.count == 10)
+        #expect(result.cutFromOtherCount == 2)
+        #expect(log.balance.isBalanced)
+    }
+
     @Test func topicsOfSeveralBatchesAreMergedByNameAndTheTraceRecordsTheRequest() async throws {
         let log = NotesTraceLog()
         let rig = NotesRig { _, messages, _ in

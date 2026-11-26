@@ -43,6 +43,9 @@ struct NotesResult: Equatable, Sendable {
     var markdown: String?
     /// Points whose quote is not in the recording, left out (`notes_dropped_count`).
     var droppedCount: Int
+    /// Points the closing "Other" topic had no room for (`NotesLayout.maxPointsPerTopic`): they were verified, but
+    /// the one-point topics joined "Other" beyond its bound and are not shown (never counted as dropped).
+    var cutFromOtherCount = 0
     /// Chunks (or halves of chunks) the model could not process.
     var failedChunks: [String]
     var chunkCount: Int
@@ -188,13 +191,13 @@ struct NotesPipeline: Sendable {
 
         func result(
             status: NotesResult.Status, markdown: String?, dropped: Int = 0, points: Int = 0,
-            reduceFailed: Bool = false, rejected: Int = 0,
+            reduceFailed: Bool = false, rejected: Int = 0, cutFromOther: Int = 0,
             downgraded: Int = 0, backfilled: Int = 0, kept: [NotesPoint] = [], keyPoints: [NotesPoint] = []
         ) -> NotesResult {
             NotesResult(
-                status: status, markdown: markdown, droppedCount: dropped, failedChunks: failed,
-                chunkCount: chunks.count, verifiedPointCount: points, reduceFailed: reduceFailed,
-                rejectedIDs: rejected, language: verifier.language,
+                status: status, markdown: markdown, droppedCount: dropped, cutFromOtherCount: cutFromOther,
+                failedChunks: failed, chunkCount: chunks.count, verifiedPointCount: points,
+                reduceFailed: reduceFailed, rejectedIDs: rejected, language: verifier.language,
                 promptVersion: String(NotesPrompt.version), downgradedCount: downgraded,
                 backfilledCount: backfilled, points: kept, keyPoints: keyPoints)
         }
@@ -242,7 +245,8 @@ struct NotesPipeline: Sendable {
         let final = audited.verdict
         // The layout decides what is shown (the short-meeting list, one-point topics joined into "Other"); the
         // Markdown, the trace and the result all read the same arrangement.
-        let shown = NotesComposer.shownKeyPoints(of: final, labels: labels, durationMs: durationMs)
+        let arrangement = NotesComposer.arrangement(of: final, labels: labels, durationMs: durationMs)
+        let shown = arrangement.topics
         recorder?.reduced(
             points: points, proposed: proposed, verdict: final, audit: audited.audit, shownKeyPoints: shown,
             reduceFailed: reduced.failed)
@@ -250,8 +254,8 @@ struct NotesPipeline: Sendable {
             verdict: final, participants: participants, labels: labels, durationMs: durationMs)
         return result(
             status: reduced.failed ? .partial : flowStatus, markdown: markdown, dropped: verdict.dropped,
-            points: points.count, reduceFailed: reduced.failed,
-            rejected: final.rejectedIDs, downgraded: verdict.downgraded,
+            points: points.count, reduceFailed: reduced.failed, rejected: final.rejectedIDs,
+            cutFromOther: arrangement.cutFromOther, downgraded: verdict.downgraded,
             backfilled: final.backfilled, kept: final.decisions + final.tasks + final.questions,
             keyPoints: shown.flatMap(\.points))
     }
