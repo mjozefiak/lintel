@@ -882,7 +882,9 @@ actor MeetingSession {
     ) async -> SegmentOutcome {
         guard let handle = await load?.value else { return .deferred }
         do {
-            switch try await handle.transcribe(samples, options: language.options()) {
+            switch try await handle.transcribe(
+                samples, options: language.options(duration: Self.seconds(samples.count)))
+            {
             case .transcript(let segment): return .text(segment.text)
             case .spool: return .spool
             }
@@ -940,6 +942,9 @@ actor MeetingSession {
     }
 
     private static func milliseconds(_ sample: Int) -> Int { sample * 1_000 / AudioFormat.sampleRate }
+
+    /// A sample count as seconds (the length a request's options look at).
+    private static func seconds(_ samples: Int) -> TimeInterval { Double(samples) / Double(AudioFormat.sampleRate) }
 
     /// Until when a track's text is final: the start of its earliest unfinished speech or deferred segment, the
     /// end of what it received while it lives, and for ever once it is dead and finished.
@@ -1222,7 +1227,9 @@ actor MeetingSession {
         continuation.yield(.replaying(remaining: deferredCount))
         let outcome: SegmentOutcome
         do {
-            switch try await handle.transcribe(samples, options: language.options()) {
+            switch try await handle.transcribe(
+                samples, options: language.options(duration: Self.seconds(samples.count)))
+            {
             case .transcript(let segment): outcome = .text(segment.text)
             case .spool: outcome = .failed
             }

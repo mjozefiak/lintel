@@ -77,10 +77,12 @@ private let automatic = SpeechLanguageSelection(mode: .automatic, languages: ["p
         #expect(MeetingLanguage.options(for: automatic, profile: mixed).scriptHint == nil)
     }
 
-    /// Automatic Whisper detection comes with step 2.5: until then Whisper is pinned to the first listed language.
-    @Test func automaticPinsWhisperToTheFirstListedLanguage() {
+    /// Step 2.5: a short segment (and any segment while detection is not asked for) is pinned to the profile's
+    /// dominant language, else the first listed one, else English.
+    @Test func automaticPinsAShortSegmentToTheDominantOrTheFirstListedLanguage() {
         let list = SpeechLanguageSelection(mode: .automatic, languages: ["uk", "pl"], isDerived: false)
-        #expect(MeetingLanguage.options(for: list, profile: profile(["pl": 60])).whisperLanguage == .pinned("uk"))
+        #expect(MeetingLanguage.options(for: list, profile: profile(["pl": 60])).whisperLanguage == .pinned("pl"))
+        #expect(MeetingLanguage.options(for: list, profile: LanguageProfile()).whisperLanguage == .pinned("uk"))
         let empty = SpeechLanguageSelection(mode: .automatic, languages: [], isDerived: true)
         #expect(MeetingLanguage.options(for: empty, profile: LanguageProfile()).whisperLanguage == .pinned("en"))
     }
@@ -133,8 +135,8 @@ private let automatic = SpeechLanguageSelection(mode: .automatic, languages: ["p
             settings: ["plugins.meetings.speechLanguage": .string("en")],
             speechLanguages: FixedSpeechLanguageSettings(.automatic, ["pl"]))
         let runtime = MeetingsRuntime(context: harness.context, settings: harness.meetingsSettings)
-        #expect(runtime.makeLanguage().options().whisperLanguage == .pinned("pl"))
-        #expect(runtime.makeLanguage().options().scriptHint == nil)
+        #expect(runtime.makeLanguage().options(duration: 1).whisperLanguage == .pinned("pl"))
+        #expect(runtime.makeLanguage().options(duration: 1).scriptHint == nil)
     }
 }
 
@@ -177,7 +179,13 @@ private let automatic = SpeechLanguageSelection(mode: .automatic, languages: ["p
             [11, 12, 13, 14, 15], identified: [11: "pl", 12: "pl", 13: "en", 14: "pl", 15: "pl"],
             settings: ChangingSpeechLanguages(["pl", "en"]))
         #expect(sent.map(\.scriptHint) == [nil, nil, nil, .latin, .latin])
-        #expect(sent.allSatisfy { $0.whisperLanguage == .pinned("pl") })
+        // Step 2.5: long segments are detected among the list until the profile settles, then pinned to its
+        // dominant language.
+        #expect(
+            sent.map(\.whisperLanguage) == [
+                .detect(candidates: ["pl", "en"], fallback: "pl"), .detect(candidates: ["pl", "en"], fallback: "pl"),
+                .detect(candidates: ["pl", "en"], fallback: "pl"), .pinned("pl"), .pinned("pl"),
+            ])
     }
 
     @Test func aCyrillicMeetingGetsTheCyrillicHint() async throws {

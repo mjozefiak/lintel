@@ -390,7 +390,8 @@ struct MeetingResumer: MeetingResuming {
             }
             let text: String
             do {
-                switch try await handle.transcribe(Array(window[from..<to]), options: language.options()) {
+                let options = language.options(duration: Double(to - from) / Double(AudioFormat.sampleRate))
+                switch try await handle.transcribe(Array(window[from..<to]), options: options) {
                 case .transcript(let segment): text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 case .spool:
                     state.lost += 1
