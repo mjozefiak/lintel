@@ -12,6 +12,7 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ### Changed
 
+- Notes: the Notes section now has a sidebar with All notes, Meetings and Dictations (with counts), a list grouped by day with a ring and one line of facts per note, and a preview of the selected note with the tabs Notes, My notes and Transcript. A search stays in the list you are in, and "Search All Notes" widens it. Empty lists say what to do next. The window has a Settings row at the bottom of the sidebar.
 - Meeting notes now follow a topic layout: topics, decisions made and next steps. Notes written by a provider (Claude) start with a short intro; notes written by the model on this Mac, since notes prompt 7, have no intro, so the model never adds a sentence of its own about the meeting. They also show more of the points it checked (up to six per topic instead of ten in all). Notes written earlier stay as they are.
 - On a new install, Dictation and Meetings are on, and app search, file search and clipboard history are add-ons that you turn on in Settings → Features. If you used Lintel before this version, every switch stays as it was.
 - The welcome screen starts with dictation and meeting notes. It asks for the launcher shortcut only when app search, file search or window management is on; the shortcut stays in Settings → General and works only while one of them is on.
