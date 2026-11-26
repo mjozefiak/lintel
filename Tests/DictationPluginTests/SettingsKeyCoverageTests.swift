@@ -67,7 +67,7 @@ import Testing
                 "cleanupLevel": "$formatting.choice",
                 "llmEndpoint": "formatting.chooseEndpoint(",
                 "llmModel": "formatting.chooseModel(",
-                "llmSource": "$formatting.source",
+                "llmSource": "formatting.source = .server",
                 "builtInLLMModel": "formatting.chooseBuiltInModel(",
                 "provider": "formatting.source = .provider",
                 "providerModel": "formatting.chooseProviderModel(",
