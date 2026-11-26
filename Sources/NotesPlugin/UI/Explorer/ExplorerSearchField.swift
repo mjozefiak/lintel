@@ -47,6 +47,8 @@ struct ExplorerSearchField: View {
         }
         .font(textSize.font(.callout))
         .foregroundStyle(LintelBrand.secondaryText)
+        // The text field's own height varies by a point between renders; a floor keeps the row, and every golden, steady.
+        .frame(minHeight: 18 * textSize.scale)
         .padding(.horizontal, 10 * textSize.scale)
         .padding(.vertical, 6 * textSize.scale)
         .background(LintelBrand.fill, in: RoundedRectangle(cornerRadius: 7))
