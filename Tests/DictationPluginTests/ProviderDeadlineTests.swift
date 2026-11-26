@@ -197,4 +197,42 @@ import Testing
         #expect(output.formatting.firstReason == .rejected(.newNumber))
         #expect(output.formatting.notableReason == .tooSlow)
     }
+
+    @Test func aTooSlowChunkWinsOverAnEarlierProviderFailure() async throws {
+        // Chunk 1 fails because the network is down, chunk 2 is too slow: the user is told "too slow".
+        let process = FakeProviderProcess { call, _ in
+            if call == 1 { return FakeProviderProcess.output(answer: "fetch failed: ENOTFOUND", isError: true) }
+            try await Task.sleep(for: .seconds(60))
+            return FakeProviderProcess.output(answer: "never")
+        }
+        let formatter = ProviderFormatter(
+            runner: FakeProviderProcess.runner(process), selection: Self.selection, level: .standard,
+            currentSelection: { Self.selection })
+        let clock = TestClock()
+        let second = Self.second
+        let session = DictationSession(
+            audio: ScriptedAudioInput(seconds: 8),
+            vad: RangeVAD([second..<(2 * second), (5 * second)..<(6 * second)]), engine: TwoChunkEngine(),
+            formatter: formatter, releaseDeadline: .seconds(4), clock: clock, modelFolder: URL(filePath: "/tmp/none"))
+        try await session.start()
+        try await waitUntilTheFirstChunkIsOut(process)
+        let finishing = Task { try await session.finish() }
+        for _ in 0..<1000 where process.contentRuns < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        await clock.waitForSleepers(1)
+        clock.advance(by: .seconds(4))
+        let output = try await finishing.value
+        #expect(output.formatting.firstReason == .provider(.network))
+        #expect(output.formatting.notableReason == .tooSlow)
+    }
+
+    @Test func aProviderFailureAloneIsTheNotableReason() async throws {
+        let rig = rig(deadline: nil) { _, _ in
+            FakeProviderProcess.output(answer: "Not logged in. Please run /login.", isError: true)
+        }
+        try await rig.session.start()
+        try await waitUntilTheFirstChunkIsOut(rig.process)
+        let output = try await rig.session.finish()
+        // Chunk 1 was answered with a tidy text; chunk 2 is the signed-out failure.
+        #expect(output.formatting.notableReason == .provider(.notSignedIn))
+    }
 }
