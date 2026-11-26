@@ -132,6 +132,27 @@ import Testing
         await source.stop()
     }
 
+    /// The loop below ends only when the stream finishes; without that the time limit fails the test.
+    @Test(.timeLimit(.minutes(1))) func stopEndsTheStream() async throws {
+        let source = QAAudioSource(file: nil, chunkSamples: 400, silenceChunkDelay: .milliseconds(10))
+        let stream = try await source.start { _ in }
+        var iterator = stream.makeAsyncIterator()
+        let first = await iterator.next()
+        #expect(first != nil)
+        await source.stop()
+        // Chunks already buffered may still arrive; after them the stream finishes instead of running forever.
+        while await iterator.next() != nil {}
+    }
+
+    /// An empty path (what `AppEnvironment.qaAudioSettings` writes without a flag) is silence, not a file named "".
+    @Test func anEmptyPathIsNoFile() throws {
+        let harness = try MeetingsHarness(settings: [
+            "plugins.meetings.qaAudio": .bool(true), "plugins.meetings.qaMicWAV": .string(""),
+            "plugins.meetings.qaSystemWAV": .string(""), "plugins.meetings.qaSpoolDir": .string(""),
+        ])
+        #expect(harness.meetingsSettings.qaAudio == QAAudioSettings())
+    }
+
     @Test func anUnreadableFileMakesTheStartFailInsteadOfRecordingSilence() async throws {
         let source = QAAudioSource(file: URL(filePath: "/nonexistent/qa-mic.wav"))
         await #expect(throws: (any Error).self) { _ = try await source.start { _ in } }

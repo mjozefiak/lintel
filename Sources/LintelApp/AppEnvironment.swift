@@ -288,9 +288,16 @@ struct AppEnvironment {
         var result = settings
         result[QAOptions.meetingsAudioKey] = .bool(true)
         result[QAOptions.dictationAudioKey] = .bool(true)
-        if let url = options.meetingMicWAV { result[QAOptions.meetingsMicWAVKey] = .string(url.path) }
-        if let url = options.meetingSystemWAV { result[QAOptions.meetingsSystemWAVKey] = .string(url.path) }
-        if let url = options.meetingSpoolDirectory { result[QAOptions.meetingsSpoolDirectoryKey] = .string(url.path) }
+        // Always written (the flag, else this run's `--qa-setting`, else empty): with `--qa-persistent-settings` a
+        // path of an earlier run would otherwise stay in the settings file and play again.
+        let paths: [(String, URL?)] = [
+            (QAOptions.meetingsMicWAVKey, options.meetingMicWAV),
+            (QAOptions.meetingsSystemWAVKey, options.meetingSystemWAV),
+            (QAOptions.meetingsSpoolDirectoryKey, options.meetingSpoolDirectory),
+        ]
+        for (key, url) in paths {
+            result[key] = url.map { .string($0.path) } ?? settings[key] ?? .string("")
+        }
         return result
     }
 

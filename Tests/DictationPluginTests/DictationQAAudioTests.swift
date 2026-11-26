@@ -43,5 +43,22 @@ import Testing
         #expect(real.status() == .denied)
         #expect(await real.requestAccess() == false)
     }
+
+    /// The Settings pane and the banner of a `--qa` run read the permission as granted too (no "Allow" button that
+    /// would show the system prompt); other runs keep the real answer.
+    @MainActor
+    @Test func theSettingsPaneOfAQARunSeesTheMicrophoneAsGranted() async throws {
+        let qaHarness = try DictationHarness(settings: ["plugins.dictation.qaAudio": .bool(true)])
+        defer { qaHarness.tearDown() }
+        let qa = DictationPlugin(context: qaHarness.context, makeBuiltInLLM: nil, authorizer: Denied())
+        await qa.settingsModel.refreshStatus()
+        #expect(qa.settingsModel.microphone == .granted)
+
+        let harness = try DictationHarness()
+        defer { harness.tearDown() }
+        let plain = DictationPlugin(context: harness.context, makeBuiltInLLM: nil, authorizer: Denied())
+        await plain.settingsModel.refreshStatus()
+        #expect(plain.settingsModel.microphone == .denied)
+    }
 }
 #endif

@@ -346,10 +346,13 @@ struct MeetingsSettings: Sendable {
     var qaAudio: QAAudioSettings? {
         #if DEBUG
         guard settings.bool(Key.qaAudio, default: false) else { return nil }
+        // An empty path means no file: `AppEnvironment.qaAudioSettings` writes one so an earlier run's path is not
+        // kept.
+        func path(_ key: String) -> String? { settings.string(key).flatMap { $0.isEmpty ? nil : $0 } }
         return QAAudioSettings(
-            micWAV: settings.string(Key.qaMicWAV).map { URL(filePath: $0) },
-            systemWAV: settings.string(Key.qaSystemWAV).map { URL(filePath: $0) },
-            spoolDirectory: settings.string(Key.qaSpoolDirectory).map { URL(filePath: $0, directoryHint: .isDirectory) }
+            micWAV: path(Key.qaMicWAV).map { URL(filePath: $0) },
+            systemWAV: path(Key.qaSystemWAV).map { URL(filePath: $0) },
+            spoolDirectory: path(Key.qaSpoolDirectory).map { URL(filePath: $0, directoryHint: .isDirectory) }
         )
         #else
         nil

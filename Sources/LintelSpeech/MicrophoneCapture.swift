@@ -177,6 +177,10 @@ public final class MicrophoneCapture: InputFallbackReporting, @unchecked Sendabl
     }
 
     public func start(onLevel: @escaping @Sendable (Float) -> Void) async throws -> AsyncStream<[Float]> {
+        #if DEBUG
+        // Before the engine exists: a QA run never builds the input node or selects a device (`RealAudioGuard`).
+        try RealAudioGuard.check("microphone")
+        #endif
         let (stream, continuation) = AsyncStream<[Float]>.makeStream(bufferingPolicy: .unbounded)
         let engine = makeEngine()
         let used = try attach(engine, continuation: continuation, onLevel: onLevel)

@@ -22,7 +22,10 @@ import Testing
         let plain = AppEnvironment.qaAudioSettings([:], options: try #require(try QAOptions.parse(["--qa"])))
         #expect(plain[QAOptions.meetingsAudioKey] == .bool(true))
         #expect(plain[QAOptions.dictationAudioKey] == .bool(true))
-        #expect(plain[QAOptions.meetingsMicWAVKey] == nil)
+        // Empty, not missing: with `--qa-persistent-settings` the file of an earlier run must not play again.
+        #expect(plain[QAOptions.meetingsMicWAVKey] == .string(""))
+        #expect(plain[QAOptions.meetingsSystemWAVKey] == .string(""))
+        #expect(plain[QAOptions.meetingsSpoolDirectoryKey] == .string(""))
         // A `--qa-setting` cannot turn the switch off.
         let forced = AppEnvironment.qaAudioSettings(
             [QAOptions.meetingsAudioKey: .bool(false), QAOptions.dictationAudioKey: .bool(false)],
