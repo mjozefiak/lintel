@@ -381,6 +381,19 @@ private func results(_ query: String, sections: [[String]], source: FixedSource)
         #expect(rig.registrar.registrationProbes == [controlOptionD])
     }
 
+    /// The launcher's shortcut is stored but not registered while no search plugin is on, so the probe would say
+    /// yes; a default on it must still fall back.
+    @Test func aDefaultOnTheStoredLauncherShortcutFallsBack() {
+        let rig = makeRig()
+        rig.registrar.setShortcut(.optionSpace, for: .main)
+        rig.service.syncCommands([dictation()]) { _ in }
+        #expect(rig.registrar.shortcuts[name] == controlOptionD)
+        #expect(
+            rig.service.commandDefaultOutcomes["dictation.record"]
+                == .fellBack(to: controlOptionD, requested: .optionSpace, because: .registrarRefused))
+        #expect(rig.registrar.registrationProbes == [controlOptionD])
+    }
+
     @Test func nothingIsRegisteredWhenTheFallbackIsTakenToo() {
         let rig = makeRig()
         rig.service.syncCommands([dictation()], occupied: [.optionSpace, controlOptionD]) { _ in }

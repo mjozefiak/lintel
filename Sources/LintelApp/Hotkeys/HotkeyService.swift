@@ -18,10 +18,11 @@ protocol HotkeyRegistrar: AnyObject {
     /// (or another app) refuses.
     func claimEscape(_ action: @escaping @MainActor () -> Void) -> EscapeKeyClaim
 
-    /// Whether the system would accept `shortcut` right now. A registration is attempted and given back at once,
-    /// so nothing is left registered. Carbon reports no error for a combination another app holds without
-    /// `kEventHotKeyExclusive` (both apps then get the key), so this refuses only what would fail for Lintel: a
-    /// combination one of Lintel's own commands holds, or a refusal by the system.
+    /// Whether `shortcut` would reach Lintel right now. An exclusive registration is attempted and given back at
+    /// once, so nothing is left registered. It refuses a combination one of Lintel's own commands holds, one another
+    /// app holds with `kEventHotKeyExclusive` (Lintel would get no key), and a refusal by the system. Carbon reports
+    /// no error for a combination another app holds without that option (both apps then get the key), so that
+    /// conflict is not refused.
     func canRegister(_ shortcut: HotkeyShortcut) -> Bool
 }
 
@@ -68,8 +69,8 @@ final class HotkeyService {
     /// Whether Spotlight (or another symbolic hotkey) holds Command-Space right now.
     private(set) var spotlightHoldsCommandSpace = false
     /// What the shell did the one time it applied each command's default shortcut, keyed by command id. A value for
-    /// the Try dictation step (a fallback line such as "⌥ Space is used by another app, so Lintel uses ⌃⌥D"); no
-    /// view reads it yet.
+    /// the Try dictation step (a fallback line that names the reason, `CommandDefaultOutcome.Refusal`); no view
+    /// reads it yet.
     private(set) var commandDefaultOutcomes: [String: CommandDefaultOutcome] = [:]
     /// Command ids whose shortcut the user reported as doing nothing ("It didn't work"). macOS does not report a key
     /// another app holds without the exclusive option, so a report is the only sign of that conflict. Kept in memory
@@ -206,9 +207,12 @@ final class HotkeyService {
         commandID: String,
         occupied: Set<HotkeyShortcut>
     ) {
+        // The launcher's shortcut is registered only while a search plugin is on, so a probe does not see it while it
+        // is off; a default on it would collide (one of the two silently dead) once the launcher comes back.
+        let launcher = registrar.shortcut(for: .main)
         let outcome = CommandDefaultPolicy.decide(
             default: shortcut, fallback: fallback, occupied: occupied,
-            canRegister: { [registrar] in registrar.canRegister($0) })
+            canRegister: { [registrar] in $0 != launcher && registrar.canRegister($0) })
         if let chosen = outcome.shortcut {
             registrar.setShortcut(chosen, for: name)
         }

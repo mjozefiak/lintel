@@ -133,7 +133,8 @@ nonisolated enum CommandDefaultOutcome: Equatable, Sendable {
     enum Refusal: String, Equatable, Sendable {
         /// A symbolic hot key (a system shortcut such as Spotlight's) holds the combination.
         case systemHoldsIt
-        /// The system refused the registration: another of Lintel's commands holds it, or Carbon returned an error.
+        /// The registration was refused: another of Lintel's shortcuts holds it (registered, or stored for the
+        /// launcher while it is off), another app holds it exclusively, or Carbon returned an error.
         case registrarRefused
     }
 
@@ -152,8 +153,8 @@ nonisolated enum CommandDefaultOutcome: Equatable, Sendable {
         }
     }
 
-    /// Whether the user is running on something other than the command's own default, for a line such as
-    /// "⌥ Space is used by another app, so Lintel uses ⌃⌥D".
+    /// Why the user is running on something other than the command's own default, for the line that says so
+    /// ("⌥ Space is taken, so Lintel uses ⌃⌥D", with the reason).
     var fallbackReason: Refusal? {
         switch self {
         case .applied: nil

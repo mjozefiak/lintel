@@ -115,15 +115,18 @@ final class PreviewHotkeyRegistrar: HotkeyRegistrar {
 }
 #endif
 
-/// Whether the system would accept a hot key: the call KeyboardShortcuts makes, attempted and given back at once.
+/// Whether a hot key would reach Lintel: a registration with `kEventHotKeyExclusive`, given back at once.
 ///
-/// The spike of onboarding step 4.2 measured what Carbon reports: a combination another app holds **without**
-/// `kEventHotKeyExclusive` registers with `noErr`, and both apps then receive the key, so that conflict cannot be
-/// detected (the Try dictation step handles it with "It didn't work"); one another app holds **exclusively** also
-/// registers with `noErr` here, and the key then reaches only that app; and a combination this process already
-/// holds answers `eventHotKeyExistsErr`, which is what a second of Lintel's own commands on one key looks like.
+/// The spike of onboarding step 4.2 measured what Carbon reports (and the review re-measured it): a combination
+/// another app holds **without** `kEventHotKeyExclusive` registers with `noErr` either way, and both apps then
+/// receive the key, so that conflict cannot be detected (the Try dictation step handles it with "It didn't work").
+/// One another app holds **exclusively** registers with `noErr` for a plain registration, which then receives
+/// nothing, but answers `eventHotKeyExistsErr` to an exclusive one; and a combination this process already holds
+/// answers `eventHotKeyExistsErr` to both, which is what a second of Lintel's own commands on one key looks like.
+/// So the probe registers exclusively, and KeyboardShortcuts then registers the chosen key plain as always.
 nonisolated enum CarbonHotkeyProbe {
-    /// "LINT", so a probe that leaked a registration would still be recognisable in a log.
+    /// "LINT", so a probe that leaked a registration would still be recognisable in a log. KeyboardShortcuts
+    /// ignores a hot key event with another signature, so a press in the instant of a probe runs nothing.
     private static let signature = OSType(0x4C49_4E54)
 
     static func canRegister(_ shortcut: HotkeyShortcut) -> Bool {
@@ -131,7 +134,7 @@ nonisolated enum CarbonHotkeyProbe {
         let status = RegisterEventHotKey(
             UInt32(shortcut.carbonKeyCode), UInt32(shortcut.carbonModifiers),
             EventHotKeyID(signature: signature, id: 0),
-            GetEventDispatcherTarget(), 0, &reference)
+            GetEventDispatcherTarget(), OptionBits(kEventHotKeyExclusive), &reference)
         if let reference { UnregisterEventHotKey(reference) }
         return status == noErr
     }
