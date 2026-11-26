@@ -27378,6 +27378,78 @@
           }
         }
       }
+    },
+    "Dictating" : {
+      "comment" : "Spoken name of the turning ring while the user dictates",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictating"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie trwa"
+          }
+        }
+      }
+    },
+    "Recording, needs attention" : {
+      "comment" : "Spoken name of the turning ring with the amber dot",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording, needs attention"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nagrywanie, wymaga uwagi"
+          }
+        }
+      }
+    },
+    "Working, %lld percent" : {
+      "comment" : "Spoken name of the closing ring with a progress, e.g. 60 percent",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Working, %lld percent"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "W toku, %lld procent"
+          }
+        }
+      }
+    },
+    "Something went wrong" : {
+      "comment" : "Spoken name of the open ring in the error colour",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Something went wrong"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coś poszło nie tak"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
