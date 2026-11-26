@@ -111,6 +111,31 @@ enum NotesTraceEvent: Equatable, Sendable, Codable {
     /// The fate of one verified point, in time order.
     case point(NotesTracePoint)
     case finished(status: NotesResult.Status, verified: Int, rendered: Int, notRendered: Int)
+    /// The speaker names of the meeting, resolved before the notes' transcript is built (speaker names spec, step
+    /// 1.4b). Sent by `NotesService`, not by the pipeline.
+    case speakerNames(NotesTraceSpeakerNames)
+}
+
+/// What the speaker names step did before the notes, as counts (spec `2026-11-25-meeting-speaker-names`, Data Model:
+/// `NotesTrace` holds only counters). Never a name, a quote, a label or the model's answer.
+struct NotesTraceSpeakerNames: Equatable, Sendable, Codable {
+    var passStatus: SpeakerNamePass.Outcome.Status
+    /// The pass's request time, the open of the writer included (step 1.5 measures it).
+    var elapsedMs: Int
+    var excerpts: Int
+    var droppedExcerpts: Int
+    /// Name entries in the model's answer before the guard.
+    var answers: Int
+    /// The guard's refusals per `NameEvidenceGuard.Rejection.rawValue`.
+    var rejections: [String: Int]
+    /// The evidence that passed the guard.
+    var acceptedEvidence: Int
+    var speakers: Int
+    var written: Bool
+    /// Names shown as labels, per `NameSource.rawValue`.
+    var applied: [String: Int]
+    /// Names waiting for a confirmation, per `NameSource.rawValue`.
+    var suggested: [String: Int]
 }
 
 /// Points by kind.

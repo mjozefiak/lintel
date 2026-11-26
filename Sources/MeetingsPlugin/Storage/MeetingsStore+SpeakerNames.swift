@@ -217,6 +217,94 @@ extension MeetingsStore {
         }
     }
 
+    // MARK: A second finalization
+
+    /// What a speaker of the meeting carries over a new speaker plan: the user's decisions only. Read inside the
+    /// plan's transaction, before its speakers are deleted.
+    struct CarriedName: Equatable, Sendable {
+        let speakerID: Int64
+        let label: String
+        /// The raw stored values, written back as they are (a value of a newer build included).
+        let source: String
+        let status: String
+        let rejectedNames: String?
+        /// The user named the speaker (`user`) or confirmed an automatic name: the name moves.
+        let keepsName: Bool
+        /// The meeting's segments this speaker had.
+        let segments: Set<Int64>
+    }
+
+    /// The speakers whose name or rejected names must survive a new plan, with their segments.
+    static func namesToCarry(meetingID: Int64, in db: Database) throws -> [CarriedName] {
+        var segments: [Int64: Set<Int64>] = [:]
+        for row in try Row.fetchAll(
+            db, sql: "SELECT id, speaker_id FROM meeting_segment WHERE meeting_id = ? AND speaker_id IS NOT NULL",
+            arguments: [meetingID])
+        {
+            let speaker: Int64 = row["speaker_id"]
+            segments[speaker, default: []].insert(row["id"])
+        }
+        return try Row.fetchAll(
+            db,
+            sql: """
+                SELECT id, label, name_source, name_status, rejected_names FROM meeting_speaker
+                WHERE meeting_id = ? ORDER BY id
+                """,
+            arguments: [meetingID]
+        ).compactMap { row -> CarriedName? in
+            let source: String = row["name_source"]
+            let status: String = row["name_status"]
+            let rejected: String? = row["rejected_names"]
+            let automatic = [NameSource.platform, .calendar, .transcript].map(\.rawValue).contains(source)
+            let keepsName =
+                source == NameSource.user.rawValue
+                || (automatic && status == SpeakerNameStatus.confirmed.rawValue)
+            let hasRejections = !decodeNames(rejected).isEmpty
+            guard keepsName || hasRejections else { return nil }
+            let id: Int64 = row["id"]
+            return CarriedName(
+                speakerID: id, label: row["label"], source: source, status: status,
+                rejectedNames: hasRejections ? rejected : nil, keepsName: keepsName, segments: segments[id] ?? [])
+        }
+    }
+
+    /// Gives each carried speaker's decisions to at most one new speaker: the pair that shares the most segments
+    /// goes first (the segments survive a new plan, the speaker rows do not), then the next, one to one. A carried
+    /// speaker that shares no segment with any new one is dropped with its row. A new speaker keeps its own
+    /// `is_self`: the plan decides who the microphone's owner is.
+    static func carryNames(
+        _ carried: [CarriedName], to newIDs: [Int64], assignments: [Int64: Int], in db: Database
+    ) throws {
+        guard !carried.isEmpty else { return }
+        var pairs: [(count: Int, new: Int, old: Int)] = []
+        for (oldIndex, old) in carried.enumerated() {
+            var shared: [Int: Int] = [:]
+            for segment in old.segments {
+                guard let index = assignments[segment], newIDs.indices.contains(index) else { continue }
+                shared[index, default: 0] += 1
+            }
+            for (newIndex, count) in shared { pairs.append((count, newIndex, oldIndex)) }
+        }
+        pairs.sort { ($0.count, -$0.new, -$0.old) > ($1.count, -$1.new, -$1.old) }
+        var takenNew: Set<Int> = []
+        var takenOld: Set<Int> = []
+        for pair in pairs where !takenNew.contains(pair.new) && !takenOld.contains(pair.old) {
+            takenNew.insert(pair.new)
+            takenOld.insert(pair.old)
+            let old = carried[pair.old]
+            let id = newIDs[pair.new]
+            if old.keepsName {
+                try db.execute(
+                    sql: "UPDATE meeting_speaker SET label = ?, name_source = ?, name_status = ? WHERE id = ?",
+                    arguments: [old.label, old.source, old.status, id])
+            }
+            if let rejected = old.rejectedNames {
+                try db.execute(
+                    sql: "UPDATE meeting_speaker SET rejected_names = ? WHERE id = ?", arguments: [rejected, id])
+            }
+        }
+    }
+
     // MARK: Helpers
 
     private static func markNotesStale(meetingID: Int64, in db: Database) throws {

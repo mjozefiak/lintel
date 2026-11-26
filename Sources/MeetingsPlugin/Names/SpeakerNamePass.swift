@@ -39,6 +39,22 @@ struct SpeakerNamePass: Sendable {
     }
 
     struct Outcome: Equatable, Sendable {
+        /// How the pass ended. Only `failed` says nothing about the transcript: the caller keeps the names it had.
+        enum Status: String, Equatable, Sendable, Codable {
+            /// The conditions keep the model out (notes off, names from the conversation off, a `channels` meeting).
+            case notAsked
+            /// The extractor found no excerpt: there is no name to look for, and the model was not asked.
+            case noExcerpts
+            /// The model answered (an empty or unusable answer included): the evidence is what passed the guard.
+            case answered
+            /// No answer: the writer could not be opened, the request failed, the time limit came first, the
+            /// answer was cut by the token limit or the task was cancelled.
+            case failed
+        }
+
+        var status: Status = .notAsked
+        /// The time from the first request to its end, the open of the writer included; 0 when it was not asked.
+        var elapsedMs = 0
         /// The evidence that passed the guard, `source = .transcript`.
         var accepted: [NameEvidence] = []
         /// How many excerpts went to the model (0 when it was not asked).
@@ -57,15 +73,18 @@ struct SpeakerNamePass: Sendable {
     var knownNames: [String]
     var configuration: Configuration
     private let sleep: @Sendable (Duration) async throws -> Void
+    private let now: @Sendable () -> ContinuousClock.Instant
 
     init(
         generator: any NotesGenerating, knownNames: [String] = [], configuration: Configuration = Configuration(),
-        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }
     ) {
         self.generator = generator
         self.knownNames = knownNames
         self.configuration = configuration
         self.sleep = sleep
+        self.now = now
     }
 
     /// The evidence found for the transcript, or none. Never throws.
@@ -82,35 +101,55 @@ struct SpeakerNamePass: Sendable {
         guard conditions.notesEnabled, conditions.namesFromConversation, !conditions.isChannelMeeting else {
             return outcome
         }
-        guard !extraction.excerpts.isEmpty else { return outcome }
+        guard !extraction.excerpts.isEmpty else {
+            outcome.status = .noExcerpts
+            return outcome
+        }
         outcome.excerpts = extraction.excerpts.count
+        outcome.status = .failed
 
         let messages = SpeakerNamePrompt.messages(excerpts: extraction.excerpts)
+        let generator = generator
+        let maxTokens = configuration.answerMaxTokens
+        let started = now()
+        let answer: String?
         do {
-            try await generator.open()
+            answer =
+                try await NotesDeadline.run(limit: configuration.timeout, sleep: sleep) { report in
+                    // The pass has no queue phase of its own: the whole request, the open of the writer (a model load,
+                    // the wait for a busy model) included, counts against the limit.
+                    report(.running)
+                    // The operation releases what it opened on every path, also when the limit already gave up on it:
+                    // a load that ignores cancellation still ends here and must not keep the model.
+                    do {
+                        try await generator.open()
+                        try Task.checkCancellation()
+                        let generated = try await generator.generateResult(
+                            messages: messages, maxTokens: maxTokens, onPhase: nil)
+                        await generator.release()
+                        // An answer cut by the token limit is no JSON array: never trusted.
+                        return generated.stoppedByTokenLimit ? nil : generated.text
+                    } catch {
+                        await generator.release()
+                        throw error
+                    }
+                } ?? nil
         } catch {
-            return outcome
+            answer = nil
         }
-        do {
-            let answer = try await NotesDeadline.run(limit: configuration.timeout, sleep: sleep) { report in
-                // The pass has no queue phase of its own: the whole request counts against the limit.
-                report(.running)
-                let generated = try await generator.generateResult(
-                    messages: messages, maxTokens: configuration.answerMaxTokens, onPhase: nil)
-                // An answer cut by the token limit is no JSON array: never trusted.
-                return generated.stoppedByTokenLimit ? nil : generated.text
-            }
-            await generator.release()
-            guard let text = answer ?? nil else { return outcome }
-            let proposals = SpeakerNameParser.proposals(from: text)
-            outcome.answers = proposals.count
-            let checked = NameEvidenceGuard(segments: segments).check(proposals)
-            outcome.accepted = checked.accepted
-            outcome.rejections = checked.rejections
-            return outcome
-        } catch {
-            await generator.release()
-            return outcome
-        }
+        outcome.elapsedMs = Self.milliseconds(now() - started)
+        guard let text = answer, !Task.isCancelled else { return outcome }
+        outcome.status = .answered
+        let proposals = SpeakerNameParser.proposals(from: text)
+        outcome.answers = proposals.count
+        let checked = NameEvidenceGuard(segments: segments).check(proposals)
+        outcome.accepted = checked.accepted
+        outcome.rejections = checked.rejections
+        return outcome
+    }
+
+    private static func milliseconds(_ duration: Duration) -> Int {
+        let (seconds, attoseconds) = duration.components
+        return max(0, Int(seconds) * 1000 + Int(attoseconds / 1_000_000_000_000_000))
     }
 }

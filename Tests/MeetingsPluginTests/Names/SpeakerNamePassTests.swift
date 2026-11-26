@@ -120,7 +120,9 @@ import Testing
         #expect(outcome.accepted.isEmpty)
         #expect(generator.calls.count == 1)
         #expect(await cancelled.wait("the generator to be cancelled by the limit"))
-        #expect(generator.released == 1)
+        #expect(outcome.status == .failed)
+        // The cancelled operation releases the writer itself, after the limit has already answered.
+        #expect(await pollUntil("the writer to be released") { generator.released == 1 })
         clock.finish()
     }
 

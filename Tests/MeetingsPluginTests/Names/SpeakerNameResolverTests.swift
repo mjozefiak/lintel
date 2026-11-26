@@ -79,6 +79,64 @@ import Testing
         #expect(result(1, results)?.source == .platform)
     }
 
+    @Test func anAppliedNameFromALowerSourceBeatsASuggestionFromAHigherOne() {
+        // A weak platform share (suggested) against a sure self-introduction (applied): the state decides first.
+        let results = resolve(
+            [cluster(1)],
+            evidence: [
+                evidence("Zofia"),
+                evidence("Ala", source: .platform, kind: nil, confidence: nil, strength: 0.35),
+            ])
+        #expect(result(1, results)?.name == "Zofia")
+        #expect(result(1, results)?.source == .transcript)
+        #expect(result(1, results)?.status == .applied)
+        #expect(result(1, results)?.suggestedName == nil)
+    }
+
+    @Test func withinOneStateTheHigherSourceWins() {
+        // Two suggestions: a weak platform share and a vocative. The platform outranks the conversation.
+        let results = resolve(
+            [cluster(1)],
+            evidence: [
+                evidence("Zofia", kind: .addressed),
+                evidence("Ala", source: .platform, kind: nil, confidence: nil, strength: 0.35),
+            ])
+        #expect(result(1, results)?.name == nil)
+        #expect(result(1, results)?.status == .suggested)
+        #expect(result(1, results)?.suggestedName == "Ala")
+        #expect(result(1, results)?.source == .platform)
+    }
+
+    @Test func aVocativeNamesTheClusterThatAnswersNotTheCaller() {
+        // Segment 0: Mówca 1 calls "Zofia, ..."; segment 1: Mówca 2 answers. The quote's segment is the caller's.
+        let results = resolve(
+            [cluster(1, label: "Mówca 1"), cluster(2, label: "Mówca 2")],
+            evidence: [evidence("Zofia", kind: .addressed, speaker: "Mówca 2", segment: 0)],
+            segments: [0: 1, 1: 2])
+        #expect(result(1, results)?.suggestedName == nil)
+        #expect(result(2, results)?.suggestedName == "Zofia")
+    }
+
+    @Test func anAnnouncementNamesTheNextSpeakerEvenWithASharedLabel() {
+        // Two people kept apart under one label: the segment after the quote decides which one is meant.
+        let known = ["Zofia"]
+        let results = resolve(
+            [cluster(1, label: "Mówca 1"), cluster(2, label: "Mówca 2"), cluster(3, label: "Mówca 2")],
+            evidence: [evidence("Zofia", kind: .announced, speaker: "Mówca 2", segment: 1)],
+            known: known, segments: [0: 2, 1: 1, 2: 3])
+        #expect(result(3, results)?.name == "Zofia")
+        #expect(result(2, results)?.name == nil)
+        #expect(result(1, results)?.name == nil)
+    }
+
+    @Test func aVocativeWithoutAnAnswerIsDropped() {
+        let results = resolve(
+            [cluster(1, label: "Mówca 1"), cluster(2, label: "Mówca 2")],
+            evidence: [evidence("Zofia", kind: .addressed, speaker: "Mówca 2", segment: 1)],
+            segments: [0: 2, 1: 1])
+        #expect(results.allSatisfy { $0.name == nil && $0.suggestedName == nil })
+    }
+
     @Test func theConversationBeatsTheCalendar() {
         let owner = cluster(1, label: SpeakerLabels.me, channel: .mic, isSelf: true)
         let other = cluster(2, label: "Mówca 1")

@@ -29,9 +29,13 @@ extension MeetingsStore {
 
     /// Replaces the meeting's speakers with the plan's in one transaction and sets `speaker_id` of its
     /// segments, `speaker_mode` and `diarization_model_id`. Running it again (a second finalization) starts
-    /// from a clean slate: the old speakers go and their segments are re-linked.
+    /// from a clean slate: the old speakers go and their segments are re-linked, except for what the user decided
+    /// about names (speaker names spec, Edge Cases, "Ponowna finalizacja"): a name the user gave or confirmed and the
+    /// names the user rejected move to the new speaker that took most of the old one's segments
+    /// (`carryNames`).
     func applySpeakerPlan(_ plan: SpeakerPlan, meetingID: Int64, diarizationModelID: String?) throws {
         try write { db in
+            let previous = try Self.namesToCarry(meetingID: meetingID, in: db)
             try db.execute(sql: "DELETE FROM meeting_speaker WHERE meeting_id = ?", arguments: [meetingID])
             try db.execute(
                 sql: "UPDATE meeting_segment SET speaker_id = NULL WHERE meeting_id = ?", arguments: [meetingID])
@@ -53,6 +57,7 @@ extension MeetingsStore {
                     sql: "UPDATE meeting_segment SET speaker_id = ? WHERE id = ? AND meeting_id = ?",
                     arguments: [ids[index], segmentID, meetingID])
             }
+            try Self.carryNames(previous, to: ids, assignments: plan.assignments, in: db)
             try db.execute(
                 sql: "UPDATE meeting SET speaker_mode = ?, diarization_model_id = ? WHERE id = ?",
                 arguments: [plan.mode.rawValue, diarizationModelID, meetingID])

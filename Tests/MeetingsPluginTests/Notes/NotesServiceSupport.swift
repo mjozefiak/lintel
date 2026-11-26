@@ -93,7 +93,9 @@ final class NotesServiceRig {
         modelWatchInterval: Duration = .seconds(15),
         markAwaiting: @escaping @Sendable (MeetingsStore, Int64) async -> Void = { store, id in
             await AwaitingMarker.mark(store, id)
-        }
+        },
+        configureNames: @escaping @Sendable (inout SpeakerNamePass.Configuration) -> Void = { _ in },
+        trace: NotesTraceSink? = nil
     ) throws {
         harness = try MeetingsHarness(settings: initial)
         library = harness.library()
@@ -119,7 +121,8 @@ final class NotesServiceRig {
                 configure(&configuration)
             }, providerRunner: providerRunner, configureWhole: configureWhole,
             markAwaiting: markAwaiting, now: { now },
-            shutdownLimit: shutdownLimit, modelWatchInterval: modelWatchInterval,
+            shutdownLimit: shutdownLimit, modelWatchInterval: modelWatchInterval, configureNames: configureNames,
+            trace: trace,
             openModels: { id in opened.update { $0.append(id) } },
             changed: {
                 changes.update { $0 += 1 }

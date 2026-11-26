@@ -137,6 +137,13 @@ final class NotesService: ProviderNotesControl {
         var shutdownLimit: Duration = .seconds(5)
         /// How often the model file is looked for while a meeting waits for it (a few file sizes are read).
         var modelWatchInterval: Duration = .seconds(15)
+        /// Tests shorten the speaker names pass's time limit.
+        var configureNames: @Sendable (inout SpeakerNamePass.Configuration) -> Void = { _ in }
+        /// The clock the names pass's request time is measured on (`NotesTraceSpeakerNames.elapsedMs`).
+        var namesNow: @Sendable () -> ContinuousClock.Instant = { .now }
+        /// Where the speaker names counters go (`NotesTraceEvent.speakerNames`); `nil`, the product's, records
+        /// nothing.
+        var trace: NotesTraceSink?
         /// `PluginContext.openModels`: a "Regenerate" without the notes model leads to its download.
         var openModels: @MainActor (_ packageID: String?) -> Void = { _ in }
         var changed: @Sendable () -> Void = {}
@@ -425,17 +432,14 @@ final class NotesService: ProviderNotesControl {
         let id = job.meetingID
         guard let store = deps.library.store else { return }
         if !job.requested, !deps.settings.notesEnabled { return }
-        guard let document = try? await MeetingLibraryIO.document(store: store, id: id), document.status == .ready
+        guard let loaded = try? await MeetingLibraryIO.document(store: store, id: id), loaded.status == .ready
         else { return }
-        let utterances = NotesUtterance.make(from: document, selfName: deps.settings.selfName)
-        guard !utterances.isEmpty else { return }
+        guard !NotesUtterance.make(from: loaded, selfName: deps.settings.selfName).isEmpty else { return }
 
-        // The writer is chosen here, for this job, from the settings as they are now. The provider's authorization
-        // reads them again before every process.
+        // The writer is chosen here, for this job, from the settings as they are now, and the speaker names pass uses
+        // the same one. The provider's authorization reads them again before every process.
         if !job.local, let selection = deps.settings.notesProviderSelection {
-            await processWithProvider(
-                job, selection: selection, utterances: utterances, store: store,
-                title: document.title.map(MeetingLibraryPresentation.visible), startedAt: document.startedAt)
+            await processWithProvider(job, selection: selection, document: loaded, store: store)
             return
         }
 
@@ -464,13 +468,25 @@ final class NotesService: ProviderNotesControl {
             }
         }
         queueArrivals(arrived)
-        guard let previous = try? store.beginNotes(id) else { return }
-        setPhase(.queued, for: id)
 
         var configuration = NotesPipeline.Configuration()
         configuration.chunkTokens = deps.settings.notesChunkTokens
         configuration.reduceInputTokens = deps.settings.notesReduceInputTokens
         deps.configure(&configuration)
+
+        // The speaker names first, on the notes' own model (a lease of its own, released before the notes take one:
+        // the warm model is shared), so the notes see the names as speaker labels.
+        let namesLease = NotesLease(
+            model: NotesModel(lease: deps.lease, runtime: deps.makeRuntime(), modelURL: file),
+            configuration: configuration, sleep: deps.sleep,
+            onEvent: { [weak self] event in Task { @MainActor in self?.apply(event, to: id) } })
+        guard let document = await refreshNames(of: loaded, generator: namesLease, store: store) else { return }
+        let utterances = NotesUtterance.make(from: document, selfName: deps.settings.selfName)
+        guard !utterances.isEmpty else { return }
+
+        guard let previous = try? store.beginNotes(id) else { return }
+        setPhase(.queued, for: id)
+
         let pipeline = NotesPipeline(
             model: NotesModel(lease: deps.lease, runtime: deps.makeRuntime(), modelURL: file),
             configuration: configuration, sleep: deps.sleep)
@@ -495,10 +511,32 @@ final class NotesService: ProviderNotesControl {
     /// The notes written by the chosen provider: the whole-transcript track over `ProviderNotesGenerator`. No
     /// model file is needed and nothing falls back to the built-in model; an error ends the job as `failed`.
     private func processWithProvider(
-        _ job: Job, selection: NotesProviderSelection, utterances: [NotesUtterance], store: MeetingsStore,
-        title: String?, startedAt: Date
+        _ job: Job, selection: NotesProviderSelection, document loaded: MeetingDocument, store: MeetingsStore
     ) async {
         let id = job.meetingID
+        let title = loaded.title.map(MeetingLibraryPresentation.visible)
+        let startedAt = loaded.startedAt
+        let settings = deps.settings
+        let runner = deps.providerRunner
+        let descriptor = MeetingsSettings.knownProviders.first(where: { $0.id == selection.provider })
+        runningSelection = selection
+        defer { runningSelection = nil }
+
+        var document = loaded
+        if let runner, let descriptor {
+            // The speaker names first, through the provider the notes go to (the user chose it: that is the consent
+            // for the transcript, and the pass sends only excerpts of it). A generator of its own, so a failed pass
+            // never shows as the notes' failure or changes the model the notes are marked with.
+            let namesGenerator = ProviderNotesGenerator(
+                runner: runner, selection: selection,
+                inputBudgetTokens: descriptor.inputBudgetTokens(forModel: selection.model),
+                currentSelection: { settings.notesProviderSelection })
+            guard let named = await refreshNames(of: loaded, generator: namesGenerator, store: store) else { return }
+            document = named
+        }
+        let utterances = NotesUtterance.make(from: document, selfName: settings.selfName)
+        guard !utterances.isEmpty else { return }
+
         guard let previous = try? store.beginNotes(id) else { return }
         board.update {
             $0.modelMissing = false
@@ -506,18 +544,13 @@ final class NotesService: ProviderNotesControl {
             if $0.providerFailure?.meetingID == id { $0.providerFailure = nil }
         }
         setPhase(.mapping(done: 0, total: 1), for: id)
-        runningSelection = selection
-        defer { runningSelection = nil }
 
-        guard let runner = deps.providerRunner,
-            let descriptor = MeetingsSettings.knownProviders.first(where: { $0.id == selection.provider })
-        else {
+        guard let runner, let descriptor else {
             _ = try? store.settleNotes(id, status: .failed)
             deps.logger.error("Notes failed: no provider runner")
             deps.library.refreshCount()
             return
         }
-        let settings = deps.settings
         let reasons = ProviderFailureSink()
         let generator = ProviderNotesGenerator(
             runner: runner, selection: selection,
@@ -546,6 +579,41 @@ final class NotesService: ProviderNotesControl {
             rerun.insert(id)
         }
         recordProviderFailure(outcome, reason: reasons.last, id: id, title: title, startedAt: startedAt, epoch: epoch)
+    }
+
+    /// The speaker names step of a job (spec `2026-11-25-meeting-speaker-names`, step 1.4b): the pass over the job's
+    /// writer, the resolution and its write, all before `beginNotes`, so a changed label never marks the notes being
+    /// written `stale`. Returns the document to write the notes from (read again when a name was written), or `nil`
+    /// when the job was cancelled meanwhile (nothing of the job is written then). A pass that fails, runs out of
+    /// time or finds nothing never stops the notes.
+    private func refreshNames(
+        of document: MeetingDocument, generator: any NotesGenerating, store: MeetingsStore
+    ) async -> MeetingDocument? {
+        guard document.speakerMode == .diarized else { return document }
+        let id = document.id
+        let epoch = epoch
+        let settings = deps.settings
+        let conditions = SpeakerNamePass.Conditions(
+            notesEnabled: settings.notesEnabled, namesFromConversation: settings.namesFromConversation,
+            isChannelMeeting: document.speakerMode == .channels)
+        var configuration = SpeakerNamePass.Configuration()
+        deps.configureNames(&configuration)
+        let pass = SpeakerNamePass(
+            generator: generator, configuration: configuration, sleep: deps.sleep, now: deps.namesNow)
+        if conditions.notesEnabled, conditions.namesFromConversation {
+            // Past the queue: with a provider, the excerpts may be on their way to it (D12).
+            setPhase(.mapping(done: 0, total: 1), for: id)
+        }
+        let report = await MeetingSpeakerNames.refresh(
+            store: store, document: document, selfName: settings.selfName, pass: pass, conditions: conditions)
+        guard !Task.isCancelled, epoch == self.epoch else { return nil }
+        guard let report else { return document }
+        deps.trace?(.speakerNames(report.trace))
+        deps.logger.notice(
+            "Speaker names: pass \(report.pass.status.rawValue, privacy: .public), \(report.applied.values.reduce(0, +), privacy: .public) applied, \(report.suggested.values.reduce(0, +), privacy: .public) suggested, \(report.pass.elapsedMs, privacy: .public) ms"
+        )
+        guard report.written else { return document }
+        return (try? await MeetingLibraryIO.document(store: store, id: id)) ?? document
     }
 
     /// Remembers why a provider job wrote nothing, for the banner. A success, a cancellation and a refusal (the

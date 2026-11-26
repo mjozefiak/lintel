@@ -352,7 +352,9 @@ struct MeetingNoteLayerTests {
         try rig.store.applySpeakerPlan(plan, meetingID: id, diarizationModelID: nil)
         let replanned = try #require(try await rig.source.content(for: key))
         #expect(replanned.layers.first { $0.id == "transcript" }?.version == versionBefore)
-        #expect(replanned.speakers.map(\.name) == ["Me", "Jan"])
+        // The name the user gave moves to the new speaker that took its segments (speaker names spec, Edge Cases,
+        // "Ponowna finalizacja").
+        #expect(replanned.speakers.map(\.name) == ["Me", "Anna Nowak"])
         #expect(replanned.speakers.map(\.isSelf) == [true, false])
         #expect(Set(replanned.speakers.map(\.id)).count == 2)
         // The block still points at its segment while the speaker row was replaced.

@@ -133,6 +133,12 @@ struct MeetingFinalizer: Sendable {
         guard apply(plan, meetingID: meetingID, modelID: diarizer.modelID) else {
             return fallback(.failed, segments: segments, meetingID: meetingID)
         }
+        // Speaker names (spec `2026-11-25-meeting-speaker-names`, order of the finalization): the names the user gave,
+        // confirmed or rejected survived the new plan (`applySpeakerPlan` carries them), and the owner's speaker is
+        // named by `selfName` when the notes are written. The sources that exist only now go here, before the
+        // meeting becomes ready: the platform's samples (F2) and the calendar (F3), through
+        // `MeetingSpeakerNames.refresh(pass: nil)`. The conversation (F1) runs in the notes job, on the notes' own
+        // writer, so a meeting never waits for a model here.
         logger.notice("Diarization finished: \(plan.speakers.count, privacy: .public) speakers")
         return .diarized(speakers: plan.speakers.count)
     }

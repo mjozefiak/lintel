@@ -50,8 +50,9 @@ struct SpeakerNameRequest: Equatable, Sendable {
     var knownNames: [String] = []
     var calendar: SpeakerNameCalendar?
     /// The cluster of every transcript segment, by the index the transcript evidence refers to
-    /// (`NameEvidence.segment`). Evidence without a segment is matched by its cluster label, and only when exactly
-    /// one cluster has that label.
+    /// (`NameEvidence.segment`, where the quote starts; a vocative or an announcement names the cluster of the
+    /// first later segment with its label). Evidence without a segment is matched by its cluster label, and only
+    /// when exactly one cluster has that label.
     var segmentClusters: [Int: Int] = [:]
 }
 
@@ -79,8 +80,9 @@ struct SpeakerNameResolution: Equatable, Sendable {
 ///   automatic source.
 /// - The owner's cluster (`isSelf`, microphone channel) gets `selfName` as `applied` when it is set and not a
 ///   placeholder — how today's finalizer names it. Without `selfName` the cluster keeps no name.
-/// - Automatic sources run only in `diarized` mode and only for the other clusters. One cluster's name comes
-///   from the source with the highest priority that has evidence for it: `platform` > `transcript` > `calendar`.
+/// - Automatic sources run only in `diarized` mode and only for the other clusters. One cluster takes the surest
+///   candidate first (`applied` beats `suggested`), and among candidates of one state the source with the highest
+///   priority: `platform` > `transcript` > `calendar` (orchestrator decision 2026-11-26).
 /// - A name the user rejected for a cluster never comes back for that cluster, from any source, neither as a name
 ///   nor as a suggestion.
 /// - Transcript: a self-introduction the model is sure of (`introduction`, `high`) is `applied`; an announcement
@@ -290,16 +292,37 @@ enum SpeakerNameResolver {
 
     /// The cluster a piece of evidence is about: through the segment's own cluster when the evidence names one,
     /// else through its cluster label when exactly one cluster has it. `nil` is unusable evidence.
+    ///
+    /// The segment of transcript evidence is where its quote starts. A self-introduction is said by the person it
+    /// names, so that segment's cluster is the one. A vocative and an announcement are said by somebody else and
+    /// name who speaks right after the quote (`NameEvidenceGuard` checks it): their cluster is the first later
+    /// segment with the evidence's label.
     private static func cluster(
         for evidence: NameEvidence, in request: SpeakerNameRequest, indexes: [Int: Int]
     ) -> SpeakerNameCluster? {
         if let segment = evidence.segment {
-            guard let id = request.segmentClusters[segment] else { return nil }
+            let named: Int?
+            switch evidence.kind {
+            case .addressed, .announced: named = answeringCluster(after: segment, label: evidence.speaker, in: request)
+            default: named = request.segmentClusters[segment]
+            }
+            guard let id = named else { return nil }
             return request.clusters.first { $0.id == id }
         }
         guard let label = evidence.speaker else { return nil }
         let matching = request.clusters.filter { $0.label == label }
         return matching.count == 1 ? matching[0] : nil
+    }
+
+    /// The cluster of the first segment after `segment` whose cluster has `label`; `nil` when there is none.
+    private static func answeringCluster(after segment: Int, label: String?, in request: SpeakerNameRequest) -> Int? {
+        guard let label, let last = request.segmentClusters.keys.max(), segment < last else { return nil }
+        let labels = Dictionary(request.clusters.map { ($0.id, $0.label) }, uniquingKeysWith: { first, _ in first })
+        for index in (segment + 1)...last {
+            guard let id = request.segmentClusters[index], labels[id] == label else { continue }
+            return id
+        }
+        return nil
     }
 
     /// The index of every cluster in the request, by its id. A repeated id makes the whole plan ambiguous: no
@@ -381,9 +404,11 @@ enum SpeakerNameResolver {
         value >= threshold - strengthTieEpsilon
     }
 
-    /// Which of two candidates a cluster takes: the higher-priority source first (spec: Proposed Solution 2),
-    /// then the stronger evidence, then the alphabetically first name so a run is reproducible.
+    /// Which of two candidates a cluster takes: the surer state first (`applied` beats `suggested`, orchestrator
+    /// decision 2026-11-26), then within one state the higher-priority source (spec: Proposed Solution 2), then the
+    /// stronger evidence, then the alphabetically first name so a run is reproducible.
     private static func isPreferred(_ lhs: Candidate, _ rhs: Candidate) -> Bool {
+        if lhs.status != rhs.status { return lhs.status == .applied }
         if lhs.source.priority != rhs.source.priority { return lhs.source.priority < rhs.source.priority }
         if abs(lhs.strength - rhs.strength) > strengthTieEpsilon { return lhs.strength > rhs.strength }
         return lhs.name < rhs.name
