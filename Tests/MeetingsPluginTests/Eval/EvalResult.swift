@@ -15,6 +15,8 @@ struct EvalResult: Codable, Equatable, Sendable {
         /// Additive and optional: the file name of the result whose transcript a replay used
         /// (`LINTEL_MEETING_EVAL_TRANSCRIPT`); absent for a run that recognised the audio itself.
         var transcriptSource: String?
+        /// Additive and optional: `LINTEL_MEETING_EVAL_LANGUAGES` of an automatic run (`language` is then `auto`).
+        var languages: [String]?
     }
 
     struct Segment: Codable, Equatable, Sendable {
@@ -27,9 +29,13 @@ struct EvalResult: Codable, Equatable, Sendable {
         /// Additive and optional: the speaker per word, with times, when the engine reports them. The scorer
         /// prefers it over spreading the segment's words evenly over its duration. Carries no text.
         var words: [Word]?
+        /// Additive and optional: whether the language repair changed this segment's text. Written for every row
+        /// of a run that ran the repair, absent otherwise.
+        var repaired: Bool?
 
         init(
-            track: String, startMs: Int, endMs: Int, text: String, speaker: String? = nil, words: [Word]? = nil
+            track: String, startMs: Int, endMs: Int, text: String, speaker: String? = nil, words: [Word]? = nil,
+            repaired: Bool? = nil
         ) {
             self.track = track
             self.startMs = startMs
@@ -37,6 +43,7 @@ struct EvalResult: Codable, Equatable, Sendable {
             self.text = text
             self.speaker = speaker
             self.words = words
+            self.repaired = repaired
         }
     }
 
@@ -73,6 +80,46 @@ struct EvalResult: Codable, Equatable, Sendable {
         var markdown: String
     }
 
+    /// Additive and optional (spec `2026-11-23-automatic-language-detection`, step 2.5): numbers and closed codes
+    /// only, never text.
+    struct Language: Codable, Equatable, Sendable {
+        struct Repair: Codable, Equatable, Sendable {
+            /// The model id the repair decoded with.
+            var engine: String
+            var suspect: Int
+            /// Decoded again: `replaced + kept`.
+            var redecoded: Int
+            var replaced: Int
+            var kept: Int
+            var skipped: Int
+            /// `LanguageRepairReport.Stop` (`none`, `busy`, `timeLimit`, `noProfile`, ...).
+            var stop: String
+            /// The repair stage alone.
+            var seconds: Double
+            /// The whole `beforeReady` hook: how much later the meeting becomes `ready`.
+            var beforeReadySeconds: Double
+            var peakFootprintMB: Double
+            /// The repair's requests per options key (`LanguageEval.key`).
+            var requests: [String: Int]
+            /// Rows whose text the repair changed (the rows with `repaired: true`).
+            var changedSegments: Int
+        }
+
+        /// The languages the profile was identified with (the user's list of the run).
+        var languages: [String]
+        /// Audio time at the end of the segment that settled the profile (the live transcript replayed in the
+        /// order it was sent); `nil` when it never settled.
+        var profileSettledAtMs: Int?
+        var profileConfidentSeconds: Double
+        /// Share of confident speech per language code, 0...1.
+        var shares: [String: Double]
+        /// Live segments sent per options key (`none`, `script:latin`, `whisper:pinned:pl`, `whisper:detect`),
+        /// replays after the meeting included.
+        var requests: [String: Int]
+        /// `nil` when the run did not run the repair (the fixed-language baseline, or `_REPAIR=0`).
+        var repair: Repair?
+    }
+
     var schema: Int = EvalResult.schemaVersion
     var recording: String
     var audioSeconds: Double
@@ -83,9 +130,11 @@ struct EvalResult: Codable, Equatable, Sendable {
     /// Additive and optional: the capture counters of the run (numbers only), including the voice activity
     /// detector statistics. Written only when the run had them.
     var capture: CaptureCounters?
+    /// Additive and optional: the language numbers of the run, written only when the run had them.
+    var language: Language?
 
     private enum CodingKeys: String, CodingKey {
-        case schema, recording, audioSeconds, config, asr, diarization, notes, capture
+        case schema, recording, audioSeconds, config, asr, diarization, notes, capture, language
     }
 
     init(
@@ -110,6 +159,7 @@ struct EvalResult: Codable, Equatable, Sendable {
         diarization = try container.decodeIfPresent(Diarization.self, forKey: .diarization)
         notes = try container.decodeIfPresent(Notes.self, forKey: .notes)
         capture = try container.decodeIfPresent(CaptureCounters.self, forKey: .capture)
+        language = try container.decodeIfPresent(Language.self, forKey: .language)
     }
 
     /// The optional sections are always written, as `null` when absent (the scorer reads the keys directly).
@@ -131,6 +181,7 @@ struct EvalResult: Codable, Equatable, Sendable {
             try container.encodeNil(forKey: .notes)
         }
         try container.encodeIfPresent(capture, forKey: .capture)
+        try container.encodeIfPresent(language, forKey: .language)
     }
 }
 

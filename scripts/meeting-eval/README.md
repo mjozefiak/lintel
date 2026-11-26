@@ -154,3 +154,20 @@ Other knobs: `LINTEL_MEETING_EVAL_VAD_EXIT_OFFSET`, `_VAD_MIN_SILENCE`, `_VAD_PA
 Columns (all rates; the first group are shares of every reference word and add up to `lost`): `outside` is speech in no segment at all (never sent; `outside±.5s` leaves a margin of 0.5 s for the coarse word clock), `inside` is a word missing from a segment the engine decoded. The `rate:` columns are the loss among the words of one zone (middle of a segment, within 0.4 s of a boundary, within 0.6 s of a segment cut at the model window, deep in a gap). `extra` is transcript words with no partner in the reference, `uncovered` the share of reference speech time that no segment covers.
 
 A quiet remote speaker is simulated by lowering the same recording (`ffmpeg -i meeting.wav -af volume=-20dB -ar 16000 -ac 1 -c:a pcm_s16le quiet.wav`). Silence and stationary noise are the false-alarm control: no segment must open on them.
+
+## Automatic language and the language repair (spec 2026-11-23-automatic-language-detection, step 2.5)
+
+`--language auto` records as the app does in Automatic mode: the live language profile, the options of each request, then the real `LanguageRepair` stage on the recorded spool before `ready`. `--whisper-folder` makes the repair decode with Whisper (what the app does when Whisper is installed), without it the repair uses Parakeet with the profile's script hint; `--no-repair` skips it. `--language pl` / `en` is the fixed baseline of `main`. Every run writes a `language` block of numbers (when the profile settled in audio time, shares per language, requests per hint, and for the repair suspect / re-decoded / replaced / kept / skipped with the stop reason, seconds and peak footprint); a run with the repair marks every row `repaired`.
+
+```sh
+scripts/meeting-eval/run.sh --audio meeting.wav --out out --name base --engine parakeet-ultra \
+  --language pl --speech-folder <Models>/speech/parakeet-ultra
+scripts/meeting-eval/run.sh --audio meeting.wav --out out --name auto --engine parakeet-ultra \
+  --language auto --languages pl,en --speech-folder <Models>/speech/parakeet-ultra \
+  --whisper-folder <Models>/speech/whisper-large-v3-turbo
+# Which segments changed (keys, durations and word counts only; exit 1 when one longer than 2 s and 3 words did):
+python3 -I scripts/meeting-eval/diff_segments.py out/base.json out/auto.json
+python3 -I scripts/meeting-eval/diff_segments.py out/base.json out/auto.json --repaired-only
+```
+
+Rows are matched on `track@startMs-endMs`; rows found in one run only are counted (`onlyBefore`, `onlyAfter`), not compared. The tests are `test_diff_segments.py`.
