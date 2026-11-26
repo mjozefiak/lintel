@@ -247,7 +247,8 @@ struct LanguageRepair: Sendable {
 
     /// Takes the lease but gives up after `timeLimit`: a model load cannot be interrupted (the first Whisper load
     /// took 143 s in the step 2.5 measurement), and `ready` must not wait for it. The load goes on in the
-    /// background and the lease it ends with is released at once, so nothing stays held. `nil` = gave up.
+    /// background and the lease it ends with is released at once, so nothing stays held after the load (while it
+    /// runs, the lease counts it, so another model is `busy` until then). `nil` = gave up.
     /// A refusal (`busy`, no model) is thrown as it is.
     private func boundedAcquire(_ setup: RepairSpeech) async throws -> SpeechLease? {
         let state = AcquireRace()
@@ -260,9 +261,11 @@ struct LanguageRepair: Sendable {
                 let acquired = try await lease.acquire(
                     modelID: setup.modelID, folder: setup.folder, engine: setup.engine, priority: .background,
                     keepWarm: { Self.keepWarm })
-                if state.deliver() {
-                    continuation.yield(.acquired(acquired))
-                } else {
+                // Released here unless the waiting side really received it: it lost the race, or the stream was
+                // already finished (the waiting task was cancelled) and the lease would be dropped.
+                if !state.deliver() {
+                    await acquired.release()
+                } else if case .terminated = continuation.yield(.acquired(acquired)) {
                     await acquired.release()
                 }
             } catch {
@@ -272,8 +275,11 @@ struct LanguageRepair: Sendable {
         }
         let timer = Task {
             try? await timerSleep(limit)
-            if state.expire() { continuation.yield(.timedOut) }
-            continuation.finish()
+            // Only the winner ends the stream: a timer that lost must not finish it before the lease is yielded.
+            if state.expire() {
+                continuation.yield(.timedOut)
+                continuation.finish()
+            }
         }
         defer { timer.cancel() }
         let first: AcquireRace.Outcome? = await withTaskCancellationHandler {

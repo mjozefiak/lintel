@@ -1,5 +1,6 @@
 import Foundation
 import LintelSpeech
+import LintelTestSupport
 import Synchronization
 import Testing
 
@@ -367,6 +368,28 @@ private func samples(_ milliseconds: Int) -> Int { milliseconds * AudioFormat.sa
         engine.loadGate.open()
         for _ in 0..<200 where await rig.lease.activeLeases != 0 { try await Task.sleep(for: .milliseconds(10)) }
         #expect(await rig.lease.activeLeases == 0)
+    }
+
+    @Test func aRepairCancelledWhileTheModelLoadsReleasesTheLeaseTheLoadEndsWith() async throws {
+        let rig = try RepairRig([
+            (.mic, 0, 6_000, words("a")), (.mic, 6_500, 7_000, "Thank you."), (.mic, 8_000, 14_000, words("b")),
+        ])
+        let engine = RepairEngine()
+        engine.loadGate.close()
+        // The time limit never fires here: only the cancellation ends the wait.
+        let repair = rig.repair(engine: engine, loadTimer: { _ in try await Task.sleep(for: .seconds(3_600)) })
+        let running = Task { await repair.run(meetingID: rig.meetingID, uuid: rig.uuid) }
+        #expect(await pollUntil("the repair's load holds the lease") { await rig.lease.activeLeases == 1 })
+        running.cancel()
+        let report = await running.value
+
+        #expect(report == LanguageRepairReport(suspect: 1, replaced: 0, kept: 0, stop: .cancelled))
+        // The load ends after the repair gave up: its lease is given back, never kept. The count was 1 while the
+        // load ran, so only the late lease's release brings it to 0 (the rig's keep-warm then unloads at once).
+        engine.loadGate.open()
+        #expect(await pollUntil("the late lease is released") { await rig.lease.activeLeases == 0 })
+        #expect(engine.calls.isEmpty)
+        #expect(try rig.text(1) == "Thank you.")
     }
 
     @Test func theTimeLimitStopsTheStageAndKeepsTheRest() async throws {
