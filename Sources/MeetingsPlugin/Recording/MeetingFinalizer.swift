@@ -27,7 +27,8 @@ enum DiarizationOutcome: Equatable, Sendable {
 }
 
 /// Runs after the transcript is complete and before the meeting becomes `ready` (the `beforeReady` hook of
-/// `MeetingSession`): diarize each track from its spool, assign speakers, write them. Whatever happens, the
+/// `MeetingSession`): diarize each track from its spool, assign speakers, write them, then run the language
+/// repair (`LanguageRepair`) on every path that leaves a transcript. Whatever happens, the
 /// transcript stays: a failure, a missing model or a track over the memory budget end in a fallback plan, never
 /// in an error that would stop the meeting from becoming `ready`. The session deletes the spool afterwards, so
 /// the spool goes only after a success or a deliberate fallback. A cancelled task is neither: it returns
@@ -44,6 +45,9 @@ struct MeetingFinalizer: Sendable {
     let makeDiarizer: @Sendable (URL) -> any Diarizer
     let budget: DiarizationBudget
     let onOutcome: @Sendable (Int64, DiarizationOutcome) -> Void
+    /// The language repair that runs after the speaker step (spec `2026-11-23-automatic-language-detection`,
+    /// step 2.4); `nil` runs none.
+    let languageRepair: LanguageRepair?
     let logger: Logger
 
     init(
@@ -52,6 +56,7 @@ struct MeetingFinalizer: Sendable {
         makeDiarizer: @escaping @Sendable (URL) -> any Diarizer = { FluidDiarizer(modelFolder: $0) },
         budget: DiarizationBudget = DiarizationBudget(),
         onOutcome: @escaping @Sendable (Int64, DiarizationOutcome) -> Void = { _, _ in },
+        languageRepair: LanguageRepair? = nil,
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "meetings")
     ) {
         self.store = store
@@ -62,6 +67,7 @@ struct MeetingFinalizer: Sendable {
         self.makeDiarizer = makeDiarizer
         self.budget = budget
         self.onOutcome = onOutcome
+        self.languageRepair = languageRepair
         self.logger = logger
     }
 
@@ -78,6 +84,11 @@ struct MeetingFinalizer: Sendable {
     @discardableResult
     func run(meetingID: Int64, uuid: UUID) async -> DiarizationOutcome {
         let outcome = await finalize(meetingID: meetingID, uuid: uuid)
+        // After the speakers, before `ready`, while the spool still exists. Its own cancellation leaves the task
+        // cancelled, so the session keeps the meeting `processing` with its spool, as for a cancelled diarization.
+        if let languageRepair, outcome.leavesTranscriptToRepair, !Task.isCancelled {
+            await languageRepair.run(meetingID: meetingID, uuid: uuid)
+        }
         onOutcome(meetingID, outcome)
         return outcome
     }
@@ -173,6 +184,18 @@ struct MeetingFinalizer: Sendable {
             return true
         } catch {
             return false
+        }
+    }
+}
+
+extension DiarizationOutcome {
+    /// Every path that leaves a transcript gets the language repair: diarized, diarization off and the fallbacks.
+    /// Not a cancelled run (the meeting stays `processing`), an empty transcript, or a spool that cannot be read.
+    var leavesTranscriptToRepair: Bool {
+        switch self {
+        case .diarized, .disabled: true
+        case .fallback(let reason): reason != .spoolUnavailable
+        case .cancelled, .nothingToLabel: false
         }
     }
 }

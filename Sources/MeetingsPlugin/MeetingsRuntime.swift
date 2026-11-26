@@ -77,13 +77,34 @@ struct MeetingsRuntime: Sendable {
     func makeFinalizer(store: MeetingsStore, keys: MeetingKeys, spool: SpoolStorage) -> MeetingFinalizer {
         let settings = settings
         let manager = diarizationManager
+        let languages = speechLanguages
+        let runtime = self
+        let repair = LanguageRepair(
+            store: store, speech: { await runtime.repairSpeech() }, hints: { languages.current().languages },
+            openTrack: LanguageRepair.spoolOpener(spool: spool, keys: keys), logger: logger)
         return MeetingFinalizer(
             store: store, keys: keys, spool: spool, isEnabled: { settings.diarization },
             modelFolder: {
                 await manager.location(
                     of: ModelCatalog.diarizationCommunity1, customFolder: settings.diarizationModelFolder
                 ).folder
-            }, logger: logger)
+            }, languageRepair: repair, logger: logger)
+    }
+
+    /// The language repair's model: Whisper when it is installed (it can be pinned to a language), else Parakeet
+    /// (a script hint only). A custom folder counts only for the model chosen in Settings, as everywhere else.
+    func repairSpeech() async -> RepairSpeech? {
+        let candidates: [(ModelPackage, RepairSpeech.Kind)] = [
+            (ModelCatalog.whisperLargeV3Turbo, .whisper), (ModelCatalog.parakeetUltra, .parakeet),
+        ]
+        for (package, kind) in candidates {
+            let custom = settings.speechModelID == package.id ? settings.speechModelFolder : nil
+            if let folder = await speechManager.location(of: package, customFolder: custom).folder {
+                return RepairSpeech(
+                    kind: kind, modelID: package.id, folder: folder, engine: makeEngine(modelID: package.id))
+            }
+        }
+        return nil
     }
 
     func makeSession(_ request: MeetingSessionRequest) -> MeetingSession {

@@ -96,8 +96,9 @@ struct MeetingResumer: MeetingResuming {
     /// What a detected range is widened by (`SegmentWindow`); the live session's values by default.
     let preRoll: Duration
     let postRoll: Duration
-    /// A new language profile per run over the shared setting (step 2.3; rebuilding it from the stored segments
-    /// comes with the language repair, step 2.4), so one meeting's profile never reaches another.
+    /// A new language profile per run over the shared setting (step 2.3), so one meeting's profile never reaches
+    /// another. It only gives the replayed segments their options; the language repair in `finalize` rebuilds the
+    /// whole meeting's profile from its stored segment texts (step 2.4).
     let makeLanguage: @Sendable () -> MeetingLanguage
     let logger: Logger
 
