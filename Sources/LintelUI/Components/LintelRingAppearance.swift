@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// What the ring says (notes explorer spec `2026-11-24-notes-explorer-main-window`, "The working ring"). It is the one
@@ -66,6 +67,19 @@ public nonisolated struct LintelRingAppearance: Equatable, Sendable {
             case .onAccent: dark ? BrandPalette.onAccentDark : BrandPalette.onAccentLight
             }
         }
+
+        /// The dynamic colour the layers draw: the same token as `hex(dark:)`, listed beside it so the two stay one switch
+        /// apart.
+        @MainActor var brandColor: NSColor {
+            switch self {
+            case .quiet: LintelBrand.secondaryTextColor
+            case .ink: LintelBrand.inkColor
+            case .live: LintelBrand.accentColor
+            case .attention: LintelBrand.statusAttentionColor
+            case .error: LintelBrand.statusErrorColor
+            case .onAccent: LintelBrand.onAccentColor
+            }
+        }
     }
 
     public var ringTone: Tone
@@ -94,8 +108,10 @@ public nonisolated struct LintelRingAppearance: Equatable, Sendable {
 
     /// - Parameters:
     ///   - reduceMotion: nothing turns or breathes; an indeterminate sweep becomes a static half ring.
-    ///   - onAccentFill: the ring sits on a Verdigris fill (the Record button): the quiet, ink and live colours
-    ///     become `onAccent`, so it stays visible; the warning and error colours do not change, and there is no track.
+    ///   - onAccentFill: the ring sits on a Verdigris fill (the Record button): every colour becomes `onAccent`, so it
+    ///     stays visible, and there is no track. The amber warning dot and the error colour measure 1.07 to 1.27:1 on
+    ///     Verdigris (C16 needs 3:1), so they are never drawn there: a warning keeps its dot and an error its wider
+    ///     opening (neither is colour alone) in `onAccent`. The approved sheet does not show them on the fill.
     public init(state: LintelRingState, mark: LintelRingMark, reduceMotion: Bool, onAccentFill: Bool = false) {
         let dotOn = mark == .meeting
         switch state {
@@ -147,9 +163,8 @@ public nonisolated struct LintelRingAppearance: Equatable, Sendable {
             dotBreathes = false
         }
         if onAccentFill {
-            func onAccent(_ tone: Tone) -> Tone { [.quiet, .ink, .live].contains(tone) ? .onAccent : tone }
-            ringTone = onAccent(ringTone)
-            dotTone = dotTone.map(onAccent)
+            ringTone = .onAccent
+            dotTone = dotTone.map { _ in .onAccent }
             showsTrack = false
         }
     }

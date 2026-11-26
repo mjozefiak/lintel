@@ -117,11 +117,35 @@ import Testing
         #expect(
             BrandPalette.contrast(LintelRingAppearance.Tone.onAccent.hex(dark: false), BrandPalette.accentLight) >= 3)
         #expect(BrandPalette.contrast(LintelRingAppearance.Tone.onAccent.hex(dark: true), BrandPalette.accentDark) >= 3)
-        for state in [LintelRingState.idle, .listening, .processing(progress: 0.5), .processing(progress: nil)] {
+        let states: [LintelRingState] = [
+            .idle, .listening, .warning, .processing(progress: 0.5), .processing(progress: nil), .error,
+        ]
+        for state in states {
             for mark in [LintelRingMark.meeting, .dictation] {
                 let appearance = LintelRingAppearance(state: state, mark: mark, reduceMotion: false, onAccentFill: true)
                 #expect(appearance.ringTone == .onAccent && !appearance.showsTrack, "\(state) \(mark)")
                 #expect(appearance.dotTone == nil || appearance.dotTone == .onAccent, "\(state) \(mark)")
+            }
+        }
+    }
+
+    /// C16 on the fill: the amber dot and the error ring are 1.07 to 1.27:1 on Verdigris, so the fill never draws them.
+    /// A warning keeps its dot and an error its wider opening (the signal is not colour alone), both in `onAccent`.
+    @Test func aWarningOrAnErrorOnAVerdigrisFillStaysReadable() {
+        for mark in [LintelRingMark.meeting, .dictation] {
+            let warning = LintelRingAppearance(state: .warning, mark: mark, reduceMotion: false, onAccentFill: true)
+            #expect(warning.dotTone == .onAccent, "a warning keeps its dot, \(mark)")
+            let error = LintelRingAppearance(state: .error, mark: mark, reduceMotion: false, onAccentFill: true)
+            #expect(error.cutWidth == LintelRingAppearance.errorCutWidth && error.dotTone == nil, "\(mark)")
+        }
+        let tones: [LintelRingState] = [.idle, .listening, .warning, .processing(progress: 0.3), .error]
+        for dark in [false, true] {
+            let fill = dark ? BrandPalette.accentDark : BrandPalette.accentLight
+            for state in tones {
+                let look = LintelRingAppearance(state: state, mark: .meeting, reduceMotion: false, onAccentFill: true)
+                for tone in [look.ringTone] + [look.dotTone].compactMap({ $0 }) {
+                    #expect(BrandPalette.contrast(tone.hex(dark: dark), fill) >= 3, "\(state) dark=\(dark)")
+                }
             }
         }
     }
@@ -248,5 +272,27 @@ import Testing
             animates: true)
         #expect(view.runningAnimationKeys.isEmpty)
         withExtendedLifetime((window, other)) {}
+    }
+
+    /// A layout pass or a theme change rebuilds the shapes but must not start the turn from zero again.
+    @Test func aLayoutPassOrAThemeChangeDoesNotRestartTheAnimation() {
+        let (view, window) = hosted(.listening)
+        let restarts = view.animationRestarts
+        view.needsLayout = true
+        view.layoutSubtreeIfNeeded()
+        view.layout()
+        view.viewDidChangeEffectiveAppearance()
+        view.configure(
+            appearance: LintelRingAppearance(state: .listening, mark: .meeting, reduceMotion: false), small: false,
+            animates: true)
+        #expect(view.animationRestarts == restarts)
+        #expect(view.runningAnimationKeys == [RingLayerView.turnKey, RingLayerView.breatheKey])
+        // A different state does restart (here: the breathing dot goes, the turn stays).
+        view.configure(
+            appearance: LintelRingAppearance(state: .warning, mark: .meeting, reduceMotion: false), small: false,
+            animates: true)
+        #expect(view.animationRestarts == restarts + 1)
+        #expect(view.runningAnimationKeys == [RingLayerView.turnKey])
+        withExtendedLifetime(window) {}
     }
 }

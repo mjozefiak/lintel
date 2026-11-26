@@ -164,6 +164,17 @@ final class RingLayerView: NSView {
     private(set) var look: LintelRingAppearance?
     private var small = false
     private var animates = true
+    /// What the layers' running animations were made from; a rebuild that does not change it leaves them running,
+    /// so a layout pass or a theme change does not restart the turn from zero.
+    private var appliedMotion: Motion?
+    /// How many times the animations were (re)made, for tests.
+    private(set) var animationRestarts = 0
+
+    private struct Motion: Equatable {
+        var secondsPerTurn: Double?
+        var dotBreathes: Bool
+        var inWindow: Bool
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -245,9 +256,22 @@ final class RingLayerView: NSView {
     }
 
     private func applyAnimations() {
+        let wanted: Motion? =
+            if animates, window != nil, let appearance = look {
+                Motion(
+                    secondsPerTurn: appearance.secondsPerTurn, dotBreathes: appearance.dotBreathes, inWindow: true)
+            } else {
+                nil
+            }
+        var expected: Set<String> = []
+        if wanted?.secondsPerTurn != nil { expected.insert(Self.turnKey) }
+        if wanted?.dotBreathes == true { expected.insert(Self.breatheKey) }
+        if wanted == appliedMotion && runningAnimationKeys == expected { return }
+        appliedMotion = wanted
+        animationRestarts += 1
         spinLayer.removeAnimation(forKey: Self.turnKey)
         dotLayer.removeAnimation(forKey: Self.breatheKey)
-        guard animates, window != nil, let appearance = look else { return }
+        guard wanted != nil, let appearance = look else { return }
         if let seconds = appearance.secondsPerTurn {
             let turn = CABasicAnimation(keyPath: "transform.rotation.z")
             turn.fromValue = 0
@@ -272,16 +296,7 @@ final class RingLayerView: NSView {
     }
 
     private static func cgColor(_ tone: LintelRingAppearance.Tone, in view: NSView) -> CGColor {
-        let color: NSColor =
-            switch tone {
-            case .quiet: LintelBrand.secondaryTextColor
-            case .ink: LintelBrand.inkColor
-            case .live: LintelBrand.accentColor
-            case .attention: LintelBrand.statusAttentionColor
-            case .error: LintelBrand.statusErrorColor
-            case .onAccent: LintelBrand.onAccentColor
-            }
-        return cgColor(color, in: view)
+        cgColor(tone.brandColor, in: view)
     }
 
     private static func cgColor(_ color: NSColor, in view: NSView) -> CGColor {
