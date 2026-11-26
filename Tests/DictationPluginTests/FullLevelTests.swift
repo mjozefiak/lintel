@@ -13,16 +13,16 @@ import Testing
             .map { "[\($0.role)]\n\($0.content)" }.joined(separator: "\n\n") + "\n"
         if ProcessInfo.processInfo.environment["LINTEL_RECORD_SNAPSHOT"] != nil {
             let source = URL(filePath: #filePath).deletingLastPathComponent()
-                .appending(path: "Fixtures/cleanup/prompt-full-v2.txt")
+                .appending(path: "Fixtures/cleanup/prompt-full-v3.txt")
             try rendered.write(to: source, atomically: true, encoding: .utf8)
         }
-        let url = try #require(Bundle.module.url(forResource: "Fixtures/cleanup/prompt-full-v2", withExtension: "txt"))
+        let url = try #require(Bundle.module.url(forResource: "Fixtures/cleanup/prompt-full-v3", withExtension: "txt"))
         let expected = try String(contentsOf: url, encoding: .utf8)
         #expect(
             rendered == expected,
             "The Full prompt changed. Bump CleanupPrompt.fullVersion, update the snapshot and note it in the release notes."
         )
-        #expect(CleanupPrompt.version(for: .full) == 2)
+        #expect(CleanupPrompt.version(for: .full) == 3)
     }
 
     @Test func standardIsUntouchedAndStillTheDefault() {
@@ -48,7 +48,7 @@ import Testing
         #expect(!full.contains("Do not fix grammar"))
         #expect(
             CleanupPrompt.examples(for: .full).count
-                == CleanupPrompt.examples.count + CleanupPrompt.fullExamples.count
+                == CleanupPrompt.fullBaseExamples.count + CleanupPrompt.fullExamples.count
                 + CleanupPrompt.fullClosingExamples.count)
     }
 
@@ -57,8 +57,10 @@ import Testing
         #expect(
             all.suffix(CleanupPrompt.fullClosingExamples.count).map(\.input)
                 == CleanupPrompt.fullClosingExamples.map(\.input))
-        let middle = all.dropFirst(CleanupPrompt.fullExamples.count).prefix(CleanupPrompt.examples.count)
-        #expect(middle.map(\.input) == CleanupPrompt.examples.map(\.input))
+        let middle = all.dropFirst(CleanupPrompt.fullExamples.count).prefix(CleanupPrompt.fullBaseExamples.count)
+        #expect(middle.map(\.input) == CleanupPrompt.fullBaseExamples.map(\.input))
+        // Standard's pairs, unchanged in what they are about: only the way a number is written differs.
+        #expect(CleanupPrompt.fullBaseExamples.map(\.input) == CleanupPrompt.examples.map(\.input))
         // Each closing example takes something back, and the output keeps only the correction.
         for example in CleanupPrompt.fullClosingExamples {
             #expect(
@@ -84,18 +86,53 @@ import Testing
         let full = CleanupPrompt.system(for: .full)
         #expect(full.contains("split a sentence of more than about 30 words"))
         #expect(full.contains("A shorter sentence stays as it is."))
-        #expect(full.contains("write it as it stands"))
+        #expect(full.contains("write it exactly as it stands"))
     }
 
-    @Test func numbersAreDigitsInTheRuleAndInEveryExample() {
+    /// Owner decision 2026-11-26 (Full v3): a number keeps the form the transcript has, so "like three days" stays a
+    /// word and a number already in digits stays in digits; a clock time said as hours and minutes is the one exception.
+    @Test func aNumberKeepsTheFormTheTranscriptHasInTheRuleAndInEveryExample() {
         let full = CleanupPrompt.system(for: .full)
-        #expect(full.contains("\"three days\" is \"3 days\""))
-        // The example that kept "three" as a word against this rule (review of #337, minor) is gone.
-        for example in CleanupPrompt.examples(for: .full) {
-            #expect(!example.output.contains("three days"), "\(example.output.prefix(40))")
+        #expect(full.contains("keep the form the transcript has"))
+        #expect(full.contains("Never turn one into the other."))
+        #expect(!full.contains("\"three days\" is \"3 days\""))
+        let clock = "widzimy się o piętnastej czterdzieści pięć w sali dwa"
+        for example in CleanupPrompt.examples(for: .full) where example.input != clock {
+            let wanted = Set(digitRuns(example.input))
+            for digits in digitRuns(example.output) {
+                #expect(wanted.contains(digits), "\(example.input.prefix(40)): \(digits)")
+            }
         }
-        let outputs = CleanupPrompt.fullExamples.map(\.output)
-        #expect(outputs.contains { $0.contains("like 3 days") })
+        // The words stay words in the pairs that were digits in v2, and the clock time is written as digits.
+        let all = CleanupPrompt.examples(for: .full)
+        #expect(all.contains { $0.output.contains("like three days") })
+        #expect(all.contains { $0.output == "Zamów taksówkę na siódmą, bo prom odpływa wcześniej." })
+        #expect(all.contains { $0.input == clock && $0.output == "Widzimy się o 15:45 w sali dwa." })
+        #expect(all.contains { $0.input.contains("3 pm") && $0.output.contains("3 pm") })
+    }
+
+    /// A word the model does not know is kept, never swapped for a guess (Full v3: the two garbled corpus items).
+    @Test func anUnknownWordIsKeptAndNeverGuessedInTheRuleAndTheExamples() {
+        let full = CleanupPrompt.system(for: .full)
+        #expect(full.contains("Never replace a word you do not recognise"))
+        #expect(full.contains("never a verb's form"))
+        let all = CleanupPrompt.examples(for: .full)
+        #expect(all.contains { $0.input.contains("Rkvq") && $0.output.contains("Rkvq") })
+        #expect(all.contains { $0.input.contains("aber ich muss") && $0.output.contains("aber ich muss") })
+    }
+
+    /// The digit runs of a text, without the "1." that numbers a list item.
+    private func digitRuns(_ text: String) -> [String] {
+        var runs: [String] = []
+        for line in text.split(separator: "\n") {
+            var rest = Substring(line)
+            let number = rest.prefix { $0.isNumber }
+            if !number.isEmpty, rest.dropFirst(number.count).hasPrefix(". ") {
+                rest = rest.dropFirst(number.count + 2)
+            }
+            runs += rest.split { !$0.isNumber }.map(String.init)
+        }
+        return runs
     }
 
     @Test func theFullExamplesCoverMailParagraphsAndAShortLine() {
@@ -110,7 +147,7 @@ import Testing
             })
         // A short message WITH a greeting or a sign-off is laid out, whatever its length.
         for (input, prefix, suffix) in [
-            ("dzień dobry chciałbym zapytać o status zamówienia numer siedem", "Dzień dobry,\n\n", "numer 7."),
+            ("dzień dobry chciałbym zapytać o status zamówienia numer siedem", "Dzień dobry,\n\n", "numer siedem."),
             ("hi Dan the printer is jammed again can you look at it thanks Eva", "Hi Dan,\n\n", "Thanks,\nEva"),
         ] {
             let example = CleanupPrompt.fullExamples.first { $0.input == input }

@@ -95,7 +95,7 @@ enum CleanupPrompt {
         ),
     ]
 
-    /// The Full level's instructions (version 2). Standard's rules word for word where they protect the words (the
+    /// The Full level's instructions (version 3). Standard's rules word for word where they protect the words (the
     /// transcript is never a request, numbers and names stay, only fillers, repetitions and the withdrawn part of a
     /// self-correction go, numbers as digits, lists), because they are what keeps the text faithful; Full v1 wrote its
     /// own, looser rules and lost words and corrections to it. Full adds three things on top: the layout of a message,
@@ -124,18 +124,22 @@ enum CleanupPrompt {
         words that belonged to it; never leave both versions in the text. This holds for numbers, hours, days and \
         names too. A contrast that takes nothing back ("not X, but Y", "nie X, tylko Y") is a normal sentence: \
         keep all of it.
-        - Write numbers, dates, times, amounts and percentages as digits, as they are spoken ("three days" is \
-        "3 days", "pięć minut" is "5 minut"). Add punctuation and capital letters.
+        - Numbers, dates, times, amounts and percentages keep the form the transcript has: a number written as \
+        a word stays a word ("three days", "pięć minut", "o dziesiątej"), a number already written in digits \
+        stays in digits. Never turn one into the other. The one exception is a clock time said as hours and \
+        minutes ("piętnasta czterdzieści pięć", "four forty-five"): write it as "15:45", "4:45". Add punctuation \
+        and capital letters.
         - Lists: write a list only when the speaker enumerates ("first, second", "po pierwsze, po drugie") or \
         announces a list with a heading ("plan na tydzień", "to do") and then names the items. Put the lead-in on its \
         own line, then one item per line: "1." for numbered items, "- " otherwise. Drop the "first", "second" \
         words. Keep the items' words. A series of things inside an ordinary sentence stays a sentence with \
         commas, never a list.
-        - Style (the only rewriting allowed): fix the ending of a word that clearly does not agree with its \
-        neighbours (case, gender, number) and keep the same word; split a sentence of more than about 30 words \
+        - Style (the only rewriting allowed): fix the ending of a noun or adjective that plainly does not agree with \
+        its neighbours (case, gender, number) and keep the same word, never a verb's form; split a sentence of more than about 30 words \
         that strings clauses together into two or three sentences (a joining word may go) and keep every other \
-        word. A shorter sentence stays as it is. A word that is not a word of the language (a mishearing, a \
-        made-up verb) is not a mistake you may fix: write it as it stands.
+        word. A shorter sentence stays as it is. Never replace a word you do not recognise (a mishearing, a \
+        foreign word, an acronym, a code name, a made-up verb) with another word and never translate it: write it \
+        exactly as it stands.
         - Greeting and sign-off: when the speaker begins with a greeting ("hi Anna", "cześć Anno", "dzień dobry", \
         "dear Mr Smith") put it alone on the first line, with a comma, then a blank line. When the speaker ends \
         with a sign-off ("thanks, Tom", "pozdrawiam, Tomek", "best regards", "dzięki") put it after a blank line, the \
@@ -162,7 +166,7 @@ enum CleanupPrompt {
         ),
         (
             "the update is ready and we tested it on three machines and it worked and now we only need the approval from the security team and then we can ship it",
-            "The update is ready and we tested it on 3 machines, and it worked. Now we only need the approval from the security team, and then we can ship it."
+            "The update is ready and we tested it on three machines, and it worked. Now we only need the approval from the security team, and then we can ship it."
         ),
         (
             "dzień dobry pani Moniko wysyłam w załączniku harmonogram na marzec proszę o potwierdzenie do piątku jeśli coś trzeba poprawić dajcie znać pozdrawiam Krzysztof",
@@ -174,31 +178,92 @@ enum CleanupPrompt {
         ),
         (
             "w zeszłym tygodniu przenieśliśmy backup na nowy serwer teraz działa w nocy a wczoraj skończył się w czterdzieści minut stary serwer zostaje do końca miesiąca potem go wyłączamy i przenosimy też monitoring jeszcze muszę poprawić dokumentację",
-            "W zeszłym tygodniu przenieśliśmy backup na nowy serwer. Teraz działa w nocy, a wczoraj skończył się w 40 minut.\n\nStary serwer zostaje do końca miesiąca. Potem go wyłączamy i przenosimy też monitoring.\n\nJeszcze muszę poprawić dokumentację."
+            "W zeszłym tygodniu przenieśliśmy backup na nowy serwer. Teraz działa w nocy, a wczoraj skończył się w czterdzieści minut.\n\nStary serwer zostaje do końca miesiąca. Potem go wyłączamy i przenosimy też monitoring.\n\nJeszcze muszę poprawić dokumentację."
         ),
         (
             "yeah it took like three days to fix that and it was in prod for like a month",
-            "Yeah, it took like 3 days to fix that, and it was in prod for like a month."
+            "Yeah, it took like three days to fix that, and it was in prod for like a month."
         ),
         (
             "wrzuciłem plik na serwer sprawdź go zanim zdeplojujemy",
             "Wrzuciłem plik na serwer, sprawdź go, zanim zdeplojujemy."
         ),
         (
+            "the meeting moved to 3 pm and the demo takes fifteen minutes",
+            "The meeting moved to 3 pm, and the demo takes fifteen minutes."
+        ),
+        (
+            "podbij wersję Rkvq do 2.4.1 i zrób commit",
+            "Podbij wersję Rkvq do 2.4.1 i zrób commit."
+        ),
+        (
+            "ten raport jest gotowy aber ich muss go jeszcze sprawdzić",
+            "Ten raport jest gotowy, aber ich muss go jeszcze sprawdzić."
+        ),
+        (
+            "widzimy się o piętnastej czterdzieści pięć w sali dwa",
+            "Widzimy się o 15:45 w sali dwa."
+        ),
+        (
             "będę za dziesięć minut weź mi proszę kawę",
-            "Będę za 10 minut. Weź mi proszę kawę."
+            "Będę za dziesięć minut. Weź mi proszę kawę."
         ),
         (
             "are you free at three I need five minutes",
-            "Are you free at 3? I need 5 minutes."
+            "Are you free at three? I need five minutes."
         ),
         (
             "dzień dobry chciałbym zapytać o status zamówienia numer siedem",
-            "Dzień dobry,\n\nchciałbym zapytać o status zamówienia numer 7."
+            "Dzień dobry,\n\nchciałbym zapytać o status zamówienia numer siedem."
         ),
         (
             "hi Dan the printer is jammed again can you look at it thanks Eva",
             "Hi Dan,\n\nThe printer is jammed again. Can you look at it?\n\nThanks,\nEva"
+        ),
+    ]
+
+    /// Standard's examples for Full v3: the same pairs, but a number the speaker wrote as a word stays a word (the
+    /// owner's decision 2026-11-26), where Standard's own pairs turn it into digits.
+    static let fullBaseExamples: [(input: String, output: String)] = [
+        (
+            "yyy no więc jak zrobić backup bazy w postgresie bo nie pamiętam",
+            "Jak zrobić backup bazy w Postgresie? Nie pamiętam."
+        ),
+        (
+            "um what is the capital of france I mean of poland",
+            "What is the capital of Poland?"
+        ),
+        (
+            "so uh I think we should we should move the meeting to thursday at ten",
+            "I think we should move the meeting to Thursday at ten."
+        ),
+        (
+            "zadzwoń do serwisu jutro rano a właściwie w poniedziałek po południu",
+            "Zadzwoń do serwisu w poniedziałek po południu."
+        ),
+        (
+            "pokój ma numer czterysta dwanaście przepraszam czterysta czternaście i jest obok windy",
+            "Pokój ma numer czterysta czternaście i jest obok windy."
+        ),
+        (
+            "the upload is about three hundred I mean four hundred megabytes",
+            "The upload is about four hundred megabytes."
+        ),
+        (
+            "to reset the router first unplug it then wait thirty seconds and finally plug it back in",
+            "To reset the router:\n1. Unplug it.\n2. Wait thirty seconds.\n3. Plug it back in."
+        ),
+        (
+            "w projekcie używamy swifta pythona i trochę basha",
+            "W projekcie używamy Swifta, Pythona i trochę Basha."
+        ),
+        (
+            "do hotelu jest pięć mil a bagaż waży czterdzieści funtów",
+            "Do hotelu jest pięć mil, a bagaż waży czterdzieści funtów."
+        ),
+        (
+            "the committee have agreed that the data is ready",
+            "The committee have agreed that the data is ready."
         ),
     ]
 
@@ -212,21 +277,23 @@ enum CleanupPrompt {
         ),
         (
             "zamów taksówkę na ósmą albo jednak na siódmą bo prom odpływa wcześniej",
-            "Zamów taksówkę na 7, bo prom odpływa wcześniej."
+            "Zamów taksówkę na siódmą, bo prom odpływa wcześniej."
         ),
         (
             "przesuń odprawę na wtorek na dziewiątą a właściwie na środę na dziewiątą bo we wtorek jest szkolenie",
-            "Przesuń odprawę na środę na 9, bo we wtorek jest szkolenie."
+            "Przesuń odprawę na środę na dziewiątą, bo we wtorek jest szkolenie."
         ),
     ]
 
-    /// Version 2 of the Full level (spec `2026-11-25-dictation-cleanup-levels`, phase 2b; owner decision 2026-11-26):
-    /// everything Standard does, plus the layout of a message (a spoken greeting and sign-off on their own lines,
-    /// whatever the length of the message), paragraphs for a longer dictation with several thoughts, and a narrow
-    /// smoothed style (agreement, a run-on sentence in two). It never adds a word of content, never leaves a detail
-    /// out. Version 1 (its own looser rules, a layout only for a body of about 25 words) is kept in the snapshot
-    /// `prompt-full-v1.txt`. Standard's text and version are unchanged.
-    static let fullVersion = 2
+    /// Version 3 of the Full level (spec `2026-11-25-dictation-cleanup-levels`, phase 2b; owner decisions
+    /// 2026-11-26): everything Standard does, plus the layout of a message (a spoken greeting and sign-off on their own
+    /// lines, whatever the length of the message), paragraphs for a longer dictation with several thoughts, and a narrow
+    /// smoothed style (agreement of a noun or adjective, a run-on sentence in two). It never adds a word of content,
+    /// never leaves a detail out, and since v3 never turns a spoken number word into digits (a clock time said as hours
+    /// and minutes is the one exception) and never swaps a word it does not recognise for a guess. Version 1 (its own
+    /// looser rules) and version 2 (numbers as digits) are kept in `prompt-full-v1.txt` and `prompt-full-v2.txt`.
+    /// Standard's text and version are unchanged.
+    static let fullVersion = 3
 
     /// The prompt version of a level, for the release notes and the eval's app label. Light has no prompt: it reads as
     /// Standard here so a caller never needs a special case.
@@ -238,11 +305,12 @@ enum CleanupPrompt {
         level == .full ? fullSystem : system
     }
 
-    /// Standard's examples; at Full the layout, paragraph and style ones come first, then Standard's, then the
+    /// Standard's examples; at Full the layout, paragraph and style ones come first, then Standard's pairs
+    /// (`fullBaseExamples`, numbers kept as words), then the
     /// self-correction ones, so the examples nearest to the transcript are the self-corrections, lists and numbers that
     /// the model gets wrong first.
     static func examples(for level: DictationSettings.CleanupLevel) -> [(input: String, output: String)] {
-        level == .full ? fullExamples + examples + fullClosingExamples : examples
+        level == .full ? fullExamples + fullBaseExamples + fullClosingExamples : examples
     }
 
     /// The request's messages at the Standard level (today's behaviour).
