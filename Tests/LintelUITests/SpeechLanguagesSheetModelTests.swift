@@ -203,7 +203,7 @@ import Testing
         sheet.add("ja")
         #expect(
             sheet.whisperNote.map { String(localized: $0) }
-                == "With this list, meetings and dictation use the Whisper model. It is slower than the standard one.")
+                == "With this list, meetings use the Whisper model. It is slower than the standard one.")
         sheet.remove("ja")
         #expect(sheet.whisperNote == nil)
     }

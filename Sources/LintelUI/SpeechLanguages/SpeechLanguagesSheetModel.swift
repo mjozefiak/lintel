@@ -211,12 +211,12 @@ public struct SpeechLanguagesSheetModel: Sendable, Equatable {
         case .automatic:
             guard languages.contains(where: needsWhisper) else { return nil }
             return LocalizedStringResource(
-                "With this list, meetings and dictation use the Whisper model. It is slower than the standard one.",
+                "With this list, meetings use the Whisper model. It is slower than the standard one.",
                 comment: "Languages sheet: note above Done when a listed language needs the Whisper model")
         case .single:
             guard let singleLanguage, needsWhisper(singleLanguage) else { return nil }
             return LocalizedStringResource(
-                "With this language, meetings and dictation use the Whisper model. It is slower than the standard one.",
+                "With this language, meetings use the Whisper model. It is slower than the standard one.",
                 comment: "Languages sheet: note above Done when the one pinned language needs the Whisper model")
         }
     }

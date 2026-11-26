@@ -189,13 +189,22 @@ public final class DictationPlugin: LintelPlugin {
     }
 
     /// What every segment of a new dictation is sent with (spec `2026-11-23-automatic-language-detection`, step
-    /// 2.3): Whisper pinned to the single language, else the first listed one; Parakeet no hint (automatic dictation,
-    /// with its short-dictation script re-decode, is Phase 3).
+    /// 2.3): Whisper pinned to the single language, else the first language of a list the user wrote; Parakeet no
+    /// hint (automatic dictation, with its short-dictation script re-decode, is Phase 3).
+    ///
+    /// Until Phase 3 a list nobody edited (`isDerived`: nothing stored, so it only mirrors the Mac's languages) must
+    /// not decide the language of a Whisper dictation: a Mac that speaks only English would pin a user who never
+    /// chose a language to English, where the hidden per-plugin setting this replaced gave `pl`. That default
+    /// stays (owner, 2026-11-26) until dictation detects its language itself; a list the user wrote, and a
+    /// language migrated from the old key (which writes the list), still win.
+    nonisolated static let legacyDictationLanguage = "pl"
+
     nonisolated static func requestOptions(for selection: SpeechLanguageSelection) -> SpeechRequestOptions {
         let language: String
         switch selection.mode {
         case .single(let code): language = code
-        case .automatic: language = selection.languages.first ?? "en"
+        case .automatic:
+            language = selection.isDerived ? legacyDictationLanguage : selection.languages.first ?? "en"
         }
         return SpeechRequestOptions(scriptHint: nil, whisperLanguage: .pinned(language))
     }

@@ -1,7 +1,9 @@
 import Foundation
 import LintelKit
+import LintelSpeech
 import Testing
 
+@testable import DictationPlugin
 @testable import LintelApp
 
 /// Spec `2026-11-23-automatic-language-detection`, Data Model and step 2.3: the one-time move of
@@ -154,5 +156,32 @@ import Testing
             return
         }
         #expect(languages.first == "en")
+    }
+
+    // MARK: Whisper dictation keeps Polish until Phase 3 (owner, 2026-11-26)
+
+    /// A user who dictates with Whisper, never stored a language and has a Mac that speaks only English: after the
+    /// migration and through the real host setting, the options of a new dictation are still pinned to Polish.
+    @Test func anEnglishOnlyMacWithNoStoredLanguageIsStillDictatedAsPolish() {
+        let store = InMemorySettingsStore()
+        #expect(run(store, preferred: ["en-US"]) == .nothingToMove)
+        let selection = current(store, preferred: ["en-US"])
+        #expect(selection == SpeechLanguageSelection(mode: .automatic, languages: ["en"], isDerived: true))
+        #expect(DictationPlugin.requestOptions(for: selection).whisperLanguage == .pinned("pl"))
+    }
+
+    /// A stored Dictation language was a choice: it survives as the first language of the list.
+    @Test func aStoredEnglishDictationLanguageStaysEnglish() {
+        let store = InMemorySettingsStore([Self.dictation: .string("en")])
+        _ = run(store, preferred: ["pl-PL"])
+        let selection = current(store, preferred: ["pl-PL"])
+        #expect(DictationPlugin.requestOptions(for: selection).whisperLanguage == .pinned("en"))
+    }
+
+    @Test func aStoredPolishDictationLanguageStaysPolishOnAnEnglishMac() {
+        let store = InMemorySettingsStore([Self.dictation: .string("pl")])
+        _ = run(store, preferred: ["en-US"])
+        let selection = current(store, preferred: ["en-US"])
+        #expect(DictationPlugin.requestOptions(for: selection).whisperLanguage == .pinned("pl"))
     }
 }

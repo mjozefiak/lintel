@@ -25,8 +25,34 @@ import Testing
                 == SpeechRequestOptions(scriptHint: nil, whisperLanguage: .pinned("el")))
     }
 
-    @Test func anEmptyListFallsBackToEnglish() {
-        let selection = SpeechLanguageSelection(mode: .automatic, languages: [], isDerived: true)
+    @Test func anEmptyListThatTheUserWroteFallsBackToEnglish() {
+        let selection = SpeechLanguageSelection(mode: .automatic, languages: [], isDerived: false)
+        #expect(DictationPlugin.requestOptions(for: selection).whisperLanguage == .pinned("en"))
+    }
+
+    // MARK: Regression: Polish stays the Whisper dictation default until Phase 3 (owner, 2026-11-26)
+
+    /// A user who never chose a language, on a Mac that speaks only English: the list is derived (`["en"]`), and
+    /// Whisper dictation must keep getting `pl`, as it did before the shared setting.
+    @Test func anUntouchedListOnAnEnglishOnlyMacKeepsWhisperDictationOnPolish() {
+        let selection = SpeechLanguageSelection(mode: .automatic, languages: ["en"], isDerived: true)
+        #expect(DictationPlugin.requestOptions(for: selection).whisperLanguage == .pinned("pl"))
+    }
+
+    @Test func anUntouchedListOnAnyOtherMacAlsoKeepsPolish() {
+        let selection = SpeechLanguageSelection(mode: .automatic, languages: ["de", "fr"], isDerived: true)
+        #expect(DictationPlugin.requestOptions(for: selection).whisperLanguage == .pinned("pl"))
+    }
+
+    /// Writing the list is a choice: a one-language English list pins English.
+    @Test func aListTheUserWroteWinsOverThePolishDefault() {
+        let selection = SpeechLanguageSelection(mode: .automatic, languages: ["en"], isDerived: false)
+        #expect(DictationPlugin.requestOptions(for: selection).whisperLanguage == .pinned("en"))
+    }
+
+    /// The default is not a pin the user cannot undo: "Always one language" still wins.
+    @Test func singleModeWinsEvenWhileTheListIsDerived() {
+        let selection = SpeechLanguageSelection(mode: .single("en"), languages: ["en"], isDerived: true)
         #expect(DictationPlugin.requestOptions(for: selection).whisperLanguage == .pinned("en"))
     }
 
