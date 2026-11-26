@@ -1,5 +1,155 @@
 {
   "files" : {
+    "dictation.tidy-source\/claude-checking@dark-m-en.png" : {
+      "height" : 570,
+      "sha256" : "fdb5c6a9f1c2704aec5e407223b68c7cca59d4e09e351d720dc1ef93e02eb4c9",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-checking@light-m-en.png" : {
+      "height" : 570,
+      "sha256" : "2712125fee75a1ac3bdea7d624994378132195b57c7fdaad355c676843677d60",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-checking@light-xl-pl.png" : {
+      "height" : 664,
+      "sha256" : "8717a9fa75baaa2fe5a8c1871f63a388aa01fd923ce56ef50a5e3ba4a3705cdb",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full-falls-back-to-nothing@dark-m-en.png" : {
+      "height" : 600,
+      "sha256" : "b43fdf805d1961a47506a9c6a6727405c374ccea7d666cf8585853e4522149db",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full-falls-back-to-nothing@light-m-en.png" : {
+      "height" : 600,
+      "sha256" : "cc399b385b8b756cb5aa0c4160d8f426cb90f2f3439dd89f018830fe3ec9217c",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full-falls-back-to-nothing@light-xl-pl.png" : {
+      "height" : 778,
+      "sha256" : "cc4aad0cac8c37084057f3bbdcf3825d448265395acbee82d926f4a3bf62f6b6",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full-falls-back-to-this-mac@dark-m-en.png" : {
+      "height" : 600,
+      "sha256" : "c6e65ea03e335c1bd03ffaa00df450988265fa2b497e9a04cfffb0f404f27bbe",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full-falls-back-to-this-mac@light-m-en.png" : {
+      "height" : 600,
+      "sha256" : "c4b05d1d777701e90c9637fbe35d60efa98eef6a0ee33d6a900f070c0b30920b",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full-falls-back-to-this-mac@light-xl-pl.png" : {
+      "height" : 778,
+      "sha256" : "108adeef44b7655306254cf60ed26122f1c63c83f7dd59c868c0beed96fd9b38",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full@dark-m-en.png" : {
+      "height" : 526,
+      "sha256" : "c40902cecc7f8a218f9be7275cc69f7928161bb2c9df27beb1ae4ab4b69d0e62",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full@light-m-en.png" : {
+      "height" : 526,
+      "sha256" : "de9907a985bf07d56d971e895f2472f3ed6898bc9d05d1e7424c91ac6eb37473",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-full@light-xl-pl.png" : {
+      "height" : 698,
+      "sha256" : "6a5647fe800b1a314c7549d81db6ab20c77afad40fcf68766c40ef79aec1551d",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-heavier-model@dark-m-en.png" : {
+      "height" : 522,
+      "sha256" : "873e299ceaedce618954032ed58d58a72203255123360f3b7f5b21d902e2dc69",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-heavier-model@light-m-en.png" : {
+      "height" : 522,
+      "sha256" : "780b19ca01e2b000fa64e466aad81d397b46a2bd46078163cde3b6ff56a424df",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-heavier-model@light-xl-pl.png" : {
+      "height" : 658,
+      "sha256" : "b0052e3fd028cdff6f23e14242b2159d81ccbe6c632523ad5a3741accc592369",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-not-installed@dark-m-en.png" : {
+      "height" : 576,
+      "sha256" : "8c822528a5ea004b7b1c355e69fa1726e88cf3d4eb18981fb3a2b06a6df24dde",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-not-installed@light-m-en.png" : {
+      "height" : 576,
+      "sha256" : "21674f9d1616ce04854b244abcf6daa01a381a3138dba1b006dae4b18953f4ac",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-not-installed@light-xl-pl.png" : {
+      "height" : 702,
+      "sha256" : "3116d4fd443ee48e8305367a859fd8ca6845255f2560fc7f337118a371d94d18",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-signed-out@dark-m-en.png" : {
+      "height" : 576,
+      "sha256" : "7213589c9b924ea6bd1e0e4061658fdad882eac976a8ac1f61f587387ce5892f",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-signed-out@light-m-en.png" : {
+      "height" : 576,
+      "sha256" : "3ea2ee4cdaba43156b828f481326da94735218a6faf39ac2dd388d564d876315",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-signed-out@light-xl-pl.png" : {
+      "height" : 702,
+      "sha256" : "9e328aef1e6abfe33601b63409698a8574316d7fb1d4f267cd50cbbb7bdfd927",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-standard@dark-m-en.png" : {
+      "height" : 496,
+      "sha256" : "7cf1b0c8086af1fd2ef0884c46418b97f5b9e5911c8f08ce7f86fa3ed6e57a60",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-standard@light-m-en.png" : {
+      "height" : 496,
+      "sha256" : "56492f216691ba459e3a31ebd5e4ad4e125fe39a327d608f66cf8a9fc09eeb11",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/claude-standard@light-xl-pl.png" : {
+      "height" : 584,
+      "sha256" : "ce3660b3c4c58e780652a43eeafc15eeee17fe5aaa90c7aa5f7415c733415fc5",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/my-server-no-provider@dark-m-en.png" : {
+      "height" : 340,
+      "sha256" : "da1ef19a68231c6f018907e7000cb6cbc9446e0523ebad64597c74a20f8caa09",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/my-server-no-provider@light-m-en.png" : {
+      "height" : 340,
+      "sha256" : "eafd54baefd342c809e04330ac45bda5b832f674bb15657f46b78592c122e07c",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/my-server-no-provider@light-xl-pl.png" : {
+      "height" : 378,
+      "sha256" : "e33b1d6348910f14145fb680a59f7accd1ab7a47314849016f040b7a5e03de0f",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/this-mac-standard@dark-m-en.png" : {
+      "height" : 340,
+      "sha256" : "06c5e432aead5ba669fba3330fa3b638e77551455162444c09f4517a4de1ed4a",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/this-mac-standard@light-m-en.png" : {
+      "height" : 340,
+      "sha256" : "65b69e24ea8ad281a1d646278499f3297339f26a5007bc6891aa472b80da36dd",
+      "width" : 1360
+    },
+    "dictation.tidy-source\/this-mac-standard@light-xl-pl.png" : {
+      "height" : 378,
+      "sha256" : "d28ec6e17a9bb44ea6d06d75a4a304f18d256853e1d9dd9045909438aa6e880a",
+      "width" : 1360
+    },
     "dictation.tidy-up\/full-small-model@dark-m-en.png" : {
       "height" : 320,
       "sha256" : "84e3c606b3cdee533193959ad8a7051ce84fb2858b03d72b2429cd1cadcac996",
@@ -592,7 +742,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45855037849",
+  "recordRun" : "45885064436",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
