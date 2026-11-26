@@ -149,6 +149,35 @@ import Testing
         #expect(full(input, output) == .accepted(output))
     }
 
+    @Test func aSpokenNumberAboveTenThatIsGoneIsALostNumber() {
+        let input = "spotkanie przesuwamy na czternastą trzydzieści a potem jedziemy razem do biura na Mokotowie"
+        let output = "Spotkanie przesuwamy, a potem jedziemy razem do biura na Mokotowie."
+        #expect(full(input, output) == .rejected(.lostNumber))
+        #expect(FormatterGuard.check(input: input, output: output) == .accepted(output))
+    }
+
+    @Test func aSpokenTimeWrittenAsDigitsIsKept() {
+        let input = "spotkanie przesuwamy na czternastą trzydzieści a potem jedziemy razem do biura"
+        let output = "Spotkanie przesuwamy na 14:30, a potem jedziemy razem do biura."
+        #expect(full(input, output) == .accepted(output))
+    }
+
+    @Test func spokenNumbersUpToTenAreNotCheckedForLoss() {
+        // "po pierwsze", "po drugie" become list markers: a run of number words whose largest reading is 10 or less
+        // is exempt, because a list or a rewrite turns such words into markers or other words.
+        let input = "na zakupy po pierwsze mleko i masło po drugie chleb razowy z piekarni"
+        let output = "Na zakupy:\n- mleko i masło\n- chleb razowy z piekarni"
+        #expect(SpokenNumbers.lostNumbers(in: output, comparedTo: input).isEmpty)
+        #expect(full(input, output) == .accepted(output))
+    }
+
+    @Test func aNumberSaidInGroupsIsKeptWhenItsGroupsAre() {
+        let input = "zadzwoń do Marka na numer 501 234 567 jutro rano przed spotkaniem w biurze"
+        let output = "Zadzwoń do Marka na numer 501-234-567 jutro rano przed spotkaniem w biurze."
+        #expect(SpokenNumbers.lostNumbers(in: output, comparedTo: input).isEmpty)
+        #expect(full(input, output) == .accepted(output))
+    }
+
     @Test func aSelfCorrectionMayWithdrawANumber() {
         let input = "zamówcie pizzę na 16 sorry na 17 i weźcie jedną dużą dla wszystkich"
         let output = "Zamówcie pizzę na 17 i weźcie jedną dużą dla wszystkich."
@@ -212,6 +241,13 @@ import Testing
         let output = "Dzisiaj rano byłem w biurze, rozmawiałem z kierownikiem o nowym projekcie."
         #expect(FormatterGuard.check(input: input, output: output) == .rejected(.tooShort))
         #expect(full(input, output) == .accepted(output))
+    }
+
+    @Test func fullsPlainRangeStartsAtSevenTenths() {
+        // The spec's first 0.6 was tightened to 0.7 from the eval: 9 words of 14 (0.64) is a dropped detail.
+        #expect(FormatterGuard.fullPlainLengthRange == 0.7...1.15)
+        let input = "dzisiaj rano byłem w biurze i rozmawiałem z kierownikiem o nowym projekcie dla klienta"
+        #expect(full(input, "Rano byłem w biurze, rozmawiałem z kierownikiem o projekcie.") == .rejected(.tooShort))
     }
 
     @Test func tooShortStillStopsAtFullBelowTheWideRange() {
