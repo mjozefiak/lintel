@@ -33,6 +33,15 @@ import Testing
         ),
         (SettingsKeys.onboardingShortcutCompleted, .exempt("internal flag: the welcome Shortcut step was finished")),
         (SettingsKeys.onboardingCompletedSteps, .exempt("internal flag list: finished plugin onboarding steps")),
+        (SettingsKeys.onboardingGoal, .exempt("internal value: the goal chosen on the onboarding goal page")),
+        (
+            SettingsKeys.onboardingFlowVersion,
+            .exempt("internal marker: the highest onboarding flow finished or closed, never rewritten")
+        ),
+        (
+            SettingsKeys.onboardingChecklistHidden,
+            .exempt("internal flag: the setup checklist row was hidden, and its control arrives with step 3.4")
+        ),
         (SettingsKeys.panelLevel, .exempt("fallback switch for the launcher panel level, set with defaults only")),
         (
             SettingsKeys.updatesIncludeBeta,

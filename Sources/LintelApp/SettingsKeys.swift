@@ -24,6 +24,19 @@ enum SettingsKeys {
     /// once. Added in Phase 2.
     static let onboardingCompletedSteps = "app.onboarding.completedSteps"
 
+    /// `String`: `both` (missing), `dictation` or `meetingNotes`, the goal last chosen on the onboarding goal
+    /// page; it preselects the page on "Show welcome again". Added with the first-run onboarding (spec
+    /// `2026-11-24-first-run-onboarding`, step 3.5).
+    static let onboardingGoal = "app.onboarding.goal"
+
+    /// `Int`: the highest onboarding flow finished or closed: `1` = the old welcome screen, `2` = the first-run
+    /// flow. Missing means the flow was never finished or closed; a stored value is never rewritten. Added with
+    /// the first-run onboarding (step 3.5).
+    static let onboardingFlowVersion = "app.onboarding.flowVersion"
+
+    /// `Bool`: the user hid the setup checklist row. Added with the first-run onboarding (step 3.5).
+    static let onboardingChecklistHidden = "app.onboarding.checklistHidden"
+
     /// `[String]`: plugin ids in the order their result sections appear (issue #5). Plugins not listed
     /// follow in `manifest.order`. Added in Phase 3.
     static let sectionOrder = "app.sectionOrder"

@@ -53,6 +53,20 @@ import Testing
         #expect(plugin.settingsPane() != nil)
     }
 
+    /// Spec `2026-11-24-first-run-onboarding`, step 3.1: the step serves the dictation goal and the plugin explains
+    /// the typing-into-other-apps permission in plain words. No UI reads either yet.
+    @Test func theSetupStepServesDictationAndExplainsTypingIntoOtherApps() throws {
+        let harness = try DictationHarness()
+        defer { harness.tearDown() }
+        let plugin = DictationPlugin(context: harness.context)
+        let step = try #require(plugin.onboardingSteps.first)
+        #expect(step.goal == .dictation)
+        #expect(
+            plugin.permissionReason(for: .accessibility).map { String(localized: $0) }
+                == "So your words appear where your cursor is.")
+        #expect(plugin.permissionReason(for: .microphone) == nil)
+    }
+
     @Test func settingsReadTheirDefaultsAndStoredValues() throws {
         let harness = try DictationHarness(settings: [
             "plugins.dictation.keepWarmMinutes": .integer(3),

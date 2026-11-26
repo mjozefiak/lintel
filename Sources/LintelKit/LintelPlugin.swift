@@ -89,6 +89,11 @@ public protocol LintelPlugin: AnyObject {
     /// A control shown under `permission`'s row in Settings → Permissions, for example a "Test" button for a
     /// permission whose state cannot be read. Added with meeting notes; the default shows nothing.
     func permissionAccessory(for permission: Permission) -> AnyView?
+    /// Why the plugin needs `permission`, in plain words for the onboarding Access step ("So your words appear
+    /// where your cursor is."). `nil` (the default) lets the shell show its generic reason. Added with the
+    /// first-run onboarding (spec `2026-11-24-first-run-onboarding`, step 3.1); a requirement with a default, so
+    /// a plugin written before it compiles unchanged.
+    func permissionReason(for permission: Permission) -> LocalizedStringResource?
     /// Sections of the main window's Workspace mode. Added with the main window; the default adds none.
     var workspaceSections: [WorkspaceSection] { get }
     /// The banner of the plugin's Settings pane, read only while the plugin is active. Added with the main
@@ -152,6 +157,7 @@ extension LintelPlugin {
     public var searchStatus: [SearchStatus] { [] }
     public var suggestionSources: [any SuggestionSource] { [] }
     public func permissionAccessory(for permission: Permission) -> AnyView? { nil }
+    public func permissionReason(for permission: Permission) -> LocalizedStringResource? { nil }
     public var workspaceSections: [WorkspaceSection] { [] }
     public var settingsStatus: SettingsStatus? { nil }
     public var busyReason: BusyReason? { nil }

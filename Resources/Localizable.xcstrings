@@ -1,6 +1,186 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Access" : {
+      "comment" : "Onboarding step rail: the permissions page",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dostęp"
+          }
+        }
+      }
+    },
+    "Next: %@" : {
+      "comment" : "Onboarding button that names the step it leads to",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next: %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dalej: %@"
+          }
+        }
+      }
+    },
+    "Next: Allow Access" : {
+      "comment" : "Onboarding privacy page: primary button that leads to the permissions page",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next: Allow Access"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dalej: zezwól na dostęp"
+          }
+        }
+      }
+    },
+    "Privacy" : {
+      "comment" : "Onboarding step rail: the privacy page",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prywatność"
+          }
+        }
+      }
+    },
+    "Set Up Both" : {
+      "comment" : "Onboarding goal page: primary button that sets up dictation and meeting notes",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Both"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skonfiguruj jedno i drugie"
+          }
+        }
+      }
+    },
+    "Set Up Dictation" : {
+      "comment" : "Onboarding goal page: primary button that sets up dictation",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Dictation"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skonfiguruj dyktowanie"
+          }
+        }
+      }
+    },
+    "Set Up Meeting Notes" : {
+      "comment" : "Onboarding goal page: primary button that sets up meeting notes",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Up Meeting Notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skonfiguruj notatki ze spotkań"
+          }
+        }
+      }
+    },
+    "So notes include what the others say." : {
+      "comment" : "Onboarding Access step: why meeting notes need the call's audio",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So notes include what the others say."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aby notatki obejmowały to, co mówią inni."
+          }
+        }
+      }
+    },
+    "So your words appear where your cursor is." : {
+      "comment" : "Onboarding Access step: why dictation needs to type into other apps",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "So your words appear where your cursor is."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aby Twoje słowa pojawiały się tam, gdzie kursor."
+          }
+        }
+      }
+    },
+    "Your goal" : {
+      "comment" : "Onboarding step rail: the goal page",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your goal"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twój cel"
+          }
+        }
+      }
+    },
     "Details" : {
       "comment" : "Inspector: tab with the view toggles and the note's facts",
       "extractionState" : "manual",
@@ -4988,7 +5168,7 @@
       }
     },
     "Open Lintel" : {
-      "comment" : "Menu bar menu item that opens the panel\nSettings label of the main shortcut",
+      "comment" : "Menu bar menu item that opens the panel\nOnboarding button on the last step that finishes setup\nSettings label of the main shortcut",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

@@ -208,3 +208,51 @@ enum TestContext {
         #expect(new.text.map { String(localized: $0) } == "One line.")
     }
 }
+
+/// The first-run onboarding (spec `2026-11-24-first-run-onboarding`, step 3.1) is additive: a step and a plugin
+/// written before it compile and keep their defaults, and an override of `permissionReason` is reached through
+/// `any LintelPlugin`.
+@MainActor
+@Suite struct OnboardingContractTests {
+    @Test func goalsAreAnOpenSetWithTheirRawValues() {
+        #expect(OnboardingGoal.dictation.rawValue == "dictation")
+        #expect(OnboardingGoal.meetingNotes.rawValue == "meetingNotes")
+        #expect(OnboardingGoal(rawValue: "somethingNew").rawValue == "somethingNew")
+        let literal: OnboardingGoal = "dictation"
+        #expect(literal == .dictation)
+    }
+
+    @Test func aStepWithoutTheNewFieldsKeepsTheirDefaults() {
+        let old = OnboardingStep(id: "old", title: "Old", symbolName: "star") { AnyView(EmptyView()) }
+        #expect(old.goal == nil)
+        #expect(old.primaryActionTitle == nil)
+    }
+
+    @Test func aStepKeepsItsGoalAndButtonTitle() {
+        let new = OnboardingStep(
+            id: "new", title: "New", symbolName: "star", text: "One line.", goal: .meetingNotes,
+            primaryActionTitle: "Start"
+        ) { AnyView(EmptyView()) }
+        #expect(new.goal == .meetingNotes)
+        #expect(new.primaryActionTitle.map { String(localized: $0) } == "Start")
+    }
+
+    @Test func permissionReasonDefaultsToNoneAndIsReachedThroughTheProtocol() {
+        let plain = DefaultContributionTests.MinimalPlugin(context: TestContext.make())
+        #expect(Permission.allCases.allSatisfy { plain.permissionReason(for: $0) == nil })
+
+        let asProtocol: any LintelPlugin = ExplainingPlugin(context: TestContext.make())
+        #expect(asProtocol.permissionReason(for: .microphone).map { String(localized: $0) } == "Because.")
+        #expect(asProtocol.permissionReason(for: .accessibility) == nil)
+    }
+}
+
+/// A plugin that gives one permission reason and leaves the others to the shell's generic wording.
+@MainActor final class ExplainingPlugin: LintelPlugin {
+    static let manifest = PluginManifest(
+        id: "explaining", displayName: "Explaining", symbolName: "circle", order: 0)
+    init(context: PluginContext) {}
+    func permissionReason(for permission: Permission) -> LocalizedStringResource? {
+        permission == .microphone ? "Because." : nil
+    }
+}
