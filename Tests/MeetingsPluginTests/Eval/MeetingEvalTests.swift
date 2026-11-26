@@ -88,12 +88,18 @@ struct MeetingEvalTests {
             let language = Self.value("LANGUAGE") ?? "pl"
             let speechFolder = URL(filePath: try #require(Self.value("SPEECH_FOLDER")), directoryHint: .isDirectory)
 
+            // The baseline of today (spec 2026-11-23-automatic-language-detection, step 2.5): one fixed language
+            // for every segment, whatever the session's own options say. The automatic run comes with step 2.5.
             let engine: any SpeechEngine
             switch engineID {
             case "parakeet-ultra":
                 let hint: String? = Self.value("PARAKEET_HINT") == "0" ? nil : language
-                engine = ParakeetEngine(language: { hint })
-            case "whisper-large-v3-turbo": engine = WhisperKitEngine(language: { language })
+                engine = FixedOptionsEngine(
+                    base: ParakeetEngine(),
+                    options: SpeechRequestOptions(scriptHint: ScriptHint.hint(forLanguages: hint.map { [$0] } ?? [])))
+            case "whisper-large-v3-turbo":
+                engine = FixedOptionsEngine(
+                    base: WhisperKitEngine(), options: SpeechRequestOptions(whisperLanguage: .pinned(language)))
             default:
                 Issue.record("Unknown engine \(engineID)")
                 return
@@ -321,4 +327,20 @@ private final class EvalArraySource: AudioSampleSource {
         }
         return range.isEmpty ? nil : Array(samples[range])
     }
+}
+
+/// Sends every request with the same options, whatever the caller asked: the evaluation's fixed-language baseline.
+private struct FixedOptionsEngine: SpeechEngine {
+    let base: any SpeechEngine
+    let options: SpeechRequestOptions
+
+    var isLoaded: Bool { get async { await base.isLoaded } }
+    func load(modelFolder: URL) async throws { try await base.load(modelFolder: modelFolder) }
+    func transcribe(_ samples: [Float]) async throws -> TranscriptSegment {
+        try await base.transcribe(samples, options: options)
+    }
+    func transcribe(_ samples: [Float], options _: SpeechRequestOptions) async throws -> TranscriptSegment {
+        try await base.transcribe(samples, options: options)
+    }
+    func unload() async { await base.unload() }
 }
