@@ -51,6 +51,10 @@ final class NoteChangeHub: Sendable {
 /// follow the open store; while it is not open (plugin off, Keychain locked or denied, failed, not yet opened)
 /// `list`, `exists` and `content` throw, and only an open store reports a meeting as absent.
 ///
+/// It is also the Recently deleted of the meetings (`NoteSourceTrash`): `list` and every search leave a trashed
+/// meeting out, while `exists` and `content` still answer for it (it is not gone, so Notes keeps its overlays),
+/// `actions` of a trashed key is empty and `delete` is permanent and works on it.
+///
 /// Nothing here logs a title, note or transcript text, and nothing touches `ranking.sqlite`.
 final class MeetingNoteSource: NoteSource {
     /// The most rows of one page.
@@ -64,12 +68,17 @@ final class MeetingNoteSource: NoteSource {
     private let openNotesModel: @MainActor @Sendable () -> Void
     private let appName: @Sendable (String) -> String?
     private let changed: @Sendable () -> Void
+    /// `plugins.meetings.retentionDays` as it is now (0 keeps everything): it bounds `purgeAt` of a trashed row.
+    private let retentionDays: @Sendable () -> Int
+    private let now: @Sendable () -> Date
 
     init(
         library: MeetingsLibrary, board: NotesBoard?, hub: NoteChangeHub,
         regenerate: (@MainActor @Sendable (Int64) -> Void)?, openNotesModel: @escaping @MainActor @Sendable () -> Void,
         appName: @escaping @Sendable (String) -> String? = MeetingLibraryPresentation.installedAppName,
-        changed: @escaping @Sendable () -> Void = {}
+        changed: @escaping @Sendable () -> Void = {},
+        retentionDays: @escaping @Sendable () -> Int = { 0 },
+        now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.library = library
         self.board = board
@@ -78,6 +87,8 @@ final class MeetingNoteSource: NoteSource {
         self.openNotesModel = openNotesModel
         self.appName = appName
         self.changed = changed
+        self.retentionDays = retentionDays
+        self.now = now
     }
 
     private var openStore: MeetingsStore {
@@ -113,7 +124,8 @@ final class MeetingNoteSource: NoteSource {
     ) async throws -> NotePage {
         try Task.checkCancellation()
         // One more than asked tells whether there is a next page.
-        let entries = try store.libraryEntries(matching: text, filter: .all, limit: size + 1, after: position)
+        let entries = try store.libraryEntries(
+            matching: text, filter: .all, limit: size + 1, after: position, withTaskCount: true)
         let total = try store.libraryCount(matching: text, filter: .all)
         try Task.checkCancellation()
         let shown = Array(entries.prefix(size))
@@ -172,20 +184,26 @@ final class MeetingNoteSource: NoteSource {
         let uuid = try uuid(of: key)
         let board = board
         let appName = appName
-        return try await Self.content(store: store, uuid: uuid, board: board, appName: appName)
+        let retentionDays = retentionDays()
+        return try await Self.content(
+            store: store, uuid: uuid, board: board, appName: appName, retentionDays: retentionDays)
     }
 
+    /// A meeting in Recently deleted still has its content, with `deletedAt` and `purgeAt` set; `nil` only after a
+    /// permanent delete, the purge or retention.
     @concurrent
     private static func content(
-        store: MeetingsStore, uuid: String, board: NotesBoard?, appName: @Sendable (String) -> String?
+        store: MeetingsStore, uuid: String, board: NotesBoard?, appName: @Sendable (String) -> String?,
+        retentionDays: Int
     ) async throws -> NoteContent? {
         try Task.checkCancellation()
-        guard let document = try store.loadDocument(uuid: uuid),
+        guard let document = try store.loadDocument(uuid: uuid, includingTrashed: true),
             let entry = try store.libraryEntry(uuid: uuid)
         else { return nil }
         try Task.checkCancellation()
         return NoteContent(
-            summary: MeetingNoteMapping.summary(entry, board: board, appName: appName),
+            summary: MeetingNoteMapping.summary(
+                entry, board: board, appName: appName, retentionDays: retentionDays),
             layers: MeetingNoteLayers.layers(document), speakers: MeetingNoteLayers.speakers(document),
             details: MeetingNoteMapping.details(document))
     }
@@ -214,7 +232,7 @@ final class MeetingNoteSource: NoteSource {
 
     func actions(for key: NoteKey) -> [NoteSourceAction] {
         guard let uuid = try? uuid(of: key), let store = try? openStore,
-            let entry = try? store.libraryEntry(uuid: uuid)
+            let entry = try? store.libraryEntry(uuid: uuid), entry.deletedAt == nil
         else { return [] }
         let id = entry.id
         let library = library
@@ -276,6 +294,144 @@ final class MeetingNoteSource: NoteSource {
     }
 
     func makeChanges() -> AsyncStream<Void> { hub.makeStream() }
+}
+
+// MARK: - Recently deleted
+
+extension MeetingNoteSource: NoteSourceTrash {
+    /// Keys per call; a larger batch is processed in chunks of this size.
+    static let trashChunk = 500
+
+    /// Moves the meeting to Recently deleted and returns the stamp the library used (the existing one for a
+    /// meeting that is there already). A meeting being recorded, processed or finished is `busy`; an unknown
+    /// one is `notFound`. Nothing of the audio, the spool or the notes overlays is touched.
+    @discardableResult
+    func trash(_ key: NoteKey) async throws -> Date {
+        let store = try openStore
+        let uuid = try uuid(of: key)
+        let protected = await MainActor.run { library.protectedMeetingIDs }
+        let now = now()
+        let outcome = try await Task.detached { try store.trash(uuid: uuid, at: now, protected: protected) }.value
+        switch outcome {
+        case .trashed(let stamp):
+            await MainActor.run { library.refreshCount() }
+            changed()
+            return stamp
+        case .alreadyTrashed(let stamp):
+            return stamp
+        case .busy:
+            throw NoteSourceError.busy
+        case .missing:
+            throw NoteSourceError.notFound
+        }
+    }
+
+    func trashAll(at deletedAt: Date) async throws -> TrashBatch {
+        let store = try openStore
+        let protected = await MainActor.run { library.protectedMeetingIDs }
+        let result = try await Task.detached { try store.trashAll(at: deletedAt, protected: protected) }.value
+        if result.moved > 0 {
+            await MainActor.run { library.refreshCount() }
+            changed()
+        }
+        return TrashBatch(
+            deletedAt: TrashStamp.date(micros: TrashStamp.micros(deletedAt)), moved: result.moved,
+            stayed: result.stayed)
+    }
+
+    @discardableResult
+    func restore(_ keys: [NoteKey]) async throws -> Set<NoteKey> {
+        let store = try openStore
+        // Another plugin's key has no meeting here: it is "no longer there", like a purged one.
+        let uuids = keys.filter { $0.pluginID == pluginID && !$0.id.isEmpty }.map(\.id)
+        let foreign = Set(keys.filter { $0.pluginID != pluginID || $0.id.isEmpty })
+        var missing = Set<String>()
+        for start in stride(from: 0, to: uuids.count, by: Self.trashChunk) {
+            let chunk = Array(uuids[start..<min(start + Self.trashChunk, uuids.count)])
+            missing.formUnion(try await Task.detached { try store.restore(uuids: chunk) }.value)
+        }
+        if !uuids.isEmpty {
+            await MainActor.run { library.refreshCount() }
+            changed()
+        }
+        let pluginID = pluginID
+        return foreign.union(missing.map { NoteKey(pluginID: pluginID, id: $0) })
+    }
+
+    func restoreBatch(deletedAt: Date) async throws -> Int {
+        let store = try openStore
+        let restored = try await Task.detached { try store.restoreBatch(deletedAt: deletedAt) }.value
+        if restored > 0 {
+            await MainActor.run { library.refreshCount() }
+            changed()
+        }
+        return restored
+    }
+
+    func liveCount() async throws -> Int {
+        let store = try openStore
+        return try await Task.detached { try store.meetingCount() }.value
+    }
+
+    func trashedCount() async throws -> Int {
+        let store = try openStore
+        return try await Task.detached { try store.trashedCount() }.value
+    }
+
+    func trashed(after: NoteCursor?, limit: Int) async throws -> NotePage {
+        let store = try openStore
+        let position = try after.map(Self.trashPosition(of:))
+        let size = min(max(1, limit), Self.maxPageSize)
+        let board = board
+        let appName = appName
+        let retentionDays = retentionDays()
+        return try await Self.trashedPage(
+            store: store, position: position, size: size, board: board, appName: appName,
+            retentionDays: retentionDays)
+    }
+
+    @concurrent
+    private static func trashedPage(
+        store: MeetingsStore, position: MeetingsStore.TrashPosition?, size: Int, board: NotesBoard?,
+        appName: @Sendable (String) -> String?, retentionDays: Int
+    ) async throws -> NotePage {
+        try Task.checkCancellation()
+        let entries = try store.trashedEntries(after: position, limit: size + 1)
+        let total = try store.trashedCount()
+        try Task.checkCancellation()
+        let shown = Array(entries.prefix(size))
+        let items = shown.map {
+            MeetingNoteMapping.summary($0, board: board, appName: appName, retentionDays: retentionDays)
+        }
+        let next = entries.count > size ? shown.last.flatMap(trashCursor(after:)) : nil
+        return NotePage(items: items, next: next, total: total)
+    }
+
+    private static func trashCursor(after entry: MeetingLibraryEntry) -> NoteCursor? {
+        entry.deletedAt.map { NoteCursor(token: "\(TrashStamp.micros($0))|\(entry.id)") }
+    }
+
+    private static func trashPosition(of cursor: NoteCursor) throws -> MeetingsStore.TrashPosition {
+        let parts = cursor.token.split(separator: "|", omittingEmptySubsequences: false)
+        guard parts.count == 2, let micros = Int64(parts[0]), let id = Int64(parts[1]) else {
+            throw MeetingNoteSourceError.invalidArgument
+        }
+        return MeetingsStore.TrashPosition(micros: micros, id: id)
+    }
+
+    func trashedKeys(_ keys: [NoteKey]) async throws -> [NoteKey: Date] {
+        let store = try openStore
+        let uuids = keys.filter { $0.pluginID == pluginID && !$0.id.isEmpty }.map(\.id)
+        let pluginID = pluginID
+        var result: [NoteKey: Date] = [:]
+        for start in stride(from: 0, to: uuids.count, by: Self.trashChunk) {
+            let chunk = Array(uuids[start..<min(start + Self.trashChunk, uuids.count)])
+            for (uuid, stamp) in try await Task.detached(operation: { try store.trashedStamps(uuids: chunk) }).value {
+                result[NoteKey(pluginID: pluginID, id: uuid)] = stamp
+            }
+        }
+        return result
+    }
 }
 
 extension MeetingNoteSource: NoteSourceEditing {

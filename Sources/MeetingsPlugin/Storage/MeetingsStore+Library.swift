@@ -19,6 +19,11 @@ struct MeetingLibraryEntry: Sendable, Equatable {
     /// Who wrote the notes (`notes_provider*`): `nil` for the built-in model.
     var notesProvider: String? = nil
     var notesProviderModel: String? = nil
+    /// When the meeting moved to Recently deleted; `nil` for a live meeting. Only the unfiltered reads
+    /// (`libraryEntries(uuids:)`, `libraryEntry(uuid:)`, `trashedEntries`) can return a trashed row.
+    var deletedAt: Date? = nil
+    /// How many checklist items (`- [ ] `) the notes hold; `nil` when there are none or no notes.
+    var taskCount: Int? = nil
 }
 
 /// The list mode's filters (⌘1 to ⌘3).
@@ -53,7 +58,8 @@ extension MeetingsStore {
     private func libraryConditions(
         matching text: String?, filter: MeetingLibraryFilter, after: LibraryPosition?
     ) -> (clause: String, arguments: StatementArguments)? {
-        var conditions: [String] = []
+        // A trashed meeting is in no list, count or search (Recently deleted reads it through `trashedEntries`).
+        var conditions: [String] = ["deleted_at IS NULL"]
         var arguments = StatementArguments()
         if let clause = filter.clause { conditions.append(clause) }
         if let after {
@@ -73,7 +79,7 @@ extension MeetingsStore {
                  OR id IN (SELECT rowid FROM meeting_notes_fts WHERE meeting_notes_fts MATCH :pattern))
                 """)
         }
-        return (conditions.isEmpty ? "" : "WHERE " + conditions.joined(separator: " AND "), arguments)
+        return ("WHERE " + conditions.joined(separator: " AND "), arguments)
     }
 
     /// The most recent meetings first, optionally filtered, optionally only those whose title, notes or
@@ -83,7 +89,8 @@ extension MeetingsStore {
     /// the transcript (or the notes, or the title) has to contain all of the words. A text without any
     /// searchable word finds nothing. `limit` is the most rows returned.
     func libraryEntries(
-        matching text: String?, filter: MeetingLibraryFilter, limit: Int, after: LibraryPosition? = nil
+        matching text: String?, filter: MeetingLibraryFilter, limit: Int, after: LibraryPosition? = nil,
+        withTaskCount: Bool = false
     ) throws -> [MeetingLibraryEntry] {
         guard let (whereClause, conditionArguments) = libraryConditions(matching: text, filter: filter, after: after)
         else { return [] }
@@ -93,23 +100,11 @@ extension MeetingsStore {
             try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT id, uuid, started_at, duration_ms, title, source_bundle_id, status, notes_status,
-                           (audio_state = 'spool') AS audio_spooled, notes_provider, notes_provider_model,
-                           (notes_markdown IS NOT NULL AND notes_markdown <> '') AS has_notes
-                    FROM meeting \(whereClause)
+                    SELECT \(Self.entryColumns(withTaskCount: withTaskCount)) FROM meeting \(whereClause)
                     ORDER BY started_at DESC, id DESC LIMIT :limit
                     """,
                 arguments: arguments
-            ).map { row in
-                MeetingLibraryEntry(
-                    id: row["id"], startedAt: Date(timeIntervalSince1970: row["started_at"]),
-                    durationMs: row["duration_ms"], title: row["title"], sourceBundleID: row["source_bundle_id"],
-                    status: MeetingStatus(rawValue: row["status"]) ?? .failed,
-                    notesStatus: NotesStatus(rawValue: row["notes_status"]) ?? .none,
-                    hasNotes: (row["has_notes"] as Int) != 0, uuid: row["uuid"],
-                    audioSpooled: (row["audio_spooled"] as Int) != 0,
-                    notesProvider: row["notes_provider"], notesProviderModel: row["notes_provider_model"])
-            }
+            ).map(Self.entry(from:))
         }
     }
 
@@ -123,34 +118,58 @@ extension MeetingsStore {
         }
     }
 
-    /// One library row by `uuid`; `nil` when there is no such meeting.
-    func libraryEntry(uuid: String) throws -> MeetingLibraryEntry? {
-        try libraryEntries(uuids: [uuid]).first
+    /// The columns of a `MeetingLibraryEntry`. The task count (only when asked: the Notes source shows it, the
+    /// launcher's list and `exists` do not) is the number of `- [ ] ` / `- [x] ` items in the notes (the composers
+    /// write every task as one), counted in SQL so a page never loads the notes text.
+    static func entryColumns(withTaskCount: Bool) -> String {
+        let tasks =
+            withTaskCount
+            ? """
+            CASE WHEN notes_markdown IS NULL THEN 0 ELSE
+                (3 * length(notes_markdown) - length(replace(notes_markdown, '- [ ] ', ''))
+                    - length(replace(notes_markdown, '- [x] ', '')) - length(replace(notes_markdown, '- [X] ', ''))) / 6
+            END
+            """
+            : "0"
+        return """
+            id, uuid, started_at, duration_ms, title, source_bundle_id, status, notes_status,
+            (audio_state = 'spool') AS audio_spooled, notes_provider, notes_provider_model, deleted_at,
+            (notes_markdown IS NOT NULL AND notes_markdown <> '') AS has_notes, \(tasks) AS task_count
+            """
     }
 
-    /// The rows of these meetings, newest first (what `exists` and the actions need).
-    func libraryEntries(uuids: [String]) throws -> [MeetingLibraryEntry] {
+    static func entry(from row: Row) -> MeetingLibraryEntry {
+        let tasks: Int = row["task_count"]
+        return MeetingLibraryEntry(
+            id: row["id"], startedAt: Date(timeIntervalSince1970: row["started_at"]),
+            durationMs: row["duration_ms"], title: row["title"], sourceBundleID: row["source_bundle_id"],
+            status: MeetingStatus(rawValue: row["status"]) ?? .failed,
+            notesStatus: NotesStatus(rawValue: row["notes_status"]) ?? .none,
+            hasNotes: (row["has_notes"] as Int) != 0, uuid: row["uuid"],
+            audioSpooled: (row["audio_spooled"] as Int) != 0,
+            notesProvider: row["notes_provider"], notesProviderModel: row["notes_provider_model"],
+            deletedAt: (row["deleted_at"] as Double?).map(TrashStamp.date(column:)), taskCount: tasks > 0 ? tasks : nil)
+    }
+
+    /// One library row by `uuid`, a trashed one included (`deletedAt` says so); `nil` when there is no such
+    /// meeting. `exists` and `content` read through this, because a note in Recently deleted still exists.
+    func libraryEntry(uuid: String) throws -> MeetingLibraryEntry? {
+        try libraryEntries(uuids: [uuid], withTaskCount: true).first
+    }
+
+    /// The rows of these meetings, newest first, trashed ones included (what `exists` and the actions need).
+    func libraryEntries(uuids: [String], withTaskCount: Bool = false) throws -> [MeetingLibraryEntry] {
         guard !uuids.isEmpty else { return [] }
         let placeholders = uuids.map { _ in "?" }.joined(separator: ", ")
         return try read { db in
             try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT id, uuid, started_at, duration_ms, title, source_bundle_id, status, notes_status,
-                           (audio_state = 'spool') AS audio_spooled,
-                           (notes_markdown IS NOT NULL AND notes_markdown <> '') AS has_notes
-                    FROM meeting WHERE uuid IN (\(placeholders)) ORDER BY started_at DESC, id DESC
+                    SELECT \(Self.entryColumns(withTaskCount: withTaskCount)) FROM meeting WHERE uuid IN (\(placeholders))
+                    ORDER BY started_at DESC, id DESC
                     """,
                 arguments: StatementArguments(uuids)
-            ).map { row in
-                MeetingLibraryEntry(
-                    id: row["id"], startedAt: Date(timeIntervalSince1970: row["started_at"]),
-                    durationMs: row["duration_ms"], title: row["title"], sourceBundleID: row["source_bundle_id"],
-                    status: MeetingStatus(rawValue: row["status"]) ?? .failed,
-                    notesStatus: NotesStatus(rawValue: row["notes_status"]) ?? .none,
-                    hasNotes: (row["has_notes"] as Int) != 0, uuid: row["uuid"],
-                    audioSpooled: (row["audio_spooled"] as Int) != 0)
-            }
+            ).map(Self.entry(from:))
         }
     }
 
