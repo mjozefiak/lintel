@@ -2,7 +2,7 @@
   "format": "discovery-prototype-v1",
   "skill": "om-mockup-prototype",
   "slug": "minimal-hud",
-  "revision": 1,
+  "revision": 3,
   "revisionPath": ".ai/specs/assets/minimal-hud",
   "previousRevision": null,
   "brief": "owner brief ux-minimal-hud (2026-11-25), not in the repository; spec .ai/specs/2026-11-25-minimal-hud.md",
@@ -13,7 +13,7 @@
   "files": [
     {
       "path": "README.md",
-      "sha256": "06b18ad6dfc741af814b98178331ce05cd078393bbf70023c8bebe4bd1de5c1c"
+      "sha256": "7875517f3653831adcad0e09922d70f12d2bf6068ff6fa1eb158fa068db81af2"
     },
     {
       "path": "before/dictation-allow-microphone-light-en.png",
@@ -313,7 +313,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "3944ef691360b1f230d77ae518c27f2ec4679835913aec06b31540bf782f7c8b"
+      "sha256": "37b7c17692642e0c7bc2a380a104ca71e12e4d5a1b2f20eed020bba24733a5d3"
     }
   ]
 }

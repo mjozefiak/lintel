@@ -1,6 +1,6 @@
 # Minimal HUD pills: dictation, meeting recording, meeting suggestions
 
-> Status: **design, decided by the owner 2026-11-26 (OD-1 to OD-13).** Nothing here is implemented. OD-6 and OD-7 took the alternative (consent reminder only in the meeting's window; nothing about the speech model in the pill, the app says it after the recording); the other eleven took the recommendation.
+> Status: **design. OD-1 to OD-13 and Q1 to Q3 decided by the owner (2026-11-26); Q4 and Q5 open.** Nothing here is implemented. OD-6 and OD-7 took the alternative (consent reminder only in the meeting's window; nothing about the speech model in the pill, the app says it after the recording); the other eleven took the recommendation. Q1 (a), Q2 (b), Q3 (a). Q4 (consent reminder when the main window is closed) and Q5 (does the OD-7 part of the meeting pill wait for #346) gate Phase 4 only; anything that depends on them is marked "pending Q4" / "pending Q5" below and is not a plan until the owner answers.
 > Owner direction (2026-11-25): "te pastylki u konkurencji zawsze są mega minimalistyczne i też chcę, aby tak było w Lintel; obecnie jest tam za dużo zbędnych informacji, ograniczamy się do totalnego minimum."
 > Sketch (before and after for every state, light and dark, en and pl, S/M/XL, Reduce Motion, Increase Contrast, hover): `.ai/specs/assets/minimal-hud/index.html`. It is a sketch for the decision only: after acceptance the SwiftUI gallery (#248) is the source of truth.
 > Related: #233 (the meeting clock wraps when a notice adds a second button; this design removes that layout), #236 (its fix), #258 (new microphone states, merged 2026-11-25, mapped below), #266 (a dictation state for a lost microphone, not designed here), #333 (`LintelRing`, merged 2026-11-26, reused by the pill), #346 (OD-7: the app's text after a meeting the speech model could not transcribe).
@@ -21,24 +21,31 @@
 | OD-3 | After pasting | **✓ for 0.6 s**, then gone | Today "Pasted" stays 0.8 s. |
 | OD-4 | "Pasted – partly cleaned up" | **Show nothing**; "Pasted without cleanup" (all raw) stays, without the "Raw version: …" hint | A partial fallback is invisible to most users; the hint names a menu path nobody reads in 3 s. |
 | OD-5 | Meeting level meters | **Hover only**; problems come as notices (20 s system silence, 10 s microphone silence, lost device) | The notices already detect the failures the meters were for. |
-| OD-6 | Consent reminder | **Only in the meeting's window** (the recording panel of the main window, spec `2026-11-24-notes-explorer-main-window`); the pill has no reminder line and no "Copy message" button | It protects the user legally; the owner wants the pill to carry problems only. See "Consent reminder (OD-6)" below. |
+| OD-6 | Consent reminder | **Only in the meeting's window**; the pill has no reminder line and no "Copy message" button. This spec reads "the meeting's window" as the recording panel of the main window (spec `2026-11-24-notes-explorer-main-window`), because the per-meeting `MeetingWindowController` is not open while a meeting records. What happens when the main window is closed is not decided: open question Q4 | It protects the user legally; the owner wants the pill to carry problems only. See "Consent reminder (OD-6)" below. |
 | OD-7 | Model loading / model unavailable during recording | **Silent pill**, also on hover (no "Text after the meeting"). The audio is recorded anyway and the transcript and notes can be made later; the app says so **after the recording**, not in the pill | Recording already runs; the user can do nothing about it then. See "After the recording: what the app says (OD-7)" below. |
 | OD-8 | A problem that lasts | **Line stays 10 s**, then the pill shrinks back and keeps an amber dot on the ring; hover and VoiceOver give the line again; a new problem expands it again | Long lines over a call window are the clutter the owner named. |
 | OD-9 | After "End" (meeting) | **Closing ring only**; "Transcribing, 3 left" on hover; then "Saved · Open" 3 s | Processing can take minutes; the ring says "working" without words. |
 | OD-10 | Suggestion pill | **One line + "Record" + ✕ (= Not now)**; "Don't ask again" on hover; end question: "End the recording?" + "End" + ✕ (= keep recording) | The mute choice is rare and stays one hover away. |
 | OD-11 | Chosen microphone missing (#258) | **Name of the microphone used, 3 s (dictation) / 4 s (meeting)**, then an amber dot; hover shows it | Quality changes when the built-in mic replaces a headset. |
 | OD-12 | Meter names | **"You" / "Others"** ("Ty" / "Rozmówcy") instead of "Me" / "System" | "System" is jargon for office users. |
-| OD-13 | Size | **32 pt at M**, follows the app's text size (28 / 32 / 38 at S / M / XL) | XL users get readable pills; today HUDs ignore text size. |
+| OD-13 | Size | **32 pt at M**, follows the app's text size (28 / 32 / 38 at S / M / XL; L is not named in the decision, this spec uses 35 pt, see "The pill family") | XL users get readable pills; today HUDs ignore text size. |
 
-## ❓ Open questions after the decisions (owner)
+## ✅ Follow-up questions decided (2026-11-26)
 
-The decisions leave three smaller questions. Each has a recommendation; none blocks Phase 1 or Phase 2.
+| # | Question | Decision | What it means here |
+|---|---|---|---|
+| Q1 | The recording panel with the consent reminder (#255 step 4.3) may land after the meeting pill is ready. | **(a) The new meeting pill lands together with the recording panel** (#255 step 4.3). The dictation pill and the suggestion pill do not wait. | Phasing: Phase 2 (dictation) and Phase 3 (suggestion pill) go as soon as Phase 1 is in; Phase 4 (meeting pill) merges only when the recording panel is on `main` (same merge batch or right after it, never before). Today's meeting HUD, with its consent line, stays until then. |
+| Q2 | "Copy message" (MEET-1.6) leaves the pill. | **(b) MEET-1.6 is retired.** No button that copies the consent sentence anywhere, the recording panel included. | See "Consent reminder (OD-6)", "Retiring Copy message (Q2)". Phase 4 removes the code path; the schema does not change. |
+| Q3 | OD-7 in dictation: dictation keeps no audio, so a model that fails after the key is released cannot be "made later". | **(a)** The dictation pill is silent only while the model loads (`recording(loadingModel)`); "No speech model · Download" and "Speech model isn't working · Fix" stay as short lines. | The dictation table below is final for Phase 2; Q3 no longer blocks it. |
+
+## ❓ Open questions (owner)
+
+Both gate **Phase 4 (meeting pill) only**. Phases 1 to 3 do not depend on them.
 
 | # | Question | Options | Recommendation |
 |---|---|---|---|
-| Q1 | The recording panel with the consent reminder (#255 step 4.3) may land after Phase 3 is ready. | (a) Phase 3 waits for it; (b) Phase 3 merges first and there is no reminder anywhere until the panel lands; (c) Phase 3 keeps today's consent line until the panel lands | **(a)**: the reminder protects the user and the wait costs only Phase 3's merge date. |
-| Q2 | "Copy message" (MEET-1.6) leaves the pill. | (a) the recording panel gets "Copy message" next to the reminder (the existing sentence and store call); (b) MEET-1.6 is retired: no copy button, the window's "Message copied at …" line goes too | **(a)**: one text button in the panel; it keeps the record that the participants were told. To be drawn on the panel's own sheet (main window). |
-| Q3 | OD-7 in dictation: dictation keeps no audio, so a model that fails after the key is released cannot be "made later". | (a) the dictation pill stays silent while the model loads (OD-7) but still shows "Speech model isn't working · Fix" when the dictation is lost; (b) also silent then | **(a)**: the text is lost, the user must know at once; nothing in the app could tell them later. |
+| Q4 | What does "the meeting's window" mean for a meeting started with ⌃⌥M, from the menu bar or from a suggestion while the main window is closed? With OD-6 read literally, such a meeting gets **no consent reminder at all**, and that is the usual way to start a recording (the main window has no Record button until #255 step 4.2). | **(a)** Reminder only in the recording panel. When the main window is closed: **(a1)** a one-time macOS notification "Remember to tell people you are recording" at the start, or **(a2)** nothing. **(b)** The main window (or the per-meeting window) opens on the recording panel when a recording starts while `consentReminder` is on. **(c)** The pill keeps one line, "Tell people you're recording" / „Powiedz, że nagrywasz”, for 8 s (today's timer, no button after Q2) only when the recording was not started from the main window's Record button; a recording started there shows the reminder in the panel and the pill stays plain. | **(c)**. Checked in the code: (a1) needs the `UserNotifications` framework, which Lintel does not use anywhere today, so it adds a second permission prompt for office users, and macOS by default does not show notifications while the screen is shared, which is exactly when a call is recorded. (a2) leaves the setting "Remind me to say I am recording" without effect in the common case. (b) opens an activating window over the call app at the moment the user is talking or presenting; every Lintel panel during a call is non-activating on purpose. (c) reuses today's path (`Recording.showsConsent`, `consentDuration` 8 s) and needs no new contract: `MeetingController` already knows how a recording started (`start()` from the command and the menu, `start(fromSuggestionOf:)`, and the panel's `LiveRecorder.start()` from #255). It differs from OD-6 only where OD-6 would leave the user with nothing. Knowing "is the main window on screen" instead of "where did it start" would need a new `PluginContext` value (a protected contract), so it is not recommended. |
+| Q5 | Phase 4 removes the pill's only hint that the transcript comes later (OD-7). Until issue #346 lands, a meeting the speech model could not transcribe ends with the meeting window's banner "Recording was interrupted. The transcript may be missing its end.", which is wrong. Does that part of Phase 4 wait for #346? | (a) Gated: the step that maps `.loadingModel` / `.modelUnavailable` to the plain pill (Phase 4 step 3) merges with or after #346. If Phase 4 is ready first, those two notices keep one interim pill line, "Text comes after the meeting" / „Tekst będzie po spotkaniu” (today's meaning in the pill copy, 28 / 25 characters), until #346 is on `main`. (b) Not gated: Phase 4 removes them; the wrong banner is accepted until #346 (risk R7). | **(a)**: OD-7's own condition is "the app says it after the recording"; without #346 the app says the wrong thing. The gate is one step, the rest of Phase 4 does not wait. |
 
 ## 📝 Problem Statement
 
@@ -62,14 +69,14 @@ The decisions leave three smaller questions. Each has a recommendation; none blo
 |---|---|---|---|
 | `live` | glyph + live content (wave, or time) + hover content + optional trailing control | hugs the content (dictation 88 pt, meeting ≈ 120 pt) | dictation recording, meeting recording |
 | `working` | the closing ring only (a 32 pt circle) | 32 pt | dictation finishing, meeting processing |
-| `message` | glyph + one line + at most one text button + optional ✕ | hugs, max 380 pt (450 at XL) | problems, done states |
-| `prompt` | glyph + one line + one primary button + hover link + ✕ | hugs, max 380 pt (450 at XL) | suggestions, "Microphone denied, record others only" |
+| `message` | glyph + one line + at most one text button + optional ✕ | hugs, max 380 pt (420 at L, 450 at XL) | problems, done states; also the notes explorer's `UndoToast` (spec `2026-11-24-notes-explorer-main-window`, component table and step 1.5: no ✕, one button "Undo", title shortened in the middle) |
+| `prompt` | glyph + one line + one primary button + hover link + ✕ | hugs, max 380 pt (420 at L, 450 at XL) | suggestions, "Microphone denied, record others only" |
 
-- Shape: capsule, height 28 / 32 / 38 pt (app text size S / M / XL), glass `.regular`, system shadow. Padding 10 pt leading, 12 pt trailing, 8 pt spacing.
-- Text: 12 / 13 / 15 pt medium, **one line, never wraps**. Copy budget: 40 characters in both languages (a test checks every pill string in `Localizable.xcstrings`), and the pixel width limit above (checked by the gallery snapshots at XL).
-- Glyphs (16 / 16 / 19 pt): **live** = the cut ring turning slowly; the meeting ring has the breathing centre dot, the dictation ring has none (the same meaning as the note-type ring in #247). **working** = the ring closing. **problem** = amber triangle (`statusAttention`). **failed** = red triangle (`statusError`). **done** = ✓ in the live colour. Microphone problems use `mic.slash` in amber. The ring is the existing `LintelRing` (`Sources/LintelUI/Components/LintelRing.swift`, #333, on `main`): live = `.listening`, the amber dot of OD-8 / OD-11 = `.warning` (a dictation ring gets the dot too), working = `.processing(progress:)`, mark `.meeting` / `.dictation`; sizes already follow `LintelRingMetrics` (16 / 16 / 19 pt). The pill does not draw a ring of its own.
+- Shape: capsule, height 28 / 32 / 35 / 38 pt (app text size S / M / L / XL; `TextSize` has four sizes, OD-13 names three: L follows `LintelRingMetrics.points`, which scales M by 1.1 at L and 1.1875 at XL, so L = 32 × 1.1 ≈ 35 pt and XL = 32 × 1.1875 = 38 pt), glass `.regular`, system shadow. Padding 10 pt leading, 12 pt trailing, 8 pt spacing.
+- Text: 12 / 13 / 14 / 15 pt medium (S / M / L / XL), **one line, never wraps**. Copy budget: 40 characters in both languages (a test checks every pill string in `Localizable.xcstrings`), and the pixel width limit above (checked by the gallery snapshots at XL).
+- Glyphs (16 / 16 / 17.6 / 19 pt, S / M / L / XL): **live** = the cut ring turning slowly; the meeting ring has the breathing centre dot, the dictation ring has none (the same meaning as the note-type ring in #247). **working** = the ring closing. **problem** = amber triangle (`statusAttention`). **failed** = red triangle (`statusError`). **done** = ✓ in the live colour. Microphone problems use `mic.slash` in amber. The ring is the existing `LintelRing` (`Sources/LintelUI/Components/LintelRing.swift`, #333, on `main`): live = `.listening`, the amber dot of OD-8 / OD-11 = `.warning` (a dictation ring gets the dot too), working = `.processing(progress:)`, mark `.meeting` / `.dictation`; sizes already follow `LintelRingMetrics` (16 / 16 / 17.6 / 19 pt). The pill does not draw a ring of its own; under Reduce Motion it shows what `LintelRingAppearance` gives (`LintelRingMotion.reduced`): no turning, no breathing, and the working ring as a static part ring with its track, no spinner.
 - Buttons: one text button (`act`, neutral fill, the live colour only for a prompt's primary), ✕ 22 pt (hit area 24 pt), the meeting's stop button is a 22 pt circle with a square.
-- Positions do not change: dictation bottom centre, 48 pt above the visible frame; meeting and suggestion top centre under the menu bar. A pill is at most 380 pt wide at S and M and 450 pt at XL, plus 120 pt while hovered (hover content must never truncate the main line). Measured in the sketch, every state in en and pl fits without truncation: widest normal pill 376 pt (M, pl) and 415 pt (XL, pl), "Mikrofon nie nagrywa · Spróbuj ponownie"; widest hovered 442 pt (M, pl) and 489 pt (XL, pl), the suggestion pill (re-measured 2026-11-26 in headless Chrome after OD-6 and OD-7 removed the consent and model lines: unchanged, neither was the widest). The panel is a fixed transparent window larger than the widest pill (580 × 56 pt), the pill centred in it, so expanding never moves or resizes the window. The transparent area must stay click-through (risk R2).
+- Positions do not change: dictation bottom centre, 48 pt above the visible frame; meeting and suggestion top centre under the menu bar. The distances are measured to the **pill's** edge, not the panel's: the transparent panel is placed (56 − pill height) / 2 pt lower (dictation) or higher (meeting, suggestion) than today's origin (`DictationHUD.swift` `minY + 48`), so the pill sits where today's HUD sits. A pill is at most 380 pt wide at S and M, 420 pt at L and 450 pt at XL, plus 120 pt while hovered (hover content must never truncate the main line). Measured in the sketch, every state in en and pl fits without truncation: widest normal pill 376 pt (M, pl) and 415 pt (XL, pl), "Mikrofon nie nagrywa · Spróbuj ponownie"; widest hovered 442 pt (M, pl) and 489 pt (XL, pl), the suggestion pill (re-measured 2026-11-26 in headless Chrome after OD-6 and OD-7 removed the consent and model lines: unchanged, neither was the widest). The panel is a fixed transparent window larger than the widest pill (580 × 56 pt), the pill centred in it, so expanding never moves or resizes the window. The transparent area must stay click-through (risk R2).
 - The meeting pill stays visible in screen sharing; the suggestion pill stays hidden from it (`sharingType = .none`), as today.
 
 ### Hover
@@ -86,7 +93,7 @@ The decisions leave three smaller questions. Each has a recommendation; none blo
 | `recording`, Esc not claimed | ring + wave + ✕ always | ✕ | "✕ cancels" |
 | `recording(loadingModel)` | same as recording, also on hover | — | "Loading model…", blinking caret (OD-7) |
 | `recording(secondsLeft)` | ring + wave + amber `9` | the seconds | "Stops in 9 s" |
-| `recording(fallback)` (#258) | ring with amber dot + wave + "Using MacBook Pro mic" for 3 s, then hover only | — | the two-line bubble (OD-11) |
+| `recording(fallback)` (#258) | ring with amber dot + wave + "Using MacBook Pro Microphone" for 3 s, then the collapsed pill with the amber dot; hover shows the line again (see "Microphone line (OD-11)") | — | the two-line bubble (OD-11) |
 | `allowMicrophone` | message: "Allow the microphone in the dialog" | | |
 | `finishing` | `working` ring | | "Finishing…" |
 | `pasted` | ✓ for 0.6 s (OD-3) | | "Pasted" |
@@ -102,29 +109,46 @@ The decisions leave three smaller questions. Each has a recommendation; none blo
 | `problem(.nothingHeard)` | ⚠ "Nothing heard" | | |
 | `problem(.nothingToPaste)` | ⚠ "Nothing to paste yet" | | |
 
-OD-7 in dictation covers the model loading while the user speaks (`recording(loadingModel)`). The model problems above come when the key is pressed or after it is released, when there is no dictation or it is lost (dictation keeps no audio, so nothing can be made later), so they stay one line in the pill (open question Q3).
+OD-7 in dictation covers the model loading while the user speaks (`recording(loadingModel)`). The model problems above come when the key is pressed or after it is released, when there is no dictation or it is lost (dictation keeps no audio, so nothing can be made later), so they stay one line in the pill (owner decision Q3 (a)).
+
+`recording(secondsLeft)` is not a problem line: the amber seconds replace nothing and never collapse (OD-8 does not apply to it). With Esc not claimed, the ✕ stays visible in every recording variant (fallback and countdown included).
+
+### Microphone line (OD-11)
+
+Both pills show the same text, built from `InputFallback` (`Sources/LintelSpeech/InputDeviceResolution.swift`):
+
+| `InputFallback` | Line (en / pl) |
+|---|---|
+| `usingName` known | "Using %@" / „Mikrofon: %@” with the name Core Audio gives (e.g. "Using MacBook Pro Microphone") |
+| `usingName` nil (the default input has no name) | "Using the default mic" / „Domyślny mikrofon” |
+
+- The requested device's name (the one that is missing) is not in the line; it is in the VoiceOver label ("USB Microphone unavailable, using MacBook Pro Microphone"), as in today's `InputFallback.message`.
+- A long name is shortened in the **middle** by the pill so the line stays within the width limit; the 40-character budget is checked with a 20-character placeholder name, and the full name is in the VoiceOver label and the hover line.
+- The new strings live where today's does: a new `InputFallback.pillLine` in `LintelSpeech`, next to `message`, so both HUDs keep one key per text (comment prefix `HUD pill:`). `message` is removed with its last use (the meeting HUD, Phase 4).
 
 ### Meeting recording (top centre)
 
-While a problem line is shown, the clock steps aside (ring · line · action · stop) and comes back when the line goes; the time stays in the VoiceOver label. This keeps every line within the width budget and puts the one thing that matters first. The pill shows no line that is not a problem: the consent reminder is in the meeting's window (OD-6) and the speech model is never mentioned while recording (OD-7).
+While a problem line is shown, the clock steps aside (ring · line · action · stop) and comes back when the line goes; the time stays in the VoiceOver label. This keeps every line within the width budget and puts the one thing that matters first. The pill shows no line that is not a problem: the consent reminder is in the meeting's window (OD-6; pending Q4 for a meeting started while the main window is closed) and the speech model is not mentioned while recording (OD-7; pending Q5 until #346 lands).
 
 | Today (`MeetingHUDState`) | After | Goes |
 |---|---|---|
 | `recording` | `live`: ring with dot + `12:34` + stop. Hover: You ▂ · Others ▂ · **End** | "Recording a meeting" (not visible, it is in the VoiceOver label), two named meters, red "End recording" (OD-1, OD-5, OD-12) |
-| notice `.consent` (first 8 s) | nothing: the plain recording pill (OD-6); the reminder is in the meeting's window | the line, "Copy message", the 8 s window |
-| notice `.loadingModel`, `.modelUnavailable` | plain recording pill, hover unchanged (OD-7); the app says it after the recording | the notice |
-| notice `.limitCountdown` | ring + amber "Ends in 4:59" + stop | separate line |
+| `recording`, system track off (`recordsSystem == false`, QA `recording-microphone-only`) | as `recording`; hover shows only You ▂ · **End** (no "Others" meter); VoiceOver "Recording a meeting, your microphone only, 12:34" | the "System" meter |
+| notice `.consent` (first 8 s) | **pending Q4.** Started from the main window's Record button: the plain recording pill (OD-6), the reminder is in the recording panel. Started with ⌃⌥M, the menu bar or a suggestion: recommended Q4 (c), the line "Tell people you're recording" for 8 s, no button | "Copy message" (Q2), the long sentence |
+| notice `.loadingModel`, `.modelUnavailable` | plain recording pill, hover unchanged (OD-7); the app says it after the recording. **Pending Q5:** until #346 is on `main`, recommended (a) keeps the interim line "Text comes after the meeting" | the notice |
+| notice `.limitCountdown` | ring + amber "Ends in 4:59" + stop; it is a clock, not a problem line, so it never collapses (OD-8 does not apply); if a collapsed problem is also active, the ring carries the amber dot next to the amber clock | separate line |
 | notice `.noSystemAudio` | ring · ⚠ "Can't hear the others" · **Fix** · stop | jargon |
 | notice `.noMicrophoneAudio` | ring · mic "Can't hear your microphone" · **Fix** · stop | |
 | notice `.deviceDisconnected` | ring · mic "Microphone disconnected" · **Try again** · stop | |
 | notice `.microphoneNotRecorded` (#258) | ring · mic "Your mic isn't recording" · **Try again** · stop | squeezed meters |
-| notice `.retryingMicrophone` (#258) | ring · spinner "Reconnecting the mic…" · stop | |
-| notice `.microphoneFallback` (#258) | "Using MacBook Pro mic" 4 s, then amber dot (OD-11) | both device names |
-| notice `.systemAudioLost` | ring · ⚠ "Others' audio stopped" · **Fix** · stop | |
+| notice `.retryingMicrophone` (#258) | ring · spinner "Reconnecting the mic…" · stop (the spinner is static under Reduce Motion) | |
+| notice `.microphoneFallback` (#258) | "Using MacBook Pro Microphone" 4 s, then amber dot (OD-11, "Microphone line (OD-11)") | both device names |
+| notice `.systemAudioLost` | ring · ⚠ "Others' audio stopped" · **Fix** · stop (new: today this notice has only Stop) | |
 | notice `.lowDisk` | ring · ⚠ "Low disk, ends soon" · stop | |
 | notice `.writeProblem` | ring · ⚠ "Saving problem, fix it later" · stop | |
-| any lasting notice after 10 s | plain pill with an amber dot on the ring (OD-8) | the line |
-| `finishing`, `processing(…)` | `working` ring with dot; hover "Transcribing, 3 left" / "Recognising speakers" (OD-9) | "Processing: transcribing (3 left)" |
+| any problem line after 10 s (every notice above except `.limitCountdown` and the Q4 / Q5 lines) | plain pill with an amber dot on the ring (OD-8) | the line |
+| `finishing`, `processing(.closing)` | `working` ring with dot; hover "Saving the meeting" | "Processing…" |
+| `processing(.transcribing)`, `processing(.recognisingSpeakers)` | `working` ring with dot; hover "Transcribing, 3 left" / "Recognising speakers" (OD-9) | "Processing: transcribing (3 left)" |
 | `saved` | ✓ "Saved" · **Open**, 3 s | |
 | `savedIncomplete` | ⚠ "Saved, incomplete" · **Open**, 6 s | "not complete" |
 
@@ -140,10 +164,22 @@ What the code has today:
 
 What this spec does:
 
-- **Pill:** removes the line, the "Copy message" button, `Notice.consent`, `Recording.showsConsent`, `Action.copyConsentText` from the HUD path and the 8 s timer from `MeetingController` (Phase 3).
-- **Window:** adds nothing of its own. The reminder's place, text and look are the notes-explorer spec's `RecordingPanel` (main window, not designed here). The setting keeps its key and meaning (it now switches the panel's reminder).
-- **Order:** the Phase 3 PR does not merge before the recording panel with the reminder is on `main` (#255 step 4.3), so no build is without a reminder while the setting is on. If the owner wants Phase 3 sooner, see open question Q1.
-- **"Copy message" (MEET-1.6):** the notes-explorer spec's panel lists the reminder sentence but not the copy action. Without it nothing writes `consent_text_copied_at` and the window's "Message copied at …" line never appears for new meetings. Needs the owner (Q2): the panel gets "Copy message" next to the reminder (recommended: one text button, the existing sentence and store call, `MeetingConsentText` and `markConsentTextCopied` move behind the panel's `LiveRecorder` call), or MEET-1.6 is retired. Minimal requirement for the panel, for the owner to approve with the panel's sheet, not a look: one line plus at most one button, shown from the start of the recording while the setting is on, never in the pill.
+- **Pill (Phase 4):** removes the "Copy message" button and `Action.copyConsentText` (Q2), and removes the consent line for a recording started from the main window's Record button (OD-6). For a recording started with ⌃⌥M, the menu bar or a suggestion the line is **pending Q4**: recommended (c) keeps `Notice.consent`, `Recording.showsConsent` and the 8 s `consentDuration` timer for those starts only, with the short text "Tell people you're recording" and no button; under Q4 (a) or (b) all three go.
+- **Window:** adds nothing of its own. The reminder's place, text and look are the notes-explorer spec's `RecordingPanel` (main window, not designed here): one line, no button (Q2), shown from the start of the recording while the setting is on. The setting keeps its key and meaning (it switches the panel's reminder, and under Q4 (c) also the pill's line for starts outside the main window).
+- **Order (Q1 (a), decided):** the meeting pill (Phase 4) lands together with the recording panel (#255 step 4.3): it merges only when the panel is on `main`, so no build is without a reminder while the setting is on. Until then today's meeting HUD stays, consent line and "Copy message" included. The dictation pill (Phase 2) and the suggestion pill (Phase 3) do not wait.
+
+#### Retiring Copy message (Q2 (b), decided)
+
+MEET-1.6 is retired: no surface copies the consent sentence, the recording panel included. Phase 4 cleans up the code path; **the schema does not change** (`BACKWARD_COMPATIBILITY.md`: migrations are additive only).
+
+| Part | Today | After Phase 4 |
+|---|---|---|
+| `MeetingHUDState.Action.copyConsentText`, the "Copy message" button and its string | the consent line's button | removed |
+| `MeetingConsentText` (`Sources/MeetingsPlugin/Recording/MeetingConsentText.swift`, the sentence to paste for the participants) and its strings | copied by the button | removed with its last use (the panel's reminder is its own, shorter text from the notes-explorer spec) |
+| `MeetingsStore.markConsentTextCopied` and the controller code that calls it | writes `consent_text_copied_at` on the first copy | removed |
+| Migration `v2-consent`, column `meeting.consent_text_copied_at` | written by the copy | **stay** (a registered migration is never removed); the column is no longer written; old rows keep their values |
+| `MeetingDocument.consentTextCopiedAt` and `MeetingWindowView.consentLine` ("Message copied at 10:02" in the per-meeting window header) | read for meetings where the sentence was copied | removed: a line about a feature that no longer exists would only show on old meetings. The column stays unread |
+| Tests (`ConsentCopyTests`, the copy cases in `ControllerTests`, `HUDStateTests`, `StoreTests`) | cover MEET-1.6 | removed or changed with the code; the `v2-consent` migration test stays |
 
 ### After the recording: what the app says (OD-7)
 
@@ -158,7 +194,7 @@ Verdict: the existing states **do not suffice for the third case**. The capabili
 1. A stored or derivable reason "speech model unavailable" for an `incomplete` meeting (Meetings data; additive, if a column: a migration in `MeetingsStore`).
 2. A text for the meeting window and for the main window's meeting row and preview (domain of the main window, notes-explorer spec; not designed here). Proposal for the owner to accept or reword, not a look: en "The speech model wasn't free, so there's no transcript yet. The recording is kept: Finish makes the transcript and notes." / pl "Model mowy był zajęty, więc nie ma jeszcze transkrypcji. Nagranie jest zachowane: Dokończ zrobi transkrypcję i notatki."
 
-Filed as issue #346 (related: #338, a meeting whose stored model was removed). It is not part of this spec's phases; Phase 3 only checks it in QA (see Phase 3).
+Filed as issue #346 (related: #338, a meeting whose stored model was removed). It is not part of this spec's phases. Whether the meeting pill's OD-7 step waits for it is open question Q5 (recommended: yes, that one step is gated); Phase 4 checks it in QA.
 
 ### Meeting: start and end messages
 
@@ -175,7 +211,7 @@ Filed as issue #346 (related: #338, a meeting whose stored model was removed). I
 | `problem(.nothingHeard)` | ⚠ "Nothing heard" |
 | `problem(.couldNotStart)` | red "Recording didn't start" |
 | `problem(.failed)` | red "The meeting couldn't be saved" |
-| `allowMicrophone` | mic "Allow the microphone in the dialog" (no ✕: the system prompt decides) |
+| `allowMicrophone` | mic "Allow the microphone in the dialog" (no ✕: the system prompt decides). This **removes** today's Cancel (`.dismiss` → `MeetingController.cancelPreparation`); ⌃⌥M and the menu bar still cancel the preparation, and the system prompt's own buttons end it |
 
 ### Meeting suggestions (top centre, hidden from screen sharing)
 
@@ -188,12 +224,13 @@ Lifetime (15 s), no key claims and the click-only start stay as today.
 
 ### Copy (en / pl)
 
-Every visible string, with its budget. Existing keys whose text changes get new keys (the old keys are removed with their last use, `StringCatalogTests` keeps both languages complete). Removed with no replacement in the pill: the consent line and "Copy message" (OD-6), "Loading the speech model – recording continues" and "… the text comes after the meeting" (OD-7). The consent sentence itself (`MeetingConsentText`) stays for the recording panel.
+Every visible string, with its budget. Existing keys whose text changes get new keys (the old keys are removed with their last use, `StringCatalogTests` keeps both languages complete). Removed with no replacement in the pill: "Copy message" and the consent sentence `MeetingConsentText` (Q2), the long consent line (OD-6; a short line stays only if the owner picks Q4 (c)), "Loading the speech model – recording continues" and "… the text comes after the meeting" (OD-7; pending Q5 for the interim line). Every key below carries the comment prefix `HUD pill:` so the budget test finds it. The Polish texts follow the owner's quotes in OD-9 („Transkrybuję, zostały 3”) and OD-10 („Nagraj”).
 
 | Key (en) | pl |
 |---|---|
 | Allow the microphone in the dialog | Zezwól na mikrofon w oknie systemu |
-| Using MacBook Pro mic *(placeholder: device name)* | Mikrofon: MacBook Pro |
+| Using %@ *(device name, shortened in the middle)* | Mikrofon: %@ |
+| Using the default mic | Domyślny mikrofon |
 | Pasted without cleanup | Wklejono bez poprawek |
 | Copied, paste with ⌘V | Skopiowano, wklej ⌘V |
 | No speech model | Brak modelu mowy |
@@ -212,8 +249,9 @@ Every visible string, with its budget. Existing keys whose text changes get new 
 | Others' audio stopped | Dźwięk rozmówców przerwany |
 | Low disk, ends soon | Mało miejsca, zaraz koniec |
 | Saving problem, fix it later | Błąd zapisu, dokończysz później |
-| Transcribing, %lld left | Transkrypcja, zostały %lld |
+| Transcribing, %lld left | Transkrybuję, zostały %lld *(plural variants: został 1 / zostały 2–4 / zostało 5+)* |
 | Recognising speakers | Rozpoznawanie mówców |
+| Saving the meeting | Zapisywanie spotkania |
 | Saved / Saved, incomplete | Zapisano / Zapisano, niepełne |
 | Meetings can't be saved now | Spotkań nie da się teraz zapisać |
 | Not enough disk space | Za mało miejsca na dysku |
@@ -226,7 +264,11 @@ Every visible string, with its budget. Existing keys whose text changes get new 
 | End the recording? | Zakończyć nagrywanie? |
 | Don't ask again | Nie pytaj więcej |
 | You / Others | Ty / Rozmówcy |
-| Buttons: Allow, Download, Fix, Try again, Open, End, Record, Record others only | Zezwól, Pobierz, Napraw, Spróbuj ponownie, Otwórz, Zakończ, Nagrywaj, Nagraj tylko rozmówców |
+| *Pending Q4 (c):* Tell people you're recording | Powiedz, że nagrywasz |
+| *Pending Q5 (a), interim:* Text comes after the meeting | Tekst będzie po spotkaniu |
+| Buttons: Allow, Download, Fix, Try again, Open, End, Record, Record others only | Zezwól, Pobierz, Napraw, Spróbuj ponownie, Otwórz, Zakończ, Nagraj, Nagraj tylko rozmówców |
+
+The suggestion's "Record" button gets a new key with „Nagraj” (OD-10); today's `Record` key („Nagrywaj”, comment "Meeting suggestion HUD button that starts a recording") is used only by the suggestion and is removed in Phase 3. Every row is within 40 characters in both languages (longest: „Poprzednie spotkanie wciąż się zapisuje”, 39; „Transkrybuję, zostały %lld” is 25 with a three-digit number).
 
 "Meeting in %@" takes the app's display name; a name that would break the budget is shortened by the pill (tail truncation) and the full name is in the VoiceOver label. The hover link "Don't ask again" has the VoiceOver label "Don't ask again for %@" ("Nie pytaj więcej dla %@").
 
@@ -234,18 +276,23 @@ Every visible string, with its budget. Existing keys whose text changes get new 
 
 - **VoiceOver:** each pill is one element whose label carries everything, including hover-only content: "Dictation, recording, 0:12. Esc cancels." / "Recording a meeting, 12:34. Can't hear the others." / "Meeting in Google Chrome". Its buttons (also the hover-only ones) are exposed as named accessibility actions, so nothing depends on the pointer. Announcements stay as today (start, stop, done, each new problem once; no ticks), with the new texts.
 - **Contrast:** text is primary label colour on glass (no coloured text except the amber countdown, which uses the text-grade `statusAttention` and is checked at 4.5:1 on the light and dark glass in the gallery). Increase Contrast adds the 1 pt border used today.
-- **Reduce Motion:** the ring does not turn, the dot does not breathe, the wave bars stay flat at the current level (as today), expand and collapse are instant, the closing ring is replaced by a static ring with a small spinner.
-- **Large text:** height and font follow the app text size (OD-13); at XL every Polish string fits in 450 pt (checked in the sketch).
+- **Reduce Motion:** the ring does not turn, the dot does not breathe, the wave bars stay flat at the current level (as today), expand and collapse are instant, the working ring is the static part ring with its track that `LintelRingAppearance` draws for `.processing` under `LintelRingMotion.reduced` (no spinner, nothing moves).
+- **Large text:** height and font follow the app text size (OD-13, all four sizes); at XL every Polish string fits in 450 pt (checked in the sketch; L, between M and XL, is checked by the gallery snapshots).
 - **Pointer-free use:** Esc cancels dictation, the menu bar and the meeting shortcut end a meeting, as today.
 
 ## 📝 Architecture
 
-- **`LintelPill`** (new, `Sources/LintelUI/Components/LintelPill.swift`): a SwiftUI view over a pure `PillContent` value (`glyph: PillGlyph` = `.live(dot:)`, `.working(dot:)`, `.attention`, `.error`, `.microphone`, `.done`, `.person`; `live: PillLive?` = `.wave(level:)` or `.clock(String, amber: Bool)`; `text: String?`; `action: PillAction?`; `hoverText`, `hoverActions`, `closes: Bool`, `badge: Bool`, `accessibilityLabel`). Plus `LintelRing` (the cut ring, shared later with the notes explorer of #255) and a `PillHoverHost` (`NSHostingView` subclass with an `NSTrackingArea` `[.activeAlways, .mouseEnteredAndExited, .inVisibleRect]`, because the panels are non-activating and Lintel is usually not the active app, so SwiftUI `.onHover` alone is not reliable there; spike in Phase 1).
+- **`LintelPill`** (new, `Sources/LintelUI/Components/LintelPill.swift`): a SwiftUI view over a pure `PillContent` value (`glyph: PillGlyph` = `.live(dot:)`, `.working(dot:)`, `.attention`, `.error`, `.microphone`, `.done`, `.person`; `live: PillLive?` = `.wave(level:)` or `.clock(String, amber: Bool)`; `text: String?`; `action: PillAction?`; `hoverText`, `hoverActions`, `closes: Bool`, `badge: Bool`, `truncation: .tail / .middle`, `accessibilityLabel`). The glyph is the existing `LintelRing` (#333, on `main`), not new work. Consumers beyond the HUDs: the notes explorer's `UndoToast` (`message`, no ✕, one button, `.middle` truncation; its keys carry `HUD pill:` and join the budget test), so the API and the test scope must keep that case working. Plus a `PillHoverHost` (`NSHostingView` subclass with an `NSTrackingArea` `[.activeAlways, .mouseEnteredAndExited, .inVisibleRect]`, because the panels are non-activating and Lintel is usually not the active app, so SwiftUI `.onHover` alone is not reliable there; spike in Phase 1).
 - **`LintelUI` depends on no plugin**; the plugins map their state to `PillContent`: `HUDState.pill` in `DictationPlugin`, `MeetingHUDState.pill` and `SuggestionPrompt.pill` in `MeetingsPlugin`. The state enums keep their cases (QA names, tests and controllers unchanged) except the consent ones (OD-6, below); only texts, actions and the view change. No `LintelKit` contract change, no settings keys, no data.
 - **Panels:** the three `NSPanel`s keep their level, collection behaviour, sharing type and placement code; their content size becomes the fixed 580 × 56 pt transparent frame.
-- **New action "Open"** on `saved` / `savedIncomplete`: `MeetingHUDState.Action.openMeeting`, handled by the controller through the existing `MeetingWindowController` (opens the meeting that was just saved). It is the only behaviour added.
-- **Timers:** the 10 s collapse of a lasting notice (OD-8) and the 3 / 4 s fallback line (OD-11) are owned by the HUD model (view-side), not by the controllers. The 8 s consent timer in `MeetingController` (`consentDuration`, `showsConsent`) is removed with the consent line (OD-6).
-- **Removed from the HUD path (OD-6, OD-7):** `MeetingHUDState.Notice.consent`, `Recording.showsConsent`, `Action.copyConsentText` and the `recording-consent` QA state; `Notice.loadingModel` and `.modelUnavailable` stay as states (QA names `recording-loading-model`, `recording-model-unavailable`, tests) but map to the plain recording pill. `MeetingConsentText`, `markConsentTextCopied` and `consent_text_copied_at` stay (data, MEET-1.6) for the recording panel.
+- **Behaviour changes** (everything else keeps today's actions):
+  - New "Open" on `saved` / `savedIncomplete`: `MeetingHUDState.Action.openMeeting`, handled by the controller through the existing `MeetingWindowController` (opens the meeting that was just saved).
+  - New "Allow" on dictation `copied(.noAccessibility)` (today no button): opens the Accessibility privacy pane, the same route as Settings → Permissions.
+  - New "Fix" on the meeting notice `.systemAudioLost` (today only Stop): the existing `openSettings` action (system audio privacy pane).
+  - Removed: the Cancel (✕) on the meeting `allowMicrophone` state (today `.dismiss` → `cancelPreparation`); ⌃⌥M and the menu bar still cancel.
+  - Removed: "Copy message" / `Action.copyConsentText` (Q2).
+- **Timers:** the 10 s collapse of a lasting notice (OD-8) and the 3 / 4 s fallback line (OD-11) are owned by the HUD model (view-side), not by the controllers. The 8 s consent timer in `MeetingController` (`consentDuration`, `showsConsent`) is pending Q4: removed under (a) or (b), kept for starts outside the main window under (c).
+- **Removed from the HUD path:** `Action.copyConsentText` and the MEET-1.6 code listed in "Retiring Copy message (Q2)" (decided). `Notice.consent`, `Recording.showsConsent` and the `recording-consent` QA state: pending Q4 (removed under (a) / (b), kept with the short text under (c)). `Notice.loadingModel` and `.modelUnavailable` stay as states (QA names `recording-loading-model`, `recording-model-unavailable`, tests) and map to the plain recording pill (OD-7; pending Q5 for the interim line until #346).
 
 ## 📝 Edge Cases & Failure Scenarios
 
@@ -258,7 +305,7 @@ Every visible string, with its budget. Existing keys whose text changes get new 
 | Very long app name in the suggestion | Tail truncation in the line; full name in VoiceOver. |
 | Screen sharing | The meeting pill (with OD-1 colour) is what participants see; the suggestion pill never shows. |
 | Reduce Motion toggled during a recording | Applied on the next state update (as today). |
-| Consent reminder on, main window closed | The pill shows nothing (OD-6); the reminder is in the recording panel when the user opens the main window. Accepted by the owner with OD-6 (risk R6). |
+| Consent reminder on, main window closed | **Pending Q4** (risk R6, open). Recommended (c): a recording started with ⌃⌥M, the menu bar or a suggestion shows "Tell people you're recording" in the pill for 8 s; one started from the main window's Record button shows the reminder in the recording panel only. |
 | Speech model still busy after "End" | `savedIncomplete` in the pill ("Saved, incomplete · Open", 6 s); the explanation and Finish are in the app (issue #346). |
 | Model loading for the whole meeting | Plain pill throughout; after "End" a longer closing ring while the spool is transcribed. |
 
@@ -271,56 +318,67 @@ Every visible string, with its budget. Existing keys whose text changes get new 
 | R3 | Hover tracking in a non-activating panel of a background app | Medium | `NSTrackingArea` with `.activeAlways`, spike in Phase 1. |
 | R4 | A Verdigris ring is not read as "recording" by call participants | Medium | OD-1; red dot is the fallback. |
 | R5 | Polish strings over budget at XL | Low | Budget test over the catalog; the sketch's XL check. |
-| R6 | The consent reminder is seen only when the main window is open during a recording (a meeting started with ⌃⌥M or from a suggestion shows no reminder) | Medium (legal comfort of the user) | Owner decision OD-6. Phase 3 waits for the recording panel with the reminder (#255 step 4.3); the setting stays. Open question Q1. |
-| R7 | Until issue #346 is done, a meeting the model could not transcribe says "Recording was interrupted", which is wrong, and the pill no longer hints "text after the meeting" | Low | Finish already works; the issue fixes the text. |
+| R6 | **Open, for the owner (Q4).** With OD-6 read literally, the consent reminder is seen only when the main window is open during a recording; a meeting started with ⌃⌥M, the menu bar or a suggestion (the usual way) shows no reminder at all | Medium (legal comfort of the user) | Not accepted: open question Q4, recommended (c). Phase 4 lands with the recording panel (Q1 (a), decided); the setting stays. |
+| R7 | Until issue #346 is done, a meeting the model could not transcribe says "Recording was interrupted", which is wrong, and the pill no longer hints "text after the meeting" | Low under Q5 (a), Medium under (b) | Open question Q5, recommended (a): the OD-7 step waits for #346 (an interim pill line until then). Finish already works. |
 
-No protected contract, settings key, database or migration changes in this spec's phases (`BACKWARD_COMPATIBILITY.md`). String keys change, which is not a protected surface. `plugins.meetings.consentReminder` keeps its key and type; it switches the recording panel's reminder instead of the pill's line. Issue #346 may add a migration; that is its own PR.
+No protected contract, settings key, database or migration changes in this spec's phases (`BACKWARD_COMPATIBILITY.md`). String keys change, which is not a protected surface. `plugins.meetings.consentReminder` keeps its key and type; it switches the recording panel's reminder (and, if the owner picks Q4 (c), the pill's short line for starts outside the main window). The column `consent_text_copied_at` stays in the schema, unwritten and unread (Q2). Issue #346 may add a migration; that is its own PR.
 
 ## 🧪 Validation
 
 - **Riskiest belief:** users notice a problem (no system audio, mic not recording) as fast without the always-visible meters.
-- **Smallest test:** the owner records three meetings with the Phase 3 build with one failure each (mute the call, unplug the mic, deny system audio) and says when they noticed. Pass: noticed within the notice's own delay (10–20 s) every time. Fail: OD-5 alternative (a combined wave stays visible).
+- **Smallest test:** the owner records three meetings with the Phase 4 build with one failure each (mute the call, unplug the mic, deny system audio) and says when they noticed. Pass: noticed within the notice's own delay (10–20 s) every time. Fail: OD-5 alternative (a combined wave stays visible).
 - **Guardrail:** no new silent-recording reports (the Granola complaint).
 - **QA without a real microphone or sound:** every phase is checked with the `--qa-hud` fixtures and the gallery, never with a real microphone, system audio or the speakers (owner rule 2026-11-26: no sound on the Mac's speakers). The owner's three validation recordings above are the only real-audio step and are the owner's.
 
 ## 📋 Phasing
 
-Three `feat/` PRs, in order. Each one:
+Four `feat/` PRs. Phase 1 first; Phases 2 and 3 after it, in any order, without waiting for anything else; Phase 4 last and gated. Each one:
 
-- has an **owner sheet**: a gallery or QA picture of every new look of that phase (light and dark, en and pl, S and XL, Reduce Motion, Increase Contrast, hover), posted on the PR for the owner's approval before `qa-approved` (new looks go to the owner's QA track);
+- has an **owner sheet**: a gallery or QA picture of every new look of that phase (light and dark, en and pl, S, M, L and XL, Reduce Motion, Increase Contrast, hover), posted on the PR for the owner's approval before `qa-approved` (new looks go to the owner's QA track);
 - has **QA with screenshots of the running debug build** (`docs/qa.md`, `--qa-hud …`, `--qa-snapshot`, light and dark), with no real microphone, system audio or sound;
 - passes the validation gate (`swift build`, `swift test`, `swift format lint --strict -r Sources Tests`).
 
 1. **Phase 1 — `LintelPill` in the gallery.** The component over `LintelRing` (#333, on `main`; reused, not redrawn), gallery scene `ui.pill` (the brief called it `lintel.pill`; `LintelUI` scenes use the `ui.` prefix, like `ui.ring`), and the R2/R3 spike in the non-activating panel. The gallery mechanism of #248 is on `main` (`Sources/LintelUI/Gallery/`), so no fallback is needed. No HUD changes yet.
-2. **Phase 2 — dictation pill.** `HUDState.pill`, the dictation panel on `LintelPill`.
-3. **Phase 3 — meeting pill and suggestion pill.** `MeetingHUDState.pill`, `SuggestionPrompt.pill`, the #258 states (merged 2026-11-25, on `main`: `microphoneFallback`, `retryingMicrophone`, `microphoneNotRecorded`, `retryMicrophone`), the OD-6 removal of the consent line (after the recording panel with the reminder is on `main`, #255 step 4.3) and `Action.openMeeting`.
+2. **Phase 2 — dictation pill.** `HUDState.pill`, the dictation panel on `LintelPill`. Not gated (Q1 (a) and Q3 (a) decided).
+3. **Phase 3 — suggestion pill.** `SuggestionPrompt.pill`, the suggestion panel on `LintelPill` (OD-10). Not gated: the suggestion pill has nothing to do with the consent reminder or the recording panel (Q1 (a)).
+4. **Phase 4 — meeting pill. Gated on Q4 and Q5, and lands together with the recording panel (#255 step 4.3, Q1 (a)).** `MeetingHUDState.pill`, the #258 states (merged 2026-11-25, on `main`: `microphoneFallback`, `retryingMicrophone`, `microphoneNotRecorded`, `retryMicrophone`), the consent change per Q4, the MEET-1.6 clean-up (Q2), `Action.openMeeting`, and the OD-7 mapping (its own step, gated on #346 if the owner picks Q5 (a)). The PR may be built and reviewed before the gates clear; it merges only when the recording panel is on `main` and Q4 and Q5 are answered.
 
 ## 📋 Implementation Plan
 
 ### Phase 1 — Pill component
 
-1. `LintelPill` + `PillContent` in `Sources/LintelUI/Components/`, with `LintelRing` as the glyph for live, warning and working (no second ring), sizes from `lintelTextSize` (28 / 32 / 38 pt at S / M / XL), colours from `LintelBrand`.
+1. `LintelPill` + `PillContent` in `Sources/LintelUI/Components/`, with `LintelRing` as the glyph for live, warning and working (no second ring), sizes from `lintelTextSize` (28 / 32 / 35 / 38 pt at S / M / L / XL, the L and XL factors of `LintelRingMetrics.points`), colours from `LintelBrand`, `truncation` `.tail` / `.middle`.
 2. `PillHoverHost` with the tracking area and the 300 / 500 ms delays; spike for R2 (click-through of the transparent 580 × 56 pt panel) and R3 (hover in a non-activating panel of a background app) recorded in the PR, with the fallback of R2 if click-through fails.
-3. Gallery scene `ui.pill` with every variant (live wave, live clock, working, message, prompt, amber dot) in the full matrix; it is the owner sheet of the phase.
-4. Tests: `PillContent` accessibility labels and actions, the 40-character copy budget test over `Localizable.xcstrings` (pill keys tagged by comment prefix `HUD pill:`), ring use under Reduce Motion (through `LintelRingMotion.reduced`), gallery goldens.
+3. Gallery scene `ui.pill` with every variant (live wave, live clock, working, message, message without ✕ and with middle truncation as the `UndoToast` uses it, prompt, amber dot) in the full matrix; it is the owner sheet of the phase.
+4. Tests: `PillContent` accessibility labels and actions, the 40-character copy budget test over `Localizable.xcstrings` (every key whose comment starts with `HUD pill:`, the notes explorer's `UndoToast` keys included; a `%@` placeholder counted as 20 characters), ring use under Reduce Motion (through `LintelRingMotion.reduced`), gallery goldens.
 
 ### Phase 2 — Dictation
 
-1. `HUDState.pill` mapping per the dictation table; new strings en + pl; remove the old ones (including "Loading model…", OD-7).
-2. `DictationHUDView` renders `LintelPill`; panel frame 580 × 56; the #258 fallback bubble becomes the 3 s line (OD-11).
-3. Tests: mapping per state (`DictationHUDQATests`), announcements unchanged except texts, hover-only actions exposed as accessibility actions, `recording(loadingModel)` maps to the same pill as `recording`.
-4. Owner sheet: a gallery scene of the dictation states (or the `--qa-hud dictation:*` snapshots).
-5. QA: every `--qa-hud dictation:*` state, light and dark, en and pl, S and XL, Reduce Motion; hover on the running app. No microphone is opened.
+1. `HUDState.pill` mapping per the dictation table (final, Q3 (a)); new strings en + pl; remove the old ones (including "Loading model…", OD-7). `InputFallback.pillLine` in `LintelSpeech` ("Microphone line (OD-11)"); `InputFallback.message` stays for the meeting HUD until Phase 4.
+2. `DictationHUDView` renders `LintelPill`; panel frame 580 × 56, placed so the pill keeps today's position; the #258 fallback bubble becomes the 3 s line (OD-11); "Allow" on `copied(.noAccessibility)`.
+3. QA fixtures (`DictationHUDQA`, listed in `docs/qa.md`): the existing `recording-microphone-fallback`, plus new `recording-escape-unclaimed` (`escapeCancels = false`), `recording-microphone-fallback-unnamed` (`usingName == nil`), `recording-microphone-fallback-collapsed` (after the 3 s line: amber dot) and a DEBUG setting `plugins.dictation.qaHUDHover` that draws the pill in its hover state. A collapsed or hovered fixture sets the HUD model's state directly; it does not wait for a timer.
+4. Tests: mapping per state (`DictationHUDQATests`), announcements unchanged except texts, hover-only actions exposed as accessibility actions, `recording(loadingModel)` maps to the same pill as `recording`, the fallback line's 3 s timer with `TestClock`.
+5. Owner sheet: a gallery scene of the dictation states (or the `--qa-hud dictation:*` snapshots).
+6. QA: every `--qa-hud dictation:*` state, light and dark, en and pl, S and XL, Reduce Motion; hover on the running app. No microphone is opened.
 
-### Phase 3 — Meetings and suggestions
+### Phase 3 — Suggestions
 
-1. `MeetingHUDState.pill` and `SuggestionPrompt.pill`; the 10 s collapse and the fallback 4 s line in the HUD model; `Action.openMeeting`.
-2. OD-6: remove `Notice.consent`, `Recording.showsConsent`, `Action.copyConsentText`, the `consentDuration` timer and the `recording-consent` QA state (update `docs/qa.md`); keep `MeetingConsentText` and the store call for the recording panel. Merge only after the recording panel with the reminder is on `main`.
-3. OD-7: `.loadingModel` and `.modelUnavailable` map to the plain recording pill with unchanged hover; remove their strings.
-4. `MeetingHUDView` and `SuggestionHUDView` render `LintelPill`; panels 580 × 56; screen-sharing behaviour unchanged.
-5. Tests: mapping per state, collapse timer with `TestClock`, `openMeeting` routes to the window, suggestion actions unchanged (`Not now` on ✕, `muteApp` on the hover link), no pill string mentions consent or the speech model while recording.
-6. Owner sheet: a gallery scene of the meeting and suggestion states.
-7. QA: every `--qa-hud meeting:*` state including the #258 and suggestion states; `recording-loading-model` and `recording-model-unavailable` show the plain pill on hover too; `saved-incomplete` shows "Saved, incomplete · Open" and Open opens the meeting; the main window's recording panel shows the consent reminder while the setting is on (the pill never does), and, once issue #346 is done, the app shows the model text for a fixture meeting the model could not transcribe (no recording). The owner's validation recordings above are separate.
+1. `SuggestionPrompt.pill` per "Meeting suggestions" (OD-10): "Record" (new key, „Nagraj”), hover "Don't ask again", ✕ = Not now; the end question with "End" and ✕ = Keep recording.
+2. `SuggestionHUDView` renders `LintelPill`; panel 580 × 56; `sharingType = .none`, 15 s lifetime, no key claims, unchanged.
+3. QA fixtures: the existing `suggestion-meeting` and `suggestion-end-recording`, plus a long app name (tail truncation) and the hover state (`plugins.meetings.qaHUDHover`, DEBUG); `docs/qa.md` updated.
+4. Tests: suggestion actions unchanged (`Not now` on ✕, `muteApp` on the hover link), VoiceOver label with the full app name.
+5. Owner sheet and QA as in Phase 2, `--qa-hud meeting:suggestion-*`.
+
+### Phase 4 — Meeting pill (gated: recording panel on `main`, Q4, Q5)
+
+1. `MeetingHUDState.pill`; the 10 s collapse and the fallback 4 s line in the HUD model; `Action.openMeeting`; "Fix" on `.systemAudioLost`; no ✕ on `allowMicrophone`; `processing(.closing)` / `finishing` hover "Saving the meeting"; `recording-microphone-only` hover with "You" only.
+2. Q2 (decided): remove `Action.copyConsentText` and the MEET-1.6 code per "Retiring Copy message (Q2)"; the `v2-consent` migration and the column stay. Consent line per the owner's Q4 answer (recommended (c): kept with the short text for starts outside the main window; under (a) / (b) remove `Notice.consent`, `Recording.showsConsent`, the `consentDuration` timer and the `recording-consent` QA state); update `docs/qa.md`.
+3. OD-7 (gated on #346 if Q5 (a)): `.loadingModel` and `.modelUnavailable` map to the plain recording pill with unchanged hover; remove their strings. Until #346 is on `main`, the interim line "Text comes after the meeting".
+4. `MeetingHUDView` renders `LintelPill`; panel 580 × 56; screen-sharing behaviour unchanged. `InputFallback.message` is removed with this last use.
+5. QA fixtures (`MeetingHUDQA`, listed in `docs/qa.md`): the existing #258 fixtures `recording-microphone-fallback` and `recording-microphone-retrying` stay; new `recording-microphone-fallback-unnamed`, `recording-microphone-fallback-collapsed` and `recording-no-system-audio-collapsed` (OD-8, amber dot), `recording-countdown` together with a collapsed problem, and the hover setting `plugins.meetings.qaHUDHover`.
+6. Tests: mapping per state, collapse timer with `TestClock` (and that `limitCountdown` never collapses), `openMeeting` routes to the window, no pill string mentions the speech model while recording (after #346 under Q5 (a)), no pill path copies the consent sentence.
+7. Owner sheet: a gallery scene of the meeting states.
+8. QA: every `--qa-hud meeting:*` state including the #258 states; `recording-loading-model` and `recording-model-unavailable` show the plain pill on hover too (or the interim line, Q5); `saved-incomplete` shows "Saved, incomplete · Open" and Open opens the meeting; the main window's recording panel shows the consent reminder with no copy button while the setting is on, and the pill follows the Q4 answer; once issue #346 is done, the app shows the model text for a fixture meeting the model could not transcribe (no recording). The owner's validation recordings above are separate.
 
 ## 📝 Not doing
 

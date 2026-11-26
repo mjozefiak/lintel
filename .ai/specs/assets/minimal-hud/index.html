@@ -209,7 +209,7 @@ const MEET = [
   { id: "meeting-recording-collapsed-problem", name: "A problem that lasts (after 10 s)", before: null, keep: "Plain pill with an amber dot on the ring; hover and VoiceOver give the sentence", gone: "The sentence after 10 s", od: [8],
     pill: (l) => clockPill(l, recMore(l), true) },
   { id: "meeting-finishing", name: "Finishing / processing", before: "meeting-processing-transcribing", keep: "The ring closing; on hover “Transcribing, 3 left”", gone: "“Processing: transcribing (3 left)”", od: [9],
-    pill: (l) => `${ring("work", true)}<span class="more"><span class="sec">${l === "pl" ? "Transkrypcja, zostały 3" : "Transcribing, 3 left"}</span></span>` },
+    pill: (l) => `${ring("work", true)}<span class="more"><span class="sec">${l === "pl" ? "Transkrybuję, zostały 3" : "Transcribing, 3 left"}</span></span>` },
   { id: "meeting-saved", name: "Saved", before: "meeting-saved", keep: "✓ + one word + Open, 3 s", gone: "—", od: [],
     pill: (l) => `${check}<span class="txt">${l === "pl" ? "Zapisano" : "Saved"}</span>${act(l === "pl" ? "Otwórz" : "Open")}` },
   { id: "meeting-saved-incomplete", name: "Saved, not complete", before: "meeting-saved-incomplete", keep: "One line + Open, 6 s", gone: "—", od: [],
@@ -218,7 +218,7 @@ const MEET = [
 const msg = (glyph, en, pl, action, x) => (l) => `${glyph}<span class="txt">${l === "pl" ? pl : en}</span>${action ? act(action[l === "pl" ? 1 : 0], action[2] || "") : ""}${x ? xBtn(t(L.close, l)) : ""}`;
 const START = [
   { id: "meeting-microphone-denied-system-only", name: "Microphone denied, others can be recorded", before: "meeting-microphone-denied-system-only", keep: "One line, one button, ✕; “Allow microphone” on hover", gone: "Three buttons", od: [],
-    pill: (l) => `${mic}<span class="txt">${l === "pl" ? "Brak mikrofonu" : "No microphone access"}</span>${act(l === "pl" ? "Nagraj tylko rozmówców" : "Record others only")}<span class="more">${act(l === "pl" ? "Zezwól" : "Allow", "link")}</span>${xBtn(t(L.close, l))}` },
+    pill: (l) => `${mic}<span class="txt">${l === "pl" ? "Brak dostępu do mikrofonu" : "No microphone access"}</span>${act(l === "pl" ? "Nagraj tylko rozmówców" : "Record others only")}<span class="more">${act(l === "pl" ? "Zezwól" : "Allow", "link")}</span>${xBtn(t(L.close, l))}` },
   { id: "meeting-microphone-denied", name: "Microphone denied", before: null, keep: "One line + Allow", gone: "“Open Privacy settings”", od: [], pill: msg(mic, "No microphone access", "Brak dostępu do mikrofonu", ["Allow", "Zezwól"]) },
   { id: "meeting-model-missing", name: "No speech model", before: "meeting-model-missing", keep: "One line + Download", gone: "“in Settings”", od: [], pill: msg(warn("--err"), "No speech model", "Brak modelu mowy", ["Download", "Pobierz"]) },
   { id: "meeting-library-unavailable", name: "Library unavailable", before: null, keep: "One line + Fix", gone: "—", od: [], pill: msg(warn("--err"), "Meetings can't be saved now", "Spotkań nie da się teraz zapisać", ["Fix", "Napraw"]) },
@@ -232,7 +232,7 @@ const START = [
 ];
 const SUGG = [
   { id: "suggestion-meeting", name: "Looks like a meeting", before: "s1:suggestion-meeting-light-pl", keep: "One line, Record, ✕; “Don't ask again” on hover", gone: "Second row with three buttons", od: [10],
-    pill: (l) => `${person}<span class="txt">${l === "pl" ? "Spotkanie w Google Chrome" : "Meeting in Google Chrome"}</span>${act(l === "pl" ? "Nagrywaj" : "Record", "primary")}<span class="more">${act(l === "pl" ? "Nie pytaj więcej" : "Don't ask again", "link")}</span>${xBtn(l === "pl" ? "Nie teraz" : "Not now")}`,
+    pill: (l) => `${person}<span class="txt">${l === "pl" ? "Spotkanie w Google Chrome" : "Meeting in Google Chrome"}</span>${act(l === "pl" ? "Nagraj" : "Record", "primary")}<span class="more">${act(l === "pl" ? "Nie pytaj więcej" : "Don't ask again", "link")}</span>${xBtn(l === "pl" ? "Nie teraz" : "Not now")}`,
     copy: T("✕ = Not now. Hidden from screen sharing. 15 s.", "✕ = Nie teraz. Niewidoczna w udostępnianiu ekranu. 15 s.") },
   { id: "suggestion-end-recording", name: "End the recording?", before: "s1:suggestion-end-recording-light-pl", keep: "One line, End, ✕ (= keep recording)", gone: "“Keep recording” button", od: [10],
     pill: (l) => `${ring("live", true)}<span class="txt">${l === "pl" ? "Zakończyć nagrywanie?" : "End the recording?"}</span>${act(l === "pl" ? "Zakończ" : "End", "primary")}${xBtn(l === "pl" ? "Nagrywaj dalej" : "Keep recording")}` },

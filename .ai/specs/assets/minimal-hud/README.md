@@ -10,7 +10,7 @@ Open `index.html` in a browser (no server, no network). The header switches lang
 
 ## What is in it
 
-- **Before:** the real HUD views from the debug build (`--qa-hud <plugin>:<state> --qa-appearance light --qa-snapshot`, en and pl). Only light: a snapshot cannot draw the dark glass (`docs/qa.md`). The #258 states (`recording-microphone-*`, `suggestion-*`, `dictation-recording-microphone-fallback`) are that PR's own screenshots (pl only), because #258 is not on `main` yet. States without a QA fixture say so.
+- **Before:** the real HUD views from the debug build (`--qa-hud <plugin>:<state> --qa-appearance light --qa-snapshot`, en and pl). Only light: a snapshot cannot draw the dark glass (`docs/qa.md`). The #258 states (`recording-microphone-*`, `suggestion-*`, `dictation-recording-microphone-fallback`) are that PR's own screenshots (pl only), because #258 was not on `main` when revision 1 was drawn (it merged on 2026-11-25). States without a QA fixture say so.
 - **After:** the proposed pill drawn in HTML on a sample desktop gradient, light and dark side by side. The glass is approximated with a CSS blur; the real material is judged in the app.
 - Every state lists what stays, what goes and the owner decisions (OD-n) it depends on.
 
@@ -36,3 +36,7 @@ Open `index.html` in a browser (no server, no network). The header switches lang
 ## Revision 2 (2026-11-26): owner decisions
 
 The owner decided OD-1 to OD-13 (spec, "Owner decisions"). Only two states of this sketch changed, as annotations, not a redraw: "First 8 s: consent reminder" now draws the plain recording pill (OD-6: the reminder is only in the meeting's window), and "Model loading / unavailable" has no hover line (OD-7: the app says it after the recording). The widths were measured again in headless Chrome: unchanged (widest normal 376 / 415 pt, widest hovered 442 / 489 pt, M / XL, pl). The `evidence/` images are from revision 1 and do not show these two states.
+
+## Revision 3 (2026-11-26): review of PR #273
+
+Text fixes only, no redraw and no new measurement: the Polish microphone-denied line now reads „Brak dostępu do mikrofonu” (as in the spec), the processing hover „Transkrybuję, zostały 3” (OD-9) and the suggestion button „Nagraj” (OD-10). `prototype.json` carries revision 3 and the current sha256 of `README.md` and `index.html`. The `evidence/` images are still from revision 1.
