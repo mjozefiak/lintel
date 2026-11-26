@@ -10,14 +10,19 @@ import LintelKit
 ///   its row; the HUD shows `recording` before that, and a session whose start fails gets there too) or the HUD
 ///   shows why it cannot, then returns or throws the contract's `LiveRecordingFailure`; nothing is left half
 ///   started. A denied microphone that the HUD would offer "record the system audio only" for is dismissed: the
-///   window has its own sentence and its own button.
+///   window has its own sentence and its own button. A recording that ends before that (the shortcut, a stop, a
+///   shutdown) answers the waiting `start()` with `LiveRecordingFailure.other`, never with a success for nothing.
 /// - `stop(writeNotes: false)` keeps the notes off for the meeting it stops (the automatic job after a saved
 ///   meeting is dropped for that id); `writeNotes: true` changes nothing, so the automatic job follows
-///   `plugins.meetings.notesEnabled` exactly as the shortcut does.
+///   `plugins.meetings.notesEnabled` exactly as the shortcut does. A stop while the recording is still starting
+///   (the meeting has no row yet) asks the session to finish and switches the notes off when the meeting
+///   registers. The answer lives in memory only: a meeting stopped without notes that is still `processing` when
+///   the app quits is finished by `RecoveryJob` on the next launch and its notes are written then.
 /// - `status()` mirrors the HUD (`LiveRecordingStatus` documents the row of every notice); the warnings come from
 ///   the same timers, so they go on and off with the HUD's.
 /// - It lives as long as the plugin's activation: `attach` and `detach` are `MeetingsPlugin`'s, and `detach`
-///   emits `.idle` and finishes every stream.
+///   emits `.idle` and finishes every stream. Every HUD and registration event carries the attachment's token, so
+///   a controller left over from an earlier activation never changes the status of the one that replaced it.
 ///
 /// Nothing here logs a title, a transcript or a note, and nothing touches `ranking.sqlite`.
 @MainActor
@@ -35,6 +40,9 @@ final class MeetingsLiveRecorder: LiveRecorder {
         var hasNotesJob: @MainActor (Int64) -> Bool
         /// Whether the notes pipeline is busy with any job.
         var notesBusy: @MainActor () -> Bool
+        /// How the meeting's notes stand; `nil` while the library is closed or the meeting is not there.
+        var notesStatus: @MainActor (Int64) -> NotesStatus? = { _ in nil }
+
         /// The date `LiveRecordingStatus.recording.since` carries.
         var now: @MainActor () -> Date = { Date() }
     }
@@ -43,6 +51,9 @@ final class MeetingsLiveRecorder: LiveRecorder {
 
     private let deps: Dependencies
     private var controller: MeetingController?
+    /// The token of the current attachment; `MeetingsPlugin` hands the controller's HUD and registration hooks the
+    /// same one, so a lingering controller of an earlier activation cannot change this attachment's status.
+    private var attachment = UUID()
     private var value: LiveRecordingStatus = .idle
     private var continuations: [UUID: AsyncStream<LiveRecordingStatus>.Continuation] = [:]
     /// A `start()` that waits for the recording to be registered or for the HUD to say why it cannot start.
@@ -53,8 +64,12 @@ final class MeetingsLiveRecorder: LiveRecorder {
     private var recordingKey: NoteKey?
     /// The last recording state the HUD showed (the source of `hearing` and `warning`).
     private var lastRecording: MeetingHUDState.Recording?
-    /// Meetings whose notes must not be written after they were saved (`stop(writeNotes: false)`).
+    /// Meetings whose notes must not be written after they were saved (`stop(writeNotes: false)`). The set lives
+    /// in memory only; `meeting.id` is `AUTOINCREMENT`, so an id is never reused.
     private var suppressedNotes: Set<Int64> = []
+    /// A `stop(writeNotes: false)` while the meeting had no row yet: the next meeting this recorder hears about
+    /// (registered, or saved) gets its notes switched off. Whatever ends the attempt without a meeting drops it.
+    private var suppressesNextMeeting = false
 
     init(dependencies: Dependencies) {
         deps = dependencies
@@ -68,9 +83,11 @@ final class MeetingsLiveRecorder: LiveRecorder {
 
     // MARK: Attach
 
-    /// The plugin is active: the recorder follows this controller.
-    func attach(_ controller: MeetingController) {
+    /// The plugin is active: the recorder follows this controller, under `token`.
+    func attach(_ controller: MeetingController, token: UUID) {
         self.controller = controller
+        attachment = token
+        suppressesNextMeeting = false
         clearRecording()
         set(.idle)
     }
@@ -80,6 +97,7 @@ final class MeetingsLiveRecorder: LiveRecorder {
     func detach() {
         guard controller != nil else { return }
         controller = nil
+        suppressesNextMeeting = false
         cancelPendingStart()
         clearRecording()
         set(.idle)
@@ -93,9 +111,14 @@ final class MeetingsLiveRecorder: LiveRecorder {
     /// The HUD's state as `MeetingController` showed it, or `nil` when the HUD was hidden (the controller's
     /// `hudObserver`). A `recording` state alone does not settle a `start()`: the HUD shows it before the session
     /// starts, and a session whose start fails gets there too — `meetingRegistered` says the recording really runs.
-    func hudChanged(_ state: MeetingHUDState?) {
-        guard isAttached else { return }
-        guard let state else { return recordingEnded() }
+    /// Events of a controller of an earlier attachment are ignored.
+    func hudChanged(_ state: MeetingHUDState?, from token: UUID) {
+        guard isAttached, token == attachment else { return }
+        guard let state else {
+            // The HUD was hidden: the attempt is over (the shortcut's cancel, the shutdown) and no meeting comes.
+            suppressesNextMeeting = false
+            return recordingEnded()
+        }
         switch state {
         case .allowMicrophone:
             // The prompt is on screen; `start()` keeps waiting.
@@ -105,13 +128,17 @@ final class MeetingsLiveRecorder: LiveRecorder {
             startedAt = startedAt ?? deps.now()
             updateRecording()
         case .finishing, .processing:
-            settleStart()
+            // A recording that moves on without `meetingRegistered` never ran for the waiting window.
+            failPendingStart()
             lastRecording = nil
             if let key = resolvedKey() { set(.processing(key: key, progress: nil)) }
         case .saved, .savedIncomplete:
-            settleStart()
+            // A saved meeting still becomes `ready` and asks `suppressesNotes`, so a pending stop-without-notes
+            // keeps its answer until then.
             recordingEnded()
         case .problem(let problem):
+            // No meeting of this attempt will have notes: the problem ends it.
+            suppressesNextMeeting = false
             if pendingStart != nil { return failStart(problem) }
             switch value {
             case .recording, .processing, .starting:
@@ -125,17 +152,33 @@ final class MeetingsLiveRecorder: LiveRecorder {
     }
 
     /// The recording really started: the meeting has a row, so it has a Notes key.
-    func meetingRegistered(_ meetingID: Int64) {
-        guard isAttached else { return }
-        startedAt = startedAt ?? deps.now()
+    func meetingRegistered(_ meetingID: Int64, from token: UUID) {
+        guard isAttached, token == attachment else { return }
+        if suppressesNextMeeting {
+            suppressesNextMeeting = false
+            suppressedNotes.insert(meetingID)
+        }
         if let key = deps.noteKey(meetingID) { recordingKey = key }
+        startedAt = startedAt ?? deps.now()
         settleStart()
-        updateRecording()
+        if controller?.phase == .finishing {
+            // The window stopped the recording while it was starting: the meeting exists but is being finished.
+            if let key = recordingKey { set(.processing(key: key, progress: nil)) }
+        } else {
+            updateRecording()
+        }
     }
 
     /// Whether the automatic notes job of a meeting was switched off with `stop(writeNotes: false)`, and forgets
-    /// the answer: the plugin asks this before it queues the notes of a meeting that just became `ready`.
-    func suppressesNotes(_ meetingID: Int64) -> Bool { suppressedNotes.remove(meetingID) != nil }
+    /// the answer: the plugin asks this before it queues the notes of a meeting that just became `ready`. A stop
+    /// that came before the meeting had a row is matched to the first meeting the recorder hears about.
+    func suppressesNotes(_ meetingID: Int64) -> Bool {
+        if suppressesNextMeeting {
+            suppressesNextMeeting = false
+            suppressedNotes.insert(meetingID)
+        }
+        return suppressedNotes.remove(meetingID) != nil
+    }
 
     // MARK: LiveRecorder
 
@@ -160,9 +203,13 @@ final class MeetingsLiveRecorder: LiveRecorder {
         guard let controller else { throw LiveRecordingFailure.other }
         switch controller.phase {
         case .idle: break
-        case .recording, .preparing, .awaitingMicrophoneDecision: throw LiveRecordingFailure.alreadyRecording
+        case .recording, .preparing: throw LiveRecordingFailure.alreadyRecording
+        // An ignored microphone decision holds nothing (no audio, no activity) and its HUD hides after 20 s:
+        // starting over is what the shortcut's second press does too.
+        case .awaitingMicrophoneDecision: controller.perform(.dismiss)
         case .finishing: throw LiveRecordingFailure.stillProcessing
         }
+        suppressesNextMeeting = false
         clearRecording()
         set(.starting)
         try await withTaskCancellationHandler {
@@ -181,10 +228,19 @@ final class MeetingsLiveRecorder: LiveRecorder {
 
     func stop(writeNotes: Bool) async {
         guard let controller else { return }
-        // A recording that is still being prepared or waiting for the microphone prompt never started: the
-        // window's Stop ends the attempt instead of waiting for a HUD that may never show.
+        if !writeNotes {
+            if let id = controller.meetingID {
+                suppressedNotes.insert(id)
+            } else if pendingStart != nil || controller.phase == .preparing {
+                // The meeting has no row yet (its session is still starting): the answer is applied when the
+                // meeting registers, or when it is saved.
+                suppressesNextMeeting = true
+            }
+        }
+        // A recording that is still being prepared, waiting for the microphone prompt or starting its session is
+        // not registered yet: the window's Stop ends the attempt instead of waiting for a HUD that may never
+        // show. The session is asked to finish when it exists; without one nothing was recorded.
         if pendingStart != nil { return cancelPendingStart() }
-        if !writeNotes, let id = controller.meetingID { suppressedNotes.insert(id) }
         controller.stop()
     }
 
@@ -194,6 +250,9 @@ final class MeetingsLiveRecorder: LiveRecorder {
         // One job at a time: the meeting's own job is fine (it gets the request through `regenerate`), another
         // meeting's is not.
         if deps.notesBusy(), !deps.hasNotesJob(id) { throw NoteSourceError.busy }
+        // The contract: a retry is for notes that are `failed` or `partial`. Anything else (`none`, `ok`, `stale`)
+        // has nothing to write again, so the press does nothing and writes nothing.
+        guard let status = deps.notesStatus(id), status == .failed || status == .partial else { return }
         deps.regenerateNotes(id)
     }
 
@@ -260,7 +319,7 @@ final class MeetingsLiveRecorder: LiveRecorder {
     }
 
     private func recordingEnded() {
-        settleStart()
+        failPendingStart()
         clearRecording()
         set(.idle)
     }
@@ -271,15 +330,25 @@ final class MeetingsLiveRecorder: LiveRecorder {
         lastRecording = nil
     }
 
+    /// The recording really ran: the only way a waiting `start()` succeeds (`meetingRegistered`).
     private func settleStart() {
         guard let continuation = pendingStart else { return }
         pendingStart = nil
         continuation.resume()
     }
 
+    /// Ends a `start()` that waits when the attempt is over without `meetingRegistered`: the HUD was hidden or
+    /// the recording went on to finishing, so nothing runs for it. The window gets an error, not a success.
+    private func failPendingStart() {
+        guard let continuation = pendingStart else { return }
+        pendingStart = nil
+        continuation.resume(throwing: LiveRecordingFailure.other)
+    }
+
     private func failStart(_ problem: MeetingHUDState.Problem) {
         guard let continuation = pendingStart else { return }
         pendingStart = nil
+        suppressesNextMeeting = false
         // The HUD would ask whether to record the system audio only; the window says "Allow Microphone" instead,
         // so the attempt ends here rather than staying half started behind a HUD nobody sees.
         if case .microphoneDenied(offersSystemOnly: true) = problem,
@@ -292,11 +361,20 @@ final class MeetingsLiveRecorder: LiveRecorder {
         continuation.resume(throwing: Self.failure(problem))
     }
 
+    /// Ends the attempt a waiting `start()` belongs to (the window's Stop, a cancelled task): a session that is
+    /// already up is asked to finish — a session still starting finishes as soon as its start is done — and
+    /// without one the attempt is cancelled. The waiting window gets `LiveRecordingFailure.other`.
     private func cancelPendingStart() {
         guard let continuation = pendingStart else { return }
         pendingStart = nil
-        if let controller, controller.phase == .preparing || controller.phase == .awaitingMicrophoneDecision {
-            controller.perform(.dismiss)
+        if let controller {
+            switch controller.phase {
+            case .preparing: controller.stop()
+            case .awaitingMicrophoneDecision: controller.perform(.dismiss)
+            default: break
+            }
+            // Nothing was recorded and no meeting will be made: the stop's answer must not reach a later one.
+            if controller.phase == .idle { suppressesNextMeeting = false }
         }
         clearRecording()
         set(.idle)

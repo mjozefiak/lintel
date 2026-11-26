@@ -83,6 +83,31 @@ import Testing
         await plugin.deactivate()
     }
 
+    @Test func deactivatingDuringAPendingStartAnswersItWithAnError() async throws {
+        let harness = try MeetingsHarness()
+        let authorizer = FakeAuthorizer(.notDetermined)
+        let prompt = Latch()
+        authorizer.holdAnswers(until: prompt)
+        let plugin = MeetingsPlugin(context: harness.context)
+        plugin.adjustControllerDependencies = { dependencies in
+            dependencies.authorizer = authorizer
+            dependencies.speechModel = {
+                .ready(modelID: "parakeet-ultra", folder: URL(filePath: "/tmp/lintel-model"))
+            }
+            dependencies.makeSession = { _ in ScriptedSession() }
+            dependencies.clock = ManualClock()
+            dependencies.stateChanged = { ChangeSignal.shared.fire() }
+        }
+        try await plugin.activate()
+        let recorder = try #require(plugin.liveRecorder)
+        let recording = Task { try await recorder.start() }
+        await eventually("the prompt") { authorizer.requests == 1 }
+        // The plugin is switched off while the window's start waits: it gets an error, not a success for nothing.
+        await plugin.deactivate()
+        await #expect(throws: LiveRecordingFailure.other) { try await recording.value }
+        prompt.open()
+    }
+
     @Test func stoppingWithNotesLeavesTheAutomaticNotesOn() async throws {
         let harness = try MeetingsHarness()
         let plugin = scriptedPlugin(harness)

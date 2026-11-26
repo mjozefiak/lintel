@@ -75,6 +75,34 @@ private final class StrangerLiveRecorderPlugin: LintelPlugin {
         await host.stop()
     }
 
+    @Test func aSecondRecorderIsReportedOnceHoweverOftenTheShellLooks() async throws {
+        let rig = try TestEnvironment()
+        defer { rig.tearDown() }
+        let host = rig.makeHost([LiveRecorderPlugin.self, SecondLiveRecorderPlugin.self])
+        await host.start()
+        var messages: [String] = []
+        let once = OnceReported { messages.append($0) }
+        // The shell reads the recorder on every status read and every recording of the window.
+        for _ in 0..<3 {
+            #expect(AppCoordinator.activeLiveRecorder(host) { once.report($0) }?.pluginID == "recorder")
+        }
+        #expect(messages.count == 1)
+        #expect(messages.first?.contains("is taken already") == true)
+        await host.stop()
+    }
+
+    @Test func theContextsLiveRecorderIsWhatTheRelayHas() throws {
+        let rig = try TestEnvironment()
+        defer { rig.tearDown() }
+        let relay = NoteSourcesRelay()
+        let context = rig.environment.makeContext(
+            for: LiveRecorderPlugin.manifest, liveRecorder: { relay.liveRecorder() })
+        #expect(context.liveRecorder() == nil)
+        let recorder = IdleLiveRecorder("recorder")
+        relay.liveRecorder = { recorder }
+        #expect(context.liveRecorder()?.pluginID == "recorder")
+    }
+
     @Test func aRecorderUnderAStrangersIdIsDropped() async throws {
         let rig = try TestEnvironment()
         defer { rig.tearDown() }

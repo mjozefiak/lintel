@@ -120,16 +120,16 @@ final class AppCoordinator {
         statusRelay.handler = { [weak self] id in self?.settingsHost?.pluginResultsChanged(id) }
         let host = host
         let logger = logger
-        var reported = Set<String>()
+        // One reporter for both selections: a plugin that breaks the id rule is logged once per app run, however
+        // often the shell looks.
+        let once = OnceReported { logger.error("\($0, privacy: .public)") }
         noteRelay.sources = {
-            Self.activeNoteSources(
-                host, report: { if reported.insert($0).inserted { logger.error("\($0, privacy: .public)") } })
+            Self.activeNoteSources(host, report: { once.report($0) })
         }
         noteRelay.openNote = { [weak self] route in self?.openNote(route) ?? false }
         noteRelay.commands = { [weak self] in self?.paletteCommands() ?? [] }
         noteRelay.liveRecorder = {
-            Self.activeLiveRecorder(
-                host, report: { if reported.insert($0).inserted { logger.error("\($0, privacy: .public)") } })
+            Self.activeLiveRecorder(host, report: { once.report($0) })
         }
         noteRelay.keptCopies = { [weak self] owner in await self?.host.keptNoteCopies(ofOwner: owner) ?? 0 }
         noteRelay.deleteKeptCopies = { [weak self] owner, erased in
@@ -762,5 +762,21 @@ final class PluginSettingsRelay {
 
     @MainActor func openModels(_ pluginID: String, _ packageID: String?) {
         modelsHandler(pluginID, packageID)
+    }
+}
+
+/// Lets each distinct message through once. The shell shares one between the note sources' and the live recorder's
+/// selection, so a plugin that breaks the id rule is logged once per app run, however often the shell looks.
+final class OnceReported {
+    private var seen = Set<String>()
+    private let sink: (String) -> Void
+
+    init(_ sink: @escaping (String) -> Void) {
+        self.sink = sink
+    }
+
+    func report(_ message: String) {
+        guard seen.insert(message).inserted else { return }
+        sink(message)
     }
 }
