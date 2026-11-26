@@ -27450,6 +27450,24 @@
           }
         }
       }
+    },
+    "Dictating, needs attention" : {
+      "comment" : "Spoken name of the turning ring of a dictation with the amber dot",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictating, needs attention"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie, wymaga uwagi"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

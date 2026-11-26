@@ -67,6 +67,7 @@ public struct LintelRing: View {
     private let mark: LintelRingMark
     private let baseSize: CGFloat
     private let label: String?
+    private let onAccentFill: Bool
 
     @Environment(\.lintelTextSize) private var textSize
     @Environment(\.lintelRingMotion) private var motion
@@ -74,22 +75,25 @@ public struct LintelRing: View {
 
     /// - Parameters:
     ///   - baseSize: points at the S and M text sizes; the ring grows with L and XL.
+    ///   - onAccentFill: the ring is drawn on a Verdigris fill (the Record button), so it uses `onAccent`.
     ///   - accessibilityLabel: what the screen knows and the ring does not ("Recording, 12 minutes"); the default
     ///     is the state's own words (`LintelRingLabels`).
     public init(
         _ state: LintelRingState, mark: LintelRingMark = .meeting, baseSize: CGFloat = 16,
-        accessibilityLabel: String? = nil
+        onAccentFill: Bool = false, accessibilityLabel: String? = nil
     ) {
         self.state = state
         self.mark = mark
         self.baseSize = baseSize
+        self.onAccentFill = onAccentFill
         self.label = accessibilityLabel
     }
 
     public var body: some View {
         let points = LintelRingMetrics.points(base: baseSize, textSize: textSize)
         let reduce = motion == .reduced || (motion == .system && systemReduceMotion)
-        let appearance = LintelRingAppearance(state: state, mark: mark, reduceMotion: reduce)
+        let appearance = LintelRingAppearance(
+            state: state, mark: mark, reduceMotion: reduce, onAccentFill: onAccentFill)
         RingLayers(
             appearance: appearance, small: LintelRingMetrics.usesSmallCut(points: points),
             animates: motion != .frozen
@@ -114,9 +118,13 @@ public enum LintelRingLabels {
                 ? String(localized: "Recording", comment: "Spoken name of the turning ring while a meeting is recorded")
                 : String(localized: "Dictating", comment: "Spoken name of the turning ring while the user dictates")
         case .warning:
-            String(
-                localized: "Recording, needs attention",
-                comment: "Spoken name of the turning ring with the amber dot")
+            mark == .meeting
+                ? String(
+                    localized: "Recording, needs attention",
+                    comment: "Spoken name of the turning ring with the amber dot")
+                : String(
+                    localized: "Dictating, needs attention",
+                    comment: "Spoken name of the turning ring of a dictation with the amber dot")
         case .processing(let progress):
             if let progress = LintelRingAppearance.clamped(progress) {
                 String(
@@ -271,6 +279,7 @@ final class RingLayerView: NSView {
             case .live: LintelBrand.accentColor
             case .attention: LintelBrand.statusAttentionColor
             case .error: LintelBrand.statusErrorColor
+            case .onAccent: LintelBrand.onAccentColor
             }
         return cgColor(color, in: view)
     }

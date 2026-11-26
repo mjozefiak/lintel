@@ -52,6 +52,8 @@ public nonisolated struct LintelRingAppearance: Equatable, Sendable {
         case attention
         /// `LintelBrand.statusError`.
         case error
+        /// `LintelBrand.onAccent`: the ring on a Verdigris fill (the Record button).
+        case onAccent
 
         /// The colour as plain sRGB (for the contrast tests): the same values `LintelBrand` draws.
         public func hex(dark: Bool) -> UInt32 {
@@ -61,6 +63,7 @@ public nonisolated struct LintelRingAppearance: Equatable, Sendable {
             case .live: dark ? BrandPalette.accentDark : BrandPalette.accentLight
             case .attention: dark ? BrandPalette.statusAttentionDark : BrandPalette.statusAttentionLight
             case .error: dark ? BrandPalette.statusErrorDark : BrandPalette.statusErrorLight
+            case .onAccent: dark ? BrandPalette.onAccentDark : BrandPalette.onAccentLight
             }
         }
     }
@@ -91,7 +94,9 @@ public nonisolated struct LintelRingAppearance: Equatable, Sendable {
 
     /// - Parameters:
     ///   - reduceMotion: nothing turns or breathes; an indeterminate sweep becomes a static half ring.
-    public init(state: LintelRingState, mark: LintelRingMark, reduceMotion: Bool) {
+    ///   - onAccentFill: the ring sits on a Verdigris fill (the Record button): the quiet, ink and live colours
+    ///     become `onAccent`, so it stays visible; the warning and error colours do not change, and there is no track.
+    public init(state: LintelRingState, mark: LintelRingMark, reduceMotion: Bool, onAccentFill: Bool = false) {
         let dotOn = mark == .meeting
         switch state {
         case .idle:
@@ -140,6 +145,12 @@ public nonisolated struct LintelRingAppearance: Equatable, Sendable {
             sweep = 1
             secondsPerTurn = nil
             dotBreathes = false
+        }
+        if onAccentFill {
+            func onAccent(_ tone: Tone) -> Tone { [.quiet, .ink, .live].contains(tone) ? .onAccent : tone }
+            ringTone = onAccent(ringTone)
+            dotTone = dotTone.map(onAccent)
+            showsTrack = false
         }
     }
 

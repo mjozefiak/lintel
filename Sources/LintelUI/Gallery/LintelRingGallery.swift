@@ -3,8 +3,8 @@ import SwiftUI
 
 /// DEBUG only: the design gallery scenes of the shared UI components (spec `2026-11-24-notes-explorer-main-window`, step
 /// 2.1: the ring's window states). They draw the real `LintelRing` over no data at all. The turning and the breathing
-/// are frozen (`lintelRingMotion = .frozen`), so a picture is the same every time; the animation itself is Core
-/// Animation and is looked at live in `--qa-gallery`.
+/// are Core Animation layer animations: the live gallery shows them moving, and a picture (`cacheDisplay`) draws the
+/// layer's model values, so it is always the first frame.
 public enum LintelUIGallery {
     @MainActor public static var scenes: [GalleryScene] { [LintelRingGallery.scene] }
 }
@@ -16,6 +16,8 @@ private struct LintelRingSheet: View {
     let title: String
     let rows: [(state: LintelRingState, label: String?)]
     let motion: LintelRingMotion
+    /// The rings sit on a Verdigris fill, like the Record button.
+    var onAccent = false
 
     @Environment(\.lintelTextSize) private var textSize
     static let sizes: [CGFloat] = [16, 28, 64]
@@ -27,13 +29,13 @@ private struct LintelRingSheet: View {
                     HStack(spacing: 14) {
                         HStack(alignment: .center, spacing: 12) {
                             ForEach(Self.sizes, id: \.self) { size in
-                                LintelRing(row.state, mark: mark, baseSize: size)
+                                LintelRing(row.state, mark: mark, baseSize: size, onAccentFill: onAccent)
                                     .frame(width: 70 * textSize.scale, height: 70 * textSize.scale)
                             }
                         }
                         Text(row.label ?? LintelRingLabels.label(state: row.state, mark: mark))
                             .font(textSize.font(.body))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(onAccent ? LintelBrand.onAccent : .primary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -41,6 +43,7 @@ private struct LintelRingSheet: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(onAccent ? LintelBrand.accent : .clear)
         .environment(\.lintelRingMotion, motion)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
@@ -55,12 +58,13 @@ private struct LintelRingSheet: View {
     private static let window = GalleryPresentation.window(width: 560)
 
     private static func state(
-        _ id: String, _ summary: String, _ states: [LintelRingState], motion: LintelRingMotion = .frozen
+        _ id: String, _ summary: String, _ states: [LintelRingState], motion: LintelRingMotion = .system,
+        onAccent: Bool = false
     ) -> GalleryState {
         GalleryState(
             id: id, summary: summary, presentation: window
         ) {
-            AnyView(LintelRingSheet(title: id, rows: states.map { ($0, nil) }, motion: motion))
+            AnyView(LintelRingSheet(title: id, rows: states.map { ($0, nil) }, motion: motion, onAccent: onAccent))
         }
     }
 
@@ -90,6 +94,10 @@ private struct LintelRingSheet: View {
                 "error",
                 "Error: an open ring in the error colour with a wider opening than the idle ring, no dot, never colour alone. The row Notes not written, a failed recording.",
                 [.error]),
+            state(
+                "on-verdigris",
+                "On a Verdigris fill, as on the Record button: idle, listening and processing in the on-accent colour (white in light, the dark surface colour in dark). A warning or an error is not drawn on the fill.",
+                [.idle, .listening, .processing(progress: 0.5)], onAccent: true),
             state(
                 "reduced-motion",
                 "Reduce Motion: nothing turns or breathes; the sweep without a known progress becomes a static half ring. Listening, warning and processing shown as the system draws them with Reduce Motion on.",

@@ -16,7 +16,10 @@ struct LintelRingGalleryTests {
         let scenes = LintelUIGallery.scenes
         #expect(GalleryScene.validationProblems(scenes).isEmpty, "\(GalleryScene.validationProblems(scenes))")
         let ids = Set(scenes.flatMap { $0.states.map(\.id) })
-        for id in ["idle", "listening", "warning", "processing", "processing-unknown", "error", "reduced-motion"] {
+        for id in [
+            "idle", "listening", "warning", "processing", "processing-unknown", "error", "on-verdigris",
+            "reduced-motion",
+        ] {
             #expect(ids.contains(id), "the ring scene has no state \(id)")
         }
     }

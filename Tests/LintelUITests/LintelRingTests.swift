@@ -101,12 +101,27 @@ import Testing
                 BrandPalette.accentDark, alpha: BrandPalette.windowSelectionTintAlpha.dark,
                 over: BrandPalette.windowDark),
         ]
-        for tone in LintelRingAppearance.Tone.allCases {
+        for tone in LintelRingAppearance.Tone.allCases where tone != .onAccent {
             for background in light {
                 #expect(BrandPalette.contrast(tone.hex(dark: false), background) >= 3, "\(tone) light")
             }
             for background in dark {
                 #expect(BrandPalette.contrast(tone.hex(dark: true), background) >= 3, "\(tone) dark")
+            }
+        }
+    }
+
+    /// The Record button: the ring on the Verdigris fill needs 3:1 against it in both themes, and every tone the
+    /// on-accent look uses is `onAccent`.
+    @Test func theRingOnAVerdigrisFillIsVisible() {
+        #expect(
+            BrandPalette.contrast(LintelRingAppearance.Tone.onAccent.hex(dark: false), BrandPalette.accentLight) >= 3)
+        #expect(BrandPalette.contrast(LintelRingAppearance.Tone.onAccent.hex(dark: true), BrandPalette.accentDark) >= 3)
+        for state in [LintelRingState.idle, .listening, .processing(progress: 0.5), .processing(progress: nil)] {
+            for mark in [LintelRingMark.meeting, .dictation] {
+                let appearance = LintelRingAppearance(state: state, mark: mark, reduceMotion: false, onAccentFill: true)
+                #expect(appearance.ringTone == .onAccent && !appearance.showsTrack, "\(state) \(mark)")
+                #expect(appearance.dotTone == nil || appearance.dotTone == .onAccent, "\(state) \(mark)")
             }
         }
     }
