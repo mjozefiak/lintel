@@ -225,7 +225,9 @@ public final class DictationPlugin: LintelPlugin {
         #if DEBUG
         let qaPlayback = qaPlayback
         let qaRecorder = qaRecorder
-        let authorizer: any MicrophoneAuthorizer = DictationQAAuthorizer(playback: qaPlayback, base: self.authorizer)
+        let isQARun = context.settings.bool(DictationQAPlayback.settingName, default: false)
+        let authorizer: any MicrophoneAuthorizer = DictationQAAuthorizer(
+            playback: qaPlayback, base: self.authorizer, isQARun: isQARun)
         let hud: any HUDPresenter = qaRecorder ?? self.hud
         #else
         let authorizer = self.authorizer
@@ -239,7 +241,7 @@ public final class DictationPlugin: LintelPlugin {
                 makeSession: { folder, onEvent in
                     #if DEBUG
                     let audio: any AudioInput =
-                        qaPlayback.url.map { WAVFileAudioInput(url: $0) }
+                        qaPlayback.input(isQARun: isQARun)
                         ?? MicrophoneCapture(deviceUID: settings.inputDevice, deviceName: settings.inputDeviceName)
                     #else
                     let audio: any AudioInput = MicrophoneCapture(

@@ -20,15 +20,50 @@ final class DictationQAPlayback: Sendable {
         get { state.withLock { $0 } }
         set { state.withLock { $0 = newValue } }
     }
+
+    /// `--qa-setting plugins.dictation.qaAudio` (set by `AppEnvironment.qa` in every `--qa` run): while it is on, the
+    /// plugin never builds the real microphone, so a dictation outside `qa dictation play` hears silence.
+    static let settingName = "qaAudio"
+
+    /// The session's audio in a DEBUG build: the file being played, silence in a `--qa` run, `nil` for the real
+    /// microphone (every other run).
+    func input(isQARun: Bool) -> (any AudioInput)? {
+        if let url { return WAVFileAudioInput(url: url) }
+        return isQARun ? QASilentAudioInput() : nil
+    }
 }
 
-/// The microphone permission as the QA playback sees it: granted while a file is played, the real answer otherwise.
+/// Silence in 100 ms chunks, in real time, until `stop()`: the microphone of a `--qa` run outside `qa dictation play`.
+struct QASilentAudioInput: AudioInput {
+    func start(onLevel: @escaping @Sendable (Float) -> Void) async throws -> AsyncStream<[Float]> {
+        AsyncStream { continuation in
+            let task = Task {
+                let chunk = [Float](repeating: 0, count: AudioFormat.sampleRate / 10)
+                while !Task.isCancelled {
+                    onLevel(0)
+                    continuation.yield(chunk)
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func stop() async {}
+}
+
+/// The microphone permission as the QA playback sees it: granted while a file is played and in a `--qa` run, the real
+/// answer otherwise.
 struct DictationQAAuthorizer: MicrophoneAuthorizer {
     let playback: DictationQAPlayback
     let base: any MicrophoneAuthorizer
+    /// A `--qa` run: granted without asking, so the QA bundle shows no system prompt.
+    var isQARun = false
 
-    func status() -> MicrophoneAccess { playback.url == nil ? base.status() : .granted }
-    func requestAccess() async -> Bool { playback.url == nil ? await base.requestAccess() : true }
+    private var isGranted: Bool { playback.url != nil || isQARun }
+    func status() -> MicrophoneAccess { isGranted ? .granted : base.status() }
+    func requestAccess() async -> Bool { isGranted ? true : await base.requestAccess() }
 }
 
 /// Forwards to the real HUD and remembers the last state, and the dictation the history was handed.

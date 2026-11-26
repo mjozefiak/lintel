@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreAudio
 import Foundation
+import LintelSpeech
 import Synchronization
 
 /// The real Core Audio side of `SystemAudioSource`: `CATapDescription` + `AudioHardwareCreateProcessTap`, a
@@ -125,6 +126,10 @@ private final class CoreAudioTapSession: ProcessTapSession, @unchecked Sendable 
     var droppedBuffers: Int { ringBox.withLock { $0?.dropped ?? 0 } }
 
     func open(excludingOwnProcess: Bool, onBuffer: @escaping @Sendable (TapBuffer) -> Void) throws(SystemAudioError) {
+        #if DEBUG
+        // QA mode never taps the system audio (`RealAudioGuard`).
+        if RealAudioGuard.isForbidden { throw SystemAudioError.tapUnavailable(0) }
+        #endif
         // The output device first: without one there is nothing to tap, and creating the tap would show
         // the consent prompt for nothing.
         guard let outputUID = Self.defaultOutputUID() else { throw SystemAudioError.tapUnavailable(-1) }
@@ -328,6 +333,10 @@ struct AVAudioEngineTonePlayer: TonePlayer {
     var amplitude: Float = 0.25
 
     func play(duration: TimeInterval) async throws {
+        #if DEBUG
+        // QA mode never plays a sound on the speakers (`RealAudioGuard`).
+        if RealAudioGuard.isForbidden { throw SystemAudioError.tonePlayerFailed(0) }
+        #endif
         let engine = AVAudioEngine()
         let player = AVAudioPlayerNode()
         engine.attach(player)

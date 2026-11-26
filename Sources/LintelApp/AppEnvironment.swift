@@ -190,17 +190,20 @@ struct AppEnvironment {
         try createPrivateDirectory(root, fileManager: fileManager)
         let fileHome = root.appending(path: "files-home", directoryHint: .isDirectory)
         try createPrivateDirectory(fileHome, fileManager: fileManager)
-        var seeded = qaHUDSettings(
-            qaIdentitySettings(
-                qaNotesSettings(
-                    qaAppActivitySettings(
-                        qaFileIndexSettings(options.settings, emptyHome: fileHome.path),
-                        activity: options.appActivity,
-                        live: options.liveAppActivity
-                    ),
-                    fixtures: options.notesFixtures
-                )),
-            hud: options.hud
+        var seeded = qaAudioSettings(
+            qaHUDSettings(
+                qaIdentitySettings(
+                    qaNotesSettings(
+                        qaAppActivitySettings(
+                            qaFileIndexSettings(options.settings, emptyHome: fileHome.path),
+                            activity: options.appActivity,
+                            live: options.liveAppActivity
+                        ),
+                        fixtures: options.notesFixtures
+                    )),
+                hud: options.hud
+            ),
+            options: options
         )
         // A QA run never opens an open or save panel: they write their sizes into the real defaults domain.
         if seeded[QAOptions.windowsScriptedFilesKey] == nil { seeded[QAOptions.windowsScriptedFilesKey] = .bool(true) }
@@ -274,6 +277,20 @@ struct AppEnvironment {
         if result[QAOptions.meetingsProviderBinaryKey] == nil {
             result[QAOptions.meetingsProviderBinaryKey] = .string(qaProviderBinaryPath)
         }
+        return result
+    }
+
+    /// A QA run never records the tester's microphone or taps the system audio: meetings and dictation get WAV files
+    /// (`--qa-meeting-mic-wav`, `--qa-meeting-system-wav`) or silence, and the permission as granted. These keys are
+    /// forced: a `--qa-setting` cannot turn the switches off. `LintelMain` also makes the real audio objects throw
+    /// (`RealAudioGuard`).
+    static func qaAudioSettings(_ settings: [String: SettingValue], options: QAOptions) -> [String: SettingValue] {
+        var result = settings
+        result[QAOptions.meetingsAudioKey] = .bool(true)
+        result[QAOptions.dictationAudioKey] = .bool(true)
+        if let url = options.meetingMicWAV { result[QAOptions.meetingsMicWAVKey] = .string(url.path) }
+        if let url = options.meetingSystemWAV { result[QAOptions.meetingsSystemWAVKey] = .string(url.path) }
+        if let url = options.meetingSpoolDirectory { result[QAOptions.meetingsSpoolDirectoryKey] = .string(url.path) }
         return result
     }
 

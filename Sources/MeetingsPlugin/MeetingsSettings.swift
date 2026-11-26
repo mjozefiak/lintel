@@ -27,6 +27,10 @@ struct MeetingsSettings: Sendable {
         static let qaAccountName = "qaAccountName"
         static let qaProviderBinary = "qaProviderBinary"
         static let qaNotesDownload = "qaNotesDownload"
+        static let qaAudio = "qaAudio"
+        static let qaMicWAV = "qaMicWAV"
+        static let qaSystemWAV = "qaSystemWAV"
+        static let qaSpoolDirectory = "qaSpoolDir"
         static let notesChunkTokens = "notesChunkTokens"
         static let notesReduceInputTokens = "notesReduceInputTokens"
         static let suggestMeetings = "suggestMeetings"
@@ -335,6 +339,23 @@ struct MeetingsSettings: Sendable {
         #endif
     }
 
+    /// DEBUG only: the settings of a `--qa` run's meeting audio, `nil` in every other run. `AppEnvironment.qa` always
+    /// sets `plugins.meetings.qaAudio` (a `--qa-setting` cannot turn it off), plus the WAV files and the spool folder
+    /// when `--qa-meeting-mic-wav`, `--qa-meeting-system-wav` and `--qa-meeting-spool-dir` are given. While it is set
+    /// the plugin never builds a real microphone, system-audio tap or tone player (`QAAudio`).
+    var qaAudio: QAAudioSettings? {
+        #if DEBUG
+        guard settings.bool(Key.qaAudio, default: false) else { return nil }
+        return QAAudioSettings(
+            micWAV: settings.string(Key.qaMicWAV).map { URL(filePath: $0) },
+            systemWAV: settings.string(Key.qaSystemWAV).map { URL(filePath: $0) },
+            spoolDirectory: settings.string(Key.qaSpoolDirectory).map { URL(filePath: $0, directoryHint: .isDirectory) }
+        )
+        #else
+        nil
+        #endif
+    }
+
     /// DEBUG only (`--qa-setting plugins.meetings.qaNotesDownload=missing|partial|downloading|offline|noSpace|installed`):
     /// the state the "Notes on this Mac" offer of the `meetings.setup` step shows, with nothing downloaded or read
     /// from the disk (the free space of `noSpace` is invented). Release builds never read it.
@@ -361,6 +382,13 @@ struct MeetingsSettings: Sendable {
     func setRetentionDays(_ days: Int) { settings.set(max(0, days), for: Key.retentionDays) }
     func setKeepAudio(_ value: Bool) { settings.set(value, for: Key.keepAudio) }
     func setOrphanAudioDays(_ days: Int) { settings.set(days, for: Key.orphanAudioDays) }
+}
+
+/// What `MeetingsSettings.qaAudio` reads: the files a `--qa` run plays as the two tracks (`nil`: silence).
+struct QAAudioSettings: Sendable, Equatable {
+    var micWAV: URL?
+    var systemWAV: URL?
+    var spoolDirectory: URL?
 }
 
 /// The states `plugins.meetings.qaNotesDownload` (DEBUG only) can force on the "Notes on this Mac" offer.

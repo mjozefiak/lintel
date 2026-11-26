@@ -18,6 +18,31 @@ import Testing
         #expect(try QAOptions.parse(["--qa"])?.meetingMicWAV == nil)
     }
 
+    @Test func everyQARunSwitchesMeetingsAndDictationToFilesOrSilence() throws {
+        let plain = AppEnvironment.qaAudioSettings([:], options: try #require(try QAOptions.parse(["--qa"])))
+        #expect(plain[QAOptions.meetingsAudioKey] == .bool(true))
+        #expect(plain[QAOptions.dictationAudioKey] == .bool(true))
+        #expect(plain[QAOptions.meetingsMicWAVKey] == nil)
+        // A `--qa-setting` cannot turn the switch off.
+        let forced = AppEnvironment.qaAudioSettings(
+            [QAOptions.meetingsAudioKey: .bool(false), QAOptions.dictationAudioKey: .bool(false)],
+            options: try #require(try QAOptions.parse(["--qa"])))
+        #expect(forced[QAOptions.meetingsAudioKey] == .bool(true))
+        #expect(forced[QAOptions.dictationAudioKey] == .bool(true))
+    }
+
+    @Test func theFlagsFilesAndSpoolFolderReachThePluginsSettings() throws {
+        let options = try #require(
+            try QAOptions.parse([
+                "--qa", "--qa-meeting-mic-wav", "/tmp/mic.wav", "--qa-meeting-system-wav", "/tmp/system.wav",
+                "--qa-meeting-spool-dir", "/tmp/spool",
+            ]))
+        let settings = AppEnvironment.qaAudioSettings([:], options: options)
+        #expect(settings[QAOptions.meetingsMicWAVKey] == .string("/tmp/mic.wav"))
+        #expect(settings[QAOptions.meetingsSystemWAVKey] == .string("/tmp/system.wav"))
+        #expect(settings[QAOptions.meetingsSpoolDirectoryKey] == .string("/tmp/spool"))
+    }
+
     @Test func qaNotesTurnsOnTheFixturesKeyOnly() throws {
         #expect(try QAOptions.parse(["--qa-notes"])?.notesFixtures == true)
         #expect(try QAOptions.parse(["--qa"])?.notesFixtures == false)

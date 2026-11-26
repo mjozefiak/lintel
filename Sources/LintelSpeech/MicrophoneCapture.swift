@@ -94,6 +94,9 @@ final class SystemCaptureEngine: CaptureEngine, @unchecked Sendable {
     func removeTap() { engine.inputNode.removeTap(onBus: 0) }
 
     func start() throws {
+        #if DEBUG
+        try RealAudioGuard.check("microphone")
+        #endif
         engine.prepare()
         do {
             try engine.start()
