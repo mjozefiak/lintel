@@ -114,8 +114,9 @@ old switches. A stored switch is never changed, and a second run changes nothing
 | `--qa-setting plugins.notes.qaComments=threads\|popover\|changed` | Notes workspace, step 5.2 | With `--qa-notes`: the QA run's own `notes.sqlite` gets an overlay on the fixture meeting's notes with two open comments and a resolved one, the note opens in the editor (highlights on the commented text) and the inspector shows the Comments tab with the number of open threads and the disabled "Revise with N comments" (the agent comes with step 6.2). `popover` also selects "next sprint" and opens the new-comment popover; `changed` replaces one open comment's text with one that is not in the note ("Text changed", Use selection). ⇧⌘M opens the popover on a selection, ⌘↩ sends, Escape cancels. |
 | `--qa-setting plugins.notes.qaRevise=waiting\|writing\|done\|skipped\|rejected\|conflict\|timedOut\|needsModel` | Notes workspace, step 6.2 | With `--qa-notes` and `plugins.notes.qaComments=threads`: shows the revise run without a model. `waiting` ("Waiting for the model", editor still editable) and `writing` (the lock strip "Agent is writing notes · read-only until it finishes" with Cancel, the editor read-only) put the open note's edit lock in that phase; `done`, `skipped`, `rejected`, `conflict`, `timedOut` and `needsModel` show how a run ended (the report strips). Nothing runs and nothing is written; the real run needs an installed notes model (never in tests). Screenshots: `--qa-snapshot` with `--qa-appearance`, `--qa-setting app.textSize=s\|xl` and `-AppleLanguages "(pl)"` from the app bundle. |
 | `--qa-setting plugins.notes.qaDelete=meeting\|meeting-edited\|dictation\|manual\|copy` | Notes workspace, step 4.6 | With `--qa-notes`: opens that delete confirmation sheet over the fixture note (`dlg-delete-meeting`, the same with "and your edits to them", `dlg-delete-dictation`, a manual note, the copy of a removed recording). Confirming deletes only the fixture; nothing real is reachable in QA mode. Details has an Actions list with "Delete…" for every note that can be deleted (not one being recorded or processed). |
-| `--qa-setting plugins.meetings.qaProviderStatus=ready\|notInstalled\|notSignedIn\|incompatibleVersion\|newerVersion` | Notes provider picker (A6), DEBUG only | Forces the provider row's status and the Settings → Meetings banner without starting any process (the real probes run `claude --version` and `claude auth status`, so a QA run always sets this). Combine with `--qa-setting plugins.meetings.notesEnabled=true`, `plugins.meetings.notesProvider=claude-code` and `plugins.meetings.notesProviderModel=sonnet\|opus\|fable` to open the picker with a provider chosen; without them the pane shows Local. Not a contract. |
+| `--qa-setting plugins.meetings.qaProviderStatus=ready\|notInstalled\|notSignedIn\|incompatibleVersion\|newerVersion` | Notes provider picker (A6), DEBUG only | Forces the provider row's status and the Settings → Meetings banner without starting any process (the real probes run `claude --version` and `claude auth status`, so a QA run always sets this). Notes are on by default on a QA profile since #252 (add `--qa-setting plugins.meetings.notesEnabled=false` to see them off); combine with `--qa-setting plugins.meetings.notesProvider=claude-code` and `plugins.meetings.notesProviderModel=sonnet\|opus\|fable` to open the picker with a provider chosen; without them the pane shows Local. Not a contract. |
 | `--qa-setting plugins.meetings.qaProviderScenario=running\|confirm\|details\|earlier\|menu\|modelMenu\|timedOut\|network\|rateLimited\|other\|tooLong\|modelNotAvailable` | Notes provider picker (A6), DEBUG only | Shows a job state without a real CLI: a job in progress, the "Use Local" question, the notice's Details open, the mark of earlier notes after Use Local (`earlier`, with Local chosen), or the last job failed with that reason. Any value puts the provider banner before the other banners. `menu` / `modelMenu` open the popover after 1.5 s (popovers are not part of `--qa-snapshot`). Not a contract. `plugins.meetings.qaAccountName=<name>` (DEBUG only) replaces the macOS account name that "Your name" suggests, because `--qa` does not isolate it (issue #222): always use an invented name and a path outside the home folder (for example `/opt/example/bin/claude`) in screenshots, and look at every screenshot before it is published. `plugins.meetings.notesProviderBinary=<path>` shows the hand-picked file row with "Restore Default". |
+| `--qa-setting plugins.meetings.qaNotesDownload=missing\|partial\|downloading\|offline\|noSpace\|installed` | Notes on by default (#252), DEBUG only | Forces the state of the "Notes on this Mac" part of the `meetings.setup` step with nothing read from the disk or the network: `missing` (Download with the size of the model for this Mac), `partial` (Continue Download with what is left), `downloading` (progress at 40 % with Cancel), `offline` ("The download did not finish…" with Try Again), `noSpace` (the space needed and an invented free space, Check Again, no Download button), `installed` (Downloaded). Clicking Download or Try Again downloads nothing. Recipes in "Meeting notes on by default (#252)". Not a contract. |
 | `--qa-meeting-mic-wav <path>` | Meeting notes 1.5 | A 16 kHz mono WAV (16-bit PCM or 32-bit float) played back as the meeting's microphone track instead of the real microphone. Options parsing only until the plugin is registered (step 1.10). |
 | `--qa-meeting-system-wav <path>` | Meeting notes 1.5 | The same for the system-audio track; real Core Audio capture is never started in QA mode. |
 | `--qa-meeting-spool-dir <path>` | Meeting notes 1.5 | Folder for the encrypted spool of QA meetings instead of `<data root>/Plugins/meetings/Spool`. The Keychain is the in-memory one in QA mode, so the spool key never reaches the real Keychain. |
@@ -507,17 +508,19 @@ is manual and uses a real model; nothing in `swift test` loads one.
 
 Flow to check, in light and dark mode and once in Polish (`-AppleLanguages '(pl)'`):
 
-- Settings → Meetings → Notes: the switch is off on a fresh profile and `plugins.meetings.notesEnabled` stays unset until
+- Settings → Meetings → Notes: the switch is **on** on a fresh profile since #252 and `plugins.meetings.notesEnabled` stays unset until
   you flip it; the model list shows only models that fit this Mac's memory (an 8 GB Mac lists the small one only), with
   the download size and the memory; with a stored model that does not fit, the pane says which one is used instead;
   Download shows progress and can be cancelled, Remove is refused while notes are being written or dictation uses the
   model.
-- The `meetings.setup` step has an optional notes row: nothing is downloaded until the button is pressed.
+- The `meetings.setup` step has the "Notes on this Mac" offer: nothing is downloaded until the button is pressed (states:
+  "Meeting notes on by default (#252)" below).
 - With the switch on and the model present, stop a recording: the library row shows "Writing notes 1 of N", then
   "Notes". With the model missing it shows "Notes model needed" and the row has a "Download Notes Model" action (also a
   banner and button in the meeting window) that opens Settings; only meetings that finished in this session with notes on
-  and the model missing get it, older ones show nothing, and downloading the model does not write notes for old
-  meetings by itself (use Regenerate Notes). Dictate with the built-in model while notes run: the notes' generation is
+  and the model missing get it, older ones show nothing; downloading the model (from any screen) writes the notes of
+  the meetings of this session that waited for it, within about 15 s, while older meetings and meetings from before a
+  restart need Regenerate Notes. Dictate with the built-in model while notes run: the notes' generation is
   cancelled between two tokens, the model is reloaded for dictation (a few seconds the first time; at most one copy
   is in memory), the dictation is formatted, and the notes take the model again afterwards and repeat the interrupted
   step (the badge may say "Waiting for the model" for up to a few seconds meanwhile). Dictating with another model file
@@ -546,6 +549,60 @@ It asserts the guard's invariants for any model (no image, link or HTML in the n
 stands on a quote that is in the recording; no task owner nobody named; none of the corpus's bait text) and prints
 `NOTES-BENCH` lines with the timings, chunk count, dropped count and memory (`docs/perf.md`). It prints no transcript
 text. Record the lines in the PR body together with the model and the Mac.
+
+### Meeting notes on by default (#252)
+
+A QA profile is a new install, so automatic notes are on (`plugins.meetings.notesEnabled` unset) and the QA data
+root has no notes model. Build the debug app first (`CONFIGURATION=debug scripts/make-app.sh`). The states of the
+"Notes on this Mac" offer in the `meetings.setup` step, each in light and dark mode and once in Polish
+(`-AppleLanguages "(pl)"` from the app bundle):
+
+```bash
+QA=dist/Lintel-QA.app/Contents/MacOS/Lintel-QA
+# Not downloaded (Download with the size for this Mac), then each forced state; nothing downloads:
+$QA --qa --qa-onboarding-step meetings.setup --qa-appearance light
+for state in missing partial downloading offline noSpace installed; do
+  $QA --qa --qa-onboarding-step meetings.setup --qa-setting plugins.meetings.qaNotesDownload=$state \
+    --qa-appearance light --qa-quit-after 6
+done
+# Notes switched off (only the switch, no offer):
+$QA --qa --qa-onboarding-step meetings.setup --qa-setting plugins.meetings.notesEnabled=false
+```
+
+`--qa-snapshot` renders the main window (or a `--qa-hud` panel) only, never the welcome screen: capture the welcome
+window while it is open with a window screenshot (`screencapture -o -l <window id> <file>.png`, or ⌘⇧4 then Space),
+and look at it for the account name and home-folder paths before publishing it.
+
+The default flip also changes two Settings screens on a fresh profile (capture them with `--qa-snapshot`):
+
+```bash
+# Settings → Meetings: the switch on, the notes model row and "Notes are written by" (Local) shown:
+$QA --qa --qa-window settings --qa-settings meetings --qa-snapshot /tmp/meetings.png --qa-quit-after 6
+# Settings → Models: the notes model "used by Meetings", no "needed" banner for it:
+$QA --qa --qa-window settings --qa-settings models --qa-snapshot /tmp/models.png --qa-quit-after 6
+```
+
+Check: Continue is never disabled; the line "You can record now. Notes are written once the model is on this Mac."
+shows under every state except Downloaded and off; `noSpace` shows the needed and the free size and no Download
+button; Download, Try Again and Continue Download in a forced state do nothing. A real download (2.5 GB for the
+default model) is a manual check: unforced, click Download, see the progress, Cancel, then Continue Download resumes
+where it stopped (`ModelManager`); with the network off it ends with the offline message and Try Again.
+
+The note of a meeting that waits for the model: the Notes workspace fixture `…0007` (`--qa-notes`) is in that state
+("Notes need a model…" strip, "Needs a notes model" in the explorer, "Download Notes Model" action):
+
+```bash
+$QA --qa --qa-notes --qa-window workspace \
+  --qa-setting plugins.notes.qaOpen=meetings:00000000-0000-0000-0000-000000000007
+```
+
+The meeting window banner ("Notes will be written once the notes model is on this Mac.") and the real path need a
+recorded meeting (`--qa-meeting-mic-wav`, "Meetings (Phase 1)" above) without the model: the meeting is saved
+with its transcript, the note says it waits for the model; downloading the model (setup step, Settings → Meetings or
+Settings → Models) writes its notes within about 15 s without a restart. An install from before #252
+(`--qa-data-root <folder> --qa-persistent-settings` on a folder that holds a `ranking.sqlite` and no
+`qa-settings.json`) gets `plugins.meetings.notesEnabled = false` and `app.notesDefaultMigrated = true` in
+`<folder>/qa-settings.json`, and the switch shows off; a stored value is never changed.
 
 ### Notes workspace: `--qa-notes` and the DEBUG QA keys (steps 1.2 to 6.4)
 

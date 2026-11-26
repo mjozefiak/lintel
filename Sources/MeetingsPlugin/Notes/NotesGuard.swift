@@ -75,6 +75,26 @@ struct NotesGuard: Sendable {
         case reportWithoutVerdict
     }
 
+    /// Why a point was refused, one level below `DropReason`: the rule inside `unsupportedDetail` that failed and the
+    /// kind of miss behind `quoteNotInTranscript`. A measurement aid (`NotesTrace` schema 6, the rejection report):
+    /// it names a rule and never carries text.
+    enum DropDetail: String, Sendable, CaseIterable, Codable {
+        case unsupportedNumber, unsupportedCalendarWord, unsupportedCapitalised, unsupportedSentenceStart
+        /// The quote matches a stretch of the transcript except for one word that differs.
+        case quoteChangedWord
+        /// The quote's words follow each other in one speaker's words but with more than
+        /// `maxSkippedTranscriptWords` words in between.
+        case quoteOmittedWords
+        /// The quote's words follow each other only across a change of speaker.
+        case quoteSpeakerChange
+        /// None of the above: the quote is not in the transcript.
+        case quoteAbsent
+    }
+
+    /// The version of the point rules, recorded in the trace and in `notes_prompt_version` once a rule changes
+    /// (spec `2026-11-25-meeting-notes-structure`: `g1` after S1 and S2, `g2` after S3). `g0` is the rules before it.
+    static let rulesVersion = "g0"
+
     /// What `applyingVerifications` changed (counts only).
     struct VerifierEffect: Equatable, Sendable {
         /// Points removed because the text does not follow from the quote (verdict `weaker` or `unsupported`).
@@ -85,6 +105,8 @@ struct NotesGuard: Sendable {
         var verified: [NotesPoint]
         var dropped: Int
         var reasons: [DropReason: Int]
+        /// `reasons` one level down (`DropDetail`); only `unsupportedDetail` and `quoteNotInTranscript` have details.
+        var details: [DropDetail: Int] = [:]
         /// Decisions, tasks and findings that were questions in the transcript and became open questions.
         var downgraded = 0
         /// Tasks whose person the model left empty and the guard filled with the speaker of a first person
@@ -197,6 +219,7 @@ struct NotesGuard: Sendable {
     func verifyPoints(_ points: [NotesPoint]) -> PointVerdict {
         var verified: [NotesPoint] = []
         var reasons: [DropReason: Int] = [:]
+        var details: [DropDetail: Int] = [:]
         var downgraded = 0
         var ownerFromSpeaker = 0
         for point in points {
@@ -205,12 +228,30 @@ struct NotesGuard: Sendable {
                 verified.append(outcome.point)
                 if outcome.downgraded { downgraded += 1 }
                 if outcome.ownerFromSpeaker { ownerFromSpeaker += 1 }
-            case .failure(let reason): reasons[reason, default: 0] += 1
+            case .failure(let refusal):
+                reasons[refusal.reason, default: 0] += 1
+                if let detail = refusal.detail { details[detail, default: 0] += 1 }
             }
         }
         return PointVerdict(
-            verified: verified, dropped: points.count - verified.count, reasons: reasons, downgraded: downgraded,
-            ownerFromSpeaker: ownerFromSpeaker)
+            verified: verified, dropped: points.count - verified.count, reasons: reasons, details: details,
+            downgraded: downgraded, ownerFromSpeaker: ownerFromSpeaker)
+    }
+
+    /// Why one point is refused: the reason and, for two of them, the rule or kind of miss behind it.
+    struct Refusal: Error, Equatable, Sendable {
+        var reason: DropReason
+        var detail: DropDetail?
+        init(_ reason: DropReason, detail: DropDetail? = nil) {
+            self.reason = reason
+            self.detail = detail
+        }
+    }
+
+    /// The reason and detail the guard gives one point, or nil when it passes (measurement only).
+    func refusal(of point: NotesPoint) -> Refusal? {
+        if case .failure(let refusal) = verify(point) { return refusal }
+        return nil
     }
 
     /// The verdict after the semantic verifier, by point id. Pure. A missing entry, or one whose source is not
@@ -270,28 +311,28 @@ struct NotesGuard: Sendable {
         var ownerFromSpeaker = false
     }
 
-    private func verify(_ point: NotesPoint) -> Result<Outcome, DropReason> {
+    private func verify(_ point: NotesPoint) -> Result<Outcome, Refusal> {
         var point = point
         point.text = Self.plain(point.text)
         point.quote = Self.plain(point.quote)
-        guard !point.text.isEmpty else { return .failure(.emptyText) }
+        guard !point.text.isEmpty else { return .failure(Refusal(.emptyText)) }
 
         let allQuoteWords = NotesText.words(strippingLinePrefix(point.quote))
         guard !allQuoteWords.isEmpty, let match = find(allQuoteWords, near: point.timeMs) else {
-            return .failure(.quoteNotInTranscript)
+            return .failure(Refusal(.quoteNotInTranscript, detail: missKind(of: allQuoteWords)))
         }
         // Only the matched part of the quote counts from here on (all of it, unless it was cut at a sentence end).
         let quoteWords = Array(allQuoteWords.prefix(match.quoteCount))
         guard quoteWords.count >= Self.minimumQuoteWords || match.wholeUtterance else {
-            return .failure(.quoteTooShort)
+            return .failure(Refusal(.quoteTooShort))
         }
         let claimsDecision = point.kind == .decision || point.kind == .task
-        if claimsDecision, quoteWords.count == 1 { return .failure(.kindNotSupported) }
+        if claimsDecision, quoteWords.count == 1 { return .failure(Refusal(.kindNotSupported)) }
 
         let textLanguage = NotesLanguage.dominant(in: point.text)
         let quoteLanguage = NotesLanguage.dominant(in: point.quote)
         if textLanguage != .unknown, quoteLanguage != .unknown, textLanguage != quoteLanguage {
-            return .failure(.languageChanged)
+            return .failure(Refusal(.languageChanged))
         }
 
         let covered = Set(match.range.map { wordUtterance[$0] }).sorted()
@@ -307,19 +348,23 @@ struct NotesGuard: Sendable {
         // A sentence that is a question is no decision, task or finding. It stays as an open question only when
         // the model wrote it as one.
         if outcome.point.kind != .question, isQuestion(sentence: wordSentence[match.range.lowerBound]) {
-            guard outcome.point.text.hasSuffix("?") else { return .failure(.questionNotAFinding) }
+            guard outcome.point.text.hasSuffix("?") else { return .failure(Refusal(.questionNotAFinding)) }
             outcome.point.kind = .question
             outcome.downgraded = true
         }
         switch outcome.point.kind {
         case .task:
             if NotesRelevance.isNonWorkTask(text: outcome.point.text) {
-                return .failure(.nonWorkTask)
+                return .failure(Refusal(.nonWorkTask))
             }
         case .question:
-            if NotesRelevance.isContextFreeQuestion(outcome.point.text) { return .failure(.questionWithoutContext) }
+            if NotesRelevance.isContextFreeQuestion(outcome.point.text) {
+                return .failure(Refusal(.questionWithoutContext))
+            }
         case .summary:
-            if NotesRelevance.isReportWithoutVerdict(outcome.point.text) { return .failure(.reportWithoutVerdict) }
+            if NotesRelevance.isReportWithoutVerdict(outcome.point.text) {
+                return .failure(Refusal(.reportWithoutVerdict))
+            }
         case .decision: break
         }
         let vocabulary = Vocabulary(
@@ -328,18 +373,18 @@ struct NotesGuard: Sendable {
             numbers: covered.flatMap {
                 NotesText.numberUnits(utterances[$0].text) + NotesText.linkUnits(utterances[$0].text)
             })
-        if !Self.isFaithful(outcome.point.text, vocabulary: vocabulary, strictStart: false) {
-            return .failure(.unsupportedDetail)
+        if let rule = Self.faithfulnessRefusal(outcome.point.text, vocabulary: vocabulary, strictStart: false) {
+            return .failure(Refusal(.unsupportedDetail, detail: DropDetail(rawValue: rule.rawValue)))
         }
         // A point must not turn a negation around: "nie zatwierdzamy" restated as "zatwierdzono", or the other
         // way round, keeps every word faithful and still flips the meaning.
         if Self.hasNegation(NotesText.words(outcome.point.text)) != Self.hasNegation(quoteWords) {
-            return .failure(.negationChanged)
+            return .failure(Refusal(.negationChanged))
         }
         // A summary point is a fact of the discussion in other words; when most of those words are not the
         // quote's, the sense may have been turned around without anything the checks above see.
         if outcome.point.kind == .summary, Self.driftsFromQuote(outcome.point.text, quote: Array(words[match.range])) {
-            return .failure(.driftedFromQuote)
+            return .failure(Refusal(.driftedFromQuote))
         }
 
         if outcome.point.kind == .task {
@@ -479,6 +524,46 @@ struct NotesGuard: Sendable {
             }
         }
         return nil
+    }
+
+    /// The kind of miss behind a quote that `find` did not place (measurement only; it runs for refused points).
+    /// Checked in this order: the quote's words in sequence across a change of speaker; one word that differs
+    /// in a stretch of the transcript of the quote's length; the words in order within one speaker's words with
+    /// more than `maxSkippedTranscriptWords` words in between; otherwise absent.
+    private func missKind(of quote: [String]) -> DropDetail {
+        guard quote.count >= 2, words.count >= quote.count else { return .quoteAbsent }
+        for start in 0...(words.count - quote.count) where NotesText.wordsMatch(words[start], quote[0]) {
+            var index = 1
+            while index < quote.count, NotesText.wordsMatch(words[start + index], quote[index]) { index += 1 }
+            if index == quote.count, speaker(of: start) != speaker(of: start + quote.count - 1) {
+                return .quoteSpeakerChange
+            }
+        }
+        if quote.count >= 3 {
+            for start in 0...(words.count - quote.count) {
+                let window = words[start..<(start + quote.count)]
+                let mismatches = zip(window, quote).filter { !NotesText.wordsMatch($0, $1) }.count
+                if mismatches == 1, wordSentence[start] == wordSentence[start + quote.count - 1] {
+                    return .quoteChangedWord
+                }
+            }
+        }
+        let reach = quote.count + 12
+        for start in words.indices where NotesText.wordsMatch(words[start], quote[0]) {
+            var position = start
+            var matched = 1
+            let limit = min(words.count, start + reach)
+            var next = start + 1
+            while matched < quote.count, next < limit, speaker(of: next) == speaker(of: start) {
+                if NotesText.wordsMatch(words[next], quote[matched]) {
+                    matched += 1
+                    position = next
+                }
+                next += 1
+            }
+            if matched == quote.count, position - start + 1 > quote.count { return .quoteOmittedWords }
+        }
+        return .quoteAbsent
     }
 
     /// The speaker's label (consecutive utterances of one speaker are one speaker).

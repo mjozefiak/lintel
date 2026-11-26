@@ -26,21 +26,21 @@ import Testing
         let notes = usages[2]
         #expect(notes.packageID == LLMModelCatalog.defaultModel.id || LLMModelCatalog.model(id: notes.packageID) != nil)
         #expect(!notes.isRequired)
-        // Notes are off by default.
-        #expect(!notes.isSelected)
+        // Notes are on by default (#252); the model is still only offered, never required.
+        #expect(notes.isSelected)
         #expect(notes.chooseFolder == nil)
     }
 
     @Test func selectionFollowsTheSettings() throws {
         let harness = try MeetingsHarness(settings: [
-            "plugins.meetings.diarization": .bool(false), "plugins.meetings.notesEnabled": .bool(true),
+            "plugins.meetings.diarization": .bool(false), "plugins.meetings.notesEnabled": .bool(false),
             "plugins.meetings.speechModel": .string(ModelCatalog.whisperLargeV3Turbo.id),
         ])
         let plugin = MeetingsPlugin(context: harness.context)
         let usages = plugin.modelUsage
         #expect(usages[0].packageID == ModelCatalog.whisperLargeV3Turbo.id)
         #expect(!usages[1].isSelected)
-        #expect(usages[2].isSelected)
+        #expect(!usages[2].isSelected)
     }
 
     @Test func chooseFolderWritesThePluginsOwnFolderKeys() throws {

@@ -176,6 +176,7 @@ public final class WindowsPlugin: LintelPlugin {
         runtime.tearDownOverlay = parts.tearDownOverlay
         self.runtime = runtime
         runtime.onTrustGranted = { [weak self] in await self?.recheckAvailability() }
+        runtime.onTrustHandled = { [weak self] in await self?.paneModel.refresh() }
         do {
             try await runtime.start()
         } catch {

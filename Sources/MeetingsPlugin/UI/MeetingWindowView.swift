@@ -438,7 +438,7 @@ private struct BannerView: View {
             Text(verbatim: NotesMessages.dropped(count))
         case .notesNeedsModel:
             Text(
-                "Notes are on, but their model is not downloaded.",
+                "Notes will be written once the notes model is on this Mac.",
                 comment: "Meeting window banner when the notes model is missing")
         }
     }

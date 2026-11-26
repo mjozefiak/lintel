@@ -53,6 +53,8 @@ struct NotesRejectionReport: Codable, Equatable {
         var kind: String
         /// `verified` or `dropped:<reason>`.
         var outcome: String
+        /// The rule or kind of miss behind the reason (`NotesGuard.DropDetail`), when the guard gives one.
+        var detail: String?
         var textLength: Int
         var quoteLength: Int
         var textLanguage: String
@@ -98,15 +100,16 @@ struct NotesRejectionReport: Codable, Equatable {
             case .malformed: malformed = true
             }
             let points = parsed.map { point -> Point in
-                let verdict = guardrail.verifyPoints([point])
                 let outcome: String
-                if let reason = verdict.reasons.keys.first {
-                    outcome = "dropped:\(reason.rawValue)"
+                var detail: String?
+                if let refusal = guardrail.refusal(of: point) {
+                    outcome = "dropped:\(refusal.reason.rawValue)"
+                    detail = refusal.detail?.rawValue
                 } else {
                     outcome = "verified"
                 }
                 return Point(
-                    kind: point.kind.rawValue, outcome: outcome, textLength: point.text.count,
+                    kind: point.kind.rawValue, outcome: outcome, detail: detail, textLength: point.text.count,
                     quoteLength: point.quote.count,
                     textLanguage: language(NotesLanguage.dominant(in: point.text)),
                     quoteLanguage: language(NotesLanguage.dominant(in: point.quote)),

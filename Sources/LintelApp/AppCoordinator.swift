@@ -24,6 +24,15 @@ final class AppCoordinator {
     private var mainMenu: MainMenuController?
     /// The one banner of the main window's Settings mode (spec step 2.2); built with the Settings mode.
     private var settingsHost: SettingsHostModel?
+    /// The one permission service (live states and asking), shared by Settings → Permissions and, later, the
+    /// onboarding Access step.
+    private(set) lazy var permissionGrant = PermissionGrantService(
+        reader: environment.permissionsReader,
+        // A QA run never raises the Accessibility prompt (it would target the tester's real settings).
+        requester: Self.permissionRequester(postsKeystrokes: environment.postsKeystrokes)
+    ) {
+        NSWorkspace.shared.open($0)
+    }
     /// Settings → Models (spec step 3.2).
     private var modelsPane: ModelsPaneModel?
     /// Shows the welcome screen's pending steps. Set in `start()` outside QA mode; tests replace it.
@@ -423,7 +432,9 @@ final class AppCoordinator {
             case .features:
                 return AnyView(FeaturesPane(host: host, settings: settings) { self?.pluginsChanged() })
             case .permissions:
-                let model = PermissionsModel(host: host, reader: environment.permissionsReader) { url in
+                let model = PermissionsModel(
+                    host: host, reader: environment.permissionsReader, service: self?.permissionGrant
+                ) { url in
                     NSWorkspace.shared.open(url)
                 }
                 return AnyView(PermissionsPane(model: model))
@@ -500,6 +511,12 @@ final class AppCoordinator {
                 onBack: hasSection ? { [weak self] in self?.mainWindow?.showWorkspace() } : nil))
     }
 
+    /// The requester of the shared permission service: the real one, or in QA mode (no keystrokes) one that never
+    /// raises the Accessibility prompt.
+    static func permissionRequester(postsKeystrokes: Bool) -> any PermissionRequester {
+        postsKeystrokes ? SystemPermissionRequester() : QAPermissionRequester()
+    }
+
     private func makeSettingsHost() -> SettingsHostModel {
         var navigation = SettingsHostModel.Navigation()
         navigation.openModels = { [weak self] id, packageID in self?.openModels(from: id, packageID: packageID) }
@@ -511,6 +528,10 @@ final class AppCoordinator {
             panes: { [weak self] in self?.mainWindowPluginPanes() ?? [] },
             shellBanners: shellPaneBanners(models: models))
         settingsHost = model
+        // Live checks only while the main window is visible; a change the service sees redraws the banner and dots.
+        model.liveGate = { [weak self] in self?.mainWindow?.isVisible ?? false }
+        permissionGrant.pollGate = { [weak self] in self?.mainWindow?.isVisible ?? false }
+        model.follow(permissionGrant)
         return model
     }
 

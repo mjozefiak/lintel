@@ -28,6 +28,32 @@ protocol CaptureStatsProviding: Sendable {
     var captureStats: SystemCaptureStats { get }
 }
 
+/// What the voice activity detector saw and what the pre- and post-roll added (issue #135). Kept in its own
+/// optional value on `ChannelCounters` so a file written before it existed still decodes.
+struct SegmentingStats: Equatable, Codable, Sendable {
+    /// Probability histogram of every 256 ms chunk: ten bins of 0.1, the last one includes 1.0.
+    static let nearMissFloor: Float = 0.25
+
+    var probabilityHistogram = [Int](repeating: 0, count: 10)
+    var chunks = 0
+    /// Chunks in [`nearMissFloor`, entry threshold) while no speech was open: speech the detector may have missed.
+    var nearMissChunks = 0
+    /// Runs of consecutive near-miss chunks (each chunk is 256 ms, so every run is at least 250 ms).
+    var nearMissRuns = 0
+    var longestNearMissRun = 0
+    /// Samples the pre-roll and post-roll added to the ranges the detector reported.
+    var paddedSamples = 0
+
+    /// A probability that is not a number (a damaged buffer through the model) is not counted: converting it
+    /// would trap.
+    mutating func add(_ probability: Float) {
+        guard probability.isFinite else { return }
+        chunks += 1
+        let bin = Int(min(max(probability, 0), 0.999) * Float(probabilityHistogram.count))
+        probabilityHistogram[bin] += 1
+    }
+}
+
 /// Counters of one channel of one meeting. Numbers only: no text, speaker, title or device name.
 struct ChannelCounters: Equatable, Codable, Sendable {
     /// Samples (16 kHz) that arrived, including silence inserted on a resume.
@@ -77,6 +103,13 @@ struct ChannelCounters: Equatable, Codable, Sendable {
     var silenceInsertedSamples = 0
     var endPaddingSamples = 0
     var ringDropped = 0
+    /// Absent in files written before the detector statistics existed.
+    var segmenting: SegmentingStats?
+
+    var segmentingStats: SegmentingStats {
+        get { segmenting ?? SegmentingStats() }
+        set { segmenting = newValue }
+    }
 
     mutating func apply(_ stats: SystemCaptureStats) {
         tapsRecreated = stats.tapsRecreated
@@ -147,6 +180,12 @@ enum CaptureDiagnostics {
                 "  [\(channel.rawValue)] interruptions: \(c.interruptions), resumes: \(c.resumes), lost: \(c.lost), "
                     + "silence put in place of a gap: \(milliseconds(c.gapFillSamples)) ms",
             ]
+            let stats = c.segmentingStats
+            lines.append(
+                "  [\(channel.rawValue)] VAD chunks: \(stats.chunks), near misses: \(stats.nearMissChunks) "
+                    + "in \(stats.nearMissRuns) runs, longest run: \(stats.longestNearMissRun), "
+                    + "padding added: \(milliseconds(stats.paddedSamples)) ms, "
+                    + "probability histogram: [\(stats.probabilityHistogram.map(String.init).joined(separator: ", "))]")
             if channel == .system {
                 lines.append(
                     "  [system] taps recreated: \(c.tapsRecreated), recreate failures: \(c.recreateFailures), "

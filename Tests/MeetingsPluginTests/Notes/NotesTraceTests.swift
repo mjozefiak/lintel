@@ -141,11 +141,12 @@ final class NotesTraceLog: Sendable {
             #expect(plain.0.markdown == traced.0.markdown, "scenario \(index)")
             #expect(plain.1 == traced.1, "scenario \(index)")
             #expect(log.balance.isBalanced, "scenario \(index): \(log.balance)")
-            guard case .started(let schema, _, _, _)? = log.all.first, case .finished? = log.all.last else {
+            guard case .started(let schema, _, _, _, let rules)? = log.all.first, case .finished? = log.all.last else {
                 Issue.record("scenario \(index) has no start or end")
                 continue
             }
             #expect(schema == NotesTrace.schemaVersion)
+            #expect(rules == NotesGuard.rulesVersion)
         }
     }
 
@@ -201,7 +202,58 @@ final class NotesTraceLog: Sendable {
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(NotesTraceVerification.self, from: unknown)
         }
-        #expect(NotesTrace.schemaVersion == 5)
+        #expect(NotesTrace.schemaVersion == 6)
+    }
+
+    @Test func theDetailsAndTheReservedFieldsAreCountsAndAnOlderTraceDecodesWithoutThem() throws {
+        let verdict = NotesGuard.PointVerdict(
+            verified: [], dropped: 3, reasons: [.unsupportedDetail: 2, .quoteNotInTranscript: 1],
+            details: [.unsupportedSentenceStart: 2, .quoteChangedWord: 1])
+        let verification = NotesTraceVerification(proposed: 3, verdict: verdict)
+        let data = try JSONEncoder().encode(verification)
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["details"] as? [String: Int] == ["unsupportedSentenceStart": 2, "quoteChangedWord": 1])
+        #expect(object["reanchored"] as? Int == 0)
+        #expect(try JSONDecoder().decode(NotesTraceVerification.self, from: data) == verification)
+
+        // A schema 5 trace has neither field.
+        var older = object
+        older["details"] = nil
+        older["reanchored"] = nil
+        let decoded = try JSONDecoder().decode(
+            NotesTraceVerification.self, from: JSONSerialization.data(withJSONObject: older))
+        #expect(decoded.details.isEmpty && decoded.reanchored == 0)
+        older["details"] = ["guessed": 1]
+        let unknown = try JSONSerialization.data(withJSONObject: older)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(NotesTraceVerification.self, from: unknown) }
+
+        // The layout of REDUCE is reserved as zeros, and a schema 5 reduce event decodes with none.
+        let reduce = NotesTraceReduce()
+        let reduceData = try JSONEncoder().encode(reduce)
+        let reduceObject = try #require(try JSONSerialization.jsonObject(with: reduceData) as? [String: Any])
+        let layout = try #require(reduceObject["layout"] as? [String: Any])
+        #expect(
+            Set(layout.keys) == ["topics", "pointsPerTopic", "topicNameRefused", "notChosen", "cutByLimit"])
+        #expect(layout["topics"] as? Int == 0 && (layout["pointsPerTopic"] as? [Int])?.isEmpty == true)
+        var olderReduce = reduceObject
+        olderReduce["layout"] = nil
+        let olderDecoded = try JSONDecoder().decode(
+            NotesTraceReduce.self, from: JSONSerialization.data(withJSONObject: olderReduce))
+        #expect(olderDecoded.layout == nil)
+    }
+
+    @Test func aTraceFileHoldsOnlyNumbersAndNames() async throws {
+        let log = NotesTraceLog()
+        _ = try await run(Scenario(utterances: NotesFixtures.meeting()), trace: log)
+        let text = String(
+            decoding: try EvalResultWriter.data(for: NotesTraceFile(recording: "demo", events: log.all)),
+            as: UTF8.self)
+        for utterance in NotesFixtures.meeting() {
+            for word in NotesText.words(utterance.text) where word.count >= 6 {
+                #expect(!text.localizedCaseInsensitiveContains(word), "a word of the transcript is in the trace")
+            }
+        }
+        #expect(text.contains("\"rulesVersion\""))
     }
 
     @Test func theVerifiedEventCountsTheSummaryPointsRemovedForDrift() async throws {

@@ -25,8 +25,9 @@ actor MeetingSession {
 
     /// A speech segment is cut at this length (the model's window is 15 s); never longer.
     static let longestSegment = 15 * AudioFormat.sampleRate
-    /// Audio kept before the current speech, so the start of a word is never cut.
-    private static let preRoll = AudioFormat.sampleRate / 2
+    /// What the detector can lag behind the store's end before it reports the start of speech: one pending
+    /// partial chunk, the chunk that crossed the threshold and its padding.
+    private static let detectorLookback = AudioFormat.sampleRate * 3 / 4
     /// A microphone segment is judged once the system track is known this long past its end (voice activity
     /// detection reports speech late).
     private static let echoSlackMs = 1_500
@@ -117,6 +118,8 @@ actor MeetingSession {
 
     private let limitSamples: Int
     private let warningSamples: Int
+    private let preRollSamples: Int
+    private let postRollSamples: Int
 
     /// - Parameters:
     ///   - mic: the microphone; `system` the system audio (`nil` records the microphone only).
@@ -170,6 +173,8 @@ actor MeetingSession {
         var list: [(AudioChannel, any AudioInput)] = [(.mic, mic)]
         if let system { list.append((.system, system)) }
         inputs = list
+        preRollSamples = MeetingSessionLimits.samples(in: limits.segmentPreRoll)
+        postRollSamples = MeetingSessionLimits.samples(in: limits.segmentPostRoll)
         limitSamples = MeetingSessionLimits.samples(in: limits.maximumDuration)
         warningSamples = max(
             0,
@@ -582,7 +587,11 @@ actor MeetingSession {
             }
         }
         do {
-            for event in try await track.vad.process(chunk) {
+            let wasOpen = track.speechStart != nil
+            let events = try await track.vad.process(chunk)
+            let opened = events.contains { $0.kind == .speechStart }
+            recordProbabilities(await track.vad.drainProbabilities(), of: track, open: wasOpen || opened)
+            for event in events {
                 switch event.kind {
                 case .speechStart:
                     if track.speechStart == nil {
@@ -590,9 +599,13 @@ actor MeetingSession {
                         counters[channel].vadSegmentsOpened += 1
                     }
                 case .speechEnd:
-                    if let start = track.speechStart {
+                    if track.speechStart != nil {
                         counters[channel].vadSegmentsClosed += 1
-                        closeSegment(track, start..<max(start, event.sampleIndex))
+                        // A range that outgrew the window (the end is reported late) is cut first.
+                        cutWhileTooLong(track, upTo: event.sampleIndex)
+                        if let start = track.speechStart {
+                            closeSegment(track, start..<max(start, event.sampleIndex))
+                        }
                         track.speechStart = nil
                     } else {
                         counters[channel].vadUnmatchedEnds += 1
@@ -603,14 +616,44 @@ actor MeetingSession {
             logger.error("Voice activity detection failed on \(channel.rawValue, privacy: .public)")
         }
         // Never a segment longer than the model's window.
-        while let start = track.speechStart, track.store.count - start > Self.longestSegment {
-            counters[channel].hardCuts += 1
-            closeSegment(track, start..<start + Self.longestSegment)
-            track.speechStart = start + Self.longestSegment
-        }
-        track.store.discard(before: (track.speechStart ?? track.store.count) - Self.preRoll)
+        cutWhileTooLong(track, upTo: track.store.count)
+        // Keep what a later range can still be widened into: the pre-roll before its start, and when no speech is
+        // open the stretch the detector reports late.
+        track.store.discard(before: (track.speechStart ?? track.store.count - Self.detectorLookback) - preRollSamples)
         progress()
         commitReady(force: false)
+    }
+
+    /// Cuts the open speech at the model's window while it reaches more than that far (up to `end`), so no segment
+    /// is longer than the window.
+    private func cutWhileTooLong(_ track: TrackState, upTo end: Int) {
+        while let start = track.speechStart, end - start > Self.longestSegment {
+            counters[track.channel].hardCuts += 1
+            let cut = SegmentWindow.cutEnd(start: start, notBefore: track.sentUntil, preRoll: preRollSamples)
+            closeSegment(track, start..<cut, endsInCut: true)
+            track.speechStart = cut
+        }
+    }
+
+    /// Counts the chunks the detector judged since the last batch. `open` is whether speech was open while the
+    /// batch was processed; a chunk that came close to the threshold without opening speech is a near miss.
+    private func recordProbabilities(_ probabilities: [Float], of track: TrackState, open: Bool) {
+        guard !probabilities.isEmpty else { return }
+        var stats = counters[track.channel].segmentingStats
+        for probability in probabilities where probability.isFinite {
+            stats.add(probability)
+            let nearMiss =
+                !open && probability >= SegmentingStats.nearMissFloor && probability < limits.vadEntryThreshold
+            if nearMiss {
+                stats.nearMissChunks += 1
+                track.nearMissRun += 1
+                if track.nearMissRun == 1 { stats.nearMissRuns += 1 }
+                stats.longestNearMissRun = max(stats.longestNearMissRun, track.nearMissRun)
+            } else {
+                track.nearMissRun = 0
+            }
+        }
+        counters[track.channel].segmentingStats = stats
     }
 
     private static func int16(_ sample: Float) -> Int16 {
@@ -776,7 +819,19 @@ actor MeetingSession {
     /// Hands a closed segment to the track's worker. A track has one worker, so segments reach the lease in the
     /// order they were spoken; when the worker's backlog already holds a minute of audio the segment waits in
     /// the spool instead (the replay transcribes it after the meeting), which keeps memory bounded.
-    private func closeSegment(_ track: TrackState, _ range: Range<Int>) {
+    ///
+    /// The range the detector reports is widened by the pre- and post-roll (`SegmentWindow`) before anything is
+    /// sliced, timed, deferred or replayed, so the transcript, the spool replay and the timeline agree.
+    /// `endsInCut`: the range ends because the model's window is full and speech goes on; the next piece starts
+    /// right there, so nothing is added after it.
+    private func closeSegment(_ track: TrackState, _ detected: Range<Int>, endsInCut: Bool = false) {
+        let range = SegmentWindow.widened(
+            detected, notBefore: track.sentUntil, received: track.store.count, preRoll: preRollSamples,
+            postRoll: endsInCut ? 0 : postRollSamples)
+        track.sentUntil = max(track.sentUntil, range.upperBound)
+        if !detected.isEmpty {
+            counters[track.channel].segmentingStats.paddedSamples += range.count - detected.count
+        }
         let samples = track.store.slice(range)
         guard !samples.isEmpty else {
             counters[track.channel].emptyRanges += 1
@@ -1350,6 +1405,9 @@ private final class TrackState: @unchecked Sendable {
     var store = SampleStore()
     var speechStart: Int?
     var received = 0
+    /// End of the audio already handed out as segments; a later range is never widened back into it.
+    var sentUntil = 0
+    var nearMissRun = 0
     var alive = true
     var lastAudioAt = Date.distantPast
     var inflight: [Int: Int] = [:]

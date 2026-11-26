@@ -3763,24 +3763,6 @@
         }
       }
     },
-    "Notes are on, but their model is not downloaded." : {
-      "comment" : "Meeting window banner when the notes model is missing",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notes are on, but their model is not downloaded."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notatki są włączone, ale ich model nie jest pobrany."
-          }
-        }
-      }
-    },
     "Notes model needed" : {
       "comment" : "Meeting library badge: notes are on but the model is missing",
       "extractionState" : "manual",
@@ -3867,24 +3849,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Otwórz jej panel, aby spróbować ponownie. Nic nie zostało usunięte."
-          }
-        }
-      }
-    },
-    "Optional: let a model on this Mac write notes after each meeting. It is a large download that starts only when you press the button." : {
-      "comment" : "Meetings onboarding step about the notes model",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Optional: let a model on this Mac write notes after each meeting. It is a large download that starts only when you press the button."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Opcjonalnie: pozwól modelowi na tym Macu pisać notatki po każdym spotkaniu. To duże pobranie, które zaczyna się dopiero po naciśnięciu przycisku."
           }
         }
       }
@@ -27321,6 +27285,96 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sprawdź aktualizacje…"
+          }
+        }
+      }
+    },
+    "Notes on this Mac: Lintel writes your meeting notes here, without the internet." : {
+      "comment" : "Meetings onboarding step about the notes model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes on this Mac: Lintel writes your meeting notes here, without the internet."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki na tym Macu: Lintel pisze notatki ze spotkań tutaj, bez internetu."
+          }
+        }
+      }
+    },
+    "You can record now. Notes are written once the model is on this Mac." : {
+      "comment" : "Meetings onboarding: notes wait for the notes model, recording does not",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can record now. Notes are written once the model is on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Możesz już nagrywać. Notatki powstaną, gdy model będzie na tym Macu."
+          }
+        }
+      }
+    },
+    "Not enough free space. The notes model needs %@, and %@ is free." : {
+      "comment" : "Meetings onboarding: the disk is too full for the notes model; needed and free space",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not enough free space. The notes model needs %@, and %@ is free."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Za mało miejsca na dysku. Model notatek potrzebuje %1$@, a wolne jest tylko %2$@."
+          }
+        }
+      }
+    },
+    "Continue Download (%@ left)" : {
+      "comment" : "Meetings onboarding: resumes a notes model download that stopped part of the way",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue Download (%@ left)"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wznów pobieranie (zostało %@)"
+          }
+        }
+      }
+    },
+    "Notes will be written once the notes model is on this Mac." : {
+      "comment" : "Meeting window banner when the notes model is missing",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes will be written once the notes model is on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki powstaną, gdy model notatek będzie na tym Macu."
           }
         }
       }

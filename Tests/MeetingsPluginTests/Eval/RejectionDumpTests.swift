@@ -58,9 +58,11 @@ struct RejectionDumpTests {
         #expect(points[0].textLength == points[0].text.count && points[0].quoteLength == points[0].quote.count)
         #expect(points[1].outcome == "verified")
         #expect(points[2].outcome == "dropped:quoteNotInTranscript")
+        #expect(points[2].detail == "quoteAbsent")
+        #expect(points[0].detail == nil && points[1].detail == nil)
         #expect(points[2].textHasMowca && !points[2].quoteHasMowca)
         let json = try String(contentsOf: written.url, encoding: .utf8)
-        for key in ["textLanguage", "quoteLanguage", "textHasMowca", "quoteHasMowca", "response", "outcome"] {
+        for key in ["textLanguage", "quoteLanguage", "textHasMowca", "quoteHasMowca", "response", "outcome", "detail"] {
             #expect(json.contains("\"\(key)\""))
         }
         #expect(decoded.rejectedCount == 2 && decoded.pointCount == 3)

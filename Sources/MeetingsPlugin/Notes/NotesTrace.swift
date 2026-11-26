@@ -27,8 +27,12 @@ enum NotesTrace {
     /// `NotesGuard.RepairReason` are gone; the reasons are `NotesGuard.DropReason`s), the summary paragraph is
     /// never composed (`NotesTraceSummary.sourceIDs` is always empty, `Route.composedSummary` is not produced),
     /// and the findings are chosen by REDUCE with a limit (`Route.listedByCode` is not produced, `Route.reduce`
-    /// is used; `Loss.notChosen`, `Loss.overLimit` are new).
-    static let schemaVersion = 5
+    /// is used; `Loss.notChosen`, `Loss.overLimit` are new). 6 (spec `2026-11-25-meeting-notes-structure`, F0):
+    /// `NotesTraceVerification.details` splits `unsupportedDetail` and `quoteNotInTranscript` by rule (a
+    /// measurement, nothing changes in the notes), and the fields of later phases are reserved and zero until
+    /// their phase: `NotesTraceVerification.reanchored`, `NotesTraceReduce.layout` (topics, points per topic,
+    /// `topicNameRefused`, `notChosen`, `cutByLimit`) and `started.rulesVersion` (`NotesGuard.rulesVersion`).
+    static let schemaVersion = 6
 
     /// The points of `verified` that the deduplication took out, in their order.
     static func removedIDs(from verified: [NotesPoint], kept: [NotesPoint]) -> [String] {
@@ -87,7 +91,9 @@ enum NotesTrace {
 /// One step of the notes, in the order the pipeline takes them. A run that throws (cancelled, or the model
 /// could not be had) ends without `finished`.
 enum NotesTraceEvent: Equatable, Sendable, Codable {
-    case started(schemaVersion: Int, promptVersion: Int, utterances: Int, chunks: Int)
+    case started(
+        schemaVersion: Int, promptVersion: Int, utterances: Int, chunks: Int,
+        rulesVersion: String = NotesGuard.rulesVersion)
     /// One MAP request of a chunk or of a half of one (a split chunk is followed by its halves).
     case mapChunk(NotesTraceChunk)
     /// After `NotesGuard.verifyPoints`.
@@ -193,6 +199,11 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
     var verified: NotesTraceKinds
     var dropped: Int
     var reasons: [NotesGuard.DropReason: Int]
+    /// `reasons`, one level down: the rule behind `unsupportedDetail` and the kind of miss behind
+    /// `quoteNotInTranscript` (schema 6; empty in older traces).
+    var details: [NotesGuard.DropDetail: Int] = [:]
+    /// Quotes the guard anchored to a shorter stretch of the transcript (reserved, always 0 until the S1 phase).
+    var reanchored = 0
     var downgraded: Int
     /// Tasks whose person is the speaker, given by the guard (a count; empty trace field reads as 0).
     var ownerFromSpeaker = 0
@@ -201,7 +212,7 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
     var verifier: NotesTraceVerifier?
 
     private enum CodingKeys: String, CodingKey {
-        case proposed, verified, dropped, reasons, downgraded, ownerFromSpeaker, verifier
+        case proposed, verified, dropped, reasons, details, reanchored, downgraded, ownerFromSpeaker, verifier
     }
 
     /// `reasons` is written as an object keyed by the reason's raw value (a dictionary keyed
@@ -213,6 +224,11 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
         dropped = try container.decode(Int.self, forKey: .dropped)
         reasons = try Self.decodeCounts(
             NotesGuard.DropReason.self, forKey: .reasons, in: container, unknown: "Unknown drop reason")
+        details =
+            container.contains(.details)
+            ? try Self.decodeCounts(
+                NotesGuard.DropDetail.self, forKey: .details, in: container, unknown: "Unknown drop detail") : [:]
+        reanchored = try container.decodeIfPresent(Int.self, forKey: .reanchored) ?? 0
         downgraded = try container.decode(Int.self, forKey: .downgraded)
         ownerFromSpeaker = try container.decodeIfPresent(Int.self, forKey: .ownerFromSpeaker) ?? 0
         verifier = try container.decodeIfPresent(NotesTraceVerifier.self, forKey: .verifier)
@@ -239,6 +255,9 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
         try container.encode(dropped, forKey: .dropped)
         try container.encode(
             Dictionary(uniqueKeysWithValues: reasons.map { ($0.key.rawValue, $0.value) }), forKey: .reasons)
+        try container.encode(
+            Dictionary(uniqueKeysWithValues: details.map { ($0.key.rawValue, $0.value) }), forKey: .details)
+        try container.encode(reanchored, forKey: .reanchored)
         try container.encode(downgraded, forKey: .downgraded)
         try container.encode(ownerFromSpeaker, forKey: .ownerFromSpeaker)
         try container.encodeIfPresent(verifier, forKey: .verifier)
@@ -250,6 +269,7 @@ struct NotesTraceVerification: Equatable, Sendable, Codable {
         verified = NotesTraceKinds(verdict.verified)
         dropped = verdict.dropped
         reasons = verdict.reasons
+        details = verdict.details
         downgraded = verdict.downgraded
         ownerFromSpeaker = verdict.ownerFromSpeaker
     }
@@ -326,6 +346,22 @@ struct NotesTraceReduce: Equatable, Sendable, Codable {
     /// The findings shown under "Topics discussed".
     var keyPoints = 0
     var summaryReplaced = false
+    /// The topic layout (schema 6): reserved, zero until the phase that writes topics; nil in older traces.
+    var layout: NotesTraceLayout? = NotesTraceLayout()
+}
+
+/// Counts of the topic layout of the notes (spec `2026-11-25-meeting-notes-structure`). Reserved in schema 6 and
+/// written as zeros until the phase that makes topics; numbers only, never a topic name.
+struct NotesTraceLayout: Equatable, Sendable, Codable {
+    var topics = 0
+    /// Points shown under each topic, in order.
+    var pointsPerTopic: [Int] = []
+    /// Topic names the fact check refused (their points went to "Other").
+    var topicNameRefused = 0
+    /// Verified `SUM` points REDUCE assigned to no topic.
+    var notChosen = 0
+    /// Points cut by the limit of topics times points per topic.
+    var cutByLimit = 0
 }
 
 struct NotesTraceSummary: Equatable, Sendable, Codable {
