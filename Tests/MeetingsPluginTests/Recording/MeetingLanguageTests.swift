@@ -248,7 +248,10 @@ private let automatic = SpeechLanguageSelection(mode: .automatic, languages: ["p
         let outcome = await session.finish()
         #expect(outcome.result == .ready)
 
-        let sent = rig.engine.options
+        // A short segment may overtake a long one in the engine queue under load (the CI runner did): compare by
+        // segment code. Short segments never count towards the settled profile or the 10th-segment re-check, so
+        // their position does not change what the others are sent.
+        let sent = rig.engine.options.sorted { $0.code < $1.code }
         #expect(sent.map(\.code) == utterances.map(\.code))
         let detect = { (fallback: String) in WhisperLanguageChoice.detect(candidates: ["pl", "en"], fallback: fallback)
         }
