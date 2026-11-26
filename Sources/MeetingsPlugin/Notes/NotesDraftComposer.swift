@@ -18,6 +18,12 @@ enum NotesDraftComposer {
             labels: labels)
     }
 
+    /// The points the closing "Other" topic had no room for when `markdown` shows this draft
+    /// (`NotesLayout.Arrangement.cutFromOther`): one-point topics join "Other", which holds at most six points.
+    static func cutFromOther(of draft: NotesDraft, durationMs: Int?) -> Int {
+        layout(of: draft, participants: []).arrangement(durationMs: durationMs).cutFromOther
+    }
+
     static func layout(of draft: NotesDraft, participants: [String]) -> NotesLayout {
         NotesLayout(
             intro: draft.summary,

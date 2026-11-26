@@ -20,6 +20,14 @@ struct NotesLayout: Equatable, Sendable {
         var due: String?
     }
 
+    /// The topics as they are shown and the points the closing "Other" had no room for (`maxPointsPerTopic`). Those
+    /// points are never shown, so they are reported here instead of being lost quietly: a track counts them (the
+    /// built-in track in its trace's `cutByLimit`, both tracks in `NotesResult.cutFromOtherCount`).
+    struct Arrangement: Equatable, Sendable {
+        var topics: [Topic] = []
+        var cutFromOther = 0
+    }
+
     var intro: String?
     var topics: [Topic] = []
     var decisions: [String] = []
@@ -52,22 +60,30 @@ struct NotesLayout: Equatable, Sendable {
     /// The topics as they are shown. A short meeting is one list without a heading. Otherwise a named topic with
     /// one point joins the closing topic "Other", and
     /// that topic holds at most six points. Points without a name come first, so they never read as part of a
-    /// heading above them.
-    func shownTopics(durationMs: Int?) -> [Topic] {
-        Self.arranged(
+    /// heading above them. The points "Other" cannot take are counted in `Arrangement.cutFromOther`.
+    func arrangement(durationMs: Int?) -> Arrangement {
+        let arranged = Self.arranged(
             topics.map { (name: $0.name, isOther: $0.isOther, points: $0.points) },
             short: isShortMeeting(durationMs: durationMs)
-        ).map { Topic(name: $0.name, points: $0.points, isOther: $0.isOther) }
+        )
+        return Arrangement(
+            topics: arranged.topics.map { Topic(name: $0.name, points: $0.points, isOther: $0.isOther) },
+            cutFromOther: arranged.cutFromOther)
     }
 
-    /// `shownTopics` for topics of any kind of point (the built-in track arranges its verified points with it, so
+    /// The topics as they are shown (the topics of `arrangement`).
+    func shownTopics(durationMs: Int?) -> [Topic] {
+        arrangement(durationMs: durationMs).topics
+    }
+
+    /// `arrangement` for topics of any kind of point (the built-in track arranges its verified points with it, so
     /// the trace knows exactly which ones are shown). `short` is `isShortMeeting` of the same topics.
     static func arranged<Point>(
         _ topics: [(name: String?, isOther: Bool, points: [Point])], short: Bool
-    ) -> [(name: String?, isOther: Bool, points: [Point])] {
+    ) -> (topics: [(name: String?, isOther: Bool, points: [Point])], cutFromOther: Int) {
         let filled = topics.filter { !$0.points.isEmpty }
-        if filled.isEmpty { return [] }
-        if short { return [(name: nil, isOther: false, points: filled.flatMap(\.points))] }
+        if filled.isEmpty { return ([], 0) }
+        if short { return ([(name: nil, isOther: false, points: filled.flatMap(\.points))], 0) }
         let unnamed = filled.filter { $0.name == nil && !$0.isOther }
         let named = filled.filter { $0.name != nil && !$0.isOther }
         var other = filled.filter(\.isOther).flatMap(\.points)
@@ -75,10 +91,11 @@ struct NotesLayout: Equatable, Sendable {
         let merge = !singles.isEmpty
         var kept = merge ? named.filter { $0.points.count > 1 } : named
         if merge { other = singles.flatMap(\.points) + other }
+        let cutFromOther = max(0, other.count - maxPointsPerTopic)
         if !other.isEmpty {
             kept.append((name: nil, isOther: true, points: Array(other.prefix(maxPointsPerTopic))))
         }
-        return unnamed + kept
+        return (unnamed + kept, cutFromOther)
     }
 }
 

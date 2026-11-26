@@ -660,7 +660,7 @@ final class NotesService: ProviderNotesControl {
                 }
             }
             logger.notice(
-                "Notes \(String(describing: result.status), privacy: .public): \(result.chunkCount, privacy: .public) chunks, \(result.verifiedPointCount, privacy: .public) points, \(result.droppedCount, privacy: .public) dropped"
+                "Notes \(String(describing: result.status), privacy: .public): \(result.chunkCount, privacy: .public) chunks, \(result.verifiedPointCount, privacy: .public) points, \(result.droppedCount, privacy: .public) dropped, \(result.cutFromOtherCount, privacy: .public) not shown (the closing topic's bound)"
             )
         }
         deps.library.refreshCount()
