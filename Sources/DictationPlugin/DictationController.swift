@@ -29,6 +29,8 @@ final class DictationController {
         var formatMode: () -> FormatMode = { .raw }
         var speechModelID: () -> String = { "" }
         var formatterModel: () -> String? = { nil }
+        /// The provider's name in a HUD line ("Claude"); read when the line is shown.
+        var providerName: () -> String = { "Claude" }
         var wallClock: () -> Date = { Date() }
     }
 
@@ -195,7 +197,11 @@ final class DictationController {
             recordHistory(output, outcome: outcome, target: target)
             switch outcome {
             case .pasted:
-                if output.formatting.isPartial {
+                if let reason = output.formatting.notableReason,
+                    let notice = HUDState.ProviderNotice(reason: reason, name: deps.providerName())
+                {
+                    deps.hud.show(.pastedAsSpoken(notice))
+                } else if output.formatting.isPartial {
                     deps.hud.show(
                         .pastedUnformatted(all: output.formatting.fellBack == output.formatting.chunks))
                 } else {

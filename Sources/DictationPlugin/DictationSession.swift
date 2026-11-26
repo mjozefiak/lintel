@@ -55,6 +55,10 @@ actor DictationSession {
         var chunks = 0
         var fellBack = 0
         var firstReason: FallbackReason?
+        /// The reason the HUD names when it is the provider's: `tooSlow` first (a chunk was cut off at the limit after the key
+        /// release), else the first failure of the provider. A guard rejection of an earlier chunk never hides it, because
+        /// the user can act on this one (choose This Mac, sign in). `nil` for every local source and for rejections.
+        var notableReason: FallbackReason?
         var isPartial: Bool { fellBack > 0 }
     }
 
@@ -70,6 +74,10 @@ actor DictationSession {
     private let modelID: String
     private let keepWarm: @Sendable () -> Duration
     private let formatter: (any TextFormatter)?
+    /// How long after the key release the session waits for formatting that is still out; `nil` waits as long as the
+    /// formatter's own limits (the local sources). Set for the provider source only (`ProviderLevels.releaseDeadline`).
+    private let releaseDeadline: Duration?
+    private let clock: any Clock<Duration>
     /// The user's vocabulary, applied to the final text after formatting (`rawText` is left as heard).
     private let replaceTerms: @Sendable (String) -> String
     private let modelFolder: URL
@@ -86,6 +94,9 @@ actor DictationSession {
     private var assembling: Task<Void, Never>?
     private var chunks: [(chunk: Segmenter.Chunk, result: Task<FormatResult, Never>)] = []
     private var lastChunkText: String?
+    /// The limit after the key release ran out: chunks still at the provider were cancelled and no later chunk is sent.
+    private var deadlineReached = false
+    private var deadlineTimer: Task<Void, Never>?
     private var loadTask: Task<SpeechLease?, Never>?
     /// Set by the load task when the lease could not be taken because another model is in use.
     private let loadWasBusy = Flag()
@@ -106,6 +117,8 @@ actor DictationSession {
         vad: any VoiceActivityDetector,
         engine: any SpeechEngine,
         formatter: (any TextFormatter)? = nil,
+        releaseDeadline: Duration? = nil,
+        clock: any Clock<Duration> = ContinuousClock(),
         replaceTerms: @escaping @Sendable (String) -> String = { $0 },
         modelFolder: URL,
         lease: SpeechEngineLease = SpeechEngineLease(),
@@ -123,6 +136,8 @@ actor DictationSession {
         self.modelID = modelID
         self.keepWarm = keepWarm
         self.formatter = formatter
+        self.releaseDeadline = releaseDeadline
+        self.clock = clock
         self.replaceTerms = replaceTerms
         self.modelFolder = modelFolder
         self.limit = Self.samples(in: maximumDuration)
@@ -222,6 +237,8 @@ actor DictationSession {
         guard started else { throw Failure.notStarted }
         if cancelled { throw Failure.cancelled }
         finishing = true
+        startReleaseDeadline()
+        defer { deadlineTimer?.cancel() }
         await audio.stop()
         await consumeTask?.value
         if let start = speechStart {
@@ -268,6 +285,25 @@ actor DictationSession {
             formatting: summary)
     }
 
+    /// Starts the limit that counts from the key release (spec A10, A11): when it runs out, the requests still at the
+    /// provider are cancelled (their processes end through `ProviderRunner`, so the provider's lane is free for the next
+    /// dictation) and no late answer is used.
+    private func startReleaseDeadline() {
+        guard formatter != nil, let limit = releaseDeadline else { return }
+        let clock = clock
+        deadlineTimer = Task { [weak self] in
+            do { try await clock.sleep(for: limit) } catch { return }
+            await self?.releaseDeadlineReached()
+        }
+    }
+
+    private func releaseDeadlineReached() {
+        guard !cancelled else { return }
+        deadlineReached = true
+        // A chunk that is done keeps its value; only the ones still out are cut.
+        for entry in chunks { entry.result.cancel() }
+    }
+
     /// The formatted chunks in the order they were said, whatever order the server answered in.
     private func assembleChunks() async -> (text: String, summary: FormattingSummary) {
         var summary = FormattingSummary()
@@ -279,6 +315,11 @@ actor DictationSession {
             if case .fellBack(let reason) = result.outcome {
                 summary.fellBack += 1
                 summary.firstReason = summary.firstReason ?? reason
+                switch reason {
+                case .tooSlow: summary.notableReason = .tooSlow
+                case .provider: if summary.notableReason == nil { summary.notableReason = reason }
+                default: break
+                }
             }
             let piece = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !piece.isEmpty else { continue }
@@ -292,6 +333,7 @@ actor DictationSession {
     /// Drops the recording: nothing is transcribed or kept.
     func cancel() async {
         cancelled = true
+        deadlineTimer?.cancel()
         consumeTask?.cancel()
         loadTask?.cancel()
         for task in segments { task.cancel() }
@@ -395,12 +437,20 @@ actor DictationSession {
         guard let formatter else { return }
         let context = lastChunkText.map { String($0.suffix(300)) }
         lastChunkText = chunk.text
+        if deadlineReached {
+            // The limit after the key release is over: nothing more goes to the provider.
+            let late = Task<FormatResult, Never> { FormatResult(text: chunk.text, outcome: .fellBack(.tooSlow)) }
+            chunks.append((chunk, late))
+            return
+        }
         let result = Task<FormatResult, Never> {
             do {
                 return try await formatter.format(chunk: chunk.text, previousContext: context)
             } catch {
-                // Cancelled: the session is being dropped, the value is never used.
-                return FormatResult(text: chunk.text, outcome: .fellBack(.unreachable))
+                // Cancelled: either the session is being dropped (the value is never used) or the limit after the key
+                // release ran out and this chunk goes in as spoken.
+                return FormatResult(
+                    text: chunk.text, outcome: .fellBack(self.deadlineReached ? .tooSlow : .unreachable))
             }
         }
         chunks.append((chunk, result))

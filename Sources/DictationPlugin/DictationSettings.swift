@@ -1,5 +1,6 @@
 import Foundation
 import LintelKit
+import LintelProviders
 import LintelSpeech
 
 /// `plugins.dictation.*` (a protected contract from the release that ships it, `BACKWARD_COMPATIBILITY.md` §3).
@@ -20,6 +21,8 @@ struct DictationSettings: Sendable {
         static let llmModel = "llmModel"
         static let llmSource = "llmSource"
         static let builtInLLMModel = "builtInLLMModel"
+        static let provider = "provider"
+        static let providerModel = "providerModel"
         static let historyEnabled = "historyEnabled"
         static let retentionDays = "retentionDays"
         static let maximumEntries = "maximumEntries"
@@ -60,7 +63,33 @@ struct DictationSettings: Sendable {
         case server
         /// The model Lintel downloaded and runs itself (ADR 0005).
         case builtIn
+        /// An external AI provider's CLI (spec `2026-11-25-dictation-cleanup-levels`, Phase 5): the dictated text leaves
+        /// the Mac. Chosen only in Settings, which is the consent; an older build reads this value as `.server`.
+        case provider
     }
+
+    /// Where the tidying of one dictation really runs: the chosen source, or the local fallback when the provider is
+    /// chosen but cannot serve the level (spec "Source × level").
+    enum EffectiveSource: Equatable, Sendable {
+        case provider(ProviderSelection)
+        case builtIn
+        case server
+        /// No model runs: Light, or a provider source with no level offered and nothing local to fall back to.
+        case none
+    }
+
+    /// The provider and model the user chose for dictation: `plugins.dictation.provider` + `providerModel`. Its own
+    /// choice, never inherited from Meetings (spec A13).
+    struct ProviderSelection: Equatable, Sendable {
+        var provider: ProviderID
+        var model: String
+
+        /// What the history records for a dictation tidied by it: `cli:claude-code/sonnet`.
+        var historyMark: String { "cli:\(provider.rawValue)/\(model)" }
+    }
+
+    /// The providers this build knows (the descriptors of `LintelProviders`); an id outside the list is "not chosen".
+    static let knownProviders: [ProviderDescriptor] = [.claudeCode]
 
     static let defaultSpeechModel = "parakeet-ultra"
     static let defaultKeepWarmMinutes = 10
@@ -155,6 +184,59 @@ struct DictationSettings: Sendable {
     var builtInLLMModel: LLMModel {
         settings.string(Key.builtInLLMModel).flatMap { LLMModelCatalog.model(id: $0) } ?? LLMModelCatalog.defaultModel
     }
+
+    /// The provider the user chose for dictation, or `nil` while none is chosen (the provider source is then not
+    /// selectable and a stored `provider` source runs locally). A missing or empty model is the descriptor's default; a
+    /// model the provider does not offer (the hidden Haiku, a typed id) is "not chosen", never a guess: `ProviderRunner`
+    /// starts nothing for it.
+    var providerSelection: ProviderSelection? {
+        guard let id = settings.string(Key.provider), !id.isEmpty,
+            let descriptor = Self.knownProviders.first(where: { $0.id.rawValue == id })
+        else { return nil }
+        let stored = settings.string(Key.providerModel)
+        let model = stored.flatMap { $0.isEmpty ? nil : $0 } ?? descriptor.defaultModelID
+        guard ProviderDescriptor.isValidModelID(model), descriptor.models.contains(where: { $0.id == model }) else {
+            return nil
+        }
+        return ProviderSelection(provider: descriptor.id, model: model)
+    }
+
+    /// Choosing the provider (the consent): writes the provider and its model, and makes it the source.
+    func setProvider(_ selection: ProviderSelection) {
+        settings.set(selection.provider.rawValue, for: Key.provider)
+        settings.set(selection.model, for: Key.providerModel)
+    }
+
+    func clearProvider() {
+        settings.removeValue(for: Key.provider)
+        settings.removeValue(for: Key.providerModel)
+    }
+
+    /// Where `level` runs now (spec "Source × level"). `builtInInstalled` is the answer of a cached check, because the
+    /// formatter is chosen synchronously when a dictation starts: the provider source serves only the levels in
+    /// `offered`; any other level runs locally: the built-in model when it is installed, else the user's server when
+    /// one is set, else not at all (raw). The source stored beside it is never changed by this.
+    func effectiveSource(
+        for level: CleanupLevel, builtInInstalled: Bool, offered: Set<CleanupLevel> = ProviderLevels.offered
+    ) -> EffectiveSource {
+        guard level.usesModel else { return .none }
+        switch llmSource {
+        case .builtIn: return .builtIn
+        case .server: return .server
+        case .provider:
+            if let selection = providerSelection, offered.contains(level) { return .provider(selection) }
+            if builtInInstalled { return .builtIn }
+            return llmTarget != nil ? .server : .none
+        }
+    }
+
+    #if DEBUG
+    /// DEBUG only (`--qa-setting plugins.dictation.qaProviderStatus=ready|notInstalled|notSignedIn|incompatibleVersion|newerVersion`):
+    /// the state the provider row shows, with no process started. Release builds never read it.
+    var qaProviderStatus: ProviderStatus? {
+        settings.string("qaProviderStatus").flatMap(ProviderStatus.init(rawValue:))
+    }
+    #endif
 
     func setLLMSource(_ source: LLMSource) { settings.set(source.rawValue, for: Key.llmSource) }
     func setBuiltInLLMModel(_ model: LLMModel) { settings.set(model.id, for: Key.builtInLLMModel) }

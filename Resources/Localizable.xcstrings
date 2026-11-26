@@ -27720,6 +27720,402 @@
           }
         }
       }
+    },
+    "Tidy up with" : {
+      "comment" : "Settings → Dictation: the row that says where the tidying runs",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidy up with"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Porządkuj za pomocą"
+          }
+        }
+      }
+    },
+    "This Mac" : {
+      "comment" : "Settings → Dictation, Tidy up with: the built-in model on this Mac",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Mac"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Na tym Macu"
+          }
+        }
+      }
+    },
+    "Add a provider…" : {
+      "comment" : "Settings → Dictation, Tidy up with: the row for a provider that is not set up",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a provider…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dodaj dostawcę…"
+          }
+        }
+      }
+    },
+    "Text you dictate is sent to **%@** through your %@. Audio stays on this Mac." : {
+      "comment" : "Settings → Dictation, next to the choice of an AI provider: what leaves the Mac for the tidying. Audio never does",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text you dictate is sent to **%@** through your %@. Audio stays on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowany tekst jest wysyłany do **%@** przez Twoje %@. Dźwięk zostaje na tym Macu."
+          }
+        }
+      }
+    },
+    "Text you dictate is sent to %@ through your %@. Audio stays on this Mac." : {
+      "comment" : "Settings → Dictation: VoiceOver text of the sentence about what is sent to the AI provider",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text you dictate is sent to %@ through your %@. Audio stays on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowany tekst jest wysyłany do %@ przez Twoje %@. Dźwięk zostaje na tym Macu."
+          }
+        }
+      }
+    },
+    "Checking %@…" : {
+      "comment" : "Settings → Dictation: the AI provider is being checked",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking %@…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprawdzam %@…"
+          }
+        }
+      }
+    },
+    "%@ isn’t installed. Install it, then check again." : {
+      "comment" : "Settings → Dictation: the AI provider's command-line tool is not found",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ isn’t installed. Install it, then check again."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ nie jest zainstalowany. Zainstaluj go i sprawdź ponownie."
+          }
+        }
+      }
+    },
+    "%@ isn’t signed in. In Terminal, run: claude auth login" : {
+      "comment" : "Settings → Dictation: the AI provider is installed but signed out",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ isn’t signed in. In Terminal, run: claude auth login"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ nie jest zalogowany. W Terminalu uruchom: claude auth login"
+          }
+        }
+      }
+    },
+    "This %@ is too old. Update it, then check again." : {
+      "comment" : "Settings → Dictation: the AI provider's tool is older than Lintel supports",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This %@ is too old. Update it, then check again."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To %@ jest zbyt stare. Zaktualizuj je i sprawdź ponownie."
+          }
+        }
+      }
+    },
+    "This %@ is newer than this Lintel supports. Update Lintel." : {
+      "comment" : "Settings → Dictation: the AI provider's tool is newer than Lintel was checked with",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This %@ is newer than this Lintel supports. Update Lintel."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To %@ jest nowsze, niż obsługuje ten Lintel. Zaktualizuj Lintel."
+          }
+        }
+      }
+    },
+    "Slower and uses more of your %@ limit. A late answer is pasted as spoken." : {
+      "comment" : "Settings → Dictation: note under a heavier AI model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slower and uses more of your %@ limit. A late answer is pasted as spoken."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wolniejszy i zużywa więcej limitu %@. Spóźniona odpowiedź zostaje wklejona bez porządkowania."
+          }
+        }
+      }
+    },
+    "%@ is used for Full. Standard runs on this Mac." : {
+      "comment" : "Settings → Dictation: the provider serves Full only; Standard runs on the built-in model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is used for Full. Standard runs on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ porządkuje na poziomie Pełnym. Standardowe działa na tym Macu."
+          }
+        }
+      }
+    },
+    "%@ is used for Full. Standard runs on your server." : {
+      "comment" : "Settings → Dictation: the provider serves Full only; Standard runs on the user's server",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is used for Full. Standard runs on your server."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ porządkuje na poziomie Pełnym. Standardowe działa na Twoim serwerze."
+          }
+        }
+      }
+    },
+    "%@ is used for Full. Standard pastes your text untidied." : {
+      "comment" : "Settings → Dictation: the provider serves Full only; Standard has nothing to run on",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is used for Full. Standard pastes your text untidied."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ porządkuje na poziomie Pełnym. Standardowe wkleja tekst bez porządkowania."
+          }
+        }
+      }
+    },
+    "%@ is used for Standard. Full runs on this Mac." : {
+      "comment" : "Settings → Dictation: the provider serves Standard only; Full runs on the built-in model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is used for Standard. Full runs on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ porządkuje na poziomie Standardowym. Pełne działa na tym Macu."
+          }
+        }
+      }
+    },
+    "%@ is used for Standard. Full runs on your server." : {
+      "comment" : "Settings → Dictation: the provider serves Standard only; Full runs on the user's server",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is used for Standard. Full runs on your server."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ porządkuje na poziomie Standardowym. Pełne działa na Twoim serwerze."
+          }
+        }
+      }
+    },
+    "%@ is used for Standard. Full pastes your text untidied." : {
+      "comment" : "Settings → Dictation: the provider serves Standard only; Full has nothing to run on",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is used for Standard. Full pastes your text untidied."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ porządkuje na poziomie Standardowym. Pełne wkleja tekst bez porządkowania."
+          }
+        }
+      }
+    },
+    "%@ too slow, pasted as spoken" : {
+      "comment" : "Dictation HUD when the provider was not back in time and the raw text was pasted",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ too slow, pasted as spoken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ za wolny, wklejono bez porządkowania"
+          }
+        }
+      }
+    },
+    "%@ is signed out, pasted as spoken" : {
+      "comment" : "Dictation HUD when the provider is signed out and the raw text was pasted",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is signed out, pasted as spoken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ jest wylogowany, wklejono bez porządkowania"
+          }
+        }
+      }
+    },
+    "%@ limit reached, pasted as spoken" : {
+      "comment" : "Dictation HUD when the provider's usage limit is reached and the raw text was pasted",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ limit reached, pasted as spoken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limit %@ wyczerpany, wklejono bez porządkowania"
+          }
+        }
+      }
+    },
+    "No network for %@, pasted as spoken" : {
+      "comment" : "Dictation HUD when the provider cannot be reached and the raw text was pasted",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No network for %@, pasted as spoken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brak sieci dla %@, wklejono bez porządkowania"
+          }
+        }
+      }
+    },
+    "%@ unavailable, pasted as spoken" : {
+      "comment" : "Dictation HUD when the provider cannot be used and the raw text was pasted",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ unavailable, pasted as spoken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ niedostępny, wklejono bez porządkowania"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

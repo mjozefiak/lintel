@@ -242,7 +242,7 @@ struct DictationHUDView: View {
         case .pasted:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 .font(.title3).accessibilityHidden(true)
-        case .pastedUnformatted, .copied, .allowMicrophone:
+        case .pastedUnformatted, .pastedAsSpoken, .copied, .allowMicrophone:
             Image(systemName: state.symbolName).foregroundStyle(.orange)
                 .font(.title3).accessibilityHidden(true)
         case .problem:

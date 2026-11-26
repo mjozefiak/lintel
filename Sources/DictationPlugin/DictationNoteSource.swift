@@ -561,12 +561,31 @@ enum DictationNoteMapping {
                     value: entry.detectedLanguages))
         }
         if let model = entry.formatterModel, !model.isEmpty {
-            result.append(
-                NoteDetail(
-                    label: LocalizedStringResource(
-                        "Cleanup model", comment: "Notes details: the model that cleaned the text"),
-                    value: model))
+            if let sent = providerDetail(model) {
+                // A dictation tidied by an external provider says where its text went ("Claude · sonnet").
+                result.append(
+                    NoteDetail(
+                        label: LocalizedStringResource(
+                            "Sent to", comment: "Notes details: the provider the transcript was sent to for the notes"),
+                        value: sent))
+            } else {
+                result.append(
+                    NoteDetail(
+                        label: LocalizedStringResource(
+                            "Cleanup model", comment: "Notes details: the model that cleaned the text"),
+                        value: model))
+            }
         }
         return result
+    }
+
+    /// "Claude · sonnet" for the history's `cli:claude-code/sonnet`; `nil` for a local model's name.
+    static func providerDetail(_ model: String) -> String? {
+        guard model.hasPrefix("cli:") else { return nil }
+        let parts = model.dropFirst(4).split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2,
+            let descriptor = DictationSettings.knownProviders.first(where: { $0.id.rawValue == parts[0] })
+        else { return nil }
+        return "\(descriptor.shortName) · \(parts[1])"
     }
 }

@@ -98,7 +98,8 @@ let package = Package(
             // External AI providers (spec 2026-11-10-external-ai-providers, ADR 0011): runs the provider's CLI as a
             // child process behind a consent check. Depends only on LintelSpeech (the value types ChatMessage and
             // GenerationResult), on no plugin and not on LintelApp (`LintelProvidersTests` checks that). Only
-            // `MeetingsPlugin` calls it (the notes provider, behind a setting that is off by default).
+            // `MeetingsPlugin` (the notes provider) and `DictationPlugin` (the cleanup provider, spec
+            // 2026-11-25-dictation-cleanup-levels Phase 5) call it, each behind its own setting that is off by default.
             dependencies: ["LintelSpeech"]
         ),
         .target(
@@ -109,6 +110,9 @@ let package = Package(
                 "LintelPersistence",
                 "LintelSpeech",
                 "LintelUI",
+                // The cleanup provider (spec 2026-11-25-dictation-cleanup-levels, Phase 5): `ProviderFormatter` runs the
+                // provider CLI only through `ProviderRunner`, which asks the plugin's authorization before every start.
+                "LintelProviders",
                 // The plugin owns dictation.sqlite and its migrator, like ClipboardPlugin owns clipboard.sqlite.
                 .product(name: "GRDB", package: "GRDBCipher"),
             ]
@@ -217,6 +221,8 @@ let package = Package(
             name: "DictationPluginTests",
             dependencies: [
                 "DictationPlugin", "LintelSpeech", "LintelKit", "LintelCore", "LintelPersistence", "LintelTestSupport",
+                // A fake `ProviderSystem` for `ProviderFormatter` (a test of the plugin builds its runner over it).
+                "LintelProviders",
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "GRDB", package: "GRDBCipher"),
             ],
