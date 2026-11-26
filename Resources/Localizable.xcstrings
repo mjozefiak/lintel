@@ -27680,7 +27680,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Przytrzymaj %@ w dowolnej aplikacji i mów. Twoje dyktowania pojawią się tutaj."
+            "value" : "Przytrzymaj %@ w dowolnej aplikacji i mów. Tu pojawią się Twoje dyktowania."
           }
         }
       }
@@ -27698,7 +27698,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Przytrzymaj skrót do dyktowania w dowolnej aplikacji i mów. Twoje dyktowania pojawią się tutaj."
+            "value" : "Przytrzymaj skrót do dyktowania w dowolnej aplikacji i mów. Tu pojawią się Twoje dyktowania."
           }
         }
       }
@@ -27735,42 +27735,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lintel nie mógł odczytać tej notatki. Nic nie zostało usunięte."
-          }
-        }
-      }
-    },
-    "Lintel couldn’t write the notes. The transcript is still here." : {
-      "comment" : "Preview: the notes failed and can be written again",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel couldn’t write the notes. The transcript is still here."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel nie zdołał napisać notatek. Transkrypcja nadal tu jest."
-          }
-        }
-      }
-    },
-    "Lintel couldn’t write the notes. You can read the transcript." : {
-      "comment" : "Preview: the notes failed and cannot be written from here",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel couldn’t write the notes. You can read the transcript."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel nie zdołał napisać notatek. Możesz przeczytać transkrypcję."
           }
         }
       }
@@ -27824,7 +27788,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spotkania, które nagrasz, pojawią się tutaj."
+            "value" : "Tu pojawią się nagrane spotkania."
           }
         }
       }
@@ -28027,24 +27991,6 @@
         }
       }
     },
-    "The notes are written once a model is downloaded to this Mac." : {
-      "comment" : "Preview: the notes wait for a download",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The notes are written once a model is downloaded to this Mac."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Notatki powstaną po pobraniu modelu na ten komputer."
-          }
-        }
-      }
-    },
     "This note is no longer there." : {
       "comment" : "Preview: the note was removed",
       "extractionState" : "manual",
@@ -28184,7 +28130,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Twoje notatki pojawią się tutaj."
+            "value" : "Tu pojawią się Twoje notatki."
           }
         }
       }
@@ -28202,7 +28148,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Twoje notatki pojawią się tutaj. Przytrzymaj %@, aby dyktować w dowolnej aplikacji."
+            "value" : "Tu pojawią się Twoje notatki. Przytrzymaj %@, by dyktować w dowolnej aplikacji."
           }
         }
       }
@@ -28220,7 +28166,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Twoje notatki pojawią się tutaj. Przytrzymaj skrót do dyktowania, aby dyktować w dowolnej aplikacji."
+            "value" : "Tu pojawią się Twoje notatki. Przytrzymaj skrót do dyktowania, by dyktować w dowolnej aplikacji."
           }
         }
       }
@@ -28238,7 +28184,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Twoje notatki pojawią się tutaj. Nagraj spotkanie, a Lintel napisze notatki."
+            "value" : "Tu pojawią się Twoje notatki. Nagraj spotkanie, a Lintel napisze notatki."
           }
         }
       }
@@ -28256,7 +28202,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Twoje notatki pojawią się tutaj. Nagraj spotkanie, a Lintel napisze notatki. Albo przytrzymaj %@, aby dyktować w dowolnej aplikacji."
+            "value" : "Tu pojawią się Twoje notatki. Nagraj spotkanie, a Lintel napisze notatki. Albo przytrzymaj %@, by dyktować w dowolnej aplikacji."
           }
         }
       }
@@ -28274,7 +28220,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Twoje notatki pojawią się tutaj. Nagraj spotkanie, a Lintel napisze notatki. Albo przytrzymaj skrót do dyktowania, aby dyktować w dowolnej aplikacji."
+            "value" : "Tu pojawią się Twoje notatki. Nagraj spotkanie, a Lintel napisze notatki. Albo przytrzymaj skrót do dyktowania, by dyktować w dowolnej aplikacji."
           }
         }
       }
@@ -28292,7 +28238,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Twoje własne notatki o tym spotkaniu pojawią się tutaj."
+            "value" : "Tu pojawią się Twoje własne notatki z tego spotkania."
           }
         }
       }
@@ -28455,6 +28401,60 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. Try again, or read the transcript." : {
+      "comment" : "Preview: the notes failed and can be written again",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. Try again, or read the transcript."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel nie zdołał napisać notatek z tego spotkania. Nagranie i transkrypcja są bezpieczne. Spróbuj ponownie albo przeczytaj transkrypcję."
+          }
+        }
+      }
+    },
+    "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. You can read the transcript." : {
+      "comment" : "Preview: the notes failed and cannot be written from here",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. You can read the transcript."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel nie zdołał napisać notatek z tego spotkania. Nagranie i transkrypcja są bezpieczne. Możesz przeczytać transkrypcję."
+          }
+        }
+      }
+    },
+    "Notes are written once Lintel has downloaded what it needs." : {
+      "comment" : "Preview: the notes wait for a download",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes are written once Lintel has downloaded what it needs."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki powstaną, gdy Lintel pobierze to, czego potrzebuje."
           }
         }
       }
