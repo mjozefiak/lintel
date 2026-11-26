@@ -8,9 +8,9 @@ import Foundation
 ///   trailing `,` `.` `?` or `!`. "yyy…" or "(eee)" is left alone.
 /// - It edits only the spans around a removed token: the rest of the text is returned byte for byte, so a text without
 ///   fillers comes back identical (the whitespace is never normalised).
-/// - The comma that belonged to the filler goes with it, a comma before a filler that ends the sentence is replaced
-///   by the sentence's full stop, and the next word gets a capital letter when the (capitalised) filler started a
-///   sentence.
+/// - The comma that belonged to the filler goes with it; when the word before it already ends with a comma the two are
+///   one pair ("is, um, on" → "is on"), a comma before a filler that ends the sentence is replaced by the sentence's
+///   full stop, and the next word gets a capital letter when the (capitalised) filler started a sentence.
 /// - It never removes a repetition, a false start or a real word ("no", "więc", "jakby", "tak" are not fillers here;
 ///   Standard handles them), never touches a digit, and keeps every word of the user's vocabulary.
 struct LightCleaner: TextFormatter {
@@ -66,6 +66,13 @@ struct LightCleaner: TextFormatter {
             // sentence is a name, and what follows it stays as it is.
             if filler.startsWithCapital, output.last.map({ Self.endsSentence($0.text) }) ?? true {
                 capitalizeNext = true
+            }
+            // "is, um, on" → "is on": the filler's own comma and the one before it are one pair, so neither stays.
+            if filler.trailing == ",", var previous = output.last, previous.text.count > 1,
+                previous.text.hasSuffix(",")
+            {
+                previous.text.removeLast()
+                output[output.count - 1] = previous
             }
             if let mark = filler.trailing, ".?!".contains(mark) {
                 // The filler ended its sentence: the next word starts a new one.

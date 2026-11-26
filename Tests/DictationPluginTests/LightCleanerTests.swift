@@ -21,13 +21,16 @@ import Testing
         ("Yhm, tak.", "Tak."),
         // In the middle, with and without a comma of its own.
         ("Spotkanie jest yyy we wtorek.", "Spotkanie jest we wtorek."),
-        ("Spotkanie jest, yyy, we wtorek.", "Spotkanie jest, we wtorek."),
         ("Spotkanie jest yyy, we wtorek.", "Spotkanie jest we wtorek."),
         ("The meeting is um on Tuesday.", "The meeting is on Tuesday."),
-        ("The meeting is, um, on Tuesday.", "The meeting is, on Tuesday."),
+        // A filler with a comma on both sides: the two commas are one pair, so neither stays.
+        ("Spotkanie jest, yyy, we wtorek.", "Spotkanie jest we wtorek."),
+        ("The meeting is, um, on Tuesday.", "The meeting is on Tuesday."),
         // At the end of a sentence: the comma before it makes way for the full stop.
         ("Spotkanie jest we wtorek, yyy.", "Spotkanie jest we wtorek."),
         ("Spotkanie jest we wtorek yyy.", "Spotkanie jest we wtorek."),
+        ("Spotkanie jest, yyy.", "Spotkanie jest."),
+        ("The meeting is, um.", "The meeting is."),
         ("Is it on Tuesday, um?", "Is it on Tuesday?"),
         // The next sentence starts after the removed filler.
         ("We meet on Tuesday. Um, then we go.", "We meet on Tuesday. Then we go."),
