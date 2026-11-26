@@ -1,7 +1,7 @@
-/* Lintel post-meeting actions: clickable prototype, iteration 3 (2026-11-26).
+/* Lintel post-meeting actions: clickable prototype, iteration 4 (2026-11-26).
    Built on the accepted direction sketch (.ai/prototypes/lintel-direction, owner decisions 2026-11-24): notes explorer,
    working ring, warm neutrals, Verdigris only on the primary button, the selection and live state.
-   Query: ?screen=note|inbox|apps|after  &pop=<action id: open the task hover card>  &tab=notes|actions|mine|transcript  &state=ready|finding|none|done|errors|offline  &phase=proc|ready  &after=stay|dot|none
+   Query: ?screen=note|inbox|apps|after  &pop=<action id: open the task hover card>  &tab=notes|actions|mine|transcript  &state=ready|finding|none|done|errors|offline  &phase=proc|ready
           &mail=acct|mcp|nomail  &theme=light|dark  &lang=en|pl  &ts=m|l|xl  &chrome=0  &sel=<action id>
    All names, addresses and data are fictional. Nothing here is a decision until the owner picks it (see README). */
 (function () {
@@ -91,8 +91,8 @@
       },
       inbox: { t: 'Actions', s: 'Everything Lintel prepared after your meetings, in one place.', empty: 'Nothing to review' },
       after: {
-        procHover: ['Writing notes', 'Finding actions'], ready: (n) => n ? `Ready · ${n} actions` : 'Ready', open: 'Open', close: 'Close', replay: 'Play again', phaseL: 'Pill', proc: 'Processing', readyL: 'Ready', afterL: 'After the pill (Q15)', stay: 'Stays until closed', dot: '8 s, then a dot on the ring', none: '8 s, nothing',
-        cap2: 'P10 (owner): after the audio is saved, the pill shows only the closing ring (#273, OD-9; hover: what it is doing). When the notes AND the actions are ready it turns into “Ready · 5 actions · Open”; the meeting row and the Actions inbox show the count. No macOS notification. Open goes to the meeting’s Notes. What stays after the pill is Q15 (toolbar).',
+        procHover: ['Writing notes', 'Finding actions'], ready: (n) => n ? `Ready · ${n} actions` : 'Ready', open: 'Open', close: 'Close', replay: 'Play again', phaseL: 'Pill', proc: 'Processing', readyL: 'Ready',
+        cap2: 'P10 (owner): after the audio is saved, the pill shows only the closing ring (#273, OD-9; hover: what it is doing). When the notes AND the actions are ready it turns into “Ready · 5 actions · Open”; the meeting row and the Actions inbox show the count. No macOS notification. Open goes to the meeting’s Notes. After 8 s the pill goes and a dot stays on the menu bar ring until you open the actions (Q15 = B). ✕ closes the pill early; the dot stays.',
         notifT: '5 actions ready', notifS: 'Client call: Nordlys Energy · 2 need you', notifB: 'Review', now: 'now',
         menu: [['Record Meeting', '⌃⌥M'], ['Actions to review', '5'], ['Open Lintel', ''], ['Settings…', '⌘,']],
         cap: 'Q6: how you learn that actions are ready. Shown here: one macOS notification per meeting, and a dot on the menu bar ring while something waits. The list row also says “5 to review”.'
@@ -192,8 +192,8 @@
       },
       inbox: { t: 'Akcje', s: 'Wszystko, co Lintel przygotował po Twoich spotkaniach, w jednym miejscu.', empty: 'Nic do sprawdzenia' },
       after: {
-        procHover: ['Piszę notatki', 'Szukam akcji'], ready: (n) => n ? `Gotowe · ${n} akcji` : 'Gotowe', open: 'Otwórz', close: 'Zamknij', replay: 'Odtwórz jeszcze raz', phaseL: 'Pastylka', proc: 'Przetwarzanie', readyL: 'Gotowe', afterL: 'Po pastylce (P15)', stay: 'Zostaje do zamknięcia', dot: '8 s, potem kropka na pierścieniu', none: '8 s, nic',
-        cap2: 'P10 (właściciel): po zapisaniu audio pastylka pokazuje tylko zamykający się pierścień (#273, OD-9; po najechaniu: co robi). Gdy notatki I akcje są gotowe, zmienia się w „Gotowe · 5 akcji · Otwórz”; wiersz spotkania i skrzynka Akcje pokazują licznik. Bez powiadomienia macOS. Otwórz prowadzi do Notatek spotkania. Co zostaje po pastylce: P15 (pasek u góry).',
+        procHover: ['Piszę notatki', 'Szukam akcji'], ready: (n) => n ? `Gotowe · ${n} akcji` : 'Gotowe', open: 'Otwórz', close: 'Zamknij', replay: 'Odtwórz jeszcze raz', phaseL: 'Pastylka', proc: 'Przetwarzanie', readyL: 'Gotowe',
+        cap2: 'P10 (właściciel): po zapisaniu audio pastylka pokazuje tylko zamykający się pierścień (#273, OD-9; po najechaniu: co robi). Gdy notatki I akcje są gotowe, zmienia się w „Gotowe · 5 akcji · Otwórz”; wiersz spotkania i skrzynka Akcje pokazują licznik. Bez powiadomienia macOS. Otwórz prowadzi do Notatek spotkania. Po 8 s pastylka znika, a na pierścieniu w pasku menu zostaje kropka, dopóki nie otworzysz akcji (P15 = B). ✕ zamyka pastylkę wcześniej; kropka zostaje.',
         notifT: '5 akcji gotowych', notifS: 'Rozmowa z klientem: Nordlys Energy · 2 czekają na Ciebie', notifB: 'Sprawdź', now: 'teraz',
         menu: [['Nagraj spotkanie', '⌃⌥M'], ['Akcje do sprawdzenia', '5'], ['Otwórz Lintel', ''], ['Ustawienia…', '⌘,']],
         cap: 'P6: skąd wiesz, że akcje są gotowe. Tu: jedno powiadomienie macOS na spotkanie i kropka na pierścieniu w pasku menu, póki coś czeka. Wiersz na liście mówi też „5 do sprawdzenia”.'
@@ -264,7 +264,6 @@
     layout: 'inbox', // Q3 decided: Actions tab + Actions inbox in the sidebar
     state: pick('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline'], 'ready'),
     phase: pick('phase', ['proc', 'ready'], 'proc'), // P10: the pill after the recording
-    after: pick('after', ['stay', 'dot', 'none'], 'stay'), // Q15 (open): what stays once the Ready pill is gone
     pillGone: false,
     mail: pick('mail', ['acct', 'mcp', 'nomail'], 'acct'),
     theme: pick('theme', ['light', 'dark'], prefersDark ? 'dark' : 'light'),
@@ -547,17 +546,17 @@
     const pill = S.pillGone ? '' : S.phase === 'proc'
       ? `<div class="pill" tabindex="0" role="status" aria-label="${f.procHover.join(', ')}">${pRing(true)}<span class="more"><span class="psec">${f.procHover[S.procStep || 0]}</span></span></div>`
       : `<div class="pill" role="status">${pCheck}<span>${f.ready(n)}</span><button class="pact" data-go="note">${f.open}</button><button class="px" data-act="pillx" aria-label="${f.close}"><svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>`;
-    const dot = S.pillGone && S.after === 'dot';
+    const dot = S.pillGone; // Q15 = B: after 8 s the pill goes and the menu bar ring keeps a dot until the actions are opened
     return `<div class="vstack"><div class="desk"><div class="mbar"><b></b><span>Finder</span><span class="sp"></span><span class="${dot ? 'mbadge' : ''}" style="display:inline-grid">${ring('mark', 15)}</span><span>${S.lang === 'pl' ? 'czw. 11:52' : 'Thu 11:52'}</span></div>
       <div class="pillstage">${pill}</div></div>
-      <div class="caption">${f.cap2}<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center"><span>${f.phaseL}</span>${seg('phase', [['proc', f.proc], ['ready', f.readyL]])}<span>${f.afterL}</span>${seg('after', [['stay', f.stay], ['dot', f.dot], ['none', f.none]])}<button class="btn" data-act="replay">${f.replay}</button></div></div></div>`;
+      <div class="caption">${f.cap2}<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center"><span>${f.phaseL}</span>${seg('phase', [['proc', f.proc], ['ready', f.readyL]])}<button class="btn" data-act="replay">${f.replay}</button></div></div></div>`;
   }
 
   // ---------- shell ----------
   function bar() {
     const b = t().bar;
     const seg = (key, opts) => `<span class="sk-seg" role="group" aria-label="${key}">${opts.map(([v, l]) => `<button type="button" data-set="${key}" data-val="${v}" aria-pressed="${S[key] === v}">${l}</button>`).join('')}</span>`;
-    return `<div id="sk-bar"><b>Lintel · actions · iteration 3</b><label>${b.screen}</label>${seg('screen', [['note', b.note], ['inbox', b.inbox], ['apps', b.apps], ['after', b.after]])}
+    return `<div id="sk-bar"><b>Lintel · actions · iteration 4</b><label>${b.screen}</label>${seg('screen', [['note', b.note], ['inbox', b.inbox], ['apps', b.apps], ['after', b.after]])}
       <label>${b.state}</label>${seg('state', ['ready', 'finding', 'none', 'done', 'errors', 'offline'].map((k) => [k, b[k]]))}
       <label>${b.mail}</label>${seg('mail', [['acct', b.acct], ['mcp', b.mcp], ['nomail', b.nomail]])}
       <label>${b.theme}</label>${seg('theme', [['light', b.light], ['dark', b.dark]])}<label>${b.lang}</label>${seg('lang', [['en', 'EN'], ['pl', 'PL']])}
@@ -568,7 +567,7 @@
     p.set('screen', S.screen); p.set('state', S.state); if (S.mail !== 'acct') p.set('mail', S.mail);
     p.set('theme', S.theme); p.set('lang', S.lang); if (S.ts !== 'm') p.set('ts', S.ts); if (!S.chrome) p.set('chrome', '0');
     if (S.item !== 'nordlys') p.set('item', S.item); if (S.tab !== 'notes') p.set('tab', S.tab); if (S.open !== 'a1') p.set('sel', S.open);
-    if (S.screen === 'after') { p.set('phase', S.phase); if (S.after !== 'stay') p.set('after', S.after); }
+    if (S.screen === 'after') { p.set('phase', S.phase); }
     history.replaceState(null, '', location.pathname + '?' + p.toString());
   }
   const SCREENS = { note: noteScr, inbox: inboxScr, apps: appsScr, after: afterScr };
@@ -614,7 +613,7 @@
       S[d.set] = d.val;
       if (d.set === 'screen' && d.val === 'inbox') S.layout = 'inbox';
       if (d.set === 'layout' && d.val !== 'inbox' && S.screen === 'inbox') S.screen = 'note';
-      if (d.set === 'phase' || d.set === 'after') { clearTimeout(pillT); clearInterval(procT); S.pillGone = false; if (S.phase === 'ready') armPill(); }
+      if (d.set === 'phase') { clearTimeout(pillT); clearInterval(procT); S.pillGone = false; if (S.phase === 'ready') armPill(); }
       if (d.set === 'screen' && d.val === 'after') { syncURL(); playPill(); return; }
       if (d.set === 'state') { S.open = d.val === 'errors' || d.val === 'offline' ? 'a3' : 'a1'; S.item = 'nordlys'; S.tab = 'notes'; S.edits = {}; applyState(); }
       syncURL(); render(); return;
@@ -673,7 +672,7 @@
   document.addEventListener('focusin', (e) => { const tk = e.target.closest('[data-task]'); if (tk && (!S.pop || S.pop.id !== tk.dataset.task)) { showPop(tk); const el = document.querySelector(`[data-task="${tk.dataset.task}"]`); if (el) el.focus(); } });
   // P10 pill: processing (closing ring, hover says what it does) → Ready · N actions → per Q15.
   let pillT = null, procT = null;
-  function armPill() { clearTimeout(pillT); if (S.after !== 'stay') pillT = setTimeout(() => { S.pillGone = true; render(); }, 8000); }
+  function armPill() { clearTimeout(pillT); pillT = setTimeout(() => { S.pillGone = true; render(); }, 8000); }
   function playPill() {
     clearTimeout(pillT); clearInterval(procT);
     S.phase = 'proc'; S.procStep = 0; S.pillGone = false; render();

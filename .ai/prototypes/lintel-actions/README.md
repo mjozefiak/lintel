@@ -1,11 +1,11 @@
-# lintel-actions: post-meeting actions (prototype, iteration 3, 2026-11-26)
+# lintel-actions: post-meeting actions (prototype, iteration 4, accepted by the owner 2026-11-26)
 
 Clickable HTML prototype for the owner's vision of 2026-11-26: after a meeting you get **ready-to-run actions**, not a to-do list. The email is already written, the meeting is already set up, the Jira ticket is already filled in. You check each one and approve it with one click, all in one place. **Nothing here is decided until the owner picks it** (owner rule 2026-11-19: no default is accepted for actions or chat). This is design only, with no Swift code and no spec. The spec comes after the owner accepts the prototype and after the detection-quality spike (brainstorm decision 9).
 
 - Open: `cd .ai/prototypes/lintel-actions && python3 -m http.server 8771 --bind 127.0.0.1`, then `http://127.0.0.1:8771/index.html`. Opening `index.html` directly also works.
 - Built on the accepted direction sketch `.ai/prototypes/lintel-direction` (owner decisions 2026-11-24: notes explorer as the main view, the working ring, warm neutrals, Verdigris only on the primary button, the selection and live state, neutral links, Notes · My notes · Transcript tabs) and on spec #255 (`.ai/specs/2026-11-24-notes-explorer-main-window.md`). The tokens and primitives are copied unchanged from `lintel-direction/lintel.html`.
 - Toolbar (not part of the design): screen, state, **Account** (Google/Microsoft, connector (MCP), no account; Q1 and Q2 decided), theme, language (EN/PL), text size (M/L/XL), Reset.
-- Query: `?screen=note|inbox|apps|after&tab=notes|actions|mine|transcript&pop=a1..a5&phase=proc|ready&after=stay|dot|none&state=ready|finding|none|done|errors|offline&mail=acct|mcp|nomail&theme=light|dark&lang=en|pl&ts=m|l|xl&sel=a1..a5|s1|s2&chrome=0`.
+- Query: `?screen=note|inbox|apps|after&tab=notes|actions|mine|transcript&pop=a1..a5&phase=proc|ready&state=ready|finding|none|done|errors|offline&mail=acct|mcp|nomail&theme=light|dark&lang=en|pl&ts=m|l|xl&sel=a1..a5|s1|s2&chrome=0`.
 - All names, addresses, companies and data are fictional (`*.example`).
 
 ## What you can click
@@ -17,7 +17,7 @@ Clickable HTML prototype for the owner's vision of 2026-11-26: after a meeting y
 - **States**: Finding (ring closing and placeholder rows), None found, All done (results with "Open in Jira / Calendar / Gmail" links), Errors (no internet for mail, Jira needs a component), Not connected (Jira not connected, Google sign-in expired; the draft stays).
 - **Actions inbox** (Q3: the Actions tab plus this inbox in the sidebar): one list of every waiting action across meetings, with the card on the right.
 - **Connected apps** (Settings): Google, Calendar on this Mac, Microsoft 365, other mail through a connector, Jira, Linear, Asana (Q13).
-- **After the meeting** (Q10): once the audio is saved, the pill shows only the closing ring (#273 pill family, OD-9); hovering says "Writing notes" / "Finding actions". When notes and actions are both ready it becomes "Ready · 5 actions · Open ✕". No macOS notification. The screen plays the sequence on open ("Play again"); the caption switches the phase and the Q15 variant (what stays after the pill).
+- **After the meeting** (Q10): once the audio is saved, the pill shows only the closing ring (#273 pill family, OD-9); hovering says "Writing notes" / "Finding actions". When notes and actions are both ready it becomes "Ready · 5 actions · Open ✕". No macOS notification. The screen plays the sequence on open ("Play again"); the caption switches the phase. After 8 s the pill goes and a dot stays on the menu bar ring until the actions are opened (Q15 = B).
 
 ## Decisions applied
 
@@ -35,7 +35,10 @@ From the 2026-11-23 brainstorm (not asked again): actions before chat; approval 
 - Q5 = A: one open card at a time, fields editable at once.
 - Q6: quote + speaker on the card before approval, plus Show in Transcript. **Nothing is added to the created ticket, invitation or email** (no trace of the source); the fixture descriptions no longer say "Agreed on the client call…".
 - Q7 = A (mail held 10 s with Undo; event and ticket undone by deleting). Q8 = A (both buttons filled). Q9: no bulk approval in v1.
-- Q10 = changed by the owner: the pill after the recording (above), no macOS notification. Open question Q15 below.
+- Q10 = changed by the owner: the pill after the recording (above), no macOS notification.
+- **Q15 = B**: the Ready pill goes after 8 s, then a dot on the menu bar ring until the actions are opened; no macOS notification.
+
+**The owner accepted the direction on 2026-11-26.** Next: the detection-quality spike, then the spec (no spec in this PR).
 - Q11: "ask less" is **not in v1**: the state, the offer and the Settings section "When Lintel may act without asking" are removed.
 - Q12 = A. Q13 = Linear + Asana (+ the mail connectors). Q14 = A (detection runs by itself after the notes).
 
@@ -53,13 +56,9 @@ From the 2026-11-23 brainstorm (not asked again): actions before chat; approval 
 
 **Riskiest belief.** That detection finds the right actions with the right owner often enough for "approve" to beat "write it yourself". The parallel spike (brainstorm decision 9) measures this. If most cards need heavy edits, the cards become prefilled drafts and the copy stops saying "ready".
 
-## Open questions for the owner (no defaults; each has a recommendation)
+## Open questions for the owner
 
-| # | Question | Options | Recommendation |
-|---|---|---|---|
-| Q15 | What stays once the "Ready · 5 actions" pill is gone (there is no macOS notification, so a missed pill leaves only the count inside the app) | A) the pill stays until Open or ✕; B) the pill goes after 8 s, then a dot on the menu bar ring until you open the actions; C) the pill goes after 8 s, nothing else | B |
-
-Q1–Q14 are decided (above).
+None. Q1–Q15 are decided (above).
 
 ## Design notes
 
@@ -70,7 +69,7 @@ Q1–Q14 are decided (above).
 
 ## Evidence limits
 
-The prototype is HTML that represents native controls, so fonts and controls are approximate. Checked in Chrome: light and dark, EN and PL, layouts A/B/C, every state, and the approve, undo, dismiss, restore and speaker-choice flows. Not checked: XL text on every state, VoiceOver, Increase Contrast. Competitor UIs were not inspected directly, only their documentation (see the research file).
+The prototype is HTML that represents native controls, so fonts and controls are approximate. Checked in Chrome: light and dark, EN and PL, layouts A/B/C, every state, and the approve, undo, dismiss, restore and speaker-choice flows. Iterations 2–4 also checked: the task hover card and Show in Actions, the no-account event card, the pill sequence and the 8 s dot. Not checked: XL text on every state, VoiceOver, Increase Contrast. Competitor UIs were not inspected directly, only their documentation (see the research file).
 
 ## Process note (om-mockup-prototype)
 
