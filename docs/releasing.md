@@ -63,6 +63,26 @@ git push origin v0.1.0-beta.1
 
 Tag runs queue one after another (`release-tags` group) and are never cancelled.
 
+## The DMG window
+
+`scripts/make-dmg.sh` lays out the installer window with a vendored copy of `dmgbuild` (MIT; with its helpers `ds_store` and
+`mac_alias`) in `scripts/dmg/vendor/`. It writes `.DS_Store` and the background alias directly, so it needs no Finder, AppleScript
+or GUI session. It runs with `/usr/bin/python3 -I` (Command Line Tools) through `scripts/dmg/run.py`; there is no `pip`, no virtual
+environment, no network and no `actions/cache` in any job, so the `sign` job gains no step and no new code beyond repository
+scripts (ADR 0012, `BACKWARD_COMPATIBILITY.md` §4). `scripts/dmg/vendor/VERSIONS.txt` pins each package and the SHA-256 of the
+source archive it was copied from; updating them is a normal reviewed PR.
+
+- The window is 660 × 400 pt: the app on the left, an Applications link on the right, and the brand art between them (the cut ring
+  and a hand-drawn arrow in Verdigris). The art has no words. Settings are in `scripts/dmg/settings.py`.
+- The art is `Resources/DMG/background.svg`. After editing it run `swift scripts/dmg/render-art.swift Resources/DMG`, then
+  `tiffutil -cathidpicheck Resources/DMG/background.png Resources/DMG/background@2x.png -out Resources/DMG/background.tiff`, and
+  commit all four files. Finder draws the icon names in white or black, so each name sits on a band that gives at least 4.5:1 with
+  both pure colours (`scripts/tests/test_dmg_art.zsh` checks it). Measured on macOS 27, Finder draws the names near-black (about `#181715`) in light and dark mode over a picture, which is about 3.9:1 on the band; no single band colour gives 4.5:1 to both pure white and that near-black, so this is an open design question (see the issue linked from the PR).
+- `scripts/make-dmg.sh --plain` builds the old undecorated image for local use. The release never passes it. Without
+  `/usr/bin/python3` (Command Line Tools not installed) the script stops with a message and does not fall back silently.
+- To look at the result, mount the DMG (`gh run download <run id> -n Lintel-dmg` for a pull request's ad-hoc image) and open the
+  volume in Finder, in light and dark mode, on a Retina display.
+
 ## The update feed
 
 Every signed run builds `appcast.xml` (what installed apps check). You will see, in the `sign` job:

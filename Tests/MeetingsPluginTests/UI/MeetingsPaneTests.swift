@@ -50,7 +50,7 @@ import Testing
         #expect(types.contains("SettingsPane"))
         #expect(types.contains("ModelChoiceRow"))
         for legacy in [
-            "MeetingsModelCard", "NotesSettingsRows", "MeetingsSuggestionsSection",
+            "MeetingsModelCard", "NotesOnThisMacRows", "MeetingsSuggestionsSection",
         ] {
             #expect(!types.contains(legacy), "\(legacy)")
         }

@@ -36,6 +36,7 @@ import Testing
         "qaAccountName": "DEBUG-only QA key (--qa-setting): an invented account name for screenshots",
         "qaProviderBinary": "DEBUG-only QA key (--qa-setting): the answer of Choose File…, an invented path",
         "qaProviderScenario": "DEBUG-only QA key (--qa-setting): shows a job state without a real CLI",
+        "qaNotesDownload": "DEBUG-only QA key (--qa-setting): forces the state of the setup step's notes model offer",
         "systemAudio": "no pane control by design: capture setting kept for defaults, default on",
         "diarization": "no pane control by design: capture setting kept for defaults, default on",
         "notesChunkTokens": "tuning key set with defaults only; no pane control by design",

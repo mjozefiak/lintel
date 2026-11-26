@@ -52,6 +52,7 @@ on:
       - Resources/InfoPlist.xcstrings
       - Resources/THIRD_PARTY_NOTICES.txt
       - Resources/Assets.xcassets/**
+      - Resources/DMG/**
       - Resources/KeyboardShortcuts/**
       - scripts/**
       - .github/workflows/release.yml
