@@ -8,8 +8,8 @@ import Synchronization
 /// `MeetingsSettings.qaAudio` is set, which `AppEnvironment.qa` always does; `RealAudioGuard` backs it up where the
 /// real audio objects are created. Not a contract.
 
-/// A track that plays a 16 kHz mono WAV file (`--qa-meeting-mic-wav`, `--qa-meeting-system-wav`) a little faster
-/// than real time and then silence in real time until `stop()`, or just silence when there is no file. The stream
+/// A track that plays a 16 kHz mono WAV file (`--qa-meeting-mic-wav`, `--qa-meeting-system-wav`) in real time (so
+/// the two tracks stay on one timeline) and then silence until `stop()`, or just silence when there is no file. The stream
 /// never ends by itself: `MeetingSession` takes a stream that ends while recording for a lost track and starts it
 /// again, which would replay the file. An unreadable file makes `start` throw, so the recording says it could not
 /// start instead of silently recording nothing.
@@ -21,7 +21,7 @@ final class QAAudioSource: AudioInput, Sendable {
     private let task = Mutex<Task<Void, Never>?>(nil)
 
     init(
-        file: URL?, chunkSamples: Int = AudioFormat.sampleRate / 10, fileChunkDelay: Duration = .milliseconds(20),
+        file: URL?, chunkSamples: Int = AudioFormat.sampleRate / 10, fileChunkDelay: Duration = .milliseconds(100),
         silenceChunkDelay: Duration = .milliseconds(100)
     ) {
         self.file = file
