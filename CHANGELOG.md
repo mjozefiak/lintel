@@ -8,7 +8,7 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ### Added
 
-- Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes anything else; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
+- Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
 
 ### Changed
 
