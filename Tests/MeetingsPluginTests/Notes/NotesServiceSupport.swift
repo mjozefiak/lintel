@@ -78,6 +78,7 @@ final class NotesServiceRig {
     let bell = ChangeBell()
     let fixedNow = Date(timeIntervalSince1970: 1_800_000_000)
     private(set) var service: NotesService!
+    private let dependencies: NotesService.Dependencies
 
     var store: MeetingsStore { library.store! }
 
@@ -103,24 +104,24 @@ final class NotesServiceRig {
         let changes = changes
         let bell = bell
         let now = fixedNow
-        service = NotesService(
-            NotesService.Dependencies(
-                library: library, settings: settings, lease: lease,
-                modelFile: { _ in
-                    lookups.update { $0 += 1 }
-                    return file.get()
-                },
-                makeRuntime: { custom ?? llm },
-                configure: { configuration in
-                    configuration.busyPoll = .milliseconds(10)
-                    configure(&configuration)
-                }, providerRunner: providerRunner, configureWhole: configureWhole, now: { now },
-                shutdownLimit: shutdownLimit, modelWatchInterval: modelWatchInterval,
-                openModels: { id in opened.update { $0.append(id) } },
-                changed: {
-                    changes.update { $0 += 1 }
-                    bell.ring()
-                }))
+        dependencies = NotesService.Dependencies(
+            library: library, settings: settings, lease: lease,
+            modelFile: { _ in
+                lookups.update { $0 += 1 }
+                return file.get()
+            },
+            makeRuntime: { custom ?? llm },
+            configure: { configuration in
+                configuration.busyPoll = .milliseconds(10)
+                configure(&configuration)
+            }, providerRunner: providerRunner, configureWhole: configureWhole, now: { now },
+            shutdownLimit: shutdownLimit, modelWatchInterval: modelWatchInterval,
+            openModels: { id in opened.update { $0.append(id) } },
+            changed: {
+                changes.update { $0 += 1 }
+                bell.ring()
+            })
+        service = NotesService(dependencies)
         library.onMeetingReady = { [service] id in service?.meetingBecameReady(id) }
         library.onWillClose = { [service] in service?.cancelJobs() }
     }
@@ -171,6 +172,16 @@ final class NotesServiceRig {
     }
 
     func start() async { await service.start() }
+
+    /// A quit and a launch: the running service shuts down and a new one starts over the same open library, with
+    /// the same settings and model lookup (the board and the queue begin empty, as in a new process).
+    func restart() async {
+        await service.shutDown()
+        service = NotesService(dependencies)
+        library.onMeetingReady = { [service] id in service?.meetingBecameReady(id) }
+        library.onWillClose = { [service] in service?.cancelJobs() }
+        await service.start()
+    }
 
     /// Until `condition` holds, looked at again after every change the service reports; 60 s guard, the `Issue`
     /// lands on the caller's line.

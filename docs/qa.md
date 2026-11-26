@@ -35,7 +35,7 @@ Any `--qa…` argument turns QA mode on:
 |---|---|---|
 | Data root | `~/Library/Application Support/Lintel` | `--qa-data-root <path>`, or a fresh `$TMPDIR/lintel-qa-<uuid>` |
 | Settings | `UserDefaults` domain `com.lintelapp.Lintel` | in memory; no defaults domain is written |
-| Keychain | file-based login keychain | in memory; the real `com.lintelapp.clipboard` item is never created or read |
+| Keychain | file-based login keychain | in memory; the real `com.lintelapp.clipboard` item is never created or read. With `--qa-persistent-settings` the throwaway QA keys are kept in `<data root>/qa-keychain.json` (0600), so an encrypted QA library can be reopened after a relaunch |
 | Pasteboard | `NSPasteboard.general` | private named pasteboard `com.lintelapp.qa.<pid>` |
 | Global hotkeys | registered | never registered, so ⌘Space and ⌘⇧V stay with the tester; the shortcut recorders show the would-be shortcut from the volatile registration domain |
 | Caches | `~/Library/Caches/Lintel` | `Caches/` under the data root |

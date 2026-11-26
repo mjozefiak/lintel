@@ -11,6 +11,9 @@ Reference file (one per recording, kept outside the repository), optional keys b
   speakerTurns  [{startMs, endMs, speaker, text?}]; speaker "unknown" is excluded and counted.
                 `text` on every turn enables cpWER (needs `pip install meeteval`; skipped otherwise).
   speakerCount  number of people, when it differs from the distinct names in speakerTurns.
+The result may carry `speakerNames` [{label, name, source, status}] (status applied|suggested|confirmed);
+`speakerNames` in the score is then the name coverage, accuracy and false-name share per state, with the
+reference names taken from `speakerTurns`.
 Hypothesis segments may carry `speaker` and `words` [{startMs, endMs, speaker}].
 Warnings follow spec 2026-11-06-meeting-speaker-quality, step 1.3: more than 10% mixed segments
 or a cluster count that differs from the people by 2 or more.
@@ -444,6 +447,89 @@ def speaker_report(segments, turns, speaker_count=None):
     return rep
 
 
+def _name_tokens(name):
+    return set(tokens(name)) if isinstance(name, str) else set()
+
+
+def name_matches(shown, ref_name):
+    """A shown name is right when all its words are words of the reference speaker's name ("Marek" for
+    "Marek Sawicki"); a reference that is only a role ("Project Manager") never matches a person's name."""
+    a, b = _name_tokens(shown), _name_tokens(ref_name)
+    return bool(a) and a <= b
+
+
+NAME_STATES = ("applied", "suggested")
+NAME_SOURCES = ("self", "user", "platform", "calendar", "transcript")
+
+
+def majority_ref(pairs):
+    """Cluster -> the reference speaker with the most co-occurring words (many-to-one: a cluster split from
+    one person maps to that person too). Ties go to the first name in sort order."""
+    counts = {}
+    for cluster, ref in pairs:
+        counts.setdefault(cluster, {})
+        counts[cluster][ref] = counts[cluster].get(ref, 0) + 1
+    return {c: sorted(refs.items(), key=lambda kv: (-kv[1], kv[0]))[0][0] for c, refs in counts.items()}
+
+
+def speaker_names(segments, turns, names):
+    """Speaker-name metrics (spec 2026-11-25-meeting-speaker-names, step 0.1); None without turns.
+
+    `names` is the result's `speakerNames`: [{label, name, source, status}] with status `applied`,
+    `suggested` (or `confirmed`, counted with `applied`). `label` must be the segment `speaker` label the
+    harness writes ("Ja", "Inni", "Mówca N"), not a name: a run whose segments already carry names (the
+    SPEAKER_NAMES oracle experiment) joins nothing and reports zero coverage. Rows with source `default`
+    (the "Mówca N" placeholder) are not real names and are skipped. Each cluster is mapped to the reference
+    speaker with the largest time overlap (spec, Plan pomiaru), so diarization errors stay in
+    `wrongSpeakerWordShare` and are not counted again as false names. Per state, over the counted words
+    (words inside a known reference turn):
+      coverage      share of words whose cluster shows a real name in that state
+      accuracy      share of those words whose name matches the cluster's reference speaker
+      falseName     1 - accuracy (None when no words carry a name: nothing false was shown)
+    Never returns any text, only counts and shares (sources outside NAME_SOURCES count as `other`).
+    """
+    turns = valid_turns(turns)
+    if not turns:
+        return None
+    by_label = {}
+    for n in names or []:
+        if not isinstance(n, dict) or not _is_known(n.get("name")) or not _is_known(n.get("label")):
+            continue
+        if n.get("source") == "default":
+            continue
+        status = "applied" if n.get("status") == "confirmed" else n.get("status")
+        if status in NAME_STATES:
+            by_label[n["label"]] = (n["name"], status, n.get("source"))
+    pairs = []
+    for ms, cluster in hypothesis_words(segments):
+        covered, ref = ref_speaker_at(turns, ms)
+        if covered and ref is not None:
+            pairs.append((cluster, ref))
+    mapping = majority_ref(pairs)
+    total = len(pairs)
+    out = {"countedWords": total, "states": {}, "sources": {}}
+    for state in NAME_STATES:
+        shown = right = 0
+        for cluster, _ in pairs:
+            entry = by_label.get(cluster)
+            if entry is None or entry[1] != state:
+                continue
+            shown += 1
+            if name_matches(entry[0], mapping[cluster]):
+                right += 1
+        out["states"][state] = {
+            "namedWords": shown,
+            "coverage": shown / total if total else None,
+            "accuracy": right / shown if shown else None,
+            "falseName": (shown - right) / shown if shown else None,
+            "namedSpeakers": sum(1 for v in by_label.values() if v[1] == state),
+        }
+    for _, (_, state, source) in by_label.items():
+        key = source if source in NAME_SOURCES else "other"
+        out["sources"][key] = out["sources"].get(key, 0) + 1
+    return out
+
+
 def _import_meeteval():
     try:
         import meeteval  # type: ignore
@@ -511,6 +597,7 @@ def score_recording(result, refs):
         "mixedSegmentShare": None,
         "clusterDiff": None,
         "cpWer": None,
+        "speakerNames": None,
         "notices": [],
         "silenceWords": None,
         "silenceSpans": [],
@@ -576,6 +663,7 @@ def score_recording(result, refs):
         for key in ("wrongSpeakerWordShare", "mixedSegmentShare", "clusterDiff"):
             out[key] = sp[key]
         out["notices"].extend(sp["warnings"])
+        out["speakerNames"] = speaker_names(segments, refs.get("speakerTurns"), result.get("speakerNames"))
         out["cpWer"], note = cp_wer(segments, refs.get("speakerTurns"))
         if note:
             out["notices"].append(note)
@@ -659,6 +747,14 @@ def render_score(scored):
                 f"(+{sp['unknownWords']} unknown), mixed segments {sp['mixedSegments']}/"
                 f"{sp['evaluatedSegments']} (+{sp['unknownSegments']} unknown), clusters "
                 f"{sp['hypClusters']} vs {sp['refSpeakers']} people")
+        sn = r.get("speakerNames")
+        if sn:
+            for state in NAME_STATES:
+                st = sn["states"][state]
+                lines.append(
+                    f"- {name}: names {state}: speakers {st['namedSpeakers']}, words {st['namedWords']}/"
+                    f"{sn['countedWords']}, coverage {_fmt(st['coverage'], 'wer')}, "
+                    f"false name {_fmt(st['falseName'], 'wer')}")
         for note in r.get("notices", []):
             lines.append(f"- {name}: {note}")
         for term, t in r["terms"].items():

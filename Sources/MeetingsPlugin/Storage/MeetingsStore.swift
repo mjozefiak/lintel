@@ -257,6 +257,12 @@ final class MeetingsStore: Sendable {
             try db.execute(sql: "ALTER TABLE meeting ADD COLUMN notes_provider TEXT")
             try db.execute(sql: "ALTER TABLE meeting ADD COLUMN notes_provider_model TEXT")
         }
+        // #295: a meeting that became `ready` while notes were on and the built-in notes model was missing waits for
+        // the model across restarts. 1 = waiting. Additive only; an older build never names the column, so it reads
+        // every meeting as not waiting and loses nothing.
+        migrator.registerMigration("v4-notes-awaiting-model") { db in
+            try db.execute(sql: "ALTER TABLE meeting ADD COLUMN notes_awaiting_model INTEGER NOT NULL DEFAULT 0")
+        }
         return migrator
     }
 }
