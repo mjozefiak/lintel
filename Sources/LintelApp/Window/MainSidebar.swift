@@ -31,8 +31,10 @@ struct MainSidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    ForEach(sections.sorted { $0.order < $1.order }, id: \.id) { section in
-                        block(of: section)
+                    // Drawn from the tested model, so the view and `MainSidebarTests` cannot disagree on the order.
+                    let byID = Dictionary(sections.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                    ForEach(MainSidebarModel.entries(sections: sections), id: \.sectionID) { entry in
+                        if let section = byID[entry.sectionID] { block(of: section) }
                     }
                 }
                 .padding(.horizontal, SidebarRow.rowInset)

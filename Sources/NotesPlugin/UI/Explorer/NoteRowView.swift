@@ -61,7 +61,9 @@ struct NoteRowView: View {
         .onTapGesture { model.select(row: row.id) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            Text(verbatim: text.accessibilityLabel(row, snippet: snippet, title: model.shownTitle(of: row)))
+            Text(
+                verbatim: text.accessibilityLabel(
+                    row, snippet: snippet, title: model.shownTitle(of: row), now: model.environment.now()))
         )
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
         .accessibilityHint(Text("Shows the note. Return opens it.", comment: "Accessibility hint of a list row"))

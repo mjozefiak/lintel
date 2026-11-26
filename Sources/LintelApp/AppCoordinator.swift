@@ -317,7 +317,9 @@ final class AppCoordinator {
     }
 
     /// The active plugins' workspace sections, by `order`.
-    private static func activeWorkspaceSections(_ host: PluginHost) -> [WorkspaceSection] {
+    /// The workspace sections of the active plugins in their order; a plugin that is off contributes none, so the
+    /// sidebar has no row for it (tested in `MainSidebarTests`).
+    static func activeWorkspaceSections(_ host: PluginHost) -> [WorkspaceSection] {
         host.entries.filter(\.state.isActive).flatMap(\.plugin.workspaceSections).sorted { $0.order < $1.order }
     }
 

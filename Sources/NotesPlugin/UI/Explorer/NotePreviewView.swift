@@ -8,7 +8,6 @@ import SwiftUI
 /// notes says so in words, and "Try Again" appears only when a recorder can really write them again.
 struct NotePreviewView: View {
     let model: NotesWorkspaceModel
-    @State private var showsMine = false
     @Environment(\.lintelTextSize) private var textSize
 
     var body: some View {
@@ -23,9 +22,12 @@ struct NotePreviewView: View {
                 }
                 .id(id)
                 .task(id: id) { await model.loadPreview(id) }
-            } else {
+            } else if model.screen == .list {
                 EmptyStateView(
                     message: Text("Select a note to read it here.", comment: "Preview: nothing is selected"))
+            } else {
+                // An empty, loading or locked list says it all; the preview has nothing to add.
+                Color.clear
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,31 +56,32 @@ struct NotePreviewView: View {
         }
     }
 
-    private func isMeeting(_ document: NoteDocumentModel) -> Bool {
-        if let summary = document.summary {
-            return NoteCollection.meetings.contains(key: summary.id, kind: summary.kind)
-        }
-        return NoteCollection.meetings.contains(document.id)
+    private func isMeeting(_ document: NoteDocumentModel) -> Bool { NotesWorkspaceModel.isMeeting(document) }
+
+    private func showsMine(_ document: NoteDocumentModel) -> Bool {
+        isMeeting(document) && model.previewTab == .mine
     }
 
     @ViewBuilder private func loaded(id: NoteItemID, document: NoteDocumentModel) -> some View {
+        let notice = model.previewNotice(document)
         VStack(alignment: .leading, spacing: 0) {
-            header(document)
+            header(document, showsText: notice == nil && !showsMine(document))
             if isMeeting(document) { tabs(document) }
-            if let problem = problem(id: id, document: document) {
-                notice(problem)
-            } else if showsMine && isMeeting(document) {
+            if let notice {
+                self.notice(problem(notice, id: id))
+            } else if showsMine(document) {
                 mineBody
             } else {
                 blocks(document)
             }
-            footer(document)
+            if notice == nil { footer(document) }
         }
     }
 
     // MARK: Header and tabs
 
-    private func header(_ document: NoteDocumentModel) -> some View {
+    /// - Parameter showsText: Copy is offered only while the text it would copy is the text on screen.
+    private func header(_ document: NoteDocumentModel, showsText: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8 * textSize.scale) {
             Text(verbatim: model.shown(title(document)))
                 .font(textSize.font(.title2, weight: .semibold))
@@ -94,7 +97,7 @@ struct NotePreviewView: View {
             }
             .buttonStyle(LintelSecondaryButtonStyle())
             // Without text there is nothing to copy; the button is left out rather than shown disabled with no reason.
-            if let text = document.markdown {
+            if showsText, let text = document.markdown {
                 Button {
                     NoteClipboard.copy(text, to: model.environment.pasteboard)
                 } label: {
@@ -115,24 +118,12 @@ struct NotePreviewView: View {
 
     private func tabs(_ document: NoteDocumentModel) -> some View {
         HStack(spacing: 4 * textSize.scale) {
-            ForEach(tabItems(document), id: \.id) { item in
-                let onTranscript = document.layerID == NoteDocumentModel.transcriptLayerID
-                let selected =
-                    switch item.id {
-                    case "mine": showsMine
-                    case NoteDocumentModel.transcriptLayerID: !showsMine && onTranscript
-                    default: !showsMine && !onTranscript
-                    }
+            ForEach(PreviewTab.allCases, id: \.self) { tab in
+                let selected = model.previewTab == tab
                 Button {
-                    if item.id == "mine" {
-                        showsMine = true
-                    } else {
-                        showsMine = false
-                        // A layer the note does not have leaves the shown one as it was.
-                        document.selectLayer(item.id)
-                    }
+                    model.selectPreviewTab(tab)
                 } label: {
-                    Text(verbatim: item.title)
+                    Text(verbatim: Self.title(of: tab))
                         .font(textSize.font(.callout, weight: selected ? .semibold : .regular))
                         .foregroundStyle(selected ? LintelBrand.ink : LintelBrand.secondaryText)
                         .padding(.horizontal, 10 * textSize.scale)
@@ -150,20 +141,13 @@ struct NotePreviewView: View {
         .padding(.bottom, 6 * textSize.scale)
     }
 
-    private struct TabItem {
-        var id: String
-        var title: String
-    }
-
-    private func tabItems(_ document: NoteDocumentModel) -> [TabItem] {
-        // A meeting always has the three tabs: what is missing from one is said inside it.
-        [
-            TabItem(id: "notes", title: NoteDocumentModel.title(ofLayer: "notes")),
-            TabItem(id: "mine", title: String(localized: "My notes", comment: "Preview: the tab with your own notes")),
-            TabItem(
-                id: NoteDocumentModel.transcriptLayerID,
-                title: NoteDocumentModel.title(ofLayer: NoteDocumentModel.transcriptLayerID)),
-        ]
+    /// A meeting always has the three tabs: what is missing from one is said inside it.
+    static func title(of tab: PreviewTab) -> String {
+        switch tab {
+        case .notes: NoteDocumentModel.title(ofLayer: "notes")
+        case .mine: String(localized: "My notes", comment: "Preview: the tab with your own notes")
+        case .transcript: NoteDocumentModel.title(ofLayer: NoteDocumentModel.transcriptLayerID)
+        }
     }
 
     // MARK: Body
@@ -215,12 +199,10 @@ struct NotePreviewView: View {
         var isWriting = false
     }
 
-    private func problem(id: NoteItemID, document: NoteDocumentModel) -> Problem? {
-        guard isMeeting(document), !showsMine else { return nil }
-        guard document.layerID == "notes" || document.layerID == nil else { return nil }
-        switch document.state {
-        case .failed?:
-            let canRetry = model.canRetryNotes(id)
+    /// The words and button of a notice; the choice of notice is `PreviewNotice.make`, tested without a view.
+    private func problem(_ notice: PreviewNotice, id: NoteItemID) -> Problem {
+        switch notice {
+        case .failed(let canRetry):
             let text =
                 canRetry
                 ? String(
@@ -237,23 +219,33 @@ struct NotePreviewView: View {
                 result.perform = { Task { await model.retryNotes(id) } }
             }
             return result
-        case .needsModel?:
+        case .needsModel:
             return Problem(
                 message: String(
                     localized: "Notes are written once Lintel has downloaded what it needs.",
                     comment: "Preview: the notes wait for a download"),
                 buttonTitle: String(localized: "Download", comment: "Preview: opens the model download"),
                 perform: { model.environment.openModels() })
-        case .writing?, .processing?:
+        case .writing:
             return Problem(
                 message: String(
                     localized: "Lintel is writing the notes.", comment: "Preview: the notes are being written"),
                 isWriting: true)
-        default:
-            guard document.state == .ready, !document.layers.contains(where: { $0.id == "notes" }) else { return nil }
+        case .notesOff(let canWrite):
+            var result = Problem(
+                message: String(
+                    localized: "Notes are off for this meeting.", comment: "Preview: no notes were written"),
+                failed: model.previewRetryFailed)
+            if canWrite {
+                result.buttonTitle = String(
+                    localized: "Write Notes", comment: "Preview: writes the notes of a meeting that has none")
+                result.perform = { Task { await model.retryNotes(id) } }
+            }
+            return result
+        case .noText:
             return Problem(
                 message: String(
-                    localized: "Notes are off for this meeting.", comment: "Preview: no notes were written"))
+                    localized: "This note has no text yet.", comment: "Document: the shown layer has no text"))
         }
     }
 
@@ -300,16 +292,17 @@ struct NotePreviewView: View {
     }
 
     private func footerText(_ document: NoteDocumentModel) -> String? {
-        if showsMine { return nil }
+        if showsMine(document) { return nil }
         if NoteCollection.isDictation(document.id) { return nil }
         guard document.layerID == "notes", let writer = document.selectedLayer?.writer else { return nil }
         switch writer {
         case .thisMac:
             return String(
-                localized: "Written on this Mac. Nothing left your Mac.", comment: "Preview footer: built-in model")
+                localized: "Lintel wrote these notes from the recording, on this Mac.",
+                comment: "Preview footer: built-in model")
         case .claude:
             return String(
-                localized: "Written by Claude. The transcript was sent to Claude.",
+                localized: "Claude wrote these notes from the transcript. The recording stayed on this Mac.",
                 comment: "Preview footer: the external provider")
         }
     }

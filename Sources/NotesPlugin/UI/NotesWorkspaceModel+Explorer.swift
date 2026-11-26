@@ -22,9 +22,10 @@ extension NotesWorkspaceModel {
         }
     }
 
-    /// A click on a sidebar row: back to the list (open tabs close) and that collection.
+    /// A click on a sidebar row: the list shows that collection. Opened tabs stay open, as with the old Notes /
+    /// Dictations switch: closing them would cancel a running "Ask agent" run without a word (review m3 of #348).
+    /// The full-window note of phase 3b replaces the tabs and decides the way back.
     func showCollectionFromSidebar(_ next: NoteCollection) async {
-        for tab in tabs.tabs { close(tab.id) }
         await setCollection(next)
     }
 
@@ -44,6 +45,47 @@ extension NotesWorkspaceModel {
             await loadContent(id)
         } catch {
             previewRetryFailed = true
+        }
+    }
+}
+
+// MARK: Keys of the list
+
+/// A key the explorer's list acts on (spec "Keyboard and accessibility"). The view only maps a key press to one of
+/// these, so what each key does is tested without SwiftUI.
+enum ExplorerListKey: Sendable {
+    case up
+    case down
+    case open
+    /// ⌘⌫.
+    case delete
+    case escape
+}
+
+extension NotesWorkspaceModel {
+    /// What a key does in the list; `false` leaves the key to the rest of the window (the editor's ⌘⌫, the window's
+    /// Esc).
+    func handleListKey(_ key: ExplorerListKey) -> Bool {
+        switch key {
+        case .up:
+            moveSelection(by: -1)
+            return true
+        case .down:
+            moveSelection(by: 1)
+            return true
+        case .open:
+            guard let id = explorer.selection else { return false }
+            open(id)
+            return true
+        case .delete:
+            guard let id = explorer.selection, canDelete(id) else { return false }
+            Task { await requestDelete(id) }
+            return true
+        case .escape:
+            // Esc ends a search, as in the search field; without one it is not the list's key.
+            guard isSearching || !searchText.isEmpty else { return false }
+            Task { await clearSearch() }
+            return true
         }
     }
 }

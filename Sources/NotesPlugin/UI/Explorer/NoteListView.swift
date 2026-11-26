@@ -4,7 +4,8 @@ import SwiftUI
 
 /// The list column of the explorer (spec "Layout"): the collection's name, the search field and "New note", the day
 /// groups with their rows, and what the list says when there is nothing to list. ↑ / ↓ move the selection, Return
-/// opens the note in the full window, ⌘⌫ deletes the selected note. Hide content masks titles and drops snippets.
+/// opens the note in the full window, ⌘⌫ deletes the selected note, Esc ends a search (`handleListKey`). Hide content
+/// masks titles and drops snippets.
 struct NoteListView: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
@@ -47,6 +48,10 @@ struct NoteListView: View {
         }
     }
 
+    private func result(_ key: ExplorerListKey) -> KeyPress.Result {
+        model.handleListKey(key) ? .handled : .ignored
+    }
+
     @ViewBuilder private var list: some View {
         let screen = model.screen
         switch screen {
@@ -81,25 +86,13 @@ struct NoteListView: View {
             }
             .focusable()
             .focusEffectDisabled()
-            .onKeyPress(.upArrow) {
-                model.moveSelection(by: -1)
-                return .handled
-            }
-            .onKeyPress(.downArrow) {
-                model.moveSelection(by: 1)
-                return .handled
-            }
-            .onKeyPress(.return) {
-                guard let id = model.explorer.selection else { return .ignored }
-                model.open(id)
-                return .handled
-            }
+            .onKeyPress(.upArrow) { result(.up) }
+            .onKeyPress(.downArrow) { result(.down) }
+            .onKeyPress(.return) { result(.open) }
+            .onKeyPress(.escape) { result(.escape) }
             // ⌘⌫ deletes the selected note; in the editor it stays "delete to the start of the line".
             .onKeyPress(.delete, phases: .down) { press in
-                guard press.modifiers == .command, let id = model.explorer.selection, model.canDelete(id)
-                else { return .ignored }
-                Task { await model.requestDelete(id) }
-                return .handled
+                press.modifiers == .command ? result(.delete) : .ignored
             }
             .accessibilityLabel(Text(verbatim: Self.title(of: model.collection)))
         case .loading:

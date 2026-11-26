@@ -134,6 +134,8 @@ final class NotesWorkspaceModel {
     var pendingDelete: DeleteRequest?
     /// "Try Again" in the preview did not write the notes; the preview says so until the selection changes.
     var previewRetryFailed = false
+    /// The tab of a meeting's preview: Notes for every newly selected note (a choice never carries over to the next).
+    private(set) var previewTab: PreviewTab = .notes
 
     private(set) var loadState: LoadState = .loading
     private(set) var rows: [NoteRow] = []
@@ -316,6 +318,8 @@ final class NotesWorkspaceModel {
         let previous = explorer.selection
         let next = explorer.reconcile(order: visibleRows.map(\.id))
         guard next != previous else { return }
+        previewTab = .notes
+        previewRetryFailed = false
         // The row that was selected left the list: its preview goes (unless it is open in a tab). The view that
         // shows the new selection reads it (`loadPreview`).
         if let previous { dropPreview(previous) }
@@ -324,9 +328,37 @@ final class NotesWorkspaceModel {
     /// A click or an arrow key: the preview shows this note. It opens no tab.
     func select(row id: NoteItemID) {
         let previous = explorer.selection
+        guard previous != id else { return }
         previewRetryFailed = false
+        previewTab = .notes
         explorer.select(id)
-        if let previous, previous != id { dropPreview(previous) }
+        if let previous { dropPreview(previous) }
+    }
+
+    /// A click on the preview's Notes, My notes or Transcript tab. A tab whose layer the note does not have stays
+    /// on and says what is missing (`PreviewNotice`).
+    func selectPreviewTab(_ tab: PreviewTab) {
+        previewTab = tab
+        guard let document = previewDocument else { return }
+        document.preferredLayerID = tab.layerID ?? document.preferredLayerID
+        if let layer = tab.layerID { document.selectLayer(layer) }
+    }
+
+    /// What the Notes tab of the selected meeting says instead of the notes; `nil` when the notes (or another tab)
+    /// are shown, and always `nil` for a dictation or a note you wrote.
+    func previewNotice(_ document: NoteDocumentModel) -> PreviewNotice? {
+        guard Self.isMeeting(document) else { return nil }
+        return PreviewNotice.make(
+            tab: previewTab, state: document.state, hasNotes: document.layers.contains { $0.id == "notes" },
+            canRetry: canRetryNotes(document.id))
+    }
+
+    /// A meeting has the three preview tabs; a dictation and a note you wrote have none.
+    static func isMeeting(_ document: NoteDocumentModel) -> Bool {
+        if let summary = document.summary {
+            return NoteCollection.meetings.contains(key: summary.id, kind: summary.kind)
+        }
+        return NoteCollection.meetings.contains(document.id)
     }
 
     /// ↑ / ↓ in the list.
@@ -341,12 +373,28 @@ final class NotesWorkspaceModel {
 
     /// Reads the selected note once for the preview (its document is the one a tab would use). The preview view calls
     /// it for the selection it shows, so no read runs in the background of a model nobody looks at.
+    ///
+    /// One read per note at a time: a second caller (the gallery host, a second `.task`) waits for the running one,
+    /// so whoever awaits this sees the note loaded.
     func loadPreview(_ id: NoteItemID) async {
         guard explorer.selection == id else { return }
-        if documents[id] == nil { documents[id] = makeDocument(id) }
+        if documents[id] == nil {
+            let document = makeDocument(id)
+            document.preferredLayerID = previewTab.layerID ?? "notes"
+            documents[id] = document
+        }
+        if let running = previewReads[id] {
+            await running.value
+            return
+        }
         guard documents[id]?.phase == .loading else { return }
-        await loadContent(id)
+        let read = Task { await self.loadContent(id) }
+        previewReads[id] = read
+        await read.value
+        previewReads[id] = nil
     }
+
+    @ObservationIgnored private var previewReads: [NoteItemID: Task<Void, Never>] = [:]
 
     /// Forgets a preview nobody sees; a note that has a tab keeps its document.
     private func dropPreview(_ id: NoteItemID) {
@@ -466,6 +514,8 @@ final class NotesWorkspaceModel {
         tabs.open(
             NoteTab(id: id, kind: row?.summary.kind ?? fallbackKind, title: title, isBusy: Self.isBusy(row?.badge)))
         if documents[id] == nil { documents[id] = makeDocument(id) }
+        // A tab keeps the layer the user picks; the preview's wish no longer applies.
+        documents[id]?.preferredLayerID = nil
     }
 
     /// A document model whose editor, when it ends, writes what is typed and reads the note again.

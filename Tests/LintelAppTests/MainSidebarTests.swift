@@ -26,10 +26,42 @@ struct MainSidebarTests {
             ])
     }
 
-    @Test("a plugin that is off has no section, so its row is absent")
-    func offPluginsAreAbsent() {
-        let entries = MainSidebarModel.entries(sections: [section("notes", order: 5, block: true)])
-        #expect(entries.map(\.sectionID) == ["notes"])
-        #expect(MainSidebarModel.entries(sections: []).isEmpty)
+    @Test("an add-on that is off has no row; switched on, its row appears in its order")
+    func offPluginsAreAbsent() async throws {
+        let env = try TestEnvironment()
+        defer { env.tearDown() }
+        let host = env.makeHost([NoFilesPlugin.self, SidebarCorePlugin.self, SidebarAddOnPlugin.self])
+        await host.start()
+        var sections = AppCoordinator.activeWorkspaceSections(host)
+        #expect(MainSidebarModel.entries(sections: sections).map(\.sectionID) == ["core"])
+        await host.setEnabled(true, for: "sidebar-add-on")
+        sections = AppCoordinator.activeWorkspaceSections(host)
+        #expect(MainSidebarModel.entries(sections: sections).map(\.sectionID) == ["add-on", "core"])
+    }
+}
+
+/// A plugin that is on by default, with a section that draws its own sidebar block.
+@MainActor final class SidebarCorePlugin: LintelPlugin {
+    static let manifest = PluginManifest(id: "sidebar-core", displayName: "Core", symbolName: "1.circle", order: 1)
+    init(context: PluginContext) {}
+    var workspaceSections: [WorkspaceSection] {
+        [
+            WorkspaceSection(
+                id: "core", title: "Core", symbolName: "note.text", order: 20,
+                sidebar: WorkspaceSidebar(makeView: { _ in AnyView(EmptyView()) }), makeView: { AnyView(EmptyView()) })
+        ]
+    }
+}
+
+/// An add-on: off by default, with a section that sorts before the core one.
+@MainActor final class SidebarAddOnPlugin: LintelPlugin {
+    static let manifest = PluginManifest(
+        id: "sidebar-add-on", displayName: "Add-on", symbolName: "2.circle", order: 2, defaultEnabled: false)
+    init(context: PluginContext) {}
+    var workspaceSections: [WorkspaceSection] {
+        [
+            WorkspaceSection(
+                id: "add-on", title: "Add-on", symbolName: "puzzlepiece", order: 10, makeView: { AnyView(EmptyView()) })
+        ]
     }
 }

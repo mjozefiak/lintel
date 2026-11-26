@@ -5005,6 +5005,24 @@
         }
       }
     },
+    "Claude wrote these notes from the transcript. The recording stayed on this Mac." : {
+      "comment" : "Preview footer: the external provider",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude wrote these notes from the transcript. The recording stayed on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude napisał te notatki z transkrypcji. Nagranie zostało na tym Macu."
+          }
+        }
+      }
+    },
     "Cleaned" : {
       "comment" : "Document: switch to the cleaned text of a dictation",
       "extractionState" : "manual",
@@ -11841,6 +11859,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lintel odtworzy krótki sygnał przez głośniki i sprawdzi, czy go słyszy. macOS może najpierw zapytać o zgodę na nagrywanie dźwięku systemu. Możesz wcześniej ściszyć dźwięk."
+          }
+        }
+      }
+    },
+    "Lintel wrote these notes from the recording, on this Mac." : {
+      "comment" : "Preview footer: built-in model",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel wrote these notes from the recording, on this Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel napisał te notatki z nagrania, na tym Macu."
           }
         }
       }
@@ -26083,6 +26119,24 @@
         }
       }
     },
+    "Write Notes" : {
+      "comment" : "Preview: writes the notes of a meeting that has none",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write Notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Napisz notatki"
+          }
+        }
+      }
+    },
     "Write notes after each meeting" : {
       "comment" : "Meetings settings toggle of automatic notes",
       "extractionState" : "manual",
@@ -26331,6 +26385,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wczoraj"
+          }
+        }
+      }
+    },
+    "yesterday %@" : {
+      "comment" : "Row accessibility label: a time yesterday",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "yesterday %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "wczoraj %@"
           }
         }
       }
@@ -27362,7 +27434,7 @@
       }
     },
     "today %@" : {
-      "comment" : "Inspector, History: the time of a version made today",
+      "comment" : "A time today: a version in the inspector's History, and a list row's accessibility label",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -28167,42 +28239,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Czeka na pobranie"
-          }
-        }
-      }
-    },
-    "Written by Claude. The transcript was sent to Claude." : {
-      "comment" : "Preview footer: the external provider",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Written by Claude. The transcript was sent to Claude."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Napisane przez Claude. Transkrypcja została wysłana do Claude."
-          }
-        }
-      }
-    },
-    "Written on this Mac. Nothing left your Mac." : {
-      "comment" : "Preview footer: built-in model",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Written on this Mac. Nothing left your Mac."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Napisane na tym Macu. Nic nie opuściło Twojego Maca."
           }
         }
       }

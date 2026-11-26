@@ -27,13 +27,22 @@ extension NotesPlugin: GalleryProviding {
         case none
         /// The key to the notes cannot be read.
         case locked
+        /// The fixtures, every meeting without its notes: a finished meeting whose notes are off.
+        case notesOff
+        /// The fixtures, but the text of a note never arrives: the preview's skeleton.
+        case slowText
+        /// The fixtures and one note you wrote (`GalleryManualNote`).
+        case withManualNote
     }
 
     var sources: Sources = .fixtures
     var collection: NoteCollection = .all
     var query: String?
     var selected: NoteKey?
-    var layer: String?
+    /// The preview's tab; `nil` keeps Notes, as for every new selection.
+    var tab: PreviewTab?
+    /// `false` leaves the list before its first read: the list's skeleton.
+    var readsList = true
     var dictationShortcut: KeyShortcut? = KeyShortcut(key: " ", modifiers: [.option])
     /// A recorder that can write the notes again (the "Try Again" button of a failed meeting).
     var canRetry = false
@@ -71,6 +80,15 @@ private final class GalleryRecorder: LiveRecorder, @unchecked Sendable {
     case .locked:
         sources = NotesQAFixtureSource.all(now: galleryNow, empty: true)
         overlays = NotesQALockedOverlays()
+    case .notesOff:
+        sources = NotesQAFixtureSource.all(now: galleryNow, contentStyle: .notesOff)
+        overlays = NoOverlays()
+    case .slowText:
+        sources = NotesQAFixtureSource.all(now: galleryNow, contentStyle: .neverAnswers)
+        overlays = NoOverlays()
+    case .withManualNote:
+        sources = NotesQAFixtureSource.all(now: galleryNow)
+        overlays = GalleryManualNote.Overlays()
     }
     var environment = NotesWorkspaceModel.Environment(
         library: NoteLibrary(sources: { sources }, overlays: overlays, detacher: overlays),
@@ -78,9 +96,42 @@ private final class GalleryRecorder: LiveRecorder, @unchecked Sendable {
     environment.canCreateNotes = true
     environment.dictationShortcut = { scenario.dictationShortcut }
     if scenario.canRetry { environment.liveRecorder = { GalleryRecorder() } }
+    if scenario.sources == .withManualNote {
+        environment.overlayHeads = { id in id.key == GalleryManualNote.key ? [GalleryManualNote.head] : [] }
+    }
     let model = NotesWorkspaceModel(environment: environment)
     model.animationsDisabled = true
     return model
+}
+
+/// A note you wrote, read as the head of its own document (a manual note has no source).
+private enum GalleryManualNote {
+    static let key = NoteKey(pluginID: NotesStore.manualPluginID, id: "gallery-manual")
+    static let head = OverlayLayerHead(
+        layerID: "body",
+        markdown: """
+            - Short video of the export flow
+            - Ask Ola for two customer quotes
+            - Check the Polish texts before Friday
+            """,
+        provenance: [], seedSpeakers: [], attribution: nil)
+
+    /// The overlay index of the gallery: this one note, nothing else.
+    struct Overlays: OverlayIndex, OverlayDetacher {
+        func overlays(for keys: [NoteKey]) async throws -> [OverlayRecord] { [] }
+        func manualNotes() async throws -> [OverlayRecord] {
+            [
+                OverlayRecord(
+                    docID: 1, key: key, layer: "body", kind: .manual, sourcePluginID: NotesStore.manualPluginID,
+                    title: "Ideas for the Harbor launch", createdAt: galleryNow.addingTimeInterval(-3600),
+                    updatedAt: galleryNow.addingTimeInterval(-3600), isKept: true)
+            ]
+        }
+        func detachedOverlays() async throws -> [OverlayRecord] { [] }
+        func keptOverlays(excludingPlugins excluding: Set<PluginID>) async throws -> [OverlayRecord] { [] }
+        func liveOverlayKeys() async throws -> [NoteKey] { [] }
+        func detach(_ key: NoteKey, reason: OverlayDetachReason) async throws {}
+    }
 }
 
 private struct GalleryPasteboard: PasteboardClient {
@@ -108,6 +159,7 @@ private struct NotesExplorerGalleryHost: View {
         }
         .background(LintelBrand.windowBackground)
         .task {
+            guard scenario.readsList else { return }
             model.prepareCollection(scenario.collection)
             if let query = scenario.query {
                 model.searchText = query
@@ -116,12 +168,13 @@ private struct NotesExplorerGalleryHost: View {
                 await model.refresh()
             }
             guard let key = scenario.selected else { return }
-            model.select(row: .live(key))
-            // The preview view reads the selection; wait until it has.
-            for _ in 0..<100 where model.previewDocument?.phase != .loaded {
-                try? await Task.sleep(for: .milliseconds(10))
-            }
-            if let layer = scenario.layer { model.previewDocument?.selectLayer(layer) }
+            let id = NoteItemID.live(key)
+            model.select(row: id)
+            if let tab = scenario.tab { model.selectPreviewTab(tab) }
+            // The text that never arrives stays a skeleton; otherwise wait for the one read the preview also waits
+            // for, so the picture is never taken half way.
+            guard scenario.sources != .slowText else { return }
+            await model.loadPreview(id)
         }
     }
 }
@@ -205,6 +258,10 @@ private struct NotesSidebarGalleryHost: View {
                     "locked",
                     "The key to the notes cannot be read: one sentence, nothing was deleted, Try Again.",
                     NotesExplorerGalleryCase(sources: .locked)),
+                state(
+                    "loading",
+                    "The first page is being read: grey bars where the rows will be, no spinner.",
+                    NotesExplorerGalleryCase(readsList: false)),
             ])
     }
 
@@ -213,37 +270,60 @@ private struct NotesSidebarGalleryHost: View {
             id: "notes.preview", title: "Notes → Explorer: the preview",
             states: [
                 state(
-                    "nothing-selected",
-                    "No note to show yet: one sentence asks to choose a note.",
-                    NotesExplorerGalleryCase(sources: .empty), part: .preview),
-                state(
                     "meeting-notes",
                     "A meeting's notes with the tabs Notes, My notes and Transcript and the footer that says who wrote them.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.summaryID), part: .preview),
                 state(
                     "meeting-transcript",
                     "The Transcript tab: speakers and times, the text read-only.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, layer: "transcript"), part: .preview),
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .transcript), part: .preview),
+                state(
+                    "my-notes",
+                    "The My notes tab, read-only in this phase: what will be here and where to write it.",
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .mine), part: .preview),
                 state(
                     "dictation",
                     "A dictation: its cleaned text, no tabs.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.dictationID), part: .preview),
                 state(
+                    "own-note",
+                    "A note you wrote: its text, no tabs and no footer.",
+                    NotesExplorerGalleryCase(sources: .withManualNote, selected: GalleryManualNote.key),
+                    part: .preview),
+                state(
                     "writing",
-                    "The notes are being written: the working ring and one sentence.",
+                    "The notes are being written (the meeting has its transcript): the Notes tab shows the working ring and one sentence.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.writingID), part: .preview),
                 state(
                     "needs-model",
-                    "The notes wait for a model: one sentence and Download.",
+                    "The notes wait for a model (the meeting has its transcript): the Notes tab says so, with Download.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.needsModelID), part: .preview),
                 state(
                     "failed-with-retry",
-                    "The notes failed and a recorder can write them again: the transcript stays, Try Again.",
+                    "The notes failed and a recorder can write them again: the Notes tab says the transcript is safe, Try Again.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID, canRetry: true), part: .preview),
                 state(
                     "failed-no-retry",
                     "The notes failed and Meetings is off: no button, the sentence says the transcript can be read.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID), part: .preview),
+                state(
+                    "notes-off",
+                    "A finished meeting without notes, Meetings off: “Notes are off for this meeting.” and no button.",
+                    NotesExplorerGalleryCase(sources: .notesOff, selected: NotesQAFixtures.meetingID), part: .preview),
+                state(
+                    "loading",
+                    "The note's text is being read: a skeleton of grey lines.",
+                    NotesExplorerGalleryCase(sources: .slowText, selected: NotesQAFixtures.meetingID), part: .preview),
+                state(
+                    "unreadable",
+                    "The note's plugin did not answer: “Lintel couldn’t read this note. Nothing was deleted.” and Try Again.",
+                    NotesExplorerGalleryCase(sources: .none, selected: NotesQAFixtures.meetingID), part: .preview),
+                state(
+                    "gone",
+                    "The note was removed while it was selected: “This note is no longer there.”",
+                    NotesExplorerGalleryCase(
+                        selected: NoteKey(pluginID: "meetings", id: "00000000-0000-0000-0000-0000000000ff")),
+                    part: .preview),
             ])
     }
 

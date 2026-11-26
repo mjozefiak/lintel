@@ -100,14 +100,30 @@ struct ExplorerRowText: Sendable {
 
     // MARK: Accessibility
 
-    /// "Meeting, Client call: Nordlys Energy, 11:30, 42 min · 3 tasks, Writing notes…".
-    func accessibilityLabel(_ row: NoteRow, snippet: String?, title: String) -> String {
-        var parts = [Self.kindWord(row.summary), title, time(row.summary)]
+    /// "Meeting, Client call: Nordlys Energy, today 11:30, 42 min, 3 tasks, Writing notes…" (spec "Keyboard and
+    /// accessibility"): the day is spoken with the time, because a VoiceOver user moving between rows does not hear
+    /// the group heading.
+    func accessibilityLabel(_ row: NoteRow, snippet: String?, title: String, now: Date) -> String {
+        var parts = [Self.kindWord(row.summary), title, spokenDayAndTime(row.summary, now: now)]
         let facts = meta(row.summary).split(separator: "·").dropFirst().map { $0.trimmingCharacters(in: .whitespaces) }
         parts.append(contentsOf: facts)
         if let snippet { parts.append(snippet) }
         if let text = state(row.badge).text { parts.append(text) }
         return parts.joined(separator: ", ")
+    }
+
+    /// "today 11:30", "yesterday 09:05", "Monday 14:00", "12 October 16:20": the day of the row's group and the time.
+    func spokenDayAndTime(_ summary: NoteSummary, now: Date) -> String {
+        let time = time(summary)
+        switch NoteGroupingRules.dayKey(summary.startedAt, now: now, calendar: presentation.calendar) {
+        case .today:
+            return String(
+                localized: "today \(time)",
+                comment: "A time today: a version in the inspector's History, and a list row's accessibility label")
+        case .yesterday:
+            return String(localized: "yesterday \(time)", comment: "Row accessibility label: a time yesterday")
+        case let key: return title(of: key, now: now) + " " + time
+        }
     }
 
     // MARK: Group titles

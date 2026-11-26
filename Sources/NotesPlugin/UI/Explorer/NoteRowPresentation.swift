@@ -93,7 +93,9 @@ struct NoteRowPresentation: Sendable {
     func historyTime(_ date: Date, now: Date) -> String {
         guard calendar.isDate(date, inSameDayAs: now) else { return dateTime(date) }
         let clock = time(date)
-        return String(localized: "today \(clock)", comment: "Inspector, History: the time of a version made today")
+        return String(
+            localized: "today \(clock)",
+            comment: "A time today: a version in the inspector's History, and a list row's accessibility label")
     }
 
     // MARK: State

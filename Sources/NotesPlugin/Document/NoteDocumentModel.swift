@@ -30,6 +30,9 @@ final class NoteDocumentModel {
     private(set) var phase: Phase = .loading
     private(set) var content: NoteContent?
     private(set) var layerID: String?
+    /// The layer the explorer's preview asks for (its Notes or Transcript tab): `apply` shows it whenever the note
+    /// has it, so a reload never leaves the transcript under the Notes tab. `nil` for a tab's document.
+    var preferredLayerID: String?
     private(set) var blocks: [NoteBlock] = []
     /// The transcript block a quote chip jumped to; cleared by `clearHighlight()` or by switching layers.
     private(set) var highlightedBlock: Int?
@@ -157,7 +160,12 @@ final class NoteDocumentModel {
         self.content = content
         phase = .loaded
         parsed = [:]
-        if layerID == nil || !content.layers.contains(where: { $0.id == layerID }) {
+        if let preferred = preferredLayerID, preferred != layerID,
+            content.layers.contains(where: { $0.id == preferred })
+        {
+            layerID = preferred
+            highlightedBlock = nil
+        } else if layerID == nil || !content.layers.contains(where: { $0.id == layerID }) {
             layerID = content.layers.first?.id
             highlightedBlock = nil
         }

@@ -19,6 +19,9 @@ final class ExplorerModel {
     private(set) var selection: NoteItemID?
 
     @ObservationIgnored private let settings: PluginSettings?
+    /// The order of the list when the selection was last reconciled, so a row that leaves can hand the selection to
+    /// its neighbour.
+    @ObservationIgnored private var lastOrder: [NoteItemID] = []
 
     /// - Parameter settings: where the collection is read from and written to (`plugins.notes.explorer.collection`);
     ///   `nil` keeps it in memory (tests, QA, the gallery).
@@ -52,13 +55,24 @@ final class ExplorerModel {
     /// else to the first; an empty list selects nothing. Returns the new selection.
     @discardableResult
     func reconcile(order: [NoteItemID]) -> NoteItemID? {
+        let previousOrder = lastOrder
+        lastOrder = order
         guard !order.isEmpty else {
             selection = nil
             return nil
         }
         if let selection, order.contains(selection) { return selection }
-        selection = order.first
+        selection = Self.successor(of: selection, was: previousOrder, now: order) ?? order.first
         return selection
+    }
+
+    /// The row that takes the place of `id` that left: the first one after it in the old order that is still listed,
+    /// else the nearest one before it; `nil` when `id` was not in the old order or none of them is left.
+    private static func successor(of id: NoteItemID?, was old: [NoteItemID], now order: [NoteItemID]) -> NoteItemID? {
+        guard let id, let index = old.firstIndex(of: id) else { return nil }
+        let listed = Set(order)
+        if let next = old[(index + 1)...].first(where: { listed.contains($0) }) { return next }
+        return old[..<index].last(where: { listed.contains($0) })
     }
 
     /// The next (or previous) row in the list for the arrow keys; stays on the last (first) row at the ends.
