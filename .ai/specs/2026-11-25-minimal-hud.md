@@ -331,7 +331,7 @@ The suggestion's "Record" button gets a new key with „Nagraj” (OD-10); today
 | R7 | Until issue #346 is done, a meeting the model could not transcribe says "Recording was interrupted", which is wrong, and the pill no longer hints "text after the meeting" | Low | **Decided (Q5 (a)):** the OD-7 step waits for #346, with the interim pill line until then. Finish already works. |
 | R8 | Q4 (b) opens an activating window over the call app at the start of a recording; it may take the focus while the user talks or presents (every other Lintel panel during a call is non-activating on purpose) | Medium | Phase 4 investigates opening it without taking the focus (`orderFront` without activating the app, or opening only after 8 s or at the first mouse move); if none works, the owner is asked how to proceed (a question about how, not a change of Q4). |
 
-No protected contract, settings key, database or migration changes in this spec's phases (`BACKWARD_COMPATIBILITY.md`). String keys change, which is not a protected surface. `plugins.meetings.consentReminder` keeps its key and type; it switches the recording panel's reminder and whether the main window opens on it at a start outside it (Q4 (b)). The column `consent_text_copied_at` stays in the schema, unwritten and unread (Q2). Issue #346 may add a migration; that is its own PR.
+No protected contract, settings key, database or migration changes in this spec's phases (`BACKWARD_COMPATIBILITY.md`), unless the window route of Q4 (b) cannot use `PluginContext.openNote`: a new `PluginContext` value would then be a question for the owner before Phase 4. String keys change, which is not a protected surface. `plugins.meetings.consentReminder` keeps its key and type; it switches the recording panel's reminder and whether the main window opens on it at a start outside it (Q4 (b)). The column `consent_text_copied_at` stays in the schema, unwritten and unread (Q2). Issue #346 may add a migration; that is its own PR.
 
 ## 🧪 Validation
 
@@ -362,7 +362,14 @@ Four `feat/` PRs. Phase 1 first; Phases 2 and 3 after it, in any order, without 
 3. Gallery scene `ui.pill` with every variant (live wave, live clock, working, message, message without ✕ and with middle truncation as the `UndoToast` uses it, prompt, amber dot) in the full matrix; it is the owner sheet of the phase.
 4. Tests: `PillContent` accessibility labels and actions, the 40-character copy budget test over `Localizable.xcstrings` (every key whose comment starts with `HUD pill:`, the notes explorer's `UndoToast` keys included; a `%@` placeholder counted as 20 characters and a number as 3; accessibility-only texts carry `HUD pill, VoiceOver:` and are outside the budget), ring use under Reduce Motion (through `LintelRingMotion.reduced`), gallery goldens.
 
-### Phase 2 — Dictation
+#### Phase 1 result (2026-11-26)
+
+Built as described in Architecture. The R2/R3 spike ran on the debug build (`--qa-pill-spike`, `docs/qa.md`) with a real non-activating 580 × 56 pt panel built like the HUD panels (borderless, `.nonactivatingPanel`, status-bar level, clear, shadow, `ignoresMouseEvents` left unset), the meeting suggestion pill in it, a window of **another process** under the panel as the frontmost app, and real mouse events posted through Quartz (no microphone, no sound), once in light and once in dark:
+
+- **R2, click-through: passes.** Three clicks on transparent pixels of the panel (left of the pill, 6 pt above it, 6 pt below it) all reached the window below (3 of 3, both runs). A click on the pill body reached nobody below; a click on the pill's ✕ ran its action on the first click. The fallback (a panel that resizes with the pill) is not needed.
+- **R3, hover in a background app: passes.** With the other app frontmost the whole time, the tracking area saw the pointer enter and leave; the pill expanded 312–319 ms after the pointer came to rest (target 300 ms) and collapsed 501–538 ms after it left (target 500 ms), including when the pointer left to the transparent part of the panel. Lintel never became the active app (no `didBecomeActive`), also not on the ✕ click.
+
+
 
 1. `HUDState.pill` mapping per the dictation table (final, Q3 (a)); new strings en + pl; remove the old ones (including "Loading model…", OD-7). `InputFallback.pillLine` in `LintelSpeech` ("Microphone line (OD-11)"); `InputFallback.message` stays for the meeting HUD until Phase 4.
 2. `DictationHUDView` renders `LintelPill`; panel frame 580 × 56, placed so the pill keeps today's position; the #258 fallback bubble becomes the 3 s line (OD-11); "Allow" on `copied(.noAccessibility)`.
