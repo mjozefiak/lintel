@@ -174,7 +174,10 @@ struct MeetingsHarness {
     /// `Plugins/meetings` inside the temporary folder.
     var pluginDirectory: URL { context.storageDirectory }
 
-    init(settings initial: [String: SettingValue] = [:]) throws {
+    init(
+        settings initial: [String: SettingValue] = [:],
+        speechLanguages: any SpeechLanguageSettings = FixedSpeechLanguageSettings()
+    ) throws {
         // Every plugin a test builds gets the quiet system: no HUD on the screen, no tone, no Core Audio, no
         // microphone prompt and no real recording (step 6.3c-fix-c).
         MeetingsSystem.installQuiet()
@@ -195,7 +198,8 @@ struct MeetingsHarness {
             permissions: GrantedPermissions(),
             clock: ContinuousClock(),
             resultsChanged: { changes.update { $0 += 1 } },
-            modelsDirectory: directory.url.appending(path: "Models", directoryHint: .isDirectory)
+            modelsDirectory: directory.url.appending(path: "Models", directoryHint: .isDirectory),
+            speechLanguages: speechLanguages
         )
     }
 

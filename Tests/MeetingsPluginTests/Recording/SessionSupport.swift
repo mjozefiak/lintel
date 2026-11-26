@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import LintelKit
 import LintelSpeech
 import Synchronization
 import Testing
@@ -524,7 +525,8 @@ struct SessionRig {
         beforeReady: (@Sendable (Int64, UUID) async -> Void)? = nil, sourceBundleID: String? = nil,
         keepAudio: Bool = false, systemAudio: (any AudioInput)? = nil,
         recordCounters: @escaping @Sendable (CaptureCounters) -> Void = { _ in }, retriesMicrophone: Bool = true,
-        defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = nil, micStartsLate: Bool = false
+        defaultInputChanges: (@Sendable () -> AsyncStream<Void>)? = nil, micStartsLate: Bool = false,
+        language: MeetingLanguage? = nil
     ) -> MeetingSession {
         // Every session runs on a clock of its own that only the test moves, so a loaded machine cannot make the
         // heartbeat see a stalled stream; `realTime: true` is for a test that needs the wall clock.
@@ -550,7 +552,8 @@ struct SessionRig {
             beforeReady: beforeReady, sourceBundleID: sourceBundleID,
             keepAudio: { keepAudio }, recordCounters: recordCounters, retriesMicrophone: retriesMicrophone,
             inputDiagnostics: { "name=Test input, uid=test, sampleRate=48000, channels=1" },
-            defaultInputChanges: defaultInputChanges)
+            defaultInputChanges: defaultInputChanges,
+            language: language ?? MeetingLanguage(settings: FixedSpeechLanguageSettings()))
     }
 
     var shortLimits: MeetingSessionLimits {
