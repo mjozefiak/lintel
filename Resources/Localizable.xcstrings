@@ -28058,7 +28058,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ jest wylogowany, wklejono bez porządkowania"
+            "value" : "%@ wylogowany, wklejono bez porządkowania"
           }
         }
       }
@@ -28076,7 +28076,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Limit %@ wyczerpany, wklejono bez porządkowania"
+            "value" : "Limit %@, wklejono bez porządkowania"
           }
         }
       }

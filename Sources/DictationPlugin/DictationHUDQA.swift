@@ -85,11 +85,13 @@ final class DictationHUDQA {
         // The panel is transparent like the real one. Only `cacheDisplay` (the `--qa-snapshot` PNG) gets a backdrop,
         // cut to the capsule, because it does not draw the glass.
         let host = SnapshotBackdropHostingView(rootView: DictationHUDView(model: model))
+        let model = model
         host.backdropShape = { bounds in
             let size = DictationHUDView.size
+            let width = DictationHUDView.capsuleWidth(for: model.state)
             let capsule = NSRect(
-                x: bounds.midX - size.width / 2, y: DictationHUDView.bottomInset,
-                width: size.width, height: size.height)
+                x: bounds.midX - width / 2, y: DictationHUDView.bottomInset,
+                width: width, height: size.height)
             return SnapshotBackdropHostingView<DictationHUDView>.roundedPath(capsule, radius: size.height / 2)
         }
         panel.contentView = host

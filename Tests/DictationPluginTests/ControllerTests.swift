@@ -659,6 +659,13 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(titles.count == notices.count)
     }
 
+    @Test func theProviderLineGetsAWiderCapsuleThatStillFitsThePanel() {
+        let notice = HUDState.pastedAsSpoken(.init(.tooSlow, name: "Claude"))
+        #expect(DictationHUDView.capsuleWidth(for: notice) > DictationHUDView.size.width)
+        #expect(DictationHUDView.capsuleWidth(for: notice) <= DictationHUDView.panelSize.width - 16)
+        #expect(DictationHUDView.capsuleWidth(for: .pasted) == DictationHUDView.size.width)
+    }
+
     @Test func onlyTheProvidersReasonsMakeANotice() {
         let name = "Claude"
         #expect(HUDState.ProviderNotice(reason: .tooSlow, name: name)?.kind == .tooSlow)

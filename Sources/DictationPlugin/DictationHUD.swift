@@ -138,6 +138,15 @@ struct DictationHUDView: View {
     /// The panel is taller than the capsule: the capsule sits at its bottom (where it always was) and the
     /// one-line notice about an unavailable microphone (shown only then) goes above it.
     static let panelSize = CGSize(width: 360, height: 104)
+    /// The capsule of the one-line provider message is wider: "Claude za wolny, wklejono bez porządkowania" does not fit
+    /// in 248 points, and the line is the whole message (the panel is 360 wide, so 336 leaves the same margin each side).
+    static let providerNoticeWidth: CGFloat = 336
+
+    static func capsuleWidth(for state: HUDState) -> CGFloat {
+        if case .pastedAsSpoken = state { return providerNoticeWidth }
+        return size.width
+    }
+
     /// The distance of the capsule from the panel's bottom edge.
     static let bottomInset: CGFloat = 8
 
@@ -219,7 +228,7 @@ struct DictationHUDView: View {
         }
         .padding(.leading, 14)
         .padding(.trailing, 12)
-        .frame(width: Self.size.width, height: Self.size.height)
+        .frame(width: Self.capsuleWidth(for: state), height: Self.size.height)
         .glassEffect(.regular, in: .capsule)
         .overlay {
             if contrast == .increased { Capsule().strokeBorder(.primary.opacity(0.6), lineWidth: 1) }
