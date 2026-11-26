@@ -97,6 +97,10 @@ final class NotesWorkspaceModel {
         var renameTitle: @MainActor (NoteKey, String) async -> Bool = { _, _ in false }
         /// The commands of the active plugins and the shell for the command palette (`PluginContext.availableCommands`).
         var availableCommands: @MainActor () -> [CommandInfo] = { [] }
+        /// The dictation shortcut as it is right now (`PluginContext.commandShortcut`), for the empty states.
+        var dictationShortcut: @MainActor () -> KeyShortcut? = { nil }
+        /// The recorder of the meetings plugin, when it is on: the only way "Try Again" writes the notes again.
+        var liveRecorder: @MainActor () -> (any LiveRecorder)? = { nil }
     }
 
     enum LoadState: Equatable {
@@ -128,6 +132,8 @@ final class NotesWorkspaceModel {
     var inspectorHiddenForWidth = false
     /// The question the delete sheet shows, `nil` when none is open.
     var pendingDelete: DeleteRequest?
+    /// "Try Again" in the preview did not write the notes; the preview says so until the selection changes.
+    var previewRetryFailed = false
 
     private(set) var loadState: LoadState = .loading
     private(set) var rows: [NoteRow] = []
@@ -154,12 +160,15 @@ final class NotesWorkspaceModel {
     private(set) var searchQuery: NormalizedQuery?
     var collapsed: Set<NoteGroupKey> = []
 
-    /// The explorer's switch: meetings and manual notes, or dictations (ADR 0008 deviation 14). Kept in memory for
-    /// this window only (no setting): a new window starts on Notes. Search, the count, the empty states, paging and
-    /// the command palette all follow it.
-    private(set) var collection: NoteCollection = .notes
+    /// What the explorer has chosen: the sidebar's collection, its counts and the selected row (phase 3a). Search,
+    /// the count, the empty states, paging and the command palette follow the collection.
+    let explorer: ExplorerModel
 
-    var grouping: NoteGrouping = .time {
+    /// The collection the list shows.
+    var collection: NoteCollection { explorer.collection }
+
+    /// Today, Yesterday, the weekday, then dates (spec "Layout"); the old By Time / By Source menu is gone.
+    var grouping: NoteGrouping = .day {
         didSet { if grouping != oldValue { regroup() } }
     }
 
@@ -190,6 +199,7 @@ final class NotesWorkspaceModel {
         self.environment = environment
         presentation = NoteRowPresentation(calendar: environment.calendar, locale: environment.locale)
         preferences = environment.preferences ?? NoteViewPreferences(settings: environment.settings)
+        explorer = ExplorerModel(settings: environment.settings)
     }
 
     // MARK: Listing
@@ -217,7 +227,15 @@ final class NotesWorkspaceModel {
         pageToken += 1
         regroup()
         syncTabs()
+        reconcileSelection()
+        await refreshCounts()
         await reloadOpenDocuments()
+    }
+
+    /// The sidebar's numbers: browse counts only. A search leaves them as they were (its totals are hit counts).
+    func refreshCounts() async {
+        guard searchQuery == nil else { return }
+        explorer.setCounts(await environment.library.counts())
     }
 
     func loadMore() async {
@@ -243,22 +261,23 @@ final class NotesWorkspaceModel {
         pageToken += 1
         regroup()
         syncTabs()
+        reconcileSelection()
     }
 
-    // MARK: Notes / Dictations switch
+    // MARK: Collections
 
-    /// Shows the other list: the rows are dropped at once (so a dictation never flashes in the notes list) and the
-    /// first page of the new list is read with the same search text. Opened tabs stay open.
+    /// A click on a sidebar row: shows that collection's list with the same search text and remembers the choice
+    /// (`plugins.notes.explorer.collection`).
     func setCollection(_ next: NoteCollection) async {
-        guard prepareCollection(next) else { return }
+        guard prepareCollection(next, persist: true) else { return }
         await refresh()
     }
 
-    /// The switch itself, without the read; `false` when nothing changes.
+    /// The switch itself, without the read; `false` when nothing changes. The rows are dropped at once, so a
+    /// dictation never flashes in the Meetings list. Opened tabs stay open.
     @discardableResult
-    func prepareCollection(_ next: NoteCollection) -> Bool {
-        guard next != collection else { return false }
-        collection = next
+    func prepareCollection(_ next: NoteCollection, persist: Bool = false) -> Bool {
+        guard explorer.setCollection(next, persist: persist) else { return false }
         listEpoch += 1
         rows = []
         groups = []
@@ -270,11 +289,69 @@ final class NotesWorkspaceModel {
         return true
     }
 
-    /// Opening a note of the other list (a route, ⌘O of the dictation history) shows its list: the switch moves
-    /// at once and the list is read in the background.
+    /// Opening a note (a route, ⌘O of the dictation history) that the shown collection does not list moves the list
+    /// to All notes at once (the setting is not rewritten: it was not a choice of the user) and reads it in the
+    /// background; the note is selected once it is listed.
     private func showCollection(of id: NoteItemID) {
-        guard prepareCollection(NoteCollection.of(id)) else { return }
+        explorer.select(id)
+        guard !collection.contains(id) else { return }
+        guard prepareCollection(.all) else { return }
         Task { await refresh() }
+    }
+
+    /// "Search All Notes": the search stays, the list widens to All notes (not stored).
+    func searchAllNotes() async {
+        guard prepareCollection(.all) else { return }
+        await refresh()
+    }
+
+    // MARK: Selection and preview
+
+    /// The rows in the order the list draws them (groups first, or the flat search answer).
+    var visibleRows: [NoteRow] {
+        isSearching ? rows : groups.filter { !collapsed.contains($0.key) }.flatMap(\.rows)
+    }
+
+    private func reconcileSelection() {
+        let previous = explorer.selection
+        let next = explorer.reconcile(order: visibleRows.map(\.id))
+        guard next != previous else { return }
+        // The row that was selected left the list: its preview goes (unless it is open in a tab).
+        if let previous { dropPreview(previous) }
+        if let next { loadPreview(next) }
+    }
+
+    /// A click or an arrow key: the preview shows this note. It opens no tab.
+    func select(row id: NoteItemID) {
+        let previous = explorer.selection
+        previewRetryFailed = false
+        explorer.select(id)
+        if let previous, previous != id { dropPreview(previous) }
+        loadPreview(id)
+    }
+
+    /// ↑ / ↓ in the list.
+    func moveSelection(by step: Int) {
+        let order = visibleRows.map(\.id)
+        guard let next = explorer.neighbour(of: explorer.selection, in: order, step: step) else { return }
+        select(row: next)
+    }
+
+    /// The model of the note the preview shows; `nil` while nothing is selected.
+    var previewDocument: NoteDocumentModel? { explorer.selection.flatMap { documents[$0] } }
+
+    /// Reads the selected note once for the preview (its document is the one a tab would use).
+    private func loadPreview(_ id: NoteItemID) {
+        if documents[id] == nil { documents[id] = makeDocument(id) }
+        guard documents[id]?.phase == .loading else { return }
+        Task { await loadContent(id) }
+    }
+
+    /// Forgets a preview nobody sees; a note that has a tab keeps its document.
+    private func dropPreview(_ id: NoteItemID) {
+        guard !tabs.tabs.contains(where: { $0.id == id }) else { return }
+        documents[id] = nil
+        contentEpochs[id] = nil
     }
 
     // MARK: Search
@@ -363,6 +440,7 @@ final class NotesWorkspaceModel {
         case .previousThirtyDays:
             String(localized: "Previous 30 Days", comment: "Explorer: group of the last month's notes")
         case .earlier: String(localized: "Earlier", comment: "Explorer: group of older notes")
+        case .day: ExplorerRowText(presentation: presentation).title(of: group.key, now: environment.now())
         case .source(let id):
             switch id.rawValue {
             case "meetings": String(localized: "Meetings", comment: "Explorer: group of meeting notes")
@@ -383,7 +461,7 @@ final class NotesWorkspaceModel {
         showCollection(of: id)
         let row = row(for: id)
         let title = row.map(title(of:)) ?? id.key.rawValue
-        let fallbackKind: NoteKind = NoteCollection.of(id) == .dictations ? .dictation : .manual
+        let fallbackKind: NoteKind = NoteCollection.isDictation(id) ? .dictation : .manual
         tabs.open(
             NoteTab(id: id, kind: row?.summary.kind ?? fallbackKind, title: title, isBusy: Self.isBusy(row?.badge)))
         if documents[id] == nil { documents[id] = makeDocument(id) }
@@ -419,6 +497,8 @@ final class NotesWorkspaceModel {
         contentEpochs[id] = nil
         // The buffer is written before the document is forgotten, then the deferred delete of a detached row runs.
         if let registry = environment.registry { Task { await registry.release(item: id) } }
+        // The note stays selected in the list: its preview reads it again.
+        if explorer.selection == id { loadPreview(id) }
     }
 
     /// A detach re-keyed an open note: its tab and document move from `.live(key)` to
@@ -559,7 +639,9 @@ final class NotesWorkspaceModel {
 
     /// Every open tab is read on its own, so a source that does not answer holds up only its own tabs.
     private func reloadOpenDocuments() async {
-        let reads = tabs.tabs.map { tab in Task { await loadContent(tab.id) } }
+        var ids = tabs.tabs.map(\.id)
+        if let selected = explorer.selection, !ids.contains(selected), documents[selected] != nil { ids.append(selected) }
+        let reads = ids.map { id in Task { await loadContent(id) } }
         for read in reads { await read.value }
     }
 
@@ -613,7 +695,7 @@ final class NotesWorkspaceModel {
             return false
         }
         if case .detached = id { return false }
-        return NoteCollection.of(id) == .dictations
+        return NoteCollection.isDictation(id)
     }
 
     /// Copies the dictation's text into a NEW manual note, opens it in the editor in its tab and shows the Notes
@@ -632,7 +714,7 @@ final class NotesWorkspaceModel {
             show(.makeNoteFailed)
             return
         }
-        prepareCollection(.notes)
+        prepareCollection(.all)
         if isSearching { await clearSearch() } else { await refresh() }
         let made = NoteItemID.live(key)
         open(made)
@@ -759,10 +841,15 @@ final class NotesWorkspaceModel {
     /// "27 notes · 1 writing".
     var statusSummary: String {
         let notes =
-            collection == .dictations
-            ? String(
-                localized: "\(total) dictations", comment: "Notes status bar: how many dictations the list holds")
-            : String(localized: "\(total) notes", comment: "Notes status bar: how many notes the list holds")
+            switch collection {
+            case .dictations:
+                String(
+                    localized: "\(total) dictations", comment: "Notes status bar: how many dictations the list holds")
+            case .meetings:
+                String(localized: "\(total) meetings", comment: "Notes status bar: how many meetings the list holds")
+            case .all:
+                String(localized: "\(total) notes", comment: "Notes status bar: how many notes the list holds")
+            }
         let writing = writingCount
         guard writing > 0 else { return notes }
         let active = String(

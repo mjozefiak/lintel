@@ -26,9 +26,12 @@ struct NotesSectionView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                ExplorerView(model: model, width: model.paneWidth(.explorer, textScale: textSize.scale))
+                NoteListView(model: model, width: model.paneWidth(.explorer, textScale: textSize.scale))
                     .transaction(value: model.paneWidth(.explorer, textScale: textSize.scale)) { $0.animation = nil }
                 NotesPaneDivider(model: model, pane: .explorer)
+                if model.tabs.tabs.isEmpty {
+                    NotePreviewView(model: model)
+                } else {
                 VStack(spacing: 0) {
                     NoteTabBar(model: model)
                     NotePathBar(model: model)
@@ -57,6 +60,7 @@ struct NotesSectionView: View {
                     )
                     .hiddenContent(model.hidesContent)
                     .notesFade(.inspector)
+                }
                 }
             }
             .notesAnimation(.inspector, value: inspectorDocument != nil)

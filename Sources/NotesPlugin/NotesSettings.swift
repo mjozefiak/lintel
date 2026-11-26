@@ -17,6 +17,10 @@ enum NotesSettingsKey {
     /// means the default width (a double-click on the divider writes 0).
     static let explorerWidth = "explorerWidth"
     static let inspectorWidth = "inspectorWidth"
+    /// The collection the explorer's sidebar shows (`all`, `meetings` or `dictations`, default `all`; a value this build
+    /// does not know, such as a later release's `folder:<uuid>`, reads as `all`). Written only when the user picks a
+    /// row of the sidebar, never by a route or a search (notes explorer spec, Data Model).
+    static let explorerCollection = "explorer.collection"
     /// An `LLMModelCatalog` id; default: the first installed model, else the catalog default.
     static let builtInLLMModel = "builtInLLMModel"
     /// HIDDEN, no UI: the editor is read-only and no revision is ever written; export, copy and delete still

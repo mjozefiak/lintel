@@ -208,7 +208,7 @@ struct NotePathBar: View {
                 .accessibilityAddTraits(document.isEditing ? .isSelected : [])
                 .notesAnimation(.pen, value: document.isEditing)
             }
-            if let document = model.currentDocument, NoteCollection.of(document.id) == .dictations {
+            if let document = model.currentDocument, NoteCollection.isDictation(document.id) {
                 iconButton(
                     "note.text.badge.plus",
                     label: Text("Make note", comment: "Path bar and explorer: copies a dictation into a new note")
@@ -423,10 +423,11 @@ extension NotesWorkspaceModel {
     var newNoteAffordance: NewNoteAffordance { NewNoteAffordance(isEnabled: canCreateNote) }
 }
 
-/// "New note" (⌘N): the explorer's prominent button under the search field (owner request after manual testing)
-/// and the tab bar's plus tab (prototype `.tb.pl`). Both run `NotesWorkspaceModel.newNote`, like the menu item.
+/// "New note" (⌘N): the list header's plus button and the tab bar's plus tab (prototype `.tb.pl`). Both run
+/// `NotesWorkspaceModel.newNote`, like the menu item. Neither is filled: Record Meeting is the window's only filled
+/// button (C3).
 struct NewNoteButton: View {
-    enum Style { case prominent, tab }
+    enum Style { case icon, tab }
     let model: NotesWorkspaceModel
     let style: Style
     @Environment(\.lintelTextSize) private var textSize
@@ -444,25 +445,14 @@ struct NewNoteButton: View {
                     .padding(.horizontal, 12)
                     .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
-            case .prominent:
-                HStack(spacing: 8 * textSize.scale) {
-                    Image(systemName: "plus")
-                        .font(textSize.font(.callout, weight: .semibold))
-                        .accessibilityHidden(true)
-                    Text("New note", comment: "Explorer: the button that creates a note")
-                        .font(textSize.font(.callout, weight: .semibold))
-                    Spacer(minLength: 0)
-                    Text(verbatim: NewNoteAffordance.shortcutHint)
-                        .font(textSize.font(.caption1, weight: .semibold))
-                        .opacity(0.8)
-                        .accessibilityHidden(true)
-                }
-                .foregroundStyle(LintelBrand.onAccent)
-                .padding(.horizontal, 12 * textSize.scale)
-                .padding(.vertical, 7 * textSize.scale)
-                .background(LintelBrand.accent, in: RoundedRectangle(cornerRadius: 7))
-                .opacity(isEnabled ? 1 : 0.45)
-                .contentShape(RoundedRectangle(cornerRadius: 7))
+            case .icon:
+                Image(systemName: "plus")
+                    .font(textSize.font(.callout, weight: .semibold))
+                    .foregroundStyle(LintelBrand.ink)
+                    .frame(width: 26 * textSize.scale, height: 26 * textSize.scale)
+                    .background(LintelBrand.fill, in: RoundedRectangle(cornerRadius: 7))
+                    .contentShape(RoundedRectangle(cornerRadius: 7))
+                    .opacity(isEnabled ? 1 : 0.45)
             }
         }
         .buttonStyle(.plain)

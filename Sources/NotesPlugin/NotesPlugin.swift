@@ -277,6 +277,8 @@ public final class NotesPlugin: LintelPlugin {
             openSettings: context.openSettings, openModels: { context.openModels(nil) })
         environment.settings = context.settings
         environment.availableCommands = context.availableCommands
+        environment.dictationShortcut = { context.commandShortcut("dictation.record") }
+        environment.liveRecorder = context.liveRecorder
         environment.preferences = preferences
         // A recorded note's title is renamed in its owner (`NoteSourceEditing`), never in `notes.sqlite`.
         environment.renameTitle = { key, title in

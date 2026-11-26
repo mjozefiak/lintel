@@ -156,7 +156,7 @@ struct NoteDetailsPane: View {
     private var actions: some View {
         VStack(alignment: .leading, spacing: 0) {
             sectionHeader(Text("Actions", comment: "Inspector, Details: heading of the note's actions"), first: false)
-            if NoteCollection.of(document.id) == .dictations {
+            if NoteCollection.isDictation(document.id) {
                 actionRow(
                     "note.text.badge.plus",
                     Text("Make note", comment: "Path bar and explorer: copies a dictation into a new note"), keys: nil,

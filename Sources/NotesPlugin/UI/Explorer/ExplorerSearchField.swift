@@ -8,6 +8,16 @@ struct ExplorerSearchField: View {
     @Environment(\.lintelTextSize) private var textSize
     @FocusState private var focused: Bool
 
+    private var prompt: Text {
+        switch model.collection {
+        case .dictations:
+            Text("Search dictations", comment: "Explorer: placeholder of the search field in the Dictations list")
+        case .meetings:
+            Text("Search meetings", comment: "Explorer: placeholder of the search field in the Meetings list")
+        case .all: Text("Search notes", comment: "Explorer: placeholder of the search field")
+        }
+    }
+
     var body: some View {
         @Bindable var model = model
         HStack(spacing: 8) {
@@ -15,11 +25,7 @@ struct ExplorerSearchField: View {
                 .accessibilityHidden(true)
             TextField(
                 text: $model.searchText,
-                prompt: model.collection == .dictations
-                    ? Text(
-                        "Search dictations", comment: "Explorer: placeholder of the search field in the Dictations list"
-                    )
-                    : Text("Search notes", comment: "Explorer: placeholder of the search field")
+                prompt: prompt
             ) {
                 Text("Search notes", comment: "Accessibility label of the explorer's search field")
             }

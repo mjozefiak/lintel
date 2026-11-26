@@ -139,7 +139,7 @@ actor NoteLibrary {
     // MARK: Listing
 
     /// One page of rows, newest first. `after` is the `next` of the previous page.
-    /// `collection` limits the page to notes or to dictations (the explorer's switch); `nil` lists everything. A
+    /// `collection` limits the page to one of the explorer's collections; `nil` (or `.all`) lists everything. A
     /// cursor belongs to the collection it was made for.
     func list(
         matching query: NormalizedQuery?, after: NoteListCursor?, limit: Int, collection: NoteCollection? = nil
@@ -191,7 +191,7 @@ actor NoteLibrary {
         var local: [NoteRow] = []
         if text == nil {
             let rows = await localRows(excludingPlugins: live)
-            local = rows.rows.filter { collection == nil || NoteCollection.of($0) == collection }
+            local = rows.rows.filter { collection?.contains($0) ?? true }
             if !rows.available { overlaysAvailable = false }
         }
         let localCount = local.count
@@ -248,6 +248,60 @@ actor NoteLibrary {
         return NoteListing(
             rows: rows, next: next, total: total, unavailable: unavailable, overlaysAvailable: overlaysAvailable,
             restarted: restarted)
+    }
+
+    // MARK: Counts
+
+    /// How many notes each collection holds, for the sidebar (browse numbers, never a search's hit counts). Each
+    /// source answers under its own budget with its live count (`NoteSourceTrash.liveCount`, a cheap `COUNT`) or,
+    /// for a source without it, the total of a page of one row; Notes' own rows (manual notes, kept copies) are
+    /// classified by key and kind. A source that does not answer leaves the collections it feeds `nil`, so the
+    /// caller keeps the number it knew.
+    func counts() async -> NoteCollectionCounts {
+        await ensureSources()
+        let accepted = sources
+        let budget = budget
+        let clock = clock
+        let totals = await withTaskGroup(of: (PluginID, Int?).self) { group in
+            for id in accepted.order {
+                guard let source = accepted.accepted[id] else { continue }
+                group.addTask {
+                    if let trash = source as? any NoteSourceTrash {
+                        let outcome = await SourceFanOut.call(budget: budget, clock: clock) {
+                            try await trash.liveCount()
+                        }
+                        if case .value(let count) = outcome { return (id, count) }
+                    }
+                    let outcome = await SourceFanOut.call(budget: budget, clock: clock) {
+                        try await source.list(matching: nil, after: nil, limit: 1)
+                    }
+                    if case .value(let page) = outcome { return (id, page.total) }
+                    return (id, nil)
+                }
+            }
+            var all: [(PluginID, Int?)] = []
+            for await result in group { all.append(result) }
+            return all
+        }
+        let down = Set(totals.filter { $0.1 == nil }.map(\.0))
+        let live = Set(accepted.order).subtracting(down)
+        let local = await localRows(excludingPlugins: live).rows
+        var counts = NoteCollectionCounts(all: 0, meetings: 0, dictations: 0)
+        for (id, total) in totals {
+            for collection in NoteCollection.allCases where collection.includesSource(id) {
+                guard let total, let known = counts.count(of: collection) else {
+                    counts.set(nil, for: collection)
+                    continue
+                }
+                counts.set(known + total, for: collection)
+            }
+        }
+        for row in local {
+            for collection in NoteCollection.allCases where collection.contains(row) {
+                if let known = counts.count(of: collection) { counts.set(known + 1, for: collection) }
+            }
+        }
+        return counts
     }
 
     private static func row(for item: SourceProgress.Item) -> NoteRow {
