@@ -207,7 +207,7 @@ enum NotesPrompt {
         of work is listed once.
         - INTRO uses only facts from the points: no new names, numbers, dates or places. Write it in the \
         language of the points, without times. Start each sentence of it with "The meeting" or "The team" \
-        ("Spotkanie", "Zespół") or with a word of the points.
+        or with a word of the points.
         - An empty list is written as -.
 
         Po polsku: zwracasz tylko identyfikatory punktów w sekcjach, najwyżej \(maxTopics) tematów TOPIC \
@@ -234,7 +234,7 @@ enum NotesPrompt {
 
         Reply with exactly one line: INTRO: 1 to 3 sentences, at most 70 words, using only facts from the \
         intros (no new names, numbers or dates), in their language. Start each sentence with "The meeting" or \
-        "The team" ("Spotkanie", "Zespół") or with a word of the intros.
+        "The team" or with a word of the intros.
 
         Po polsku: jeden wstęp z 1 do 3 zdań, tylko z faktów z podanych wstępów; każde zdanie zaczyna się od \
         „Spotkanie”, „Zespół” albo od słowa z wstępów.
