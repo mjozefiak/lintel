@@ -47,4 +47,47 @@ enum MeetingEdits {
         else { throw Failure.refused }
         guard try store.markSelf(speakerID: speakerID) else { throw Failure.refused }
     }
+
+    /// "Tak" on a suggestion: `name` becomes the speaker's name (the user's own) and the notes become `stale`.
+    /// `notFound` when the speaker is not in the meeting or no longer suggests `name` (the screen was older than
+    /// the row); `refused` while the meeting is recorded or processed.
+    static func confirmName(_ name: String, speaker speakerID: Int64, of meetingID: Int64, in store: MeetingsStore)
+        throws
+    {
+        try requireEditable(speakerID, of: meetingID, in: store)
+        guard try store.confirmSuggestedName(speakerID: speakerID, name: name) else { throw Failure.notFound }
+    }
+
+    /// "Nie" on a suggestion: the speaker never gets `name` again and keeps its label; the notes stay current.
+    /// The same refusals as `confirmName`.
+    static func rejectName(_ name: String, speaker speakerID: Int64, of meetingID: Int64, in store: MeetingsStore)
+        throws
+    {
+        try requireEditable(speakerID, of: meetingID, in: store)
+        guard try store.rejectSuggestedName(speakerID: speakerID, name: name) else { throw Failure.notFound }
+    }
+
+    /// "Połącz": `speakerID` and `targetID` are one person (`MeetingsStore.mergeSpeaker`). `notFound` for a
+    /// speaker that is not in the meeting, `refused` while it is recorded or processed or in `channels` mode.
+    static func mergeSpeaker(_ speakerID: Int64, into targetID: Int64, of meetingID: Int64, in store: MeetingsStore)
+        throws
+    {
+        do {
+            try store.mergeSpeaker(speakerID, into: targetID, meetingID: meetingID)
+        } catch MeetingsStore.MergeRefusal.notFound {
+            throw Failure.notFound
+        } catch MeetingsStore.MergeRefusal.refused {
+            throw Failure.refused
+        }
+    }
+
+    /// The speaker belongs to the meeting, and the meeting is not being recorded or processed (the finalization
+    /// writes the speakers then).
+    private static func requireEditable(_ speakerID: Int64, of meetingID: Int64, in store: MeetingsStore) throws {
+        guard try store.speakers(meetingID: meetingID).contains(where: { $0.id == speakerID }) else {
+            throw Failure.notFound
+        }
+        guard let status = try store.status(of: meetingID) else { throw Failure.notFound }
+        guard status != .recording, status != .processing else { throw Failure.refused }
+    }
 }

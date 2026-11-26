@@ -9,6 +9,28 @@ struct MeetingDocument: Sendable, Equatable {
         var label: String
         var isSelf: Bool
         var channel: AudioChannel
+        /// Where the shown name came from and how sure the store is of it (`v5-speaker-names`); `nil` for a value
+        /// this build does not know. Only the window and the Notes source read them; the export never does.
+        var nameSource: NameSource? = .default
+        var nameStatus: SpeakerNameStatus? = .confirmed
+        /// The name waiting for the user's yes or no ("Marek?"); never part of the transcript or the notes.
+        var suggestedName: String? = nil
+
+        /// The suggestion to show: only while the row really waits for one, and only with visible text.
+        var pendingSuggestion: String? {
+            guard nameStatus == .suggested, let name = suggestedName.map(MeetingEdits.visible), !name.isEmpty
+            else { return nil }
+            return name
+        }
+
+        /// An automatic name the store is sure of (`applied`), shown without a mark.
+        var isAppliedName: Bool {
+            guard nameStatus == .applied else { return false }
+            switch nameSource {
+            case .platform, .calendar, .transcript: return true
+            case .user, .me, .default, nil: return false
+            }
+        }
     }
 
     struct Segment: Sendable, Equatable, Identifiable {
@@ -89,7 +111,10 @@ extension MeetingsStore {
             ).map { row in
                 MeetingDocument.Speaker(
                     id: row["id"], label: row["label"], isSelf: (row["is_self"] as Int) != 0,
-                    channel: AudioChannel(rawValue: row["source_channel"]) ?? .mic)
+                    channel: AudioChannel(rawValue: row["source_channel"]) ?? .mic,
+                    nameSource: (row["name_source"] as String?).flatMap(NameSource.init(rawValue:)),
+                    nameStatus: (row["name_status"] as String?).flatMap(SpeakerNameStatus.init(rawValue:)),
+                    suggestedName: row["suggested_name"])
             }
             let segments = try Row.fetchAll(
                 db, sql: "SELECT * FROM meeting_segment WHERE meeting_id = ? ORDER BY start_ms, id", arguments: [id]

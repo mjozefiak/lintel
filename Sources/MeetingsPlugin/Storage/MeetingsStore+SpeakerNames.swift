@@ -217,6 +217,76 @@ extension MeetingsStore {
         }
     }
 
+    // MARK: Merging
+
+    /// Why two speakers were not merged.
+    enum MergeRefusal: Error, Equatable {
+        /// A speaker is missing, or the two are one speaker, or they belong to different meetings.
+        case notFound
+        /// The meeting is being recorded or processed (its speakers may be written again at any moment), or its
+        /// speakers are the two tracks (`channels`), not people.
+        case refused
+    }
+
+    /// "Połącz": the two speakers are one person. In one transaction, after checking inside it that the meeting
+    /// is neither `recording` nor `processing` nor in `channels` mode: every segment and every piece of name
+    /// evidence of `sourceID` moves to `targetID`, the refused names of both are kept on the target, `sourceID`
+    /// is deleted and the notes become `stale`. The target keeps its name; when either speaker was the user's own
+    /// (`is_self`), the target is the user's own afterwards (one self speaker per meeting), with the label it had.
+    func mergeSpeaker(_ sourceID: Int64, into targetID: Int64, meetingID: Int64) throws {
+        try write { db in
+            guard sourceID != targetID else { throw MergeRefusal.notFound }
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT id, is_self, rejected_names FROM meeting_speaker
+                    WHERE meeting_id = ? AND id IN (?, ?)
+                    """,
+                arguments: [meetingID, sourceID, targetID])
+            guard let source = rows.first(where: { ($0["id"] as Int64) == sourceID }),
+                let target = rows.first(where: { ($0["id"] as Int64) == targetID })
+            else { throw MergeRefusal.notFound }
+            guard
+                let meeting = try Row.fetchOne(
+                    db, sql: "SELECT status, speaker_mode FROM meeting WHERE id = ?", arguments: [meetingID])
+            else { throw MergeRefusal.notFound }
+            let status: String = meeting["status"]
+            let mode: String? = meeting["speaker_mode"]
+            guard status != MeetingStatus.recording.rawValue, status != MeetingStatus.processing.rawValue,
+                mode != SpeakerMode.channels.rawValue
+            else { throw MergeRefusal.refused }
+
+            try db.execute(
+                sql: "UPDATE meeting_segment SET speaker_id = ? WHERE meeting_id = ? AND speaker_id = ?",
+                arguments: [targetID, meetingID, sourceID])
+            try db.execute(
+                sql: "UPDATE meeting_name_evidence SET speaker_id = ? WHERE meeting_id = ? AND speaker_id = ?",
+                arguments: [targetID, meetingID, sourceID])
+            var rejected = Self.decodeNames(target["rejected_names"])
+            for name in Self.decodeNames(source["rejected_names"])
+            where !rejected.contains(where: { $0.lowercased() == name.lowercased() }) {
+                rejected.append(name)
+            }
+            try db.execute(
+                sql: "UPDATE meeting_speaker SET rejected_names = ? WHERE id = ?",
+                arguments: [rejected.isEmpty ? nil : Self.encodeNames(rejected), targetID])
+            // The source goes first, so the meeting never has two self speakers, not even inside the transaction.
+            try db.execute(sql: "DELETE FROM meeting_speaker WHERE id = ?", arguments: [sourceID])
+            let sourceIsSelf: Bool = source["is_self"]
+            let targetIsSelf: Bool = target["is_self"]
+            if sourceIsSelf && !targetIsSelf {
+                try db.execute(
+                    sql: """
+                        UPDATE meeting_speaker
+                        SET is_self = 1, name_source = 'self', name_status = 'confirmed', suggested_name = NULL
+                        WHERE id = ?
+                        """,
+                    arguments: [targetID])
+            }
+            try Self.markNotesStale(meetingID: meetingID, in: db)
+        }
+    }
+
     // MARK: A second finalization
 
     /// What a speaker of the meeting carries over a new speaker plan: the user's decisions only. Read inside the

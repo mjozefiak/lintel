@@ -63,9 +63,18 @@ enum MeetingNoteLayers {
     /// Id, shown name and "is me" of every speaker row. The ids are the rows' own and may change when the
     /// speakers are assigned again; a block's `segmentRef` is the stable link.
     static func speakers(_ document: MeetingDocument) -> [NoteSpeaker] {
-        document.speakers.map {
-            NoteSpeaker(id: String($0.id), name: MeetingEdits.visible($0.label), isSelf: $0.isSelf)
+        document.speakers.map { speaker in
+            NoteSpeaker(
+                id: String(speaker.id), name: MeetingEdits.visible(speaker.label), isSelf: speaker.isSelf,
+                nameStatus: nameStatus(speaker), suggestion: speaker.pendingSuggestion)
         }
+    }
+
+    /// `suggested` only while a visible suggestion waits, `applied` for an automatic name the store is sure of,
+    /// everything else (a user's name, the user's own, a default label, a value from a newer build) `confirmed`.
+    static func nameStatus(_ speaker: MeetingDocument.Speaker) -> NoteSpeakerNameStatus {
+        if speaker.pendingSuggestion != nil { return .suggested }
+        return speaker.isAppliedName ? .applied : .confirmed
     }
 
     /// SHA-256 of the markdown and of the provenance without speaker ids, hex.
