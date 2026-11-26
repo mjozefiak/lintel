@@ -313,6 +313,8 @@ private func samples(_ milliseconds: Int) -> Int { milliseconds * AudioFormat.sa
             TranscriptSegment(text: "veto u1", noSpeechProb: 0.1, avgLogProb: -0.2),
             // Empty.
             TranscriptSegment(text: "  ", noSpeechProb: 0.1, avgLogProb: -0.2),
+            // The text the segment already has.
+            TranscriptSegment(text: "Thank you.", noSpeechProb: 0.1, avgLogProb: -0.2),
         ]
         var segments: [(AudioChannel, Int, Int, String)] = [(.mic, 0, 6_000, words("a"))]
         for index in replies.indices {
@@ -324,7 +326,19 @@ private func samples(_ milliseconds: Int) -> Int { milliseconds * AudioFormat.sa
         let engine = RepairEngine(reply: { replies[$0] })
         let report = await rig.repair(engine: engine).run(meetingID: rig.meetingID, uuid: rig.uuid)
 
-        #expect(report == LanguageRepairReport(suspect: replies.count, replaced: 0, kept: replies.count, stop: .none))
+        // Every kept segment says why (issue #315), and the reasons add up to the count the log gives.
+        let reasons: [LanguageRepairReport.Kept: Int] = [
+            .phrase: 2, .noSpeech: 1, .lowConfidence: 1, .noConfidence: 1, .script: 1, .outsideProfile: 1,
+            .empty: 1, .same: 1,
+        ]
+        #expect(
+            report
+                == LanguageRepairReport(
+                    suspect: replies.count, replaced: 0, kept: replies.count, keptReasons: reasons, stop: .none))
+        #expect(
+            report.keptReasonsLine
+                == "empty=1,same=1,noSpeech=1,lowConfidence=1,noConfidence=1,script=1,phrase=2,outsideProfile=1")
+        #expect(LanguageRepairReport().keptReasonsLine == "none")
         #expect(engine.calls.count == replies.count)
         for index in replies.indices { #expect(try rig.text(index + 1) == "Thank you.") }
     }
@@ -471,6 +485,33 @@ private func samples(_ milliseconds: Int) -> Int { milliseconds * AudioFormat.sa
             modelID: "parakeet", folder: folder, engine: RepairEngine(), priority: .interactive, keepWarm: { .zero })
         #expect(await lease.residentKey?.modelID == "parakeet")
         await after.release()
+    }
+
+    /// The other side of the busy test, and why the repair takes the model in memory (issue #315): a dictation on
+    /// the repair's own model shares the lease and is served while the repair runs.
+    @Test func aDictationOnTheRepairsOwnModelIsServedDuringIt() async throws {
+        let rig = try RepairRig([
+            (.mic, 0, 6_000, words("a")), (.mic, 7_000, 7_500, "Thank you."), (.mic, 8_500, 9_000, "Thank you."),
+            (.mic, 10_000, 16_000, words("b")),
+        ])
+        let dictation = Mutex<[String]>([])
+        let lease = rig.lease
+        let folder = rig.directory.url.appending(path: "model")
+        let engine = RepairEngine(onCall: { _ in
+            do {
+                let held = try await lease.acquire(
+                    modelID: "whisper", folder: folder, engine: RepairEngine(), priority: .interactive,
+                    keepWarm: { .zero })
+                await held.release()
+                dictation.withLock { $0.append("served") }
+            } catch {
+                dictation.withLock { $0.append((error as? ModelLeaseError) == .busy ? "busy" : "other") }
+            }
+        })
+        let report = await rig.repair(engine: engine).run(meetingID: rig.meetingID, uuid: rig.uuid)
+
+        #expect(report == LanguageRepairReport(suspect: 2, replaced: 2, kept: 0, stop: .none))
+        #expect(dictation.withLock { $0 } == ["served", "served"])
     }
 
     // MARK: Finalizer paths

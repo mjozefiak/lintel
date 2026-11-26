@@ -78,6 +78,13 @@ public final class SpeechEngineLease: Sendable {
         get async { await residency.residentKey }
     }
 
+    /// Whether the engine for `modelID` in `folder` is the one in memory already: a lease on that key starts at
+    /// once, where any other key loads first and holds the model for the whole load (the first Whisper load took
+    /// 143 s in the step 2.5 measurement). A caller that must not wait for a load asks this before it picks a model.
+    public func isWarm(modelID: String, folder: URL) async -> Bool {
+        await residency.residentKey == Key(modelID: modelID, folder: folder)
+    }
+
     public var activeLeases: Int {
         get async { await residency.activeLeases }
     }

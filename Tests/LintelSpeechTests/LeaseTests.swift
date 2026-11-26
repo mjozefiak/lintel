@@ -107,6 +107,23 @@ private let folder = URL(filePath: "/models/speech/a")
         await until { new.unloads == 1 }
     }
 
+    @Test func onlyTheKeyInMemoryIsWarm() async throws {
+        #expect(await lease.isWarm(modelID: "parakeet", folder: folder) == false)
+        let held = try await take(LeaseEngine(tracker: tracker))
+        // Warm while it is leased.
+        #expect(await lease.isWarm(modelID: "parakeet", folder: folder))
+        // Neither another model nor another folder is: a lease on those loads.
+        #expect(await lease.isWarm(modelID: "whisper", folder: folder) == false)
+        #expect(await lease.isWarm(modelID: "parakeet", folder: URL(filePath: "/models/speech/b")) == false)
+        await held.release()
+        // Still warm while the keep-warm time runs (a lease needs no load), then gone.
+        #expect(await lease.isWarm(modelID: "parakeet", folder: folder))
+        await until { sleeper.durations.count == 1 }
+        sleeper.fire()
+        await until { await lease.residentKey == nil }
+        #expect(await lease.isWarm(modelID: "parakeet", folder: folder) == false)
+    }
+
     @Test func anotherKeyWhileALeaseIsActiveIsBusy() async throws {
         let first = LeaseEngine(tracker: tracker)
         let other = LeaseEngine(tracker: tracker)

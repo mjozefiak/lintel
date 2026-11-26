@@ -517,7 +517,12 @@ list `pl,en`, Parakeet live.
 - **The repair's time bound did not hold once.** The limit includes loading the model but does not interrupt the load:
   the first Whisper load of the evaluation (cold; probably the Core ML cache, the next load took 4 s) held `beforeReady`
   for 143 s, past `LanguageRepair.timeLimit` (60 s) and past the spec's 2 min worst case, and decoded nothing
-  (`stop=timeLimit`). Whether an app update triggers the same cold load was not measured.
+  (`stop=timeLimit`). Whether an app update triggers the same cold load was not measured. Issue #315 removed the cause:
+  the repair now takes a model that is already in memory and never starts a cold Whisper load while Parakeet is
+  installed, so the load no longer holds the lease in front of a dictation (not re-measured).
+- **Reasons per kept segment** (issue #315): the run now counts them (`keptReasons` in the result block), so
+  `maximumNoSpeechProb` / `minimumAvgLogProb` can be tuned on the labelled meetings below. The table above has no
+  reasons yet: it was measured before the change.
 - Item 5 (time only): Whisper live on the same meeting took 214.6 s pinned to `pl` and 230.9 s in Automatic (29 detected
   segments), about **+0.56 s per detection** (one run each). Whether Automatic writes fewer wrong-language segments
   needs labels.

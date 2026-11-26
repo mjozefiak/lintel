@@ -79,7 +79,9 @@ struct LanguageEvalHarnessTests {
         var report = LanguageRepairReport()
         report.suspect = 7
         report.replaced = 2
-        report.kept = 3
+        report.keep(.noSpeech)
+        report.keep(.noSpeech)
+        report.keep(.outsideProfile)
         report.stop = .timeLimit
         let run = LanguageEval.RepairRun(
             engine: "whisper-large-v3-turbo", report: report, seconds: 12.5, beforeReadySeconds: 12.75,
@@ -90,6 +92,7 @@ struct LanguageEvalHarnessTests {
         #expect(block.requests == ["none": 1])
         let repair = try? #require(block.repair)
         #expect(repair?.redecoded == 5)
+        #expect(repair?.keptReasons == ["noSpeech": 2, "outsideProfile": 1])
         #expect(repair?.skipped == 2)
         #expect(repair?.stop == "timeLimit")
         #expect(repair?.requests == ["whisper:pinned:pl": 1])
@@ -116,9 +119,9 @@ struct LanguageEvalHarnessTests {
         languages: ["pl", "en"], profileSettledAtMs: 42_000, profileConfidentSeconds: 120.5,
         shares: ["pl": 0.9, "en": 0.1], requests: ["none": 4, "script:latin": 40],
         repair: .init(
-            engine: "whisper-large-v3-turbo", suspect: 9, redecoded: 8, replaced: 3, kept: 5, skipped: 1,
-            stop: "none", seconds: 20.5, beforeReadySeconds: 21, peakFootprintMB: 1_500,
-            requests: ["whisper:pinned:pl": 8], changedSegments: 3))
+            engine: "whisper-large-v3-turbo", suspect: 9, redecoded: 8, replaced: 3, kept: 5,
+            keptReasons: ["noSpeech": 4, "same": 1], skipped: 1, stop: "none", seconds: 20.5,
+            beforeReadySeconds: 21, peakFootprintMB: 1_500, requests: ["whisper:pinned:pl": 8], changedSegments: 3))
 
     @Test func theLanguageBlockAndTheRowFlagRoundTripAndAreNumbersOnly() throws {
         let value = result(language: block, repaired: true)
@@ -134,7 +137,7 @@ struct LanguageEvalHarnessTests {
         let repair = try #require(language["repair"] as? [String: Any])
         #expect(
             Set(repair.keys) == [
-                "engine", "suspect", "redecoded", "replaced", "kept", "skipped", "stop", "seconds",
+                "engine", "suspect", "redecoded", "replaced", "kept", "keptReasons", "skipped", "stop", "seconds",
                 "beforeReadySeconds", "peakFootprintMB", "requests", "changedSegments",
             ])
         let asr = try #require(object["asr"] as? [String: Any])
