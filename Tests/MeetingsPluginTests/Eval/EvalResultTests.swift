@@ -30,6 +30,18 @@ struct EvalResultTests {
         }
     }
 
+    @Test func speakerNamesAreOptionalAndAdditive() throws {
+        let plain = sample(diarization: false, notes: false)
+        let object = try #require(
+            JSONSerialization.jsonObject(with: EvalResultWriter.data(for: plain)) as? [String: Any])
+        #expect(object["speakerNames"] == nil)
+        var named = plain
+        named.speakerNames = [.init(label: "Rozmówca 1", name: "Anna", source: "transcript", status: "applied")]
+        let decoded = try JSONDecoder().decode(EvalResult.self, from: EvalResultWriter.data(for: named))
+        #expect(decoded == named)
+        #expect(decoded.speakerNames?.first?.status == "applied")
+    }
+
     @Test func speakerIsOptionalAndAdditive() throws {
         let absent = #"{"track":"mic","startMs":1,"endMs":2,"text":"t"}"#
         #expect(try JSONDecoder().decode(EvalResult.Segment.self, from: Data(absent.utf8)).speaker == nil)

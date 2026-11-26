@@ -29,6 +29,23 @@ struct ProviderJobFailure: Equatable, Sendable {
     var startedAt: Date
 }
 
+/// The persisted side of `NotesBoard.Snapshot.awaitingModel` (`meeting.notes_awaiting_model`, #295), off the main
+/// actor. A database error only means the wait is not kept across a restart: it is logged nowhere with content and
+/// never stops the notes.
+enum AwaitingMarker {
+    @concurrent static func read(_ store: MeetingsStore) async -> [Int64] {
+        (try? store.meetingsAwaitingNotesModel()) ?? []
+    }
+
+    @concurrent static func mark(_ store: MeetingsStore, _ id: Int64) async {
+        try? store.markNotesAwaitingModel(id)
+    }
+
+    @concurrent static func clear(_ store: MeetingsStore, _ id: Int64? = nil) async {
+        try? store.clearNotesAwaitingModel(id)
+    }
+}
+
 /// What the library list, its actions and the meeting windows may read from any thread: whether notes are on,
 /// whether their model is missing, and what each running job does. Written by `NotesService` on the main actor.
 final class NotesBoard: Sendable {
@@ -40,8 +57,8 @@ final class NotesBoard: Sendable {
         /// Meetings that became `ready` in this session while notes were on and the model was missing. Only they
         /// show "Notes model needed": older meetings and meetings recorded while notes were off show nothing. When
         /// the built-in model arrives (and no provider is chosen) they are queued and get their notes; notes switched
-        /// off or a chosen provider end the wait. In memory: a restart forgets them, and "Regenerate" is then the way
-        /// to their notes.
+        /// off or a chosen provider end the wait. Also kept in `meeting.notes_awaiting_model` and read back when the
+        /// service starts, so a restart (quit, crash, update) does not lose the wait (#295).
         var awaitingModel: Set<Int64> = []
         /// How the last job of the chosen provider ended when it did not write notes (Settings → Meetings shows it
         /// with "Try Again" and "Write on This Mac"). In memory: a restart forgets it. Cleared by the next job of that
@@ -159,7 +176,21 @@ final class NotesService: ProviderNotesControl {
     func start() async {
         accepting = true
         deps.providerRunner?.sweepStaleWorkspaces()
+        await restoreAwaiting()
         await refreshAvailability()
+        if !board.snapshot.awaitingModel.isEmpty { watchForModel() }
+    }
+
+    /// #295: the meetings that were waiting for the notes model when the app last ran wait again. Read before
+    /// `refreshAvailability`, which queues them at once when the model is already on this Mac and ends the wait when
+    /// notes are off or a provider is chosen.
+    private func restoreAwaiting() async {
+        guard deps.settings.notesEnabled, deps.settings.notesProviderSelection == nil,
+            let store = deps.library.store
+        else { return }
+        let ids = await AwaitingMarker.read(store)
+        guard !ids.isEmpty else { return }
+        board.update { $0.awaitingModel.formUnion(ids) }
     }
 
     /// The plugin is switched off or the app quits: queued jobs are dropped, the running one is cancelled and
@@ -242,6 +273,8 @@ final class NotesService: ProviderNotesControl {
             }
         }
         if changed { deps.changed() }
+        // The wait is over for good (notes off, or a provider writes them): forget it on disk too.
+        if !waits, let store = deps.library.store { await AwaitingMarker.clear(store) }
         queueArrivals(arrived)
     }
 
@@ -348,6 +381,17 @@ final class NotesService: ProviderNotesControl {
     // MARK: One job
 
     private func process(_ job: Job) async {
+        let epoch = epoch
+        await run(job)
+        // A wait that this job did not end again is not kept on disk. Not after `shutDown`: the board was emptied
+        // on purpose, the wait must survive the restart (#295).
+        guard epoch == self.epoch, !board.snapshot.awaitingModel.contains(job.meetingID),
+            let store = deps.library.store
+        else { return }
+        await AwaitingMarker.clear(store, job.meetingID)
+    }
+
+    private func run(_ job: Job) async {
         let id = job.meetingID
         guard let store = deps.library.store else { return }
         if !job.requested, !deps.settings.notesEnabled { return }
@@ -374,6 +418,7 @@ final class NotesService: ProviderNotesControl {
             }) {
                 deps.changed()
             }
+            if !job.requested { await AwaitingMarker.mark(store, id) }
             if job.requested { deps.openModels(model.id) }
             if !board.snapshot.awaitingModel.isEmpty { watchForModel() }
             return

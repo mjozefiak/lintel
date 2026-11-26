@@ -271,6 +271,74 @@ class EnglishTermErrorTests(unittest.TestCase):
         self.assertIsNone(score.score_recording(result([seg(0, 9000, "ala")]), refs)["termError"])
 
 
+class SpeakerNameMetricTests(unittest.TestCase):
+    TURNS = [turn(0, 10000, "Anna Nowak"), turn(10000, 20000, "Marek Sawicki")]
+    SEGS = [sseg(0, 10000, "a b c d", "Rozmówca 1"), sseg(10000, 20000, "e f g h", "Rozmówca 2")]
+
+    def names(self, *rows):
+        return [{"label": l, "name": n, "source": src, "status": st} for l, n, src, st in rows]
+
+    def test_no_names_means_zero_coverage_and_no_false_name(self):
+        rep = score.speaker_names(self.SEGS, self.TURNS, None)
+        ap = rep["states"]["applied"]
+        self.assertEqual((ap["coverage"], ap["namedWords"]), (0.0, 0))
+        self.assertIsNone(ap["falseName"])
+
+    def test_correct_first_names_count_as_accurate(self):
+        rep = score.speaker_names(self.SEGS, self.TURNS, self.names(
+            ("Rozmówca 1", "Anna", "transcript", "applied"), ("Rozmówca 2", "Marek", "platform", "applied")))
+        ap = rep["states"]["applied"]
+        self.assertEqual((ap["coverage"], ap["accuracy"], ap["falseName"]), (1.0, 1.0, 0.0))
+        self.assertEqual(rep["sources"], {"transcript": 1, "platform": 1})
+
+    def test_wrong_name_is_a_false_name_and_states_are_separate(self):
+        rep = score.speaker_names(self.SEGS, self.TURNS, self.names(
+            ("Rozmówca 1", "Marek", "transcript", "applied"), ("Rozmówca 2", "Marek", "transcript", "suggested")))
+        self.assertEqual(rep["states"]["applied"]["falseName"], 1.0)
+        self.assertEqual(rep["states"]["suggested"]["falseName"], 0.0)
+        self.assertAlmostEqual(rep["states"]["applied"]["coverage"], 0.5)
+
+    def test_confirmed_counts_as_applied_and_generic_names_are_ignored(self):
+        rep = score.speaker_names(self.SEGS, self.TURNS, self.names(
+            ("Rozmówca 1", "Anna", "user", "confirmed"), ("Rozmówca 2", "unknown", "default", "applied")))
+        self.assertEqual(rep["states"]["applied"]["namedWords"], 4)
+
+    def test_role_reference_never_matches_a_person_name(self):
+        turns = [turn(0, 10000, "Project Manager")]
+        rep = score.speaker_names([sseg(0, 10000, "a b", "S0")], turns,
+                                  self.names(("S0", "Anna", "transcript", "applied")))
+        self.assertEqual(rep["states"]["applied"]["falseName"], 1.0)
+
+    def test_none_without_turns_and_in_recording_score(self):
+        self.assertIsNone(score.speaker_names(self.SEGS, [], None))
+        res = result(self.SEGS)
+        res["speakerNames"] = self.names(("Rozmówca 1", "Anna", "transcript", "applied"))
+        refs = {"excerpts": [], "speakerTurns": self.TURNS}
+        out = score.score_recording(res, refs)
+        self.assertEqual(out["speakerNames"]["states"]["applied"]["namedWords"], 4)
+        self.assertNotIn("Anna", score.render_score({"recordings": {"x": out}, "problems": []}))
+        self.assertNotIn("Anna", json.dumps(out, ensure_ascii=False))
+
+    def test_split_cluster_with_the_right_name_is_accurate(self):
+        segs = [sseg(0, 5000, "a b", "Mówca 1"), sseg(5000, 10000, "c d", "Mówca 2"),
+                sseg(10000, 20000, "e f g h", "Mówca 3")]
+        rep = score.speaker_names(segs, self.TURNS, self.names(
+            ("Mówca 1", "Anna", "transcript", "applied"), ("Mówca 2", "Anna", "user", "confirmed")))
+        ap = rep["states"]["applied"]
+        self.assertEqual((ap["namedWords"], ap["accuracy"], ap["falseName"]), (4, 1.0, 0.0))
+
+    def test_diarization_error_inside_a_named_cluster_is_not_a_false_name(self):
+        segs = [sseg(0, 12500, "a b c d e", "Mówca 1"), sseg(12500, 20000, "f g h", "Mówca 2")]
+        rep = score.speaker_names(segs, self.TURNS, self.names(("Mówca 1", "Anna", "transcript", "applied")))
+        self.assertEqual(rep["states"]["applied"]["falseName"], 0.0)
+
+    def test_default_placeholder_is_not_a_name_and_odd_sources_are_not_echoed(self):
+        rep = score.speaker_names(self.SEGS, self.TURNS, self.names(
+            ("Rozmówca 1", "Rozmówca 1", "default", "applied"), ("Rozmówca 2", "Marek", "Marek Sawicki", "applied")))
+        self.assertEqual(rep["states"]["applied"]["namedWords"], 4)
+        self.assertEqual(rep["sources"], {"other": 1})
+
+
 class SpeakerMetricTests(unittest.TestCase):
     TURNS = [turn(0, 10000, "A"), turn(10000, 20000, "B")]
 
