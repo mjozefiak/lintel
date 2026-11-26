@@ -37,6 +37,9 @@ final class DictationController {
     private let deps: Dependencies
     private var gesture: RecordingGesture
     private var session: DictationSession?
+    /// The tidy-up model of THIS dictation, read when its session (and so its formatter) was built: the history says where
+    /// the text went, even when the source is switched while the dictation runs.
+    private var formatterModelAtStart: String?
     private var escapeClaim: EscapeKeyClaim?
     private var finishTask: Task<Void, Never>?
     private let logger = Logger(subsystem: "com.lintelapp", category: "dictation")
@@ -123,6 +126,7 @@ final class DictationController {
             Task { @MainActor in self?.sessionEvent(event) }
         }
         self.session = session
+        formatterModelAtStart = deps.formatterModel()
         var recording = HUDState.Recording()
         recording.escapeCancels = claim.isActive
         recordingState = recording
@@ -253,7 +257,7 @@ final class DictationController {
                 createdAt: deps.wallClock(), durationMs: Int(output.duration * 1000), rawText: raw,
                 formattedText: cleaned || pastedTextDiffers ? output.text : nil,
                 formatMode: mode, formatStatus: status, detectedLanguages: languages,
-                speechModelID: deps.speechModelID(), formatterModel: mode == .clean ? deps.formatterModel() : nil,
+                speechModelID: deps.speechModelID(), formatterModel: mode == .clean ? formatterModelAtStart : nil,
                 targetBundleID: pasted ? target : nil, pasteResult: pasted ? .pasted : .copied))
     }
 

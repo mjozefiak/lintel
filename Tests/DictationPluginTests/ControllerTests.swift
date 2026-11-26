@@ -70,6 +70,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         var mode = FormatMode.raw
         var now = ContinuousClock.now
         var installed = true
+        var formatterModelName: String? = "qwen"
 
         init() throws {
             directory = try TemporaryDirectory()
@@ -121,7 +122,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
                     clock: paste.clock, now: { rig.now },
                     recordHistory: { rig.recorded.append($0) },
                     frontmostBundleID: { "com.example.target" },
-                    formatMode: { rig.mode }, speechModelID: { "fixture" }, formatterModel: { "qwen" }))
+                    formatMode: { rig.mode }, speechModelID: { "fixture" }, formatterModel: { rig.formatterModelName }))
         }
 
         func tearDown() { paste.pasteboard.release() }
@@ -560,6 +561,25 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(entry.formatMode == .clean)
         #expect(entry.formatStatus == .ok)
         #expect(entry.formatterModel == "qwen")
+    }
+
+    @Test func theHistoryNamesTheModelThatWasChosenWhenTheDictationStarted() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.mode = .clean
+        rig.formatterModelName = "cli:claude-code/sonnet"
+        rig.formatter = StubFormatter { chunk, _ in FormatResult(text: "Clean \(chunk)", outcome: .formatted) }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        // The source is switched while the dictation runs: this dictation still went to the provider.
+        rig.formatterModelName = "qwen"
+        controller.menu()
+        await settle(rig)
+
+        await waitUntil { !rig.recorded.isEmpty }
+        let entry = try #require(rig.recorded.first)
+        #expect(entry.formatterModel == "cli:claude-code/sonnet")
     }
 
     @Test func aFailedFormattingIsRecordedAsFailedWithoutAFormattedText() async throws {
