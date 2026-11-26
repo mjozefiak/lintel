@@ -133,7 +133,7 @@ enum NotesQAFixtures {
                 summary: summary,
                 layers: [
                     NoteLayer(
-                        id: "notes", author: .agent, markdown: meetingNotes, version: "1"),
+                        id: "notes", author: .agent, markdown: meetingNotes, version: "1", writer: .claude),
                     NoteLayer(
                         id: "transcript", author: .stt, markdown: transcript, provenance: transcriptProvenance,
                         version: "1"),
@@ -146,7 +146,7 @@ enum NotesQAFixtures {
             return NoteContent(
                 summary: summary,
                 layers: [
-                    NoteLayer(id: "notes", author: .agent, markdown: summaryNotes, version: "1"),
+                    NoteLayer(id: "notes", author: .agent, markdown: summaryNotes, version: "1", writer: .thisMac),
                     NoteLayer(
                         id: "transcript", author: .stt,
                         markdown: segments.map { $0.text }.joined(separator: "\n\n"),

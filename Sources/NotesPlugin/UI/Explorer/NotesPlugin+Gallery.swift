@@ -199,7 +199,7 @@ private struct NotesSidebarGalleryHost: View {
 
 @MainActor enum NotesExplorerGallery {
     private static let listWindow = GalleryPresentation.window(width: 320, height: 620)
-    private static let previewWindow = GalleryPresentation.window(width: 560, height: 560)
+    private static let previewWindow = GalleryPresentation.window(width: 560, height: 500)
 
     private static func state(
         _ id: String, _ summary: String, _ scenario: NotesExplorerGalleryCase,
@@ -228,8 +228,8 @@ private struct NotesSidebarGalleryHost: View {
                     NotesExplorerGalleryCase(collection: .dictations, selected: NotesQAFixtures.dictationID)),
                 state(
                     "search",
-                    "A search in All notes: the matching words are marked in the snippet, one list across the day groups.",
-                    NotesExplorerGalleryCase(query: "onboarding", selected: NotesQAFixtures.meetingID)),
+                    "A search in All notes: the matching word is marked in the snippet of the one note that holds it.",
+                    NotesExplorerGalleryCase(query: "postpone", selected: NotesQAFixtures.meetingID)),
                 state(
                     "search-no-results-meetings",
                     "A search in Meetings that finds nothing: one sentence and Search All Notes.",
@@ -318,12 +318,6 @@ private struct NotesSidebarGalleryHost: View {
                     "unreadable",
                     "The note's plugin did not answer: “Lintel couldn’t read this note. Nothing was deleted.” and Try Again.",
                     NotesExplorerGalleryCase(sources: .none, selected: NotesQAFixtures.meetingID), part: .preview),
-                state(
-                    "gone",
-                    "The note was removed while it was selected: “This note is no longer there.”",
-                    NotesExplorerGalleryCase(
-                        selected: NoteKey(pluginID: "meetings", id: "00000000-0000-0000-0000-0000000000ff")),
-                    part: .preview),
             ])
     }
 

@@ -29,6 +29,48 @@ import Testing
         #expect(offences.isEmpty, "colours come from LintelBrand: \(offences)")
     }
 
+    /// Verdigris (the accent, its text colour and the selection tints) marks only the primary action, the selection
+    /// and live states (spec C19). In the explorer of phase 3a no view has a primary action and the live rings take
+    /// their colour inside `LintelRing`, so every use there must be a selection: a line that chooses by `isSelected`
+    /// or `selected`. The one named exception is the search highlight, which reuses the selection look for the
+    /// matched words (an owner question on #348).
+    private static let verdigris = #"LintelBrand\.(accent|accentText|onAccent|selectionTint|windowSelectionTint)\b"#
+    private static let verdigrisExceptions: [(file: String, line: String)] = [
+        ("NoteRowView.swift", "text[lower..<upper].backgroundColor = LintelBrand.windowSelectionTint"),
+        ("NoteRowView.swift", "text[lower..<upper].foregroundColor = LintelBrand.accentText"),
+    ]
+
+    @Test func verdigrisMarksOnlyTheSelectionInTheExplorer() throws {
+        let files = [
+            "Sources/NotesPlugin/UI/Explorer", "Sources/LintelUI/Components/SidebarRow.swift",
+            "Sources/LintelUI/Components/EmptyStateView.swift", "Sources/LintelApp/Window/MainSidebar.swift",
+        ].flatMap { path -> [URL] in
+            let url = Self.root.appending(path: path)
+            guard url.pathExtension != "swift" else { return [url] }
+            let names = (try? FileManager.default.contentsOfDirectory(atPath: url.path)) ?? []
+            return names.filter { $0.hasSuffix(".swift") }.map { url.appending(path: $0) }
+        }
+        #expect(files.count >= 8)
+        var uses = 0
+        var offences: [String] = []
+        for file in files {
+            let lines = try String(contentsOf: file, encoding: .utf8).components(separatedBy: .newlines)
+            for (index, line) in lines.enumerated() {
+                let code = line.components(separatedBy: "//").first ?? ""
+                guard code.range(of: Self.verdigris, options: .regularExpression) != nil else { continue }
+                uses += 1
+                let trimmed = code.trimmingCharacters(in: .whitespaces)
+                let isSelection = code.contains("isSelected ?") || code.contains("selected ?")
+                let isException = Self.verdigrisExceptions.contains {
+                    $0.file == file.lastPathComponent && trimmed.hasPrefix($0.line)
+                }
+                if !isSelection && !isException { offences.append("\(file.lastPathComponent):\(index + 1)") }
+            }
+        }
+        #expect(uses >= 5)
+        #expect(offences.isEmpty, "Verdigris outside the selection: \(offences)")
+    }
+
     @Test func thePatternCatchesRawColours() {
         for bad in [".foregroundStyle(.red)", "Color.black", "Color(red: 1, green: 0, blue: 0)", "NSColor.white"] {
             #expect(bad.range(of: Self.pattern, options: .regularExpression) != nil, "\(bad)")

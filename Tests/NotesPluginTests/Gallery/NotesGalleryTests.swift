@@ -39,7 +39,7 @@ struct NotesGalleryTests {
         #expect(
             preview == [
                 "meeting-notes", "meeting-transcript", "my-notes", "dictation", "own-note", "writing", "needs-model",
-                "failed-with-retry", "failed-no-retry", "notes-off", "loading", "unreadable", "gone",
+                "failed-with-retry", "failed-no-retry", "notes-off", "loading", "unreadable",
             ])
     }
 
