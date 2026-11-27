@@ -1,5 +1,410 @@
 {
   "files" : {
+    "dictation.hud-pills\/allow-microphone@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "4f4d5b2bedede0f694708dcca291b441df1625984862222090511d2c7a9d0191",
+      "width" : 520
+    },
+    "dictation.hud-pills\/allow-microphone@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "5a95f933ec250bf84d7a710c7f9cfdeb857a4cee9d3d2aa22bbb5cddeb7f1cf7",
+      "width" : 520
+    },
+    "dictation.hud-pills\/allow-microphone@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "027bc5793d09d350d22f86f126a2900fc5091c7479a8c0f7fc7d1303d326e74f",
+      "width" : 614
+    },
+    "dictation.hud-pills\/copied-no-accessibility@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "fb9975eb30391371c99b93c211d7d5f133441ed403b5a10ce81a7c9e83247225",
+      "width" : 498
+    },
+    "dictation.hud-pills\/copied-no-accessibility@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "17880d4f0ff8d25c290dc8dbdd017ac056b65eb7578bc3fb8ace4d12a1a3633a",
+      "width" : 498
+    },
+    "dictation.hud-pills\/copied-no-accessibility@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "dc96edc8b0bd340b147164174ac437b4aa41207efa3950017353da31021daa21",
+      "width" : 578
+    },
+    "dictation.hud-pills\/copied@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "f3a97c3db288777dbcb501aac5cd9790657b4c3364c2c8c844250e418882a393",
+      "width" : 374
+    },
+    "dictation.hud-pills\/copied@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "72f51fad46a02a3eda06f5ec304617b867b9f05cf9a0e8f534c19b555945d88d",
+      "width" : 374
+    },
+    "dictation.hud-pills\/copied@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "8c83b254a335c94daac9c54eba19326d508679cd35ef59ca64195faa7d33b0eb",
+      "width" : 412
+    },
+    "dictation.hud-pills\/finishing@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "ffd0ee564be32ae5a35166f2cdd9d75d3656399eb209c52dcacd3244d3aecece",
+      "width" : 64
+    },
+    "dictation.hud-pills\/finishing@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "67f6a16a807a9af9829b8c25a2b652b2cd4ff32dbd08fd27c6caf56d7b1d21c6",
+      "width" : 64
+    },
+    "dictation.hud-pills\/finishing@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "b1cfb99a80248b470a7c7c2aced9c7cb3e69b435f76467068ae388025f4c1464",
+      "width" : 76
+    },
+    "dictation.hud-pills\/increased-contrast-message@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "d38c1e46ce1fe58c13d8aeef6511651d6238e10beb43bca34fdac7ec80af1b05",
+      "width" : 498
+    },
+    "dictation.hud-pills\/increased-contrast-message@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "fdc091cf86f662c9f713e6ed3e19c9c7a41c3c6f1ca571b8bce301f041ff68d2",
+      "width" : 498
+    },
+    "dictation.hud-pills\/increased-contrast-message@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "99cff0a76ee3ad88df372d605516e47f64a56049ca6622a3196cee94d6ca9a5e",
+      "width" : 578
+    },
+    "dictation.hud-pills\/increased-contrast-recording@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "aced4e6a243aa6e80366406be2b042b5a598321e396833c9ce5203c1f5d44cea",
+      "width" : 176
+    },
+    "dictation.hud-pills\/increased-contrast-recording@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "188b133daec42143514b77b47d31d1fbea735f1d1fb9233e91703b60fb40efbb",
+      "width" : 176
+    },
+    "dictation.hud-pills\/increased-contrast-recording@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "5b4a97bfc41c45ffcba0c4bc40b34f0155c45686e38b548c6b99e7ded34ee84a",
+      "width" : 198
+    },
+    "dictation.hud-pills\/microphone-denied@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "b82d3052cea3166753564692533fcb1b6cf03a467570e47ce40eddd1fb042cd4",
+      "width" : 500
+    },
+    "dictation.hud-pills\/microphone-denied@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "3d989159fa4819a51a2715810d1ef80aaa046f09b3e795d7a219be82193296d0",
+      "width" : 500
+    },
+    "dictation.hud-pills\/microphone-denied@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "df36b2d3482935157edffb1d962699711cab09e8460b7413c7276d0721e4874d",
+      "width" : 644
+    },
+    "dictation.hud-pills\/model-missing@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "e953444e77d1d5c82003c7642f0359b043a71cdc9f024881918a307407555d91",
+      "width" : 488
+    },
+    "dictation.hud-pills\/model-missing@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "47684f55363ec457c4e9201705f6d6ad7ec74c622243b06fafd1860115319d53",
+      "width" : 488
+    },
+    "dictation.hud-pills\/model-missing@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "aa4bb8af1fc52127ac72c130eed7e861068283ac41c257cff403a3770ea50201",
+      "width" : 538
+    },
+    "dictation.hud-pills\/model-unavailable@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "7b9e3867e8a2a8f81592d1b64659978b904046e91ccaef1af145f487ba4ec69f",
+      "width" : 528
+    },
+    "dictation.hud-pills\/model-unavailable@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "b40e9ccef155d9ab1bbc7099ee8843b4811599cc7e5269f76170f99caf222605",
+      "width" : 528
+    },
+    "dictation.hud-pills\/model-unavailable@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "93583be1f48d18e30fb7d16b57d142b71237f32e6b308dd1dacd6859ffdfd0be",
+      "width" : 590
+    },
+    "dictation.hud-pills\/no-microphone@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "35c2a3081f1bbf4b3a07bc34e5f2461435b9331f7f3de36420bb0d6ae0328525",
+      "width" : 360
+    },
+    "dictation.hud-pills\/no-microphone@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "91fa0d5e008027e58548d6eff99b776e2a10e97a153a67efe215909e78af6047",
+      "width" : 360
+    },
+    "dictation.hud-pills\/no-microphone@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "eee2d67b601a8d88bacf9dbd3683c1c885e0f57d7bebe8d359b2d020f343a719",
+      "width" : 454
+    },
+    "dictation.hud-pills\/nothing-heard@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "5541ce2e7afaeb509868f5053b0267d584df34128bbdb8036c4fb0fbdd99b54b",
+      "width" : 270
+    },
+    "dictation.hud-pills\/nothing-heard@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "440b6f1265d0afdecbf8b502d204e4755bc66b58e3241fbb83272e1348b1580b",
+      "width" : 270
+    },
+    "dictation.hud-pills\/nothing-heard@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "0fbce18f53055a7ea0b008806acfabf890e4e944fce62c5c5ba7e29535683023",
+      "width" : 344
+    },
+    "dictation.hud-pills\/nothing-to-paste@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "12061b0e1cbfe186f7bf17fe03dc4254ee2453c9c72d65e2180a059f91460a12",
+      "width" : 344
+    },
+    "dictation.hud-pills\/nothing-to-paste@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "495e8282eafb827195cc8f5df8e22fc6eed284c11229c0649799c4f173ce56b5",
+      "width" : 344
+    },
+    "dictation.hud-pills\/nothing-to-paste@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "7b465a40261ab80db17bdcff986a073dcca28872803fedc1b0df3fe23391be2d",
+      "width" : 540
+    },
+    "dictation.hud-pills\/pasted-unformatted@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "4a9fc5616b75013d24db5d926a25f0091443c6fb1893b2ea122205a2e62f56a7",
+      "width" : 384
+    },
+    "dictation.hud-pills\/pasted-unformatted@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "728d44be599bfb47c0e95ba57af7e3d895eec12ba08893137ceaf6e5568545b7",
+      "width" : 384
+    },
+    "dictation.hud-pills\/pasted-unformatted@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "60ef083bdf319699d8c147c9b399914de73ca4cfa96edf7b7045ba83cbc1a17d",
+      "width" : 434
+    },
+    "dictation.hud-pills\/pasted@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "1f7c284db55994f72198a62337eb19fda6d74f1065da15b82d5effdd51ad5138",
+      "width" : 76
+    },
+    "dictation.hud-pills\/pasted@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "fc94e2ad91a97db6444c02c3bfa5f16f322a7c0f460dec7fe18d58f651b25b57",
+      "width" : 76
+    },
+    "dictation.hud-pills\/pasted@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "d05d607ce33b5d6ba8093c052b87b02e0828867f3b8e31c031bf8fd2feb6089e",
+      "width" : 82
+    },
+    "dictation.hud-pills\/recording-countdown@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "24c16a7ad35655713aad37c85402c83880bacd451613b7a5f69d2914a90a8edf",
+      "width" : 210
+    },
+    "dictation.hud-pills\/recording-countdown@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "2ece6213c58960b1c4b2831ad5986914e9d2b6d4f56429ca89fcfb2f6d8f5048",
+      "width" : 210
+    },
+    "dictation.hud-pills\/recording-countdown@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "792e8b62d956aad03b11f903181573482e4953a7342245e9141ee127f6e490de",
+      "width" : 234
+    },
+    "dictation.hud-pills\/recording-escape-unclaimed@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "11ddcef8b896d323659ec92aa526f4521f7cb587e6e89a08b8ba0ae72e48b7ed",
+      "width" : 240
+    },
+    "dictation.hud-pills\/recording-escape-unclaimed@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "e760094fe06b5855c681cd3ada3179a1f9a5af1506cc3071fc7e1e3e7f624e2e",
+      "width" : 240
+    },
+    "dictation.hud-pills\/recording-escape-unclaimed@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "22f5fab4937e3d18a37383dda9987298d72b1c6602f7162c349e89860ca7df9c",
+      "width" : 270
+    },
+    "dictation.hud-pills\/recording-hover@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "0da8dab079bd7790c076e3e3974ab1cab325fc9059b1bf632b1fac5ba8138de3",
+      "width" : 314
+    },
+    "dictation.hud-pills\/recording-hover@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "a0f4361897505fcbb5f5f72da5121fe769e75e8c28bede6252f3b16f0faa7825",
+      "width" : 314
+    },
+    "dictation.hud-pills\/recording-hover@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "55c0119f55f8e6438b6abd5814f59125da3cc0d7ae7ed487deb521047db16f0d",
+      "width" : 352
+    },
+    "dictation.hud-pills\/recording-loading-model@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "83f6d99a173f9364fc5018970c2898e64e876834454d867f2ed68b658178d02c",
+      "width" : 176
+    },
+    "dictation.hud-pills\/recording-loading-model@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "a019f1f5073742dccde2f7f54b47bdb934824f975d44351297b68cb69fc1fd37",
+      "width" : 176
+    },
+    "dictation.hud-pills\/recording-loading-model@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "1a4cec8ea5ae0d1f4ae9f770c4e0e8c58a8621d3a30147ad2776c38bd6f287fd",
+      "width" : 198
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-collapsed@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "db3c21cbb8b6bf5263ed507be465f938746e9922286d7ba026f8229f69e0e254",
+      "width" : 176
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-collapsed@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "09246fd2d7c8c87b117e8bcc419e0593aa9062a7f6e3bfd9cdb5af78285b6972",
+      "width" : 176
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-collapsed@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "234722396ac8807b0cea9948334e24bdb36081b459bee5d88211e261e598070b",
+      "width" : 198
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-hover@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "5e98011fb4d867cd0eda48ee5cde32fecb2d2bbf88e6ba2c5fd30e16ef61b335",
+      "width" : 732
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-hover@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "7dec727e57e68dfcd36dae23904035ecbbcbc17ec24f9ca79a07ac62e517a808",
+      "width" : 732
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-hover@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "fe5ea4d68c6e3f4466252c68e7301c4965496493d515492cd3ddc28d48285abd",
+      "width" : 878
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-long-name@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "870d4db1066d3d65046256aa2449964dde19218d876c65ef4b095304cbcc72fe",
+      "width" : 750
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-long-name@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "dfda4e8fec0051595ad35712f46a9692e9265fc4fff56676f6d68c934dc6b008",
+      "width" : 750
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-long-name@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "52b6c6e3b95dc0656749a6875cca22ccb3531e7b1be3e11dd6f43e23535203e1",
+      "width" : 894
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-unnamed@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "678381a4afd265f68e20c4be7c960e67952feac71dfb724cb4b3fde77d436ee9",
+      "width" : 456
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-unnamed@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "e7ee15c59cb159c8b0773dd736f26bca83b2a9de0e5d47766014c30eb3ef07c2",
+      "width" : 456
+    },
+    "dictation.hud-pills\/recording-microphone-fallback-unnamed@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "019623c9030d75972ab6eb6d36ac8f41e981547ede5cb4fec721079cde075a74",
+      "width" : 484
+    },
+    "dictation.hud-pills\/recording-microphone-fallback@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "e82b756cfcde46745cdf14c116994e8a213c5fdb3fb11796969ffd598cc24ebf",
+      "width" : 590
+    },
+    "dictation.hud-pills\/recording-microphone-fallback@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "365dbe60c37922b0320fde3762fefc8c42b69adce613dc6df88a6c549d2b66fc",
+      "width" : 590
+    },
+    "dictation.hud-pills\/recording-microphone-fallback@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "0c06e7b34219f0b0e3e048a60283919c90a41df5e637feebc7c5a6c0e771a0e3",
+      "width" : 716
+    },
+    "dictation.hud-pills\/recording@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "83f6d99a173f9364fc5018970c2898e64e876834454d867f2ed68b658178d02c",
+      "width" : 176
+    },
+    "dictation.hud-pills\/recording@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "a019f1f5073742dccde2f7f54b47bdb934824f975d44351297b68cb69fc1fd37",
+      "width" : 176
+    },
+    "dictation.hud-pills\/recording@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "1a4cec8ea5ae0d1f4ae9f770c4e0e8c58a8621d3a30147ad2776c38bd6f287fd",
+      "width" : 198
+    },
+    "dictation.hud-pills\/reduced-motion-finishing@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "a5f98e3249a25b3b26d229d7b4b6b0faad1cd55d4b5c06048de7a23858735066",
+      "width" : 64
+    },
+    "dictation.hud-pills\/reduced-motion-finishing@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "d98c5417ccd5dc2ddd2d12e4ced345991a49df487f5c3cd1bcc4acab9c350b2f",
+      "width" : 64
+    },
+    "dictation.hud-pills\/reduced-motion-finishing@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "4b2afb5f8af40ac86ae7468312ac1bbb324963093634042f9a22bac848df7784",
+      "width" : 76
+    },
+    "dictation.hud-pills\/reduced-motion-recording@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "b0dc93c592cffe8e31c7f1011b43bc753497c6b7bf1f12d66b590cf7e991a163",
+      "width" : 176
+    },
+    "dictation.hud-pills\/reduced-motion-recording@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "d4bb5883223ba431161d1919948055536d22e716c51ca2559a327ea2c7329e4c",
+      "width" : 176
+    },
+    "dictation.hud-pills\/reduced-motion-recording@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "78ebae338dc6f476ba6180b90c986b8d04f8478780a9a9e2137d0b502c7f6b75",
+      "width" : 198
+    },
+    "dictation.hud-pills\/speech-model-busy@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "3acbc78fabe3dc86112319fec7d76ee42e40e892f4c8e0c33f66abe50787f55f",
+      "width" : 520
+    },
+    "dictation.hud-pills\/speech-model-busy@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "be6a843a288a04c7333e70d0e11f045e8d188adec38b144013e51cf141255282",
+      "width" : 520
+    },
+    "dictation.hud-pills\/speech-model-busy@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "4d0e3dfb9cd7d74b6ed15bb03bab78d397952ea34d0efbf7f1b79de7516aac10",
+      "width" : 536
+    },
     "dictation.tidy-up\/full-small-model@dark-m-en.png" : {
       "height" : 320,
       "sha256" : "84e3c606b3cdee533193959ad8a7051ce84fb2858b03d72b2429cd1cadcac996",
@@ -997,7 +1402,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45965295955",
+  "recordRun" : "45981011703",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
