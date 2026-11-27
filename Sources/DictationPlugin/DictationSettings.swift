@@ -47,7 +47,7 @@ struct DictationSettings: Sendable {
         /// Today's cleanup by a language model (`CleanupPrompt`).
         case standard
         /// Standard plus email layout, paragraphs for a longer dictation and a smoothed style (spec phase 2, owner
-        /// decision 2026-11-26). Offered only while `DictationSettings.fullIsOffered` is on.
+        /// decision 2026-11-26). Offered since 2026-11-27 (owner decision): `DictationSettings.fullIsOffered` gates it.
         case full
 
         /// Whether a language model does the work at this level.
@@ -66,23 +66,20 @@ struct DictationSettings: Sendable {
     static let defaultKeepWarmMinutes = 10
 
     /// Whether Full is offered and runs. Spec phase 2: Full ships only when every measured target passes; with this off
-    /// a stored `full` (a newer build wrote it) shows and runs as Standard and the popup has no Full. **Off after the
-    /// third round too (2026-11-26, Full prompt v3): v3 holds self-corrections above Standard's (6 of 7 items against
-    /// 5), no invented greeting, sign-off or lost number, chat WER equal to Standard's and fewer lost content words than
-    /// Standard on the owner's corpus (see the spec's Phase 2b result), but the owner has not decided to offer it. A
-    /// DEBUG build turns it on for QA with `plugins.dictation.qaOfferFull=true`.
-    static let fullIsOffered = false
+    /// a stored `full` (a build that offers Full wrote it) shows and runs as Standard and the popup has no Full.
+    /// **On since 2026-11-27 (owner decision after the Phase 2b measurement):** Full prompt v3 meets every Full target on
+    /// the owner's corpus (self-corrections 6 of 7 against Standard's 5, no invented greeting, sign-off or lost number,
+    /// chat WER equal to Standard's, fewer lost content words), so the popup offers Full and a stored `full` runs as Full.
+    /// The flag stays the one place that would hide it again, and `DictationSettings(_:offersFull:)` is the same seam
+    /// for tests.
+    static let fullIsOffered = true
 
     private let settings: PluginSettings
     let offersFull: Bool
 
     init(_ settings: PluginSettings, offersFull: Bool = DictationSettings.fullIsOffered) {
         self.settings = settings
-        #if DEBUG
-        self.offersFull = offersFull || settings.bool("qaOfferFull", default: false)
-        #else
         self.offersFull = offersFull
-        #endif
     }
 
     var speechModelID: String { settings.string(Key.speechModel) ?? Self.defaultSpeechModel }
@@ -119,8 +116,8 @@ struct DictationSettings: Sendable {
         settings.string(Key.cleanupLevel).flatMap(CleanupLevel.init(rawValue:)) ?? .standard
     }
 
-    /// The level that runs now: `nil` while the cleanup is off. A stored `full` runs as Standard while Full is not
-    /// offered.
+    /// The level that runs now: `nil` while the cleanup is off. A stored `full` runs as Full while Full is offered (the
+    /// shipped build since 2026-11-27) and as Standard while it is not.
     var effectiveLevel: CleanupLevel? {
         guard mode == .cleanup else { return nil }
         switch cleanupLevel {

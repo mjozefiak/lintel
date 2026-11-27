@@ -96,12 +96,12 @@ enum TidyUpText {
     }
 }
 
-/// The "Tidy up my text" row: the popup (Off, Light, Standard), its help line and the example of the chosen value.
-/// Used by the Dictation pane and drawn alone by the gallery.
+/// The "Tidy up my text" row: the popup (Off, Light, Standard and Full), its help line and the example of the chosen
+/// value. Used by the Dictation pane and drawn alone by the gallery.
 struct TidyUpRow: View {
     @Binding var choice: FormattingSettingsModel.TidyChoice
-    /// The values the popup lists. The default is the offered ones, so a caller that passes nothing never shows Full
-    /// while `DictationSettings.fullIsOffered` is off; the pane passes the model's own list and the gallery all of them.
+    /// The values the popup lists. The default follows `DictationSettings.fullIsOffered`, so a caller that passes nothing
+    /// lists Full exactly while it is offered; the pane passes the model's own list and the gallery all of them.
     var choices: [FormattingSettingsModel.TidyChoice] = FormattingSettingsModel.TidyChoice.listed(
         offeringFull: DictationSettings.fullIsOffered)
     /// Whether the line "Works best with the Recommended assistant." shows (Full on the smallest built-in model).

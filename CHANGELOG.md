@@ -8,9 +8,7 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ### Added
 
-- Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
-
-- Dictation: a **Full** level of Tidy up my text (email layout, paragraphs for a long dictation, smoother style) is built and tested but not offered yet (its instructions keep corrections at least at Standard's level, lay out a greeting and sign-off whenever you say them, keep a number the way you said it and never guess a word they do not know; on the measured set it meets every quality target); it appears in the popup when it passes its quality checks.
+- Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light, Standard and Full. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off. Full (needs a model, like Standard) lays out a message the way you said it — a spoken greeting and sign-off on their own lines — splits a long dictation into paragraphs and smooths the style; it keeps your corrections at least at Standard's level, writes a number the way you said it (a clock time with minutes is the one exception, "15:45"), never guesses a word it does not know and never adds or removes content. With the smallest built-in model the pane suggests the Recommended assistant for it. On the measured set Full meets every quality target.
 
 - Dictation: a check that a name or a vocabulary word survives the cleanup is built and tested but off; in the measurement it added more fallback than its limit, so nothing changes yet.
 

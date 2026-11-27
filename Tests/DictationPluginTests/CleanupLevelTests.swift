@@ -12,7 +12,7 @@ import os
 @MainActor
 @Suite struct CleanupLevelSettingsTests {
     private func settings(
-        _ values: [String: SettingValue] = [:], offersFull: Bool = false
+        _ values: [String: SettingValue] = [:], offersFull: Bool = DictationSettings.fullIsOffered
     ) -> (DictationSettings, MemorySettingsStore) {
         let store = MemorySettingsStore(values)
         return (
@@ -41,16 +41,26 @@ import os
         #expect(store.value(forKey: "plugins.dictation.cleanupLevel") == nil)
     }
 
-    @Test func lightNeedsNoModelAndAStoredFullRunsAsStandardWhileFullIsNotOffered() {
+    @Test func lightNeedsNoModelAndAStoredFullRunsAsFull() {
         let (light, _) = settings([
             "plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("light"),
         ])
         #expect(light.effectiveLevel == .light)
         #expect(!light.usesModel)
-        // A newer build wrote `full`; while Full is not offered this one runs it as Standard.
+        // The shipped build offers Full, so a stored `full` runs as Full and needs a model.
         let (full, _) = settings([
             "plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("full"),
         ])
+        #expect(full.cleanupLevel == .full)
+        #expect(full.effectiveLevel == .full)
+        #expect(full.usesModel)
+    }
+
+    /// The seam a later "hide Full again" decision would use: with `offersFull` off a stored `full` runs as Standard.
+    @Test func aBuildThatDoesNotOfferFullRunsAStoredFullAsStandard() {
+        let (full, _) = settings(
+            ["plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("full")],
+            offersFull: false)
         #expect(full.cleanupLevel == .full)
         #expect(full.effectiveLevel == .standard)
     }
@@ -66,22 +76,11 @@ import os
         #expect(off.effectiveLevel == nil)
     }
 
-    @Test func fullIsNotOfferedUntilItsTargetsPass() {
-        // The first measurement (2026-11-26) missed the self-correction target, so the shipped flag is off.
-        #expect(!DictationSettings.fullIsOffered)
-        #expect(!DictationSettings(PluginSettings(pluginID: "dictation", store: MemorySettingsStore())).offersFull)
-    }
-
-    @Test func aDebugBuildCanOfferFullForQA() {
-        #if DEBUG
-        let store = MemorySettingsStore([
-            "plugins.dictation.qaOfferFull": .bool(true), "plugins.dictation.mode": .string("cleanup"),
-            "plugins.dictation.cleanupLevel": .string("full"),
-        ])
-        let qa = DictationSettings(PluginSettings(pluginID: "dictation", store: store))
-        #expect(qa.offersFull)
-        #expect(qa.effectiveLevel == .full)
-        #endif
+    @Test func fullIsOfferedInTheShippedBuild() {
+        // Owner decision 2026-11-27: Full prompt v3 meets every Full target on the owner's corpus, so the flag is on
+        // and a settings value built without an override offers Full.
+        #expect(DictationSettings.fullIsOffered)
+        #expect(DictationSettings(PluginSettings(pluginID: "dictation", store: MemorySettingsStore())).offersFull)
     }
 
     @Test func aBuildWithoutLevelsReadsOnlyTheModeKey() {
@@ -96,7 +95,7 @@ import os
     // MARK: The popup
 
     private func model(
-        _ store: MemorySettingsStore, offersFull: Bool = false
+        _ store: MemorySettingsStore, offersFull: Bool = DictationSettings.fullIsOffered
     ) -> (FormattingSettingsModel, DictationSettings) {
         let settings = DictationSettings(PluginSettings(pluginID: "dictation", store: store), offersFull: offersFull)
         return (
@@ -105,7 +104,7 @@ import os
         )
     }
 
-    @Test func thePopupShowsTheStoredLevelAndAStoredFullAsStandard() {
+    @Test func thePopupShowsTheStoredLevelAndAStoredFullAsFull() {
         #expect(model(MemorySettingsStore()).0.choice == .off)
         #expect(model(MemorySettingsStore(["plugins.dictation.mode": .string("cleanup")])).0.choice == .standard)
         let light = MemorySettingsStore([
@@ -115,18 +114,18 @@ import os
         let full = MemorySettingsStore([
             "plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("full"),
         ])
-        #expect(model(full).0.choice == .standard)
-        #expect(model(full, offersFull: true).0.choice == .full)
+        #expect(model(full).0.choice == .full)
+        #expect(model(full, offersFull: false).0.choice == .standard)
     }
 
-    @Test func fullIsInThePopupOnlyWhileItIsOffered() {
-        #expect(model(MemorySettingsStore()).0.choices == [.off, .light, .standard])
-        #expect(model(MemorySettingsStore(), offersFull: true).0.choices == [.off, .light, .standard, .full])
+    @Test func fullIsInThePopupWhileItIsOffered() {
+        #expect(model(MemorySettingsStore()).0.choices == [.off, .light, .standard, .full])
+        #expect(model(MemorySettingsStore(), offersFull: false).0.choices == [.off, .light, .standard])
     }
 
-    /// The row's own default (a caller that passes no list, like a new settings pane) must not show Full while it is not
-    /// offered; the pane passes the model's list and the gallery lists every value on purpose.
-    @Test func theRowsDefaultListHasNoFullWhileFullIsNotOffered() {
+    /// The row's own default (a caller that passes no list, like a new settings pane) follows the offered flag, so it
+    /// lists Full now; the pane passes the model's list and the gallery lists every value on purpose.
+    @Test func theRowsDefaultListFollowsTheOfferedFlag() {
         let row = TidyUpRow(choice: .constant(.standard))
         #expect(row.choices.contains(.full) == DictationSettings.fullIsOffered)
         #expect(row.choices == FormattingSettingsModel.TidyChoice.listed(offeringFull: DictationSettings.fullIsOffered))

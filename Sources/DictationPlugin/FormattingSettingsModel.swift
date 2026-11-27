@@ -13,8 +13,8 @@ final class FormattingSettingsModel {
         case result(original: String, text: String, cleaned: Bool)
     }
 
-    /// The values of the popup. A stored `full` is shown, and runs, as Standard while Full is not offered
-    /// (`DictationSettings.offersFull`).
+    /// The values of the popup. A stored `full` is shown, and runs, as Full while Full is offered (since 2026-11-27) and
+    /// as Standard while it is not (`DictationSettings.offersFull`).
     enum TidyChoice: String, CaseIterable, Sendable {
         case off, light, standard, full
 
@@ -28,7 +28,7 @@ final class FormattingSettingsModel {
         }
 
         /// The values a popup lists: all of them, Full only when it is offered. The one place that says so, so a view
-        /// built without a model (the row's own default) cannot show Full while it is not offered.
+        /// built without a model (the row's own default) follows the flag.
         static func listed(offeringFull: Bool) -> [TidyChoice] {
             allCases.filter { $0 != .full || offeringFull }
         }
@@ -50,7 +50,7 @@ final class FormattingSettingsModel {
     static let sample = "yyy no więc jutro mamy spotkanie o dziesiątej nie to znaczy o jedenastej w biurze"
 
     /// "Tidy up my text": one popup over two keys. Off is `mode = raw` (the stored level stays, so turning it back on
-    /// returns to it); Light and Standard are `mode = cleanup` plus `cleanupLevel`.
+    /// returns to it); Light, Standard and Full are `mode = cleanup` plus `cleanupLevel`.
     var choice: TidyChoice {
         didSet {
             guard choice != oldValue else { return }

@@ -345,7 +345,8 @@ pasting into another app cannot be faked. Check the HUD, the Settings pane and t
 
 ### Dictation formatting (Phase 2)
 
-Cleanup levels (spec `2026-11-25-dictation-cleanup-levels`, Phases 1 and 2; **Full is not offered in the shipped build**, so every Full step below also needs `--qa-setting plugins.dictation.qaOfferFull=true`, a DEBUG-only key that is not a contract): Settings → Dictation → Basics → "Tidy up my
+Cleanup levels (spec `2026-11-25-dictation-cleanup-levels`, Phases 1 and 2; **Full has been offered in the shipped
+build since 2026-11-27**, owner decision): Settings → Dictation → Basics → "Tidy up my
 text" is Off, Light, Standard or Full. Screenshots of the pane at each value, light and dark, English and
 Polish, need no model and no server: `--qa --qa-window settings --qa-settings dictation` with
 `--qa-setting plugins.dictation.mode=raw` (Off), `--qa-setting plugins.dictation.mode=cleanup
