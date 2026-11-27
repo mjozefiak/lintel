@@ -7238,7 +7238,7 @@
       }
     },
     "Download" : {
-      "comment" : "Models pane: downloads a model",
+      "comment" : "HUD pill: the missing-model pill's button; Models pane: downloads a model",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

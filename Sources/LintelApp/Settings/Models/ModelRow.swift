@@ -190,7 +190,7 @@ struct ModelRowButtons: View {
                         comment: "Models pane: downloads a model again after an error")))
         } else {
             label(
-                Text("Download", comment: "Models pane: downloads a model"),
+                Text("Download", comment: "HUD pill: the missing-model pill's button; Models pane: downloads a model"),
                 systemImage: ModelRowButtons.downloadSymbol)
         }
     }

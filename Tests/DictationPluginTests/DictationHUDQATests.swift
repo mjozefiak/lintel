@@ -35,6 +35,14 @@ import Testing
         #expect(DictationHUDQA.hoverSettingName == "qaHUDHover")
     }
 
+    /// `qa dictation play` writes what the HUD showed to `<prefix>.json`: a state without a pill (OD-4) says so
+    /// explicitly instead of leaving an empty `hud`.
+    @Test func theQAResultSaysNoneForTheStateWithoutAPill() {
+        #expect(HUDState.pastedUnformatted(all: false).qaHUDText == "none")
+        #expect(HUDState.pasted.qaHUDText == "Pasted")
+        #expect(HUDState.recording(.init()).qaHUDText == "Dictation, recording, 0:00. Esc cancels.")
+    }
+
     @Test func theMicrophoneAndEscapeFixturesHaveTheirOwnStates() throws {
         guard case .recording(let unclaimed)? = DictationHUDQA.state(named: "recording-escape-unclaimed") else {
             Issue.record("no recording")

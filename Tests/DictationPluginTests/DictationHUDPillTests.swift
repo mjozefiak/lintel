@@ -366,6 +366,14 @@ import Testing
         #expect(DictationHUDView.panelSize == PillMetrics.panelSize)
     }
 
+    /// OD-4: a partial cleanup shows no pill, so `show` must not build the empty transparent panel and leave it over
+    /// the screen for 3 s.
+    @Test func theOneStateWithoutAPillNeverBuildsThePanel() {
+        let panel = DictationHUDPanel(onCancel: {}, onOpenSettings: {}, reducesMotion: { false })
+        panel.show(.pastedUnformatted(all: false))
+        #expect(!panel.hasPanel)
+    }
+
     @Test func thePillSitsFortyEightPointsAboveTheVisibleFrame() {
         let visible = CGRect(x: 100, y: 40, width: 1440, height: 800)
         for size in TextSize.allCases {

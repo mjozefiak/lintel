@@ -6,6 +6,14 @@ import LintelUI
 import SwiftUI
 import os
 
+/// The System Settings deep link the HUD and the Settings pane both open. It lives here, once, so the two cannot
+/// drift apart.
+enum DictationLinks {
+    /// The Accessibility pane: the grant a paste keystroke needs (the HUD's "Allow" on a copied text).
+    static let accessibility = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+}
+
 /// Voice dictation (spec: Dyktowanie głosowe): records under a global shortcut, transcribes with a speech
 /// model that runs inside Lintel, and pastes the text into the app in front. Audio never leaves the Mac
 /// and is never written to disk.
@@ -167,9 +175,7 @@ public final class DictationPlugin: LintelPlugin {
             onCancel: { relay.controller?.cancel() }, onOpenSettings: { openSettings() },
             onOpenModels: { openModels(settings.speechModelID) },
             onOpenAccessibility: {
-                if let url = URL(
-                    string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-                {
+                if let url = DictationLinks.accessibility {
                     Task { try? await workspace.open(url) }
                 }
             })

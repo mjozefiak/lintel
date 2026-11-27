@@ -67,6 +67,12 @@ struct DictationQAAuthorizer: MicrophoneAuthorizer {
     func requestAccess() async -> Bool { isGranted ? true : await base.requestAccess() }
 }
 
+extension HUDState {
+    /// What the result JSON's `hud` field says the HUD showed: its VoiceOver text, or `"none"` for the one state
+    /// that shows nothing at all (OD-4, a partial cleanup), so a missing pill is never an empty string in the file.
+    var qaHUDText: String { pill() == nil ? "none" : accessibilityLabel() }
+}
+
 /// Forwards to the real HUD and remembers the last state, and the dictation the history was handed.
 @MainActor
 final class DictationQARecorder: HUDPresenter {
@@ -199,7 +205,7 @@ extension DictationPlugin: PluginQACommands {
             let promptVersion: Int
         }
         let result = Result(
-            file: wav.lastPathComponent, raw: raw, text: text, hud: state.accessibilityLabel(),
+            file: wav.lastPathComponent, raw: raw, text: text, hud: state.qaHUDText,
             promptVersion: promptVersion)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

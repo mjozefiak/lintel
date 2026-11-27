@@ -141,7 +141,9 @@ extension HUDState {
                 String(localized: "No speech model", comment: "HUD pill: no speech model is installed"),
                 PillAction(
                     id: HUDPillAction.openModels,
-                    title: String(localized: "Download", comment: "Models pane: downloads a model"))
+                    title: String(
+                        localized: "Download",
+                        comment: "HUD pill: the missing-model pill's button; Models pane: downloads a model"))
             )
         case .modelUnavailable, .modelFailedToLoad:
             return (

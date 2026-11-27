@@ -187,6 +187,10 @@ final class DictationHUDPanel: HUDPresenter {
         panel?.orderOut(nil)
     }
 
+    /// Whether the window was built. It is built lazily on the first state that has a pill and never for a state
+    /// without one (a partial cleanup, OD-4), so a test can check that the second never shows an empty panel.
+    var hasPanel: Bool { panel != nil }
+
     private func makePanel() -> NSPanel {
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: DictationHUDView.panelSize),
