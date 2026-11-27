@@ -120,7 +120,8 @@ final class FormattingSettingsModel {
     @ObservationIgnored private let llmModels: ModelManager?
     @ObservationIgnored private let runtime: KeepWarmRuntime?
     @ObservationIgnored private var tryTask: Task<Void, Never>?
-    /// The two content-free probes of the provider (`ProviderRunner.report`); `nil` leaves the provider out of the menu.
+    /// The two content-free probes of the provider (`ProviderRunner.report`); `nil` hides the provider (no menu entry,
+    /// no rows).
     @ObservationIgnored private let providerStatus: (@Sendable (ProviderID) async -> ProviderStatusReport)?
     @ObservationIgnored private var lastProviderProbe: Date?
     @ObservationIgnored private let now: @Sendable () -> Date
@@ -196,9 +197,11 @@ final class FormattingSettingsModel {
         return nil
     }
 
-    /// D14: the provider is in the menu only while it works (or is already the chosen source, so the row never lies about
-    /// the stored choice); "Add a provider…" is always there, for the one that does not.
-    var providerIsListed: Bool { offersProvider && (providerReadiness == .ready || isProvider) }
+    /// The provider is always in the source menu: the descriptor names it, and listing it starts nothing. Its own row,
+    /// shown once it is chosen, says whether the CLI works (owner decision 2026-11-27: this replaces the providers
+    /// spec's D14 for dictation, where Claude was listed only when a check said it works); "Add a provider…" stays, for
+    /// a provider this build does not know.
+    var providerIsListed: Bool { offersProvider }
 
     /// "Try it" needs a target the user's own text can reach on this Mac: not the provider (it is a deliberate send, and
     /// the sample sentence is not worth it).
@@ -229,19 +232,29 @@ final class FormattingSettingsModel {
     func refresh() async {
         guard usesModel else { return }
         await refreshBuiltIn()
-        // The provider's state is read while the source row is shown, so Claude is in the menu only when it works
-        // (a probe carries no dictated text).
-        await refreshProvider()
-        guard !isBuiltIn, !isProvider else { return }
-        isProbing = true
-        endpoints = await probe.discover(custom: settings.llmEndpoint)
-        isProbing = false
-        // Nothing chosen yet: take the first server that has a model.
-        if settings.llmTarget == nil, let first = endpoints.first(where: { !$0.models.isEmpty }) {
-            chooseEndpoint(first.baseURL)
-        } else if let model = selectedModel, !models.isEmpty, !models.contains(model) {
-            chooseModel(models.first)
+        // The provider is in the menu from its descriptor alone; its CLI (a process) is looked at only after the user
+        // chose it, and in a task of its own, so the servers and their models show without waiting for it (a probe
+        // carries no dictated text).
+        let providerProbe = startProviderProbe()
+        if !isBuiltIn, !isProvider {
+            isProbing = true
+            endpoints = await probe.discover(custom: settings.llmEndpoint)
+            isProbing = false
+            // Nothing chosen yet: take the first server that has a model.
+            if settings.llmTarget == nil, let first = endpoints.first(where: { !$0.models.isEmpty }) {
+                chooseEndpoint(first.baseURL)
+            } else if let model = selectedModel, !models.isEmpty, !models.contains(model) {
+                chooseModel(models.first)
+            }
         }
+        await providerProbe?.value
+    }
+
+    /// Starts the provider's status probe when the provider is the chosen source (choosing it in the menu is the
+    /// consent) and the level runs a model; without that choice nothing starts.
+    private func startProviderProbe() -> Task<Void, Never>? {
+        guard usesModel, isProvider else { return nil }
+        return Task { await refreshProvider() }
     }
 
     func refreshBuiltIn() async {
@@ -250,11 +263,12 @@ final class FormattingSettingsModel {
         onBuiltInLocation?(builtInLocation)
     }
 
-    /// Looks whether the provider's CLI is installed, signed in and of a known version. Runs only while the pane is shown
-    /// at a level that uses a model (`refresh()`), never for a plugin that is off, and not again within
-    /// `providerProbeInterval` while it works.
+    /// Looks whether the provider's CLI is installed, signed in and of a known version. Runs only while the provider is
+    /// the chosen source at a level that uses a model (`refresh()`, and "Check Again"), never for a plugin that is off or
+    /// before the user chose a provider, only one at a time, and not again within `providerProbeInterval` while it works.
     func refreshProvider(force: Bool = false) async {
-        guard usesModel, let providerStatus, let descriptor = Self.descriptor else { return }
+        guard usesModel, isProvider, let providerStatus, let descriptor = Self.descriptor else { return }
+        if !force, providerCheck == .checking { return }
         if !force, providerReadiness == .ready, let last = lastProviderProbe,
             now().timeIntervalSince(last) < Self.providerProbeInterval
         {

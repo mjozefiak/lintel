@@ -148,7 +148,7 @@ private struct TidySourceGalleryPane: View {
             ) { model(level: "standard", source: "builtIn", check: .known(.ready)) },
             state(
                 "my-server-no-provider",
-                "My server at Standard, no provider ready: the menu has “Add a provider…” disabled and no Claude."
+                "My server at Standard: the menu lists This Mac, My server and Claude, and “Add a provider…” is disabled."
             ) { model(level: "standard", source: "server", server: true, check: .known(.notInstalled)) },
             state(
                 "claude-standard",

@@ -159,7 +159,7 @@ Rows that follow the popup:
 Shown only for Standard and Full. Until #253 lands it is today's "Run on" popup, renamed; after #253 it is the More options row. Values:
 - **This Mac** / **Na tym Macu**
 - **My server** / **Mój serwer**
-- **Claude** / **Claude**: the provider's display name. It is listed only when the provider is ready, per the providers spec D14. Otherwise the list shows "Add a provider…" / „Dodaj dostawcę…”.
+- **Claude** / **Claude**: the provider's display name. It is always listed (owner decision 2026-11-27, which replaces the providers spec's D14 for dictation: the descriptor names it and listing it starts nothing). Once it is chosen, its row says whether the CLI works, with "Check Again"; the two probes run only after the choice. "Add a provider…" / „Dodaj dostawcę…” stays, for a provider this build does not know.
 
 With Claude chosen:
 - The fixed sentence from point 3 above sits under the row.
@@ -306,7 +306,7 @@ Status (2026-11-26): implemented in one PR. What it settled beyond the list:
 
 - **One run at a time per provider and lane.** `ProviderGate` keeps one slot per (provider, lane), so the chunks of one dictation reach Claude one after another; the limit from the key release (A10, A11) therefore covers every chunk still out, not each one.
 - **The choice is read at every start.** `ProviderFormatter`'s authorization re-reads `plugins.dictation.provider` and `providerModel` before each process, so switching back to This Mac stops the next chunk of a running dictation.
-- **The pane probes the CLI while it is open at Standard or Full, even with no provider chosen**, because Claude is in the "Tidy up with" menu only when it works (D14); Meetings probes only while a provider is chosen. The probe runs `--version` and `auth status` and sends no text.
+- **The pane probes the CLI only while the provider is the chosen source** (owner decision 2026-11-27): Claude is always in the "Tidy up with" menu, and the probes run, in a task of their own so the servers and their models show without waiting for them, when the pane opens with Claude chosen and again on "Check Again"; choosing another source stops them. The probe runs `--version` and `auth status` and sends no text. Meetings probes only while a provider is chosen.
 - **Dictation has no manual binary path** (Meetings' "Choose File…"): the CLI is found in the fixed directories only.
 
 ## Resolved assumptions (autonomous defaults)

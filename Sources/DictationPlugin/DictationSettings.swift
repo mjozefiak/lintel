@@ -232,7 +232,8 @@ struct DictationSettings: Sendable {
 
     #if DEBUG
     /// DEBUG only (`--qa-setting plugins.dictation.qaProviderStatus=ready|notInstalled|notSignedIn|incompatibleVersion|newerVersion`):
-    /// the state the provider row shows, with no process started. Release builds never read it.
+    /// the state the provider row shows once the provider is the chosen source (`plugins.dictation.llmSource=provider` plus
+    /// the provider's own keys), with no process started. Release builds never read it.
     var qaProviderStatus: ProviderStatus? {
         settings.string("qaProviderStatus").flatMap(ProviderStatus.init(rawValue:))
     }
