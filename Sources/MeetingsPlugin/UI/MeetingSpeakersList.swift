@@ -31,6 +31,9 @@ struct MeetingSpeakersList: View {
         var rows: [Row]
         var edit: MeetingWindowModel.SpeakerEdit?
         var mergeOffer: MeetingWindowModel.MergeOffer?
+
+        /// Yes on a suggestion works only while no merge question waits: Yes can ask one itself.
+        var answersSuggestions: Bool { mergeOffer == nil }
     }
 
     struct Actions {
@@ -51,7 +54,6 @@ struct MeetingSpeakersList: View {
     let actions: Actions
 
     @Environment(\.lintelTextSize) private var textSize
-    @FocusState private var fieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -127,32 +129,27 @@ struct MeetingSpeakersList: View {
             }
         }
         .accessibilityLabel(Text(verbatim: row.name))
+        // `.help` and the hint are the same attribute (AXHelp): where the name came from is the value instead.
+        .accessibilityValue(Text(verbatim: row.origin ?? ""))
         .accessibilityHint(Text("Rename this speaker", comment: "Meeting window: hint of a speaker's name"))
-        .accessibilityAction(named: Text("This is me", comment: "Meeting window button: mark this speaker as the user"))
-        {
-            if row.canMarkSelf { actions.markSelf(row.id) }
+        .accessibilityActions {
+            if row.canMarkSelf {
+                Button {
+                    actions.markSelf(row.id)
+                } label: {
+                    Text("This is me", comment: "Meeting window button: mark this speaker as the user")
+                }
+            }
         }
     }
 
     private func nameField(_ row: Row) -> some View {
-        TextField(
-            text: Binding(get: { state.edit?.draft ?? row.name }, set: { actions.updateDraft($0) })
-        ) {
-            Text("Speaker name", comment: "Meeting window: label of a speaker name field")
-        }
-        .textFieldStyle(.roundedBorder)
-        .font(textSize.font(.body))
-        .focused($fieldFocused)
-        .onAppear { fieldFocused = true }
-        .onSubmit { actions.commitEdit() }
-        .onExitCommand { actions.cancelEdit() }
-        // Clicking elsewhere saves, like Return; Esc has already closed the edit, so it saves nothing.
-        .onChange(of: fieldFocused) { _, focused in if !focused { actions.commitEdit() } }
-        .accessibilityLabel(Text("Speaker name", comment: "Meeting window: label of a speaker name field"))
-        .accessibilityHint(
-            Text(
-                "Type the name, then press Return. Escape cancels.",
-                comment: "Meeting window: hint of the speaker name field"))
+        SpeakerNameField(
+            text: state.edit?.draft ?? row.name, font: textSize.nsFont(.body),
+            onChange: { actions.updateDraft($0) }, onReturn: { actions.commitEdit() },
+            onEscape: { actions.cancelEdit() },
+            // Clicking elsewhere saves, like Return; Esc has already closed the edit, so it saves nothing.
+            onFocusLost: { actions.commitEdit() })
     }
 
     // MARK: Lines under a row
@@ -186,6 +183,8 @@ struct MeetingSpeakersList: View {
                 Text("Yes", comment: "Meeting window: confirms a suggested speaker name")
             }
             .buttonStyle(LintelPrimaryButtonStyle())
+            // Yes may ask to merge, and only one question waits at a time.
+            .disabled(!state.answersSuggestions)
             .accessibilityLabel(Text("Confirm", comment: "Meeting window: accessibility label of Yes on a suggestion"))
             Button {
                 actions.reject(row.id)
@@ -200,6 +199,7 @@ struct MeetingSpeakersList: View {
         .padding(.bottom, 6)
         .focusable()
         .onKeyPress(.return) {
+            guard state.answersSuggestions else { return .ignored }
             actions.confirm(row.id)
             return .handled
         }
@@ -266,5 +266,7 @@ struct MeetingSpeakersList: View {
             Text("Cancel", comment: "Meeting window: cancels renaming a speaker")
         }
         .buttonStyle(LintelSecondaryButtonStyle())
+        // Esc anywhere in the window is Cancel while the question waits, not only with a button of the line focused.
+        .keyboardShortcut(.cancelAction)
     }
 }

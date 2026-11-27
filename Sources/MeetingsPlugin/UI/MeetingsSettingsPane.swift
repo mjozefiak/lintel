@@ -136,6 +136,8 @@ struct MeetingsPaneContent: View {
                     comment: "Settings → Meetings: help under Write notes after each meeting"))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("Write notes after each meeting", comment: "Meetings settings toggle of automatic notes"))
     }
 
     /// Speech model, language and retention: their own card under the notes section (mockup v2).
@@ -243,6 +245,8 @@ struct MeetingsPaneContent: View {
                     "Can lower other apps’ volume.", comment: "Settings → Meetings: help under Reduce echo"))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("Reduce echo from speakers", comment: "Settings → Meetings switch of voice processing"))
         Toggle(isOn: $model.suggestMeetings) {
             Text(
                 LocalizedStringResource(
@@ -252,6 +256,11 @@ struct MeetingsPaneContent: View {
             .font(textSize.font(.body))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text(
+                LocalizedStringResource(
+                    "Suggest recording (settings)", defaultValue: "Suggest recording when a meeting starts",
+                    comment: "Meetings settings toggle of suggestions")))
         if model.suggestMeetings {
             suggestionRows
         }
@@ -367,6 +376,8 @@ struct MeetingsPaneContent: View {
                 .font(textSize.font(.body))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("Remind me to say I am recording", comment: "Settings → Meetings switch of the consent reminder"))
         LabeledContent {
             Button(role: .destructive) {
                 // The number of copies Notes keeps is read first, so the sheet can say it.
@@ -411,6 +422,8 @@ struct MeetingsPaneContent: View {
                     comment: "Settings → Meetings: help under Keep recordings (days)"))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("Keep recordings", comment: "Settings → Meetings switch that keeps the encrypted audio"))
         if model.keepAudio || model.keptAudioCount > 0 {
             LabeledContent {
                 Button(role: .destructive) {
@@ -654,6 +667,9 @@ struct SpeakerNamesSection<Model: SpeakerNamesSettings>: View {
                         comment: "Settings → Meetings: why From the conversation is inactive"))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("From the conversation", comment: "Settings → Meetings switch: names said in the meeting")
+        )
         .disabled(!model.notesEnabledForNames)
     }
 

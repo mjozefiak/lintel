@@ -31,7 +31,10 @@ final class MeetingSpeakersQA {
     /// Seeds the meeting and opens its window; false for an unknown state or a library that is not open.
     func show(named name: String, library: MeetingsLibrary, pasteboard: any PasteboardClient) async -> Bool {
         guard let state = State(rawValue: name), let store = library.store else { return false }
-        guard let seeded = try? await Task.detached(operation: { try Self.seed(store, state: state) }).value else {
+        let now = Date()
+        guard
+            let seeded = try? await Task.detached(operation: { try Self.seedOnce(store, state: state, now: now) }).value
+        else {
             return false
         }
         let model = MeetingWindowModel(
@@ -70,11 +73,31 @@ final class MeetingSpeakersQA {
         var third: Int64
     }
 
-    /// One `ready`, diarized meeting: Anna (the user's own), a second speaker, "Mówca 2" and "Mówca 3".
-    nonisolated static func seed(_ store: MeetingsStore, state: State) throws -> Seeded {
-        let start = Date(timeIntervalSince1970: 1_730_635_200)
+    /// The fixture meeting of each state has its own fixed id, so a run with `--qa-persistent-settings` finds it again.
+    nonisolated static func uuid(of state: State) -> String {
+        let index = State.allCases.firstIndex(of: state).map { $0 + 1 } ?? 0
+        return String(format: "00000000-0000-4000-8000-0000000051%02d", index)
+    }
+
+    /// The fixture meeting of `state`: the one already in the library (a relaunch with the same data root), else a
+    /// new one. Never a second copy, so the meeting a tester edited stays as they left it.
+    nonisolated static func seedOnce(_ store: MeetingsStore, state: State, now: Date) throws -> Seeded {
+        if let id = try store.meetingID(uuid: uuid(of: state)) {
+            let speakers = try store.speakers(meetingID: id)
+            guard let third = speakers.dropFirst(3).first?.id ?? speakers.last?.id else {
+                return Seeded(meetingID: id, third: 0)
+            }
+            return Seeded(meetingID: id, third: third)
+        }
+        return try seed(store, state: state, now: now)
+    }
+
+    /// One `ready`, diarized meeting: Anna (the user's own), a second speaker, "Mówca 2" and "Mówca 3". It started a
+    /// day before `now`, so the library's retention (90 days by default) never removes it before the QA run.
+    nonisolated static func seed(_ store: MeetingsStore, state: State, now: Date) throws -> Seeded {
+        let start = now.addingTimeInterval(-24 * 60 * 60)
         let id = try store.insertMeeting(
-            uuid: UUID().uuidString.lowercased(), startedAt: start, speechModelID: "parakeet-ultra", status: .ready)
+            uuid: uuid(of: state), startedAt: start, speechModelID: "parakeet-ultra", status: .ready)
         try store.setTitle(id, title: "Przegląd wdrożenia")
         try store.write { db in
             try db.execute(
