@@ -57,7 +57,8 @@ import Testing
             commands.first { $0.command.id == id }?.command.defaultShortcut
                 .flatMap(HotkeyShortcut.init)?.displayString
         }
-        #expect(shortcut(of: "dictation.record") == "⌃⌥D")
+        // Owner decision 7 of the onboarding spec: ⌥ Space for a command whose default was never applied.
+        #expect(shortcut(of: "dictation.record") == "⌥Space")
         #expect(shortcut(of: "clipboard.history") == "⇧⌘V")
         #expect(shortcut(of: "meetings.record") == "⌃⌥M")
         #expect(shortcut(of: "windows.workspace.1") == "⌥1")
@@ -71,6 +72,37 @@ import Testing
         // ⌥/ cycles the layout kind (registered with the zones phase).
         #expect(shortcut(of: "windows.toggleLayout") == "⌥/")
         #expect(shortcut(of: "windows.zones.zone.1") == nil)
+    }
+
+    /// A declared fallback is registered when its default is taken, so it must be as free as a default: it may not
+    /// collide with another command's default, another command's fallback, or the shell's own shortcuts.
+    @Test func everyDeclaredFallbackShortcutIsUnique() throws {
+        var owners: [HotkeyShortcut: String] = [
+            .commandSpace: "shell main (preferred)",
+            .controlOptionSpace: "shell main (fallback)",
+        ]
+        let commands = try registeredCommands()
+        for entry in commands {
+            guard let mapped = entry.command.defaultShortcut.flatMap(HotkeyShortcut.init) else { continue }
+            let previous = owners.updateValue(entry.command.id, forKey: mapped)
+            #expect(previous == nil, "\(entry.command.id) collides with \(previous ?? "?") on \(mapped.displayString)")
+        }
+        var fallbacks = 0
+        for entry in commands {
+            guard let fallback = entry.command.fallbackShortcut else { continue }
+            fallbacks += 1
+            guard let mapped = HotkeyShortcut(fallback) else {
+                Issue.record("\(entry.command.id) declares a fallback Lintel cannot map")
+                continue
+            }
+            let previous = owners.updateValue("\(entry.command.id) (fallback)", forKey: mapped)
+            #expect(
+                previous == nil,
+                "\(entry.command.id)'s fallback \(mapped.displayString) collides with \(previous ?? "?")")
+        }
+        #expect(fallbacks > 0, "no command declares a fallback, so this test checks nothing")
+        let dictation = commands.first { $0.command.id == "dictation.record" }?.command
+        #expect(dictation?.fallbackShortcut == KeyShortcut(key: "d", modifiers: [.control, .option]))
     }
 
     @Test func theMeetingCommandsAppearInTheMenuAndTheLibraryHasNoShortcut() throws {

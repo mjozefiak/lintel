@@ -9,6 +9,7 @@ nonisolated struct HotkeyShortcut: Hashable, Sendable {
     let carbonModifiers: Int
 
     static let commandSpace = HotkeyShortcut(carbonKeyCode: kVK_Space, carbonModifiers: cmdKey)
+    static let optionSpace = HotkeyShortcut(carbonKeyCode: kVK_Space, carbonModifiers: optionKey)
     static let controlOptionSpace = HotkeyShortcut(carbonKeyCode: kVK_Space, carbonModifiers: controlKey | optionKey)
     static let optionCommandSpace = HotkeyShortcut(carbonKeyCode: kVK_Space, carbonModifiers: cmdKey | optionKey)
 
@@ -121,5 +122,75 @@ nonisolated enum ShortcutPolicy {
         -> HotkeyShortcut?
     {
         userDefined ? current : defaultShortcut(occupied: occupied)
+    }
+}
+
+/// What the shell did with a command's default shortcut the one time it applied it (a command's default is
+/// applied once, `app.hotkey.commandDefaultsApplied`). A value for the Try dictation step and Settings; no view
+/// reads it yet.
+nonisolated enum CommandDefaultOutcome: Equatable, Sendable {
+    /// Why a shortcut was not used.
+    enum Refusal: String, Equatable, Sendable {
+        /// A symbolic hot key (a system shortcut such as Spotlight's) holds the combination.
+        case systemHoldsIt
+        /// The registration was refused: another of Lintel's shortcuts holds it (registered, or stored for the
+        /// launcher while it is off), another app holds it exclusively, or Carbon returned an error.
+        case registrarRefused
+    }
+
+    /// The default was free and registered.
+    case applied(HotkeyShortcut)
+    /// The default was not available, so the command's declared fallback was registered instead.
+    case fellBack(to: HotkeyShortcut, requested: HotkeyShortcut, because: Refusal)
+    /// Neither the default nor its fallback could be used, so the command has no shortcut.
+    case unavailable(requested: HotkeyShortcut, because: Refusal)
+
+    /// The shortcut the command has after the default was applied, if any.
+    var shortcut: HotkeyShortcut? {
+        switch self {
+        case .applied(let shortcut), .fellBack(to: let shortcut, _, _): shortcut
+        case .unavailable: nil
+        }
+    }
+
+    /// Why the user is running on something other than the command's own default, for the line that says so
+    /// ("⌥ Space is taken, so Lintel uses ⌃⌥D", with the reason).
+    var fallbackReason: Refusal? {
+        switch self {
+        case .applied: nil
+        case .fellBack(_, _, let reason), .unavailable(_, let reason): reason
+        }
+    }
+}
+
+/// Picks the shortcut to register for a command's never-applied default: the default itself, else its declared
+/// fallback, else nothing.
+enum CommandDefaultPolicy {
+    /// A symbolic hot key that holds the combination wins over the registration check: Carbon registers a key the
+    /// system itself takes without an error, and the key would then do two things.
+    static func decide(
+        default defaultShortcut: HotkeyShortcut,
+        fallback: HotkeyShortcut?,
+        occupied: Set<HotkeyShortcut>,
+        canRegister: (HotkeyShortcut) -> Bool
+    ) -> CommandDefaultOutcome {
+        if let reason = refusal(of: defaultShortcut, occupied: occupied, canRegister: canRegister) {
+            guard let fallback, refusal(of: fallback, occupied: occupied, canRegister: canRegister) == nil else {
+                return .unavailable(requested: defaultShortcut, because: reason)
+            }
+            return .fellBack(to: fallback, requested: defaultShortcut, because: reason)
+        }
+        return .applied(defaultShortcut)
+    }
+
+    /// `nil` when the shortcut can be registered, else why not.
+    static func refusal(
+        of shortcut: HotkeyShortcut,
+        occupied: Set<HotkeyShortcut>,
+        canRegister: (HotkeyShortcut) -> Bool
+    ) -> CommandDefaultOutcome.Refusal? {
+        if occupied.contains(shortcut) { return .systemHoldsIt }
+        if !canRegister(shortcut) { return .registrarRefused }
+        return nil
     }
 }

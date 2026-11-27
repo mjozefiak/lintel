@@ -361,7 +361,10 @@ public final class DictationPlugin: LintelPlugin {
                 id: Self.recordCommandID,
                 title: LocalizedStringResource("Dictate", comment: "Menu item and command that starts dictation"),
                 symbolName: "mic",
-                defaultShortcut: KeyShortcut(key: "d", modifiers: [.control, .option]),
+                // Owner decision 7 of the onboarding spec: ⌥ Space for a new install, ⌃⌥D when the shell cannot
+                // register ⌥ Space (a symbolic hot key holds it, or the system refuses it).
+                defaultShortcut: KeyShortcut(key: " ", modifiers: .option),
+                fallbackShortcut: KeyShortcut(key: "d", modifiers: [.control, .option]),
                 run: { relay.controller?.menu() },
                 onKeyEvent: { phase in relay.controller?.keyEvent(phase) }),
             PluginCommand(

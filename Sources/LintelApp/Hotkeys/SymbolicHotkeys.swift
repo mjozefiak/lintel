@@ -65,6 +65,22 @@ nonisolated enum SymbolicHotkeys {
         return occupied
     }
 
+    /// Every shortcut an enabled symbolic hot key holds, for a command's default that must not land on a key the
+    /// system already takes (the onboarding spec's ⌥ Space check). Unlike `occupiedShortcuts`, which follows only
+    /// Spotlight and the Finder search window, this reads every entry of the domain: a key assigned to switching
+    /// input sources or to Mission Control is taken too. A missing domain answers with the two known defaults, as
+    /// `occupiedShortcuts` does; an enabled entry without key parameters is taken to hold its system default, which
+    /// is known for those two entries only.
+    static func systemShortcuts(_ hotkeys: [String: Any]?) -> Set<HotkeyShortcut> {
+        var occupied = occupiedShortcuts(hotkeys)
+        let knownDefaults = [String(spotlightSearch), String(finderSearchWindow)]
+        for (id, object) in hotkeys ?? [:] where !knownDefaults.contains(id) {
+            guard let entry = entry(object), entry.enabled, let shortcut = entry.shortcut else { continue }
+            occupied.insert(shortcut)
+        }
+        return occupied
+    }
+
     /// The current `AppleSymbolicHotKeys` dictionary, read without writing anything.
     static func readSystem() -> [String: Any]? {
         CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, "com.apple.symbolichotkeys" as CFString)

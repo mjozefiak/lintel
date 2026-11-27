@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Foundation
 import LintelKit
 import Testing
@@ -97,5 +98,46 @@ import Testing
         #expect(off.title == "The launcher is off")
         #expect(off.detail == "Turn on Apps, Files or Window Management in Features to use the shortcut.")
         #expect(ShellPaneBanners.general(shortcut: "⌃⌥Space").level == .ok)
+    }
+}
+
+/// The coordinator hands the symbolic hot keys (`systemOccupiedShortcuts`) to the one-time default, so a key the
+/// system takes makes a command fall back to its declared shortcut.
+@MainActor
+@Suite(.serialized) struct CommandDefaultWiringTests {
+    @Test func aSystemShortcutOnTheDefaultMakesTheCoordinatorUseTheFallback() async throws {
+        let test = try TestEnvironment()
+        defer { test.tearDown() }
+        let registrar = InMemoryHotkeyRegistrar()
+        let coordinator = AppCoordinator(
+            environment: test.environment, pluginTypes: [FallbackShortcutPlugin.self], registrar: registrar,
+            occupiedShortcuts: { [] }, systemOccupiedShortcuts: { [.optionSpace] }, launchAtLogin: NoLaunchAtLogin())
+        await coordinator.host.start()
+        coordinator.pluginsChanged()
+        let fallback = HotkeyShortcut(carbonKeyCode: kVK_ANSI_D, carbonModifiers: controlKey | optionKey)
+        #expect(registrar.shortcut(for: .command(FallbackShortcutPlugin.commandID)) == fallback)
+        #expect(
+            coordinator.hotkeys.commandDefaultOutcomes[FallbackShortcutPlugin.commandID]
+                == .fellBack(to: fallback, requested: .optionSpace, because: .systemHoldsIt))
+    }
+}
+
+private final class FallbackShortcutPlugin: LintelPlugin {
+    static let commandID = "fallback.record"
+    static let manifest = PluginManifest(
+        id: "fallback", displayName: "Fallback", symbolName: "mic", order: 1, defaultEnabled: true)
+
+    init(context: PluginContext) {}
+
+    func activate() async throws {}
+    func deactivate() async {}
+
+    var commands: [PluginCommand] {
+        [
+            PluginCommand(
+                id: Self.commandID, title: "Record",
+                defaultShortcut: KeyShortcut(key: " ", modifiers: .option),
+                fallbackShortcut: KeyShortcut(key: "d", modifiers: [.control, .option]))
+        ]
     }
 }

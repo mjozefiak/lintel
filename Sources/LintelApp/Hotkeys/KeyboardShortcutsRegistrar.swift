@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import Foundation
 import KeyboardShortcuts
 import LintelKit
@@ -65,6 +66,10 @@ final class KeyboardShortcutsRegistrar: HotkeyRegistrar {
         CarbonEscapeRegistration.claim(action)
     }
 
+    func canRegister(_ shortcut: HotkeyShortcut) -> Bool {
+        CarbonHotkeyProbe.canRegister(shortcut)
+    }
+
     func removeHandler(for name: HotkeyName) {
         // Cancelling ends the event stream and removes the handler. KeyboardShortcuts 1.10.0 does not give the key
         // back then (the name stays in its handler table), and `setShortcut` registers a shortcut that has no handler
@@ -104,6 +109,33 @@ final class PreviewHotkeyRegistrar: HotkeyRegistrar {
     /// QA mode never takes the tester's Escape key.
     func claimEscape(_ action: @escaping @MainActor () -> Void) -> EscapeKeyClaim { .inactive }
 
+    func canRegister(_ shortcut: HotkeyShortcut) -> Bool { memory.canRegister(shortcut) }
+
     func removeHandler(for name: HotkeyName) {}
 }
 #endif
+
+/// Whether a hot key would reach Lintel: a registration with `kEventHotKeyExclusive`, given back at once.
+///
+/// The spike of onboarding step 4.2 measured what Carbon reports (and the review re-measured it): a combination
+/// another app holds **without** `kEventHotKeyExclusive` registers with `noErr` either way, and both apps then
+/// receive the key, so that conflict cannot be detected (the Try dictation step handles it with "It didn't work").
+/// One another app holds **exclusively** registers with `noErr` for a plain registration, which then receives
+/// nothing, but answers `eventHotKeyExistsErr` to an exclusive one; and a combination this process already holds
+/// answers `eventHotKeyExistsErr` to both, which is what a second of Lintel's own commands on one key looks like.
+/// So the probe registers exclusively, and KeyboardShortcuts then registers the chosen key plain as always.
+nonisolated enum CarbonHotkeyProbe {
+    /// "LINT", so a probe that leaked a registration would still be recognisable in a log, and KeyboardShortcuts
+    /// ignores its hot key events (it matches its own signature).
+    private static let signature = OSType(0x4C49_4E54)
+
+    static func canRegister(_ shortcut: HotkeyShortcut) -> Bool {
+        var reference: EventHotKeyRef?
+        let status = RegisterEventHotKey(
+            UInt32(shortcut.carbonKeyCode), UInt32(shortcut.carbonModifiers),
+            EventHotKeyID(signature: signature, id: 0),
+            GetEventDispatcherTarget(), OptionBits(kEventHotKeyExclusive), &reference)
+        if let reference { UnregisterEventHotKey(reference) }
+        return status == noErr
+    }
+}

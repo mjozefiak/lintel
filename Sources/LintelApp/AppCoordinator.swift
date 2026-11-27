@@ -17,6 +17,8 @@ final class AppCoordinator {
     private(set) var panel: PanelController?
     /// The shell panes' views in the main window's Settings mode.
     private var shellPane: ((SettingsShellPane) -> AnyView)?
+    /// Every shortcut an enabled symbolic hot key holds, read when command defaults are applied.
+    private let systemOccupiedShortcuts: () -> Set<HotkeyShortcut>
     private(set) var onboarding: OnboardingController?
     private(set) var about: AboutWindowController?
     /// The main window (ADR 0008; enabled in every build since step 6.3a): built on first use.
@@ -54,14 +56,18 @@ final class AppCoordinator {
     /// - Parameters:
     ///   - registrar: where global shortcuts go; QA mode passes one that registers nothing.
     ///   - occupiedShortcuts: the shortcuts the system holds (symbolic hotkeys 64 and 65).
+    ///   - systemOccupiedShortcuts: every shortcut an enabled symbolic hot key holds, which a command's default
+    ///     must not land on (the onboarding spec's ⌥ Space check); tests leave it empty.
     init(
         environment: AppEnvironment,
         pluginTypes: [any LintelPlugin.Type] = PluginRegistry.all,
         registrar: any HotkeyRegistrar,
         occupiedShortcuts: @escaping () -> Set<HotkeyShortcut>,
+        systemOccupiedShortcuts: @escaping () -> Set<HotkeyShortcut> = { [] },
         launchAtLogin: any LaunchAtLoginClient
     ) {
         self.environment = environment
+        self.systemOccupiedShortcuts = systemOccupiedShortcuts
         let relay = ResultsChangedRelay()
         let settingsRelay = PluginSettingsRelay()
         self.settingsRelay = settingsRelay
@@ -419,6 +425,7 @@ final class AppCoordinator {
         hotkeys.setMainShortcutActive(!host.activeSources.isEmpty)
         hotkeys.syncCommands(
             host.activeCommands,
+            occupied: systemOccupiedShortcuts(),
             perform: { [weak self] command in self?.perform(command) },
             deliver: { [weak self] command, phase in self?.deliver(command, phase: phase) })
     }

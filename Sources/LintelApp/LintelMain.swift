@@ -158,6 +158,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 environment: environment,
                 registrar: PreviewHotkeyRegistrar(),
                 occupiedShortcuts: { occupied },
+                // QA mode registers nothing, so only the real symbolic hot keys can make a default fall back.
+                systemOccupiedShortcuts: { SymbolicHotkeys.systemShortcuts(SymbolicHotkeys.readSystem()) },
                 launchAtLogin: InMemoryLaunchAtLogin()
             )
         }
@@ -166,6 +168,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             environment: environment,
             registrar: KeyboardShortcutsRegistrar(),
             occupiedShortcuts: { SymbolicHotkeys.occupiedShortcuts(SymbolicHotkeys.readSystem()) },
+            systemOccupiedShortcuts: { SymbolicHotkeys.systemShortcuts(SymbolicHotkeys.readSystem()) },
             launchAtLogin: SystemLaunchAtLogin()
         )
     }

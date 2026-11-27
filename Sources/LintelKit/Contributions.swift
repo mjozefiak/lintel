@@ -8,6 +8,11 @@ public struct PluginCommand: Identifiable, Sendable {
     public let title: LocalizedStringResource
     public let symbolName: String?
     public let defaultShortcut: KeyShortcut?
+    /// The shortcut the shell registers instead when `defaultShortcut` cannot be used the one time it applies it
+    /// (a symbolic hot key holds it, or the system refuses the registration). `nil` (the default) leaves the
+    /// command without a shortcut in that case. Added with the first-run onboarding (spec
+    /// `2026-11-24-first-run-onboarding`, step 4.2), so a plugin can declare ⌥ Space with the ⌃⌥D fallback.
+    public let fallbackShortcut: KeyShortcut?
     /// Whether the command appears in the menu bar menu.
     public let showsInMenu: Bool
     /// When set, the shell opens (or, when it is already open, closes) the panel in this plugin panel mode
@@ -24,6 +29,7 @@ public struct PluginCommand: Identifiable, Sendable {
         title: LocalizedStringResource,
         symbolName: String? = nil,
         defaultShortcut: KeyShortcut? = nil,
+        fallbackShortcut: KeyShortcut? = nil,
         showsInMenu: Bool = true,
         panelMode: PanelModeID? = nil,
         run: @escaping @MainActor @Sendable () async -> Void = {},
@@ -33,6 +39,7 @@ public struct PluginCommand: Identifiable, Sendable {
         self.title = title
         self.symbolName = symbolName
         self.defaultShortcut = defaultShortcut
+        self.fallbackShortcut = fallbackShortcut
         self.showsInMenu = showsInMenu
         self.panelMode = panelMode
         self.onKeyEvent = onKeyEvent
