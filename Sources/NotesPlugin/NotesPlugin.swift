@@ -168,6 +168,7 @@ public final class NotesPlugin: LintelPlugin {
             || context.settings.string(NotesSettingsKey.qaHistory) != nil
             || context.settings.string(NotesSettingsKey.qaDelete) != nil
             || context.settings.string(NotesSettingsKey.qaComments) != nil
+            || context.settings.string(NotesSettingsKey.qaMyNotes) != nil
         return !locked && (!fixtures || qaManual)
         #else
         return true
@@ -346,7 +347,7 @@ public final class NotesPlugin: LintelPlugin {
         }
         registry.onDiscard = { [weak model] items in model?.documentsDiscarded(items) }
         #if DEBUG
-        openQAFixtureTabs(in: model)
+        openQAFixtureNotes(in: model)
         applyQAState(to: model)
         if let raw = context.settings.string(NotesSettingsKey.qaSelect) {
             let parts = raw.split(separator: "@", maxSplits: 1).map(String.init)
@@ -380,6 +381,7 @@ public final class NotesPlugin: LintelPlugin {
             qaCreateComments(comments, in: model)
         }
         if let delete = context.settings.string(NotesSettingsKey.qaDelete) { qaRequestDelete(delete, in: model) }
+        if context.settings.string(NotesSettingsKey.qaMyNotes) == "written" { qaWriteMyNotes(in: model) }
         if context.settings.string(NotesSettingsKey.qaHidden) == "on" { model.hidesContent = true }
         if let typed = context.settings.string(NotesSettingsKey.qaPalette) {
             Task { @MainActor in
@@ -416,15 +418,37 @@ public final class NotesPlugin: LintelPlugin {
         }
     }
 
-    /// `plugins.notes.qaOpen`: opens the named notes in tabs, the last one current.
-    private func openQAFixtureTabs(in model: NotesWorkspaceModel) {
+    /// `plugins.notes.qaMyNotes=written`: types some text into the first My notes pad that appears (the preview's
+    /// or the full window's) and writes it, the way the user would: the real writer seeds the `mine` document.
+    private func qaWriteMyNotes(in model: NotesWorkspaceModel) {
+        Task { @MainActor in
+            for _ in 0..<50 {
+                if let pad = (model.currentDocument ?? model.previewDocument)?.myNotes, pad.isEditable {
+                    let text = "Ask Ola for the budget numbers before Friday.\n\n- Send Marek the export deck"
+                    pad.edit(
+                        NoteEditorEdit(text: text, range: 0..<text.utf16.count, changeInLength: text.utf16.count))
+                    await pad.flush()
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+        }
+    }
+
+    /// `plugins.notes.qaOpen`: opens the named notes in the full window, one after another (the last one stays).
+    private func openQAFixtureNotes(in model: NotesWorkspaceModel) {
         let list = context.settings.string(NotesSettingsKey.qaOpen) ?? ""
         for entry in list.split(separator: ",") {
             let parts = entry.split(separator: "@", maxSplits: 1).map(String.init)
             guard let raw = parts.first else { continue }
             let route = WorkspaceRoute(kind: NoteRoute.kind, id: raw)
             guard model.handle(route), let id = NoteRoute.itemID(for: route) else { continue }
-            if parts.count == 2 { model.preferredLayers[id] = parts[1] }
+            // `@mine` opens the full window on My notes (it is not a layer of the source).
+            if parts.count == 2, parts[1] == NotesStore.mineLayer, let document = model.documents[id] {
+                document.showsMine = true
+            } else if parts.count == 2 {
+                model.preferredLayers[id] = parts[1]
+            }
         }
     }
     #endif

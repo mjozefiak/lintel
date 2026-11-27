@@ -47,6 +47,10 @@ struct MyNotesEditor: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // The pad's text changes only through this editor, or through QA; keep the two the same.
+        .onChange(of: pad.text) { _, text in
+            if buffer != text { buffer = text }
+        }
     }
 
     private var editor: some View {
