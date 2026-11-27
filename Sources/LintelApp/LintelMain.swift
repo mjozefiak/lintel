@@ -43,6 +43,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             runGallery(options)
             return
         }
+        if let options = try? QAOptions.parse(ProcessInfo.processInfo.arguments), let log = options.pillSpikeLog {
+            let spike = QAPillSpike(log: log)
+            spike.show(appearance: options.appearance == .dark ? .darkAqua : .aqua, textSize: .medium)
+            pillSpike = spike
+            if let quitAfter = options.quitAfter { schedule(after: quitAfter) { NSApp.terminate(nil) } }
+            return
+        }
         #endif
         let environment: AppEnvironment
         do {
@@ -228,6 +235,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #if DEBUG
     private var qaOptions: QAOptions?
     private var galleryWindow: GalleryWindowController?
+
+    /// `--qa-pill-spike`: kept alive while the app runs.
+    private var pillSpike: QAPillSpike?
 
     /// `--qa-gallery` opens the window (and quits after `--qa-quit-after`, with `--qa-snapshot` writing its content);
     /// `--qa-gallery-export|compare|record` draw, report and exit with a code.

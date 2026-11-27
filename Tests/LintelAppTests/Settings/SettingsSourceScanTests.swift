@@ -20,6 +20,9 @@ import Testing
     static let hardCodedFont =
         #/[\s)]\.font\(\.(callout|caption|caption2|footnote|title|title2|title3|headline|subheadline|body|largeTitle)(?![A-Za-z0-9])/#
     static let glass = #/glassEffect|NSGlassEffectView/#
+    /// `LintelUI` files that are not Settings and draw glass on purpose: the HUD pill (spec `2026-11-25-minimal-hud`,
+    /// "a capsule …, glass `.regular`"), which floats over other apps like today's HUDs. Only the glass rule skips them.
+    static let glassExceptions: Set<String> = ["Sources/LintelUI/Components/LintelPill.swift"]
     static let longFooter = #/(comment|SettingsFooter\()\s*:?\s*"[^"]{140,}"/#
 
     private var root: URL {
@@ -48,9 +51,9 @@ import Testing
             .joined(separator: "\n")
     }
 
-    private func violations(of pattern: Regex<AnyRegexOutput>) throws -> [String] {
+    private func violations(of pattern: Regex<AnyRegexOutput>, skipping skipped: Set<String> = []) throws -> [String] {
         var found: [String] = []
-        for url in scanned() {
+        for url in scanned() where !skipped.contains(String(url.path().dropFirst(root.path().count))) {
             let text = Self.strippingComments(try String(contentsOf: url, encoding: .utf8))
             if text.contains(pattern) { found.append(url.lastPathComponent) }
         }
@@ -73,7 +76,11 @@ import Testing
     }
 
     @Test func noGlassInSettings() throws {
-        #expect(try violations(of: Regex(Self.glass)) == [])
+        #expect(try violations(of: Regex(Self.glass), skipping: Self.glassExceptions) == [])
+        // Every exception names a file that exists, so a moved file does not hide glass elsewhere.
+        for path in Self.glassExceptions {
+            #expect(FileManager.default.fileExists(atPath: root.appending(path: path).path()), "\(path)")
+        }
     }
 
     @Test func noLongFooter() throws {

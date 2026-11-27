@@ -110,7 +110,7 @@ import LintelUI
                 try Data(state.summary.utf8).write(to: directory.appending(path: "summary.txt"))
                 let caveat = state.presentation.caveat ?? ""
                 try Data(caveat.utf8).write(to: directory.appending(path: "caveat.txt"))
-                for variant in GalleryVariant.fullMatrix where variant.language == language {
+                for variant in state.sheetVariants where variant.language == language {
                     let bitmap = try await GalleryRenderer.render(state, variant)
                     try GalleryRenderer.pngData(bitmap).write(to: directory.appending(path: "\(variant.name).png"))
                     count += 1

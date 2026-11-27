@@ -188,7 +188,7 @@ let package = Package(
         ),
         .testTarget(
             name: "LintelUITests",
-            dependencies: ["LintelUI"]
+            dependencies: ["LintelUI", "LintelTestSupport"]
         ),
         .testTarget(
             name: "LintelCoreTests",
