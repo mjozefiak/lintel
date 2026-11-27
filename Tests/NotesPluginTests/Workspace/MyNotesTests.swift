@@ -202,6 +202,55 @@ import Testing
         #expect(model.previewDocument?.myNotes === pad)
     }
 
+    // MARK: Esc and the agent's strips in the full window (QA of #360: M1, m1)
+
+    @Test func escGoesBackWhenTheFocusIsNotInTextAndStaysWithTheText() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        r.publish([r.rig.layer("Ship it.", id: "notes", version: "n1")])
+        await model.refresh()
+        let id = NoteItemID.live(r.key)
+        // The list is showing: Esc is not the full window's key.
+        #expect(!model.handleEscape(textHasFocus: false))
+        model.open(id)
+        await model.loadContent(id)
+        // Right after opening nothing has the focus: Esc goes back, with the note still selected.
+        #expect(model.handleEscape(textHasFocus: false))
+        #expect(!model.isFullWindow)
+        #expect(model.explorer.selection == id)
+        // In the pad or an editor Esc stays with the text, so the note is not left.
+        model.open(id)
+        await model.loadContent(id)
+        #expect(!model.handleEscape(textHasFocus: true))
+        #expect(model.isFullWindow)
+        // The palette takes Esc first.
+        model.showPalette()
+        #expect(!model.handleEscape(textHasFocus: false))
+        #expect(model.isFullWindow)
+        model.hidePalette()
+        #expect(model.handleEscape(textHasFocus: false))
+    }
+
+    @Test func theAgentLockStripIsNotShownOnMyNotesWhereThePadStaysEditable() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        r.publish([r.rig.layer("Ship it.", id: "notes", version: "n1")])
+        await model.refresh()
+        let id = NoteItemID.live(r.key)
+        model.open(id)
+        await model.loadContent(id)
+        let document = try #require(model.currentDocument)
+        #expect(document.lock.move(to: .flushing))
+        #expect(model.strips.contains { $0.id == "revise.waiting" })
+        model.showMyNotes(document)
+        #expect(!model.strips.contains { $0.id.hasPrefix("revise.") })
+        let pad = try #require(document.myNotes)
+        #expect(pad.isEditable)
+        // Back on the Notes layer the strip is there again.
+        model.showLayer("notes", of: document)
+        #expect(model.strips.contains { $0.id == "revise.waiting" })
+    }
+
     // MARK: Coming back after a failed or running save (review M1)
 
     @Test func afterAFailedSaveComingBackShowsTheUnsavedTextAndTheNextKeystrokeKeepsIt() async throws {

@@ -105,12 +105,12 @@ struct NotesSectionView: View {
             }
         }
         .notesAnimation(.inspector, value: inspectorDocument != nil)
-        // Esc goes back to the list. The editor, the search and title fields, the palette and the comment popover
-        // take Esc first while they have the focus, so it never leaves the note under the user's typing.
-        .onExitCommand {
-            guard model.palette == nil else { return }
-            model.closeFullWindow()
-        }
+        // Esc goes back to the list unless the focus is in text (`handleEscape`). A key monitor decides it, because
+        // `onExitCommand` fires only when a text view passes Esc up (which left the note under the user's typing)
+        // and never while nothing has the focus.
+        .background(
+            EscapeKeyMonitor { textHasFocus in model.handleEscape(textHasFocus: textHasFocus) }
+        )
     }
 }
 

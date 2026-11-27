@@ -78,7 +78,8 @@ extension NotesWorkspaceModel {
     /// The lock strip while a run is going on, and how the last run ended.
     func reviseStrips(for document: NoteDocumentModel) -> [Strip] {
         var result: [Strip] = []
-        switch document.lock.phase {
+        // A run never writes My notes and its pad stays editable, so the lock strips are not shown there.
+        switch document.showsMine ? .idle : document.lock.phase {
         case .flushing, .waitingForModel:
             result.append(
                 Strip(

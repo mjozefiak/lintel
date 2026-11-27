@@ -274,7 +274,8 @@ extension NotesWorkspaceModel {
                             id: "models.open",
                             title: String(localized: "Open Models", comment: "Notes: opens the Models pane"))
                     ]))
-        case .writing(let done, let of)?:
+        case .writing(let done, let of)? where !document.showsMine:
+            // Nothing of the agent's writes My notes, and its pad stays editable: the strip is about the other layers.
             result.append(
                 Strip(
                     id: "writing", tone: .accent,

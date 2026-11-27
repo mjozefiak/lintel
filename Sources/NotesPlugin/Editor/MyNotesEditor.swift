@@ -75,6 +75,8 @@ struct MyNotesEditor: View {
                     .font(textSize.font(.body))
                     .foregroundStyle(LintelBrand.secondaryText)
                     .padding(.leading, 5.4 * 12.5 * textSize.scale)
+                    // The editor's right inset (`NoteEditorRepresentable`): the sentence wraps before the scroll bar.
+                    .padding(.trailing, 40 * textSize.scale)
                     .padding(.top, 6 * textSize.scale)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)

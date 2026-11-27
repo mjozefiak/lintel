@@ -633,6 +633,18 @@ final class NotesWorkspaceModel {
         return true
     }
 
+    /// Esc in the full window (owner decision on M1 of the QA of #360): back to the list ("‹ All notes") unless the
+    /// focus is in text (the My notes pad, a layer editor, a field), where Esc stays with the text, so typing never
+    /// leaves the note; also unless the palette or a comparison is open, which Esc closes first. Returns `true`
+    /// when it went back, and the key is then consumed. ⌘[ and ⌘W do not ask: they always go back.
+    @discardableResult
+    func handleEscape(textHasFocus: Bool) -> Bool {
+        guard isFullWindow, !textHasFocus, palette == nil else { return false }
+        if let document = currentDocument, document.compare != nil { return false }
+        closeFullWindow()
+        return true
+    }
+
     /// `WorkspaceSection.handleRoute`: an `openNote` route selects the note and opens it in the full window. Any
     /// other route, or an id that is not a note key, is not handled.
     func handle(_ route: WorkspaceRoute) -> Bool {
