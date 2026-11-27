@@ -41,7 +41,7 @@ extension NotesWorkspaceModel {
 
     /// The note left the screen (`dropPreview`): My notes are written, then every writer of the note (My notes and
     /// the layers that were edited, restored, commented on or revised) is written and let go
-    /// (`NoteDocumentRegistry.release(item:)`), so the reconciler and the deferred delete of detached rows no longer
+    /// (`NoteDocumentRegistry.release(marks:)`), so the reconciler and the deferred delete of detached rows no longer
     /// count the note as open. A writer whose write fails stays in the registry with its text.
     /// Leaves of one note run one after the other; `awaitRelease` waits for them. A read does not need to: My notes
     /// start from the writer's text or a head read in the same turn as the writer (`makeMine`).
@@ -50,12 +50,15 @@ extension NotesWorkspaceModel {
         let pad = document.myNotes
         document.myNotes = nil
         let registry = environment.registry
+        // The writers as they are AT THE LEAVE: the release below forgets only these. A note opened again while the
+        // release still writes takes the same writers again (`writer(for:)` stamps them) and keeps them.
+        let marks = registry?.marks(item: id) ?? [:]
         let previous = documentReleases[id]
         let token = UUID()
         let task = Task {
             await previous?.task.value
             await pad?.flush(closingSession: true)
-            await registry?.release(item: id)
+            await registry?.release(marks: marks)
         }
         documentReleases[id] = (token, task)
         Task {

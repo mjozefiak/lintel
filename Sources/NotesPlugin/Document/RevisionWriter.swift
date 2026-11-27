@@ -154,6 +154,12 @@ final class RevisionWriter: Sendable {
     /// change it.
     var latestText: String? { pending.withLock { $0.latest } }
 
+    /// The text typed into this writer that is not in the store yet: buffered (also after a failed write put it
+    /// back) or taken by a write that is still running; `nil` when everything typed is written. Unlike
+    /// `latestText` it goes stale only while a write is pending, so a layer editor (whose head Restore, Apply and a
+    /// reconciliation can move after typing) starts from it, else from the head it reads in the same turn.
+    var unsettledText: String? { pending.withLock { $0.text ?? ($0.writing != nil ? $0.latest : nil) } }
+
     /// Stops a document whose recording was detached before it had a row: it can never seed (its snapshot belongs
     /// to a recording that is gone), so a later flush throws instead of writing against the wrong note.
     func retire() { pending.withLock { $0.retired = true } }

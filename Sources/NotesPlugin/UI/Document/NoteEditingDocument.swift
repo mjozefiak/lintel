@@ -15,7 +15,9 @@ struct NoteEditingDocument: View {
         self.model = model
         self.document = document
         self.session = session
-        _buffer = State(initialValue: document.selectedLayer?.markdown ?? "")
+        // The writer's unsaved text first: after a failed save the note was read with an older text, and the next
+        // keystroke would write that text over what was typed.
+        _buffer = State(initialValue: session.startText ?? document.selectedLayer?.markdown ?? "")
     }
 
     var body: some View {

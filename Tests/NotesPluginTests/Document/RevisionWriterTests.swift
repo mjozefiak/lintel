@@ -313,6 +313,27 @@ import Testing
         #expect(try rig.head(document.id).body == "typed")
     }
 
+    @Test func aWriteThatFailsAfterDiscardPendingNeverPutsItsTextBack() async throws {
+        let rig = try DocRig()
+        let entered = CountLatch()
+        let gate = CountLatch()
+        let writer = try gatedWriter(rig, entered: entered, gate: gate)
+        try rig.failNextInsert(body: "typed")
+        writer.submit("typed")
+        let running = Task { try await writer.flush() }
+        await entered.wait()
+        // The note is deleted while its write runs; then that write fails.
+        writer.discardPending()
+        gate.increment()
+        await #expect(throws: (any Error).self) { try await running.value }
+        #expect(!writer.hasPendingText)
+        #expect(writer.latestText == nil)
+        // Nothing writes the text later: a flush has nothing, the fault gone changes nothing.
+        try rig.clearFault()
+        #expect(try await writer.flush() == .nothing)
+        #expect(try rig.store.liveDocument(key: rig.meeting, layer: "notes") == nil)
+    }
+
     @Test func aFailedWriteNeverPutsItsTextBackOverNewerTyping() async throws {
         let rig = try DocRig()
         let entered = CountLatch()
@@ -738,6 +759,59 @@ extension RevisionWriter.Outcome {
         await reacquired.wait()
         #expect(made.value == 0)
         #expect(registry.writer(for: id) === writer)
+    }
+
+    // MARK: One rule for who may forget a writer (review M2 of #360)
+
+    @Test func aWriterTakenAfterTheLeaveIsKeptByTheReleaseOfTheLeave() async throws {
+        let r = try ReconRig()
+        let seed = try r.rig.seededDocument(r.rig.layer("seed text"))
+        let id = NoteDocumentID.live(r.key, layer: "notes")
+        let writer = r.registry.writer(for: id, item: .live(r.key)) { r.rig.writer(.existing(docID: seed.id)) }
+        writer.submit("typed")
+        // The note leaves the screen: the marks are read now, the release runs later.
+        let marks = r.registry.marks(item: .live(r.key))
+        // The note is opened again before the release starts: the same writer is handed out again.
+        let again = r.registry.writer(for: id, item: .live(r.key)) { r.rig.writer(.existing(docID: seed.id)) }
+        #expect(again === writer)
+        await r.registry.release(marks: marks)
+        #expect(r.registry.writer(for: id) === writer)  // kept: its new holder writes it at its own leave
+        writer.submit("typed, and more")
+        await r.registry.flushAll()  // hide, Settings, `deactivate()`, quit
+        #expect(try r.rig.head(seed.id).body == "typed, and more")
+    }
+
+    @Test func aReleaseOnlyForgetsTheEntriesOfItsLeaveNotOnesTakenAfterwards() async throws {
+        let r = try ReconRig()
+        let seed = try r.rig.seededDocument(r.rig.layer("seed text"))
+        let notes = NoteDocumentID.live(r.key, layer: "notes")
+        let other = NoteDocumentID.live(r.key, layer: "transcript")
+        _ = r.registry.writer(for: notes, item: .live(r.key)) { r.rig.writer(.existing(docID: seed.id)) }
+        let marks = r.registry.marks(item: .live(r.key))
+        #expect(Set(marks.keys) == [notes])
+        // Another layer's writer is made after the leave; so is a second take of the first.
+        let late = r.registry.writer(for: other, item: .live(r.key)) {
+            r.rig.writer(.seed(try! r.rig.plan(r.rig.layer("t"))))
+        }
+        await r.registry.release(marks: marks)
+        #expect(r.registry.writer(for: notes) == nil)  // as it was at the leave: written and forgotten
+        #expect(r.registry.writer(for: other) === late)  // made after the leave: untouched
+    }
+
+    @Test func aStaleReleaseNeverForgetsAnEntryMadeAnewAfterItsForgotten() async throws {
+        let r = try ReconRig()
+        let seed = try r.rig.seededDocument(r.rig.layer("seed text"))
+        let id = NoteDocumentID.live(r.key, layer: "notes")
+        let make = { r.rig.writer(.existing(docID: seed.id)) }
+        _ = r.registry.writer(for: id, item: .live(r.key), make: make)
+        let first = r.registry.marks(item: .live(r.key))
+        let second = r.registry.marks(item: .live(r.key))  // a second leave of the same note
+        await r.registry.release(marks: first)
+        #expect(r.registry.writer(for: id) == nil)
+        // The note is opened again: a new entry (a new writer) that no earlier leave may forget.
+        let fresh = r.registry.writer(for: id, item: .live(r.key), make: make)
+        await r.registry.release(marks: second)
+        #expect(r.registry.writer(for: id) === fresh)
     }
 
     @Test func aRekeyWithoutATabReleasesTheMovedWriters() async throws {

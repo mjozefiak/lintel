@@ -353,6 +353,61 @@ import Testing
         #expect(try mine(r)?.body == "quick!")
     }
 
+    /// Review M2 of #360, the reviewer's steps: the note is chosen again while the close of the first visit still
+    /// writes. The writer is the registry's, so hiding the window writes what was typed after coming back.
+    @Test func comingBackWhileTheCloseIsStillWritingKeepsTheWriterInTheRegistry() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        let pad = try await showMine(r, model)
+        let id = NoteItemID.live(r.key)
+        let mineID = NoteDocumentID.live(r.key, layer: NotesStore.mineLayer)
+        type(pad, "first")
+        // The close's write is the first one: it waits for the source's start time, which is held here.
+        let gate = Gate()
+        r.source.contentGate = gate
+        gate.hold()
+        model.select(row: elsewhere)
+        await gate.held.wait()
+        let again = try await comeBack(r, model)
+        #expect(again.text == "first")
+        gate.release()
+        await model.awaitRelease(id)
+        #expect(try mine(r)?.body == "first")
+        type(again, "first, and more")
+        await r.registry.flushAll()  // hiding the window, Settings, `deactivate()`
+        #expect(try mine(r)?.body == "first, and more")
+        #expect(r.registry.writer(for: mineID) === again.session?.writer)
+    }
+
+    /// The same for a layer writer that the leave let go of: it is taken again (the pen on the note chosen again)
+    /// while the release, still waiting behind My notes' write, is about to forget it.
+    @Test func aLayerWriterTakenAgainWhileMyNotesOfTheNoteIsStillClosingStaysInTheRegistry() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        let pad = try await showMine(r, model)
+        let id = NoteItemID.live(r.key)
+        let notesID = NoteDocumentID.live(r.key, layer: "notes")
+        let before = try #require(model.previewDocument)
+        let content = try #require(before.content)
+        let held = try #require(model.environment.makeEditingSession(content, "notes", before))
+        type(pad, "first")
+        let gate = Gate()
+        r.source.contentGate = gate
+        gate.hold()
+        model.select(row: elsewhere)
+        await gate.held.wait()
+        // Back on the note while the leave still writes: the layer's writer is handed out again.
+        model.select(row: id)
+        await model.loadPreview(id)
+        let after = try #require(model.previewDocument)
+        let again = try #require(model.environment.makeEditingSession(content, "notes", after))
+        #expect(again.writer === held.writer)
+        gate.release()
+        await model.awaitRelease(id)
+        #expect(r.registry.writer(for: notesID) === again.writer)
+        #expect(r.registry.writer(for: .live(r.key, layer: NotesStore.mineLayer)) == nil)  // My notes, as left
+    }
+
     // MARK: Read-only and Try Now (review m2)
 
     @Test func notesReadOnlyBlocksThePadThroughItsSession() async throws {

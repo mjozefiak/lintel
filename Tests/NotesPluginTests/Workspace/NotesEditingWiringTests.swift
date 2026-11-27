@@ -165,6 +165,79 @@ import Testing
         #expect(session?.isEditable == true)
     }
 
+    // MARK: The layer editor starts from the writer's text (review p1 of #360)
+
+    /// The editor of the layer made again, over the note as it was read (`agent`), like the pen after coming back.
+    private func editorAgain(_ r: ReconRig, readWith text: String = "agent") throws -> NoteEditingSession {
+        let content = r.rig.content(layers: [r.rig.layer(text, version: "n1")])
+        return try #require(
+            NoteEditingSession.make(
+                content: content, layerID: "notes", store: r.store, registry: r.registry, readOnly: false))
+    }
+
+    @Test func aFailedSaveThenComingBackStartsTheEditorFromTheUnsavedText() async throws {
+        let r = try ReconRig()
+        let doc = try r.rig.seededDocument(r.rig.layer("agent", version: "n1"))
+        let id = NoteDocumentID.live(r.key, layer: "notes")
+        let writer = r.registry.writer(for: id, item: .live(r.key)) { r.rig.writer(.existing(docID: doc.id)) }
+        try r.rig.failNextInsert(body: "typed")
+        writer.submit("typed")
+        await r.registry.release(item: .live(r.key))  // leaving the note: the write fails, the writer lingers
+        #expect(writer.hasPendingText)
+        // Back on the note, read with the old head: the editor must not start from "agent".
+        let session = try editorAgain(r)
+        #expect(session.writer === writer)
+        #expect(session.startText == "typed")
+    }
+
+    @Test func aFlushPointWhileAwayThenComingBackStartsTheEditorFromTheHeadItWrote() async throws {
+        let r = try ReconRig()
+        let doc = try r.rig.seededDocument(r.rig.layer("agent", version: "n1"))
+        let id = NoteDocumentID.live(r.key, layer: "notes")
+        let writer = r.registry.writer(for: id, item: .live(r.key)) { r.rig.writer(.existing(docID: doc.id)) }
+        try r.rig.failNextInsert(body: "typed")
+        writer.submit("typed")
+        await r.registry.release(item: .live(r.key))
+        // The note is read again with the old head ("agent"); hiding the window then writes and forgets the writer.
+        try r.rig.clearFault()
+        await r.registry.flushAll()
+        #expect(try r.rig.head(doc.id).body == "typed")
+        #expect(r.registry.writer(for: id) == nil)
+        #expect(try editorAgain(r).startText == "typed")
+    }
+
+    @Test func textNotWrittenYetIsTheStartTextAndWrittenTextIsTheSameAsTheHead() async throws {
+        let r = try ReconRig()
+        let doc = try r.rig.seededDocument(r.rig.layer("agent", version: "n1"))
+        let id = NoteDocumentID.live(r.key, layer: "notes")
+        let writer = r.registry.writer(for: id, item: .live(r.key)) { r.rig.writer(.existing(docID: doc.id)) }
+        writer.submit("typed")
+        #expect(try editorAgain(r).startText == "typed")  // buffered, not written yet
+        try await writer.flush()
+        #expect(try editorAgain(r).startText == "typed")  // written: the head says the same
+    }
+
+    @Test func aHeadMovedWithoutTypingIsTheStartTextNotTheOlderTypedText() async throws {
+        let r = try ReconRig()
+        let doc = try r.rig.seededDocument(r.rig.layer("agent", version: "n1"))
+        let id = NoteDocumentID.live(r.key, layer: "notes")
+        let writer = r.registry.writer(for: id, item: .live(r.key)) { r.rig.writer(.existing(docID: doc.id)) }
+        writer.submit("typed")
+        try await writer.flush()
+        // Restore, Apply or an agent revision moves the head; the writer's last typed text is old by now.
+        let other = r.rig.writer(.existing(docID: doc.id))
+        other.submit("restored")
+        try await other.flush()
+        let session = try editorAgain(r, readWith: "restored")
+        #expect(session.startText == "restored")
+    }
+
+    @Test func aLayerNeverWrittenStartsFromTheNoteAsRead() throws {
+        let r = try ReconRig()
+        let session = try editorAgain(r, readWith: "source text")
+        #expect(session.startText == nil)  // the editor takes the layer's Markdown
+    }
+
     @Test func theReadOnlyKeyBlocksTheSessionAndNothingIsWritten() async throws {
         let r = try ReconRig()
         let content = r.rig.content(layers: [r.rig.layer("text")])

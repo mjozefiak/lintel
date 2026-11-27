@@ -28,8 +28,9 @@ final class NoteEditingSession {
     private(set) var keptAsProposal = false
     /// The last write failed; the text is still buffered and `retry()` saves it.
     private(set) var saveFailed = false
-    /// My notes: the text the pad starts from, read by `makeMine` in the same main-actor turn as the registry
-    /// handed out the writer; `nil` when it could not be read (the pad then takes the text the note was read with).
+    /// The text the editor starts from, read by `make` / `makeMine` in the same main-actor turn as the registry
+    /// handed out the writer: the writer's unsaved text, else the stored head. `nil` when there is none to read (a
+    /// layer that was never written) or it could not be read: the editor then takes the text the note was read with.
     let startText: String?
 
     /// Asked at every edit and save point, so `plugins.notes.readOnly` flipping while the editor is open is seen.
@@ -70,7 +71,12 @@ final class NoteEditingSession {
     ) -> NoteEditingSession? {
         let key = content.summary.id
         let id = NoteDocumentID.live(key, layer: layerID)
-        let existing = try? store?.liveDocument(key: key, layer: layerID)
+        var existing: DocumentRecord?
+        var storedText: String?
+        if let store, let found = try? store.liveDocument(key: key, layer: layerID) {
+            existing = found
+            storedText = try? store.headRevision(of: found.id)?.body
+        }
         let target: RevisionWriter.Target
         var block: Block?
         if let existing {
@@ -91,9 +97,12 @@ final class NoteEditingSession {
                 storeProvider: storeProvider ?? { nil }, target: target, clock: clock, now: now, timing: timing,
                 sourceStartedAtMs: sourceStartedAtMs, log: log)
         }
+        // A writer that outlived its editor (a failed write that lingers, a write still running) holds text the head
+        // does not have yet; otherwise the head read above, in this turn, is the newest text. Restore, Apply and a
+        // reconciliation move the head without typing, so the writer's last typed text is not used once written.
         return NoteEditingSession(
             documentID: id, writer: writer, model: model, block: block, readOnlyNow: readOnlyNow,
-            comments: CommentService(store: store, now: now))
+            comments: CommentService(store: store, now: now), startText: writer.unsettledText ?? storedText)
     }
 
     /// My notes (phase 3b): the `mine` layer of a recorded note, written only by `human`. No source offers it, so
