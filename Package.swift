@@ -271,7 +271,7 @@ let package = Package(
         ),
         .testTarget(
             name: "LintelAppTests",
-            dependencies: ["LintelApp", "LintelKit", "LintelUI", "LintelSpeech", "LintelProviders"],
+            dependencies: ["LintelApp", "LintelKit", "LintelUI", "LintelSpeech", "LintelProviders", "LintelTestSupport"],
             swiftSettings: [.defaultIsolation(MainActor.self)]
         ),
     ],

@@ -27738,6 +27738,60 @@
           }
         }
       }
+    },
+    "Drag Lintel into the list, then turn on its switch." : {
+      "comment" : "Floating helper next to the System Settings list: drag the app's icon into the list",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag Lintel into the list, then turn on its switch."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przeciągnij Lintel na listę, a potem włącz przełącznik."
+          }
+        }
+      }
+    },
+    "Turn on the switch next to Lintel." : {
+      "comment" : "Floating helper next to the System Settings list: Lintel is listed, its switch is off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on the switch next to Lintel."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włącz przełącznik obok aplikacji Lintel."
+          }
+        }
+      }
+    },
+    "Show Lintel in Finder" : {
+      "comment" : "Floating helper button that reveals the app in Finder, for the list's + button",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Lintel in Finder"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokaż w Finderze"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
