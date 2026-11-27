@@ -465,6 +465,231 @@
       "sha256" : "ad9cfb99473f7c198c9a9087dff6eda0ef9370dd3d9c9e158fbd0affed13e634",
       "width" : 1360
     },
+    "onboarding.access\/all-allowed@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "a2b622a1f78cdacc5f218aad0a8e8dfb1d4127a7779e2868a8cc5350801283ad",
+      "width" : 1640
+    },
+    "onboarding.access\/all-allowed@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "67d9dd828e8ba38d2216e30827068a540c1f287ec0b587959d3f33e709db39a0",
+      "width" : 1640
+    },
+    "onboarding.access\/all-allowed@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "822287681a3b6b0cd39ef347ec7416e1823192855c14501da0ed1931590dcc91",
+      "width" : 1640
+    },
+    "onboarding.access\/check-failed@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "59663d050dcb16e6581dea7c6afdfa28c5319d758b6e432dda32ef6d9b32ca31",
+      "width" : 1640
+    },
+    "onboarding.access\/check-failed@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "d97f059a96b084e5845e0453720cd4e31a202d18a178b2cc224dcc1f3151b4b1",
+      "width" : 1640
+    },
+    "onboarding.access\/check-failed@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "f97cba17ebe770d2bb5ed354b7fdf268bbab31791a8bc34c479ed7858d9d098c",
+      "width" : 1640
+    },
+    "onboarding.access\/checking-call-audio@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "7f697e72d94fd060f61ad7ca877fe0710979ab7e49da80248fbc00f6d3c5a206",
+      "width" : 1640
+    },
+    "onboarding.access\/checking-call-audio@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "4f0195e667d2f158123216b6c30017faf1c932853268268001b70e925adaa113",
+      "width" : 1640
+    },
+    "onboarding.access\/checking-call-audio@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "fbcdff19b64b9b032f8c9c3bbbaf5925f035ea9b1b395be7aceee4bf7e338789",
+      "width" : 1640
+    },
+    "onboarding.access\/download-running@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "3c39716828eece17813dd07b7b92dbbe0fcace7a62fdff4a90e1776cc1f20efb",
+      "width" : 1640
+    },
+    "onboarding.access\/download-running@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "3d5b70306fb5626e1b1f66c6ca60602a76e8dab541a915b926c1202a4517884c",
+      "width" : 1640
+    },
+    "onboarding.access\/download-running@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "c190c681650f4c9e974b891688f663013960a97481cc419b7b6a5b44a7a6b0c5",
+      "width" : 1640
+    },
+    "onboarding.access\/every-state@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "7cef2abb574c58c45409907b1426ee9370c4e0475415281a1e3fb8867417cd6c",
+      "width" : 1640
+    },
+    "onboarding.access\/every-state@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "148a39d3f32d39d26957cd0e085adf38400ea3d4186de5e23cf89eb044a931dc",
+      "width" : 1640
+    },
+    "onboarding.access\/every-state@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "c12e11999edbcaad22b4363d0095bb30b15ba5e14a65549ab27999876fa20527",
+      "width" : 1640
+    },
+    "onboarding.access\/move-first@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "53897810b1ee501880411cfd628d8b5c930a6ab55aace8f63201467fd896e612",
+      "width" : 1640
+    },
+    "onboarding.access\/move-first@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "651575b17f121ef6fb77d7c2ebc0f23417215cb68f812dbf673d2449cff2a45b",
+      "width" : 1640
+    },
+    "onboarding.access\/move-first@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "39cf3fa451d41926960a6c06eaaf20111be19163caf5c2c0fe1fdd032e7dce4e",
+      "width" : 1640
+    },
+    "onboarding.access\/needs-your-ok@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "134e09000dcbfec22c22425ba494d9d4f5ecaf4aa52eb8497ffcc0241dace0bd",
+      "width" : 1640
+    },
+    "onboarding.access\/needs-your-ok@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "ff1af66819ed11ddf748e952bab76175f05d4e4c8aa04089a8dcad60fc334ddf",
+      "width" : 1640
+    },
+    "onboarding.access\/needs-your-ok@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "8e455b07581c9fdd78864d7ad2ca0f67bb19822069b237049320a0a91e482815",
+      "width" : 1640
+    },
+    "onboarding.goal\/both@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "47bcbc78c4a298b75e59e4a090de0bb222e7e875d027eb077786d7f9da4f0090",
+      "width" : 1640
+    },
+    "onboarding.goal\/both@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "311af7e67e229c33df9e2aaca66ab8e83efb45f6b8c38cb232d250e0bb036e7e",
+      "width" : 1640
+    },
+    "onboarding.goal\/both@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "b9c85d987320c01d1e68690d0058a61c38a2daf89efd690ad5c43abf2c937e8a",
+      "width" : 1640
+    },
+    "onboarding.goal\/dictation@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "079a964b24401c01a1441560fb2ed65fe9314b47ad04910396be5a9e16c25b66",
+      "width" : 1640
+    },
+    "onboarding.goal\/dictation@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "aba305765f450e6540361d319880e4b2fc35bb8f8b79d68e852d1638b64373dd",
+      "width" : 1640
+    },
+    "onboarding.goal\/dictation@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "1a84021354b1d2d6c0e8b6cb32da568357d3658e11a9c6241c70b93d745a355d",
+      "width" : 1640
+    },
+    "onboarding.goal\/meeting-notes@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "c02e3efdfa47af5b87da6588eaf880c970e6589abcfa7d99e636a0001ea1445d",
+      "width" : 1640
+    },
+    "onboarding.goal\/meeting-notes@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "f94159a4bcb226161c38cdbf458af4aee8e93a1aff945a9e6b6d7504b515d0e5",
+      "width" : 1640
+    },
+    "onboarding.goal\/meeting-notes@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "1805a30c4716389372dd5f85082ebe97546c3b4d9d04c6ddb9e7299d0d47763e",
+      "width" : 1640
+    },
+    "onboarding.privacy\/with-consent@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "4dfe62add5e08305eacfc12a3e849f2fde5ff36ec1258995e951a961b3845136",
+      "width" : 1640
+    },
+    "onboarding.privacy\/with-consent@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "152fdf68c983ba5ec759872568355d6262906bae8ab081b3d3e08c35e18b3a5f",
+      "width" : 1640
+    },
+    "onboarding.privacy\/with-consent@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "d562cb789fa4a9edc3a1fc5d05867db5966d8897354adb0e710b8d2f8b1ce3f3",
+      "width" : 1640
+    },
+    "onboarding.privacy\/without-consent@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "ad51f8816df97cbeda70f43d554e4f1e8b0286a0357f1b080d71b48d86b11a69",
+      "width" : 1640
+    },
+    "onboarding.privacy\/without-consent@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "083884ea49fb1b34dc0bfc25c782f64a8ded31ee5e273a8e30760e9c98ea4a2c",
+      "width" : 1640
+    },
+    "onboarding.privacy\/without-consent@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "9ef900b8f934ba768152a209da3c439be221bde01be67140e58b88004655434f",
+      "width" : 1640
+    },
+    "onboarding.step-rail\/download-running@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "26bef247cde2d177bc5a2d8894e2304e02ee29ae64e8c7702b526856d9c613d7",
+      "width" : 480
+    },
+    "onboarding.step-rail\/download-running@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "e71b15f17f050548cf7d25372ffc7caf295c8b9d6b1244b11d626f48630e71de",
+      "width" : 480
+    },
+    "onboarding.step-rail\/download-running@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "f52b6212bdc99839e9489fc7269039e5b022f00facfefb9e57a5c9025b940752",
+      "width" : 480
+    },
+    "onboarding.step-rail\/four-steps@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "8404f4cbe368bd3b17e77c4ffc99a582d93d68eca15336bfba72d3625625b6b7",
+      "width" : 480
+    },
+    "onboarding.step-rail\/four-steps@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "bbe7fb08749788244a1c14094e754c19c07340f22b3d7f5cc0b1584f9c303528",
+      "width" : 480
+    },
+    "onboarding.step-rail\/four-steps@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "6c52f66d513a727ba62b23491a6e68dd67871d039e5217b5d9dad9a7fe05955b",
+      "width" : 480
+    },
+    "onboarding.step-rail\/step-3-of-5@dark-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "cdd6ccdfc2382ecb8a7d8a06fe682d2d321ec0023a6417bb933766b585977538",
+      "width" : 480
+    },
+    "onboarding.step-rail\/step-3-of-5@light-m-en.png" : {
+      "height" : 1160,
+      "sha256" : "55a6ae2f25bbbf16b20939eef5fb3b3baf059cebc5f151e7206b0b79a96e837a",
+      "width" : 480
+    },
+    "onboarding.step-rail\/step-3-of-5@light-xl-pl.png" : {
+      "height" : 1160,
+      "sha256" : "38cd1f4d2724e641e4142ddcd4c586c29ccfcc266f27adc2e7d5b347e3566388",
+      "width" : 480
+    },
     "ui.ring\/error@dark-m-en.png" : {
       "height" : 372,
       "sha256" : "0091777e3541f4c9d2bbc18f4531d68f25ec62f08351765650a001ae615632f0",
@@ -592,7 +817,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45855037849",
+  "recordRun" : "45897038275",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
