@@ -1,5 +1,6 @@
 import Foundation
 import LintelKit
+import LintelTestSupport
 import Testing
 
 @testable import MeetingsPlugin
@@ -50,10 +51,10 @@ import Testing
     @Test func returnSavesTheTypedName() async throws {
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
-        model.beginEditing(rig.third)
+        await model.beginEditing(rig.third)
         #expect(model.speakerEdit == .init(speakerID: rig.third, draft: "Mówca 3"))
         model.updateDraft("  Ola  ")
-        await model.commitEdit()
+        await model.commitEdit(of: rig.third)
         #expect(model.speakerEdit == nil)
         #expect(try rig.state(rig.third)?.label == "Ola")
         #expect(try rig.state(rig.third)?.source == .user)
@@ -63,9 +64,9 @@ import Testing
     @Test func anAppliedNameIsEditableToo() async throws {
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
-        model.beginEditing(rig.bartek)
+        await model.beginEditing(rig.bartek)
         model.updateDraft("Bartosz Nowak")
-        await model.commitEdit()
+        await model.commitEdit(of: rig.bartek)
         #expect(try rig.state(rig.bartek)?.label == "Bartosz Nowak")
         #expect(try rig.state(rig.bartek)?.source == .user)
     }
@@ -73,11 +74,11 @@ import Testing
     @Test func escapeSavesNothingEvenWhenTheFieldLosesFocusAfterwards() async throws {
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
-        model.beginEditing(rig.third)
+        await model.beginEditing(rig.third)
         model.updateDraft("Ola")
         model.cancelEdit()
         // The field losing focus after Esc commits through the same path, which finds no open edit.
-        await model.commitEdit()
+        await model.commitEdit(of: rig.third)
         #expect(try rig.state(rig.third)?.label == "Mówca 3")
         #expect(try rig.store.notesStatus(of: rig.meetingID) == .ok)
     }
@@ -86,12 +87,92 @@ import Testing
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
         for draft in ["   ", "\u{200B}", "Mówca 3"] {
-            model.beginEditing(rig.third)
+            await model.beginEditing(rig.third)
             model.updateDraft(draft)
-            await model.commitEdit()
+            await model.commitEdit(of: rig.third)
         }
         #expect(try rig.state(rig.third)?.label == "Mówca 3")
         #expect(try rig.store.notesStatus(of: rig.meetingID) == .ok)
+    }
+
+    // MARK: Moving to another name (review m1 of rv6)
+
+    @Test func clickingAnotherNameSavesTheOpenDraftAndEditsThatName() async throws {
+        let rig = try await SpeakerNamesRig.make()
+        let model = await model(rig)
+        await model.beginEditing(rig.third)
+        model.updateDraft("Ola")
+        await model.beginEditing(rig.second)
+        #expect(try rig.state(rig.third)?.label == "Ola")
+        #expect(try rig.state(rig.third)?.source == .user)
+        #expect(model.speakerEdit == .init(speakerID: rig.second, draft: "Mówca 2"))
+        #expect(model.mergeOffer == nil)
+    }
+
+    @Test func aBlankOrUnchangedDraftIsDroppedWhenAnotherNameIsClicked() async throws {
+        let rig = try await SpeakerNamesRig.make()
+        let model = await model(rig)
+        for draft in ["   ", "Mówca 3"] {
+            await model.beginEditing(rig.third)
+            model.updateDraft(draft)
+            await model.beginEditing(rig.second)
+            #expect(model.speakerEdit == .init(speakerID: rig.second, draft: "Mówca 2"))
+            model.cancelEdit()
+        }
+        #expect(try rig.state(rig.third)?.label == "Mówca 3")
+        #expect(try rig.store.notesStatus(of: rig.meetingID) == .ok)
+    }
+
+    @Test func aDraftWithAnotherSpeakersNameAsksBeforeTheNextNameOpens() async throws {
+        let rig = try await SpeakerNamesRig.make()
+        let model = await model(rig)
+        await model.beginEditing(rig.third)
+        model.updateDraft("Bartek Nowak")
+        await model.beginEditing(rig.second)
+        #expect(
+            model.mergeOffer
+                == .init(speakerID: rig.third, targetID: rig.bartek, name: "Bartek Nowak", origin: .rename))
+        #expect(model.speakerEdit == nil)
+        #expect(try rig.state(rig.third)?.label == "Mówca 3")
+    }
+
+    @Test func theOldFieldsLateFocusLossLeavesTheNextEditOpen() async throws {
+        let rig = try await SpeakerNamesRig.make()
+        let model = await model(rig)
+        await model.beginEditing(rig.third)
+        model.updateDraft("Ola")
+        await model.beginEditing(rig.second)
+        model.updateDraft("Ewa")
+        // The first field leaves the window only now and says it lost the keyboard.
+        await model.commitEdit(of: rig.third)
+        #expect(model.speakerEdit == .init(speakerID: rig.second, draft: "Ewa"))
+        #expect(try rig.state(rig.second)?.label == "Mówca 2")
+        #expect(try rig.state(rig.third)?.label == "Ola")
+        await model.commitEdit(of: rig.second)
+        #expect(try rig.state(rig.second)?.label == "Ewa")
+        #expect(model.speakerEdit == nil)
+    }
+
+    /// The window's wiring: a save from the list names its speaker, so the old field's focus loss arriving after a
+    /// click on another name neither closes nor saves the new edit.
+    @Test func theWindowsActionsSaveOnlyTheSpeakerTheyName() async throws {
+        let rig = try await SpeakerNamesRig.make()
+        let model = await model(rig)
+        let actions = MeetingWindowView.speakerActions(for: model)
+        actions.beginEditing(rig.third)
+        #expect(await pollUntil("the first edit", guard: .seconds(10)) { model.speakerEdit?.speakerID == rig.third })
+        actions.updateDraft("Ola")
+        actions.beginEditing(rig.second)
+        #expect(await pollUntil("the second edit", guard: .seconds(10)) { model.speakerEdit?.speakerID == rig.second })
+        actions.updateDraft("Ewa")
+        // The first field's focus loss, late.
+        actions.commitEdit(rig.third)
+        let saved = await pollUntil("the first name to be saved", guard: .seconds(10)) {
+            (try? rig.state(rig.third)?.label) == "Ola" && model.speakerList.rows[3].name == "Ola"
+        }
+        #expect(saved)
+        #expect(model.speakerEdit?.speakerID == rig.second)
+        #expect(try rig.state(rig.second)?.label == "Mówca 2")
     }
 
     // MARK: The merge question
@@ -99,25 +180,25 @@ import Testing
     @Test func aNameAnotherSpeakerHasAsksToMergeInsteadOfSaving() async throws {
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
-        model.beginEditing(rig.third)
+        await model.beginEditing(rig.third)
         model.updateDraft("bartek nowak")
-        await model.commitEdit()
+        await model.commitEdit(of: rig.third)
         #expect(
             model.mergeOffer
                 == .init(speakerID: rig.third, targetID: rig.bartek, name: "bartek nowak", origin: .rename))
         #expect(model.speakerList.mergeOffer == model.mergeOffer)
         #expect(try rig.state(rig.third)?.label == "Mówca 3")
         // While the question waits, another edit does not start.
-        model.beginEditing(rig.second)
+        await model.beginEditing(rig.second)
         #expect(model.speakerEdit == nil)
     }
 
     @Test func mergeJoinsTheTwoSpeakers() async throws {
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
-        model.beginEditing(rig.third)
+        await model.beginEditing(rig.third)
         model.updateDraft("Bartek Nowak")
-        await model.commitEdit()
+        await model.commitEdit(of: rig.third)
         await model.mergeSpeakers()
         #expect(model.mergeOffer == nil)
         #expect(try rig.state(rig.third) == nil)
@@ -129,9 +210,9 @@ import Testing
     @Test func keepSeparateSavesTheNameAtBoth() async throws {
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
-        model.beginEditing(rig.third)
+        await model.beginEditing(rig.third)
         model.updateDraft("Bartek Nowak")
-        await model.commitEdit()
+        await model.commitEdit(of: rig.third)
         await model.keepSeparate()
         #expect(model.mergeOffer == nil)
         #expect(try rig.state(rig.third)?.label == "Bartek Nowak")
@@ -142,9 +223,9 @@ import Testing
     @Test func cancelLeavesEverythingAsItWas() async throws {
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
-        model.beginEditing(rig.third)
+        await model.beginEditing(rig.third)
         model.updateDraft("Bartek Nowak")
-        await model.commitEdit()
+        await model.commitEdit(of: rig.third)
         model.cancelMerge()
         #expect(model.mergeOffer == nil)
         #expect(try rig.state(rig.third)?.label == "Mówca 3")
@@ -154,9 +235,9 @@ import Testing
     @Test func aDefaultLabelNeverAsksToMerge() async throws {
         let rig = try await SpeakerNamesRig.make()
         let model = await model(rig)
-        model.beginEditing(rig.third)
+        await model.beginEditing(rig.third)
         model.updateDraft("Mówca 2")
-        await model.commitEdit()
+        await model.commitEdit(of: rig.third)
         #expect(model.mergeOffer == nil)
         #expect(try rig.state(rig.third)?.label == "Mówca 2")
     }
@@ -164,9 +245,9 @@ import Testing
     @Test func aMeetingBeingProcessedRenamesWithoutAsking() async throws {
         let rig = try await SpeakerNamesRig.make(status: .processing)
         let model = await model(rig)
-        model.beginEditing(rig.third)
+        await model.beginEditing(rig.third)
         model.updateDraft("Bartek Nowak")
-        await model.commitEdit()
+        await model.commitEdit(of: rig.third)
         #expect(model.mergeOffer == nil)
         #expect(try rig.state(rig.third)?.label == "Bartek Nowak")
     }

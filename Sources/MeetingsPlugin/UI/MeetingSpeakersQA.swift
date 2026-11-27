@@ -44,12 +44,12 @@ final class MeetingSpeakersQA {
         await model.load()
         switch state {
         case .editing:
-            model.beginEditing(seeded.third)
+            await model.beginEditing(seeded.third)
             model.updateDraft("Ola")
         case .merge:
-            model.beginEditing(seeded.third)
+            await model.beginEditing(seeded.third)
             model.updateDraft("Bartek Nowak")
-            await model.commitEdit()
+            await model.commitEdit(of: seeded.third)
         case .mixed, .named, .conflict:
             break
         }

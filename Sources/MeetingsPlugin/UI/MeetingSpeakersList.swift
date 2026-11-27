@@ -39,7 +39,8 @@ struct MeetingSpeakersList: View {
     struct Actions {
         var beginEditing: (Int64) -> Void = { _ in }
         var updateDraft: (String) -> Void = { _ in }
-        var commitEdit: () -> Void = {}
+        /// Saves the name typed at this speaker; nothing when another speaker's edit is the open one.
+        var commitEdit: (Int64) -> Void = { _ in }
         var cancelEdit: () -> Void = {}
         var confirm: (Int64) -> Void = { _ in }
         var reject: (Int64) -> Void = { _ in }
@@ -146,10 +147,12 @@ struct MeetingSpeakersList: View {
     private func nameField(_ row: Row) -> some View {
         SpeakerNameField(
             text: state.edit?.draft ?? row.name, font: textSize.nsFont(.body),
-            onChange: { actions.updateDraft($0) }, onReturn: { actions.commitEdit() },
+            onChange: { actions.updateDraft($0) }, onReturn: { actions.commitEdit(row.id) },
             onEscape: { actions.cancelEdit() },
-            // Clicking elsewhere saves, like Return; Esc has already closed the edit, so it saves nothing.
-            onFocusLost: { actions.commitEdit() })
+            // The keyboard moving elsewhere (Tab, a click in another field) saves, like Return; a click on another
+            // speaker's name has already saved through `beginEditing`. The save is bound to this row, so this
+            // field's late focus loss never closes the next one, and after Esc it saves nothing.
+            onFocusLost: { actions.commitEdit(row.id) })
     }
 
     // MARK: Lines under a row

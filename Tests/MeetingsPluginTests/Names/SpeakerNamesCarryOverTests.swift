@@ -259,6 +259,44 @@ import Testing
         #expect(two.label == "Mówca 2" && two.suggestedName == "Marek" && two.status == .suggested)
     }
 
+    /// A suggestion a cut reply leaves frozen holds its name like an applied one (review n1 of rv6): while one
+    /// speaker still asks "Marek?", a cut reply cannot apply "Marek" at another. Every name is fictional.
+    @Test func aCutReplyCannotApplyTheNameAFrozenSuggestionShows() async throws {
+        let f = try fixture(texts: [
+            "Zaczynamy spotkanie.", "Dziękuję wszystkim.", "Chyba jestem Marek, zobaczymy.",
+            "Zaczynamy od budżetu.", "Hej, tu Marek, ruszamy.", "Omawiamy harmonogram projektu.",
+        ])
+        defer { withExtendedLifetime(f.directory) {} }
+        try f.store.applySpeakerPlan(plan(f), meetingID: f.meeting, diarizationModelID: nil)
+        let unsure = """
+            [{"speaker": "Mówca 1", "name": "Marek", "kind": "introduction", \
+            "quote": "jestem Marek", "confidence": "low"}]
+            """
+        #expect(try await refresh(f, generator: .answering(unsure)).written)
+        let suggested = try state(f, segment: 2)
+        #expect(suggested.label == "Mówca 1" && suggested.suggestedName == "Marek" && suggested.status == .suggested)
+
+        // A cut reply is sure the other speaker is Marek.
+        let cut = ScriptedGenerator { _, _ in
+            GenerationResult(
+                text: """
+                    [{"speaker": "Mówca 2", "name": "Marek", "kind": "introduction", \
+                    "quote": "tu Marek", "confidence": "high"}]
+                    """, stoppedByTokenLimit: true)
+        }
+        let truncated = try await refresh(f, generator: cut)
+        #expect(truncated.pass.truncated)
+        // The frozen suggestion stays as it was, and the other speaker does not get the name it asks about.
+        let kept = try state(f, segment: 2)
+        #expect(kept.label == "Mówca 1" && kept.suggestedName == "Marek" && kept.status == .suggested)
+        #expect(kept.source == .transcript)
+        let other = try state(f, segment: 4)
+        #expect(other.label == "Mówca 2")
+        #expect(other.status != .applied)
+        #expect(other.suggestedName == nil)
+        #expect(other.source == .default)
+    }
+
     /// The known name list reaches the resolver through `Resolution` (review n1): a sure announcement is applied
     /// only when the name stands on the list the platform or the calendar gave.
     @Test func theKnownNamesDecideASureAnnouncement() async throws {

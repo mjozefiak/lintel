@@ -14,7 +14,7 @@ import Testing
         var state: MeetingSpeakersList.State
         var title = "Przegląd wdrożenia"
         var drafts: [String] = []
-        var commits = 0
+        var commits: [Int64] = []
         var cancels = 0
         var mergeCancels = 0
 
@@ -24,7 +24,7 @@ import Testing
             MeetingSpeakersList.Actions(
                 beginEditing: { [unowned self] id in state.edit = .init(speakerID: id, draft: "Mówca 3") },
                 updateDraft: { [unowned self] in drafts.append($0) },
-                commitEdit: { [unowned self] in commits += 1 },
+                commitEdit: { [unowned self] in commits.append($0) },
                 cancelEdit: { [unowned self] in cancels += 1 },
                 cancelMerge: { [unowned self] in mergeCancels += 1 })
         }
@@ -91,7 +91,8 @@ import Testing
         editor.insertText("Ola", replacementRange: editor.selectedRange())
         #expect(box.drafts.last == "Ola")
         editor.doCommand(by: #selector(NSResponder.insertNewline(_:)))
-        #expect(box.commits >= 1)
+        #expect(!box.commits.isEmpty)
+        #expect(box.commits.allSatisfy { $0 == 4 })
         #expect(box.cancels == 0)
         #expect(box.title == "Przegląd wdrożenia")
     }
@@ -112,6 +113,31 @@ import Testing
         #expect(box.cancels == 1)
         #expect(box.commits == commitsBefore)
         #expect(box.title == "Przegląd wdrożenia")
+    }
+
+    /// Review m1 of rv6: the old field leaving the window when another name opens says which speaker it was, so its
+    /// focus loss saves that speaker's name and never closes the next field.
+    @Test func theOldFieldsFocusLossNamesItsOwnSpeaker() async throws {
+        let box = Box(.init(rows: Self.rows))
+        let (window, host) = window(box)
+        defer { window.close() }
+        host.layoutSubtreeIfNeeded()
+        box.actions.beginEditing(4)
+        let first = await pollUntil("the first speaker field to take the keyboard", guard: .seconds(10)) {
+            host.layoutSubtreeIfNeeded()
+            return speakerEditor(in: window) != nil
+        }
+        #expect(first)
+        let editor = try #require(speakerEditor(in: window))
+        editor.insertText("Ola", replacementRange: editor.selectedRange())
+        box.actions.beginEditing(2)
+        let moved = await pollUntil("the second speaker field to take the keyboard", guard: .seconds(10)) {
+            host.layoutSubtreeIfNeeded()
+            return !box.commits.isEmpty && speakerEditor(in: window) != nil
+        }
+        #expect(moved)
+        #expect(box.commits == [4])
+        #expect(box.state.edit?.speakerID == 2)
     }
 
     // MARK: m1, m2

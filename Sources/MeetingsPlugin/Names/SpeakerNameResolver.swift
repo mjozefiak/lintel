@@ -76,8 +76,8 @@ struct SpeakerNameResolution: Equatable, Sendable {
 ///
 /// Rules, in the order they are applied:
 /// - A cluster the user named (`source == .user`) or confirmed (`status == .confirmed`) is untouchable: it comes
-///   back exactly as it went in, on every resolution. Its name also cannot be given to another cluster by an
-///   automatic source.
+///   back exactly as it went in, on every resolution. Its name, and the suggestion it still shows ("Marek?"),
+///   cannot be given to another cluster by an automatic source.
 /// - The owner's cluster (`isSelf`, microphone channel) gets `selfName` as `applied` when it is set and not a
 ///   placeholder — how today's finalizer names it. Without `selfName` the cluster keeps no name.
 /// - Automatic sources run only in `diarized` mode and only for the other clusters. One cluster takes the surest
@@ -134,6 +134,9 @@ enum SpeakerNameResolver {
         for cluster in request.clusters where isProtected(cluster) {
             decided.insert(cluster.id)
             if let name = cleanedName(cluster.label) { reserved.append(name) }
+            // A suggestion a protected cluster still shows (one a cut reply left frozen, review n1) holds its name
+            // too: another cluster never gets it applied while this one asks "Marek?".
+            if let name = cluster.suggestedName.flatMap(cleanedName) { reserved.append(name) }
         }
 
         // Self: the owner's cluster gets `selfName`, as today's finalizer names it.

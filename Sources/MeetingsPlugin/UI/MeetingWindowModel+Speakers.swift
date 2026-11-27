@@ -132,9 +132,16 @@ extension MeetingWindowModel {
     // MARK: Editing in place
 
     /// A click on a name: the name becomes a field with the current name. Ignored while the merge question waits.
-    func beginEditing(_ speakerID: Int64) {
-        guard mergeOffer == nil, let speaker = document?.speaker(id: speakerID) else { return }
+    /// A name typed at another speaker is saved first, like Return (blank or unchanged saves nothing); when that
+    /// name is another speaker's, its merge question comes first and no new field opens.
+    func beginEditing(_ speakerID: Int64) async {
+        guard mergeOffer == nil, speakerEdit?.speakerID != speakerID,
+            let speaker = document?.speaker(id: speakerID)
+        else { return }
+        let rename = closeEdit(of: speakerEdit?.speakerID)
+        guard mergeOffer == nil else { return }
         speakerEdit = SpeakerEdit(speakerID: speakerID, draft: Self.visible(speaker.label))
+        if let rename { await renameSpeaker(rename.speakerID, to: rename.name) }
     }
 
     func updateDraft(_ text: String) {
@@ -147,21 +154,29 @@ extension MeetingWindowModel {
         speakerEdit = nil
     }
 
-    /// Return (and the field losing focus): saves the typed name. A blank one or the same one changes nothing; a
-    /// name another speaker has asks whether to merge instead of saving. Does nothing when no edit is open (Esc
-    /// came first).
-    func commitEdit() async {
-        guard let edit = speakerEdit else { return }
+    /// Return (and the field losing focus): saves the name typed at `speakerID`. A blank one or the same one
+    /// changes nothing; a name another speaker has asks whether to merge instead of saving. Does nothing unless
+    /// that speaker's edit is the open one: Esc came first, or a click on another name already saved it and opened
+    /// that name's field, which a late focus loss of the old field must not close.
+    func commitEdit(of speakerID: Int64) async {
+        guard let rename = closeEdit(of: speakerID) else { return }
+        await renameSpeaker(rename.speakerID, to: rename.name)
+    }
+
+    /// Closes the open edit of `speakerID` and decides what saving it means, before any `await`: nothing (blank,
+    /// unchanged, no such edit), the merge question (shown here) or the rename it returns.
+    private func closeEdit(of speakerID: Int64?) -> (speakerID: Int64, name: String)? {
+        guard let edit = speakerEdit, edit.speakerID == speakerID else { return nil }
         speakerEdit = nil
         let name = Self.visible(edit.draft)
         guard let speaker = document?.speaker(id: edit.speakerID), !name.isEmpty, name != speaker.label else {
-            return
+            return nil
         }
         if let holder = speakerHolding(name, besides: speaker.id) {
             setMergeOffer(MergeOffer(speakerID: speaker.id, targetID: holder.id, name: name, origin: .rename))
-            return
+            return nil
         }
-        await renameSpeaker(speaker.id, to: name)
+        return (speaker.id, name)
     }
 
     // MARK: Suggestions

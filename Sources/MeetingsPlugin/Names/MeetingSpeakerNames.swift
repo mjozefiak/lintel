@@ -40,9 +40,9 @@ extension MeetingsStore: SpeakerNameStore {}
 ///   knows nothing new about the conversation: the names it gave earlier (`transcript`, applied or suggested) and
 ///   their evidence stay as they are (orchestrator decision 2026-11-26).
 /// - A reply cut by the token limit (`SpeakerNamePass.Outcome.truncated`) is an answer with a hole in it, not a
-///   denial: it may add names, and the names the conversation gave earlier stay with their evidence. Those names
-///   are reserved in that run too: the resolver treats their speakers as protected, so a second speaker never
-///   gets the same name (the one-name-per-speaker rule; review m3).
+///   denial: it may add names, and the names the conversation gave earlier stay with their evidence. Those names,
+///   and the suggestions it left ("Marek?"), are reserved in that run too: the resolver treats their speakers as
+///   protected, so a second speaker never gets the same name (the one-name-per-speaker rule; reviews m3 and n1).
 ///
 /// Nothing here logs; `Report` holds counts and closed codes only (for `NotesTrace`).
 enum MeetingSpeakerNames {
@@ -299,9 +299,9 @@ extension MeetingSpeakerNames {
             let clusters = document.speakers.map { speaker -> SpeakerNameCluster in
                 var cluster = MeetingSpeakerNames.cluster(for: speaker, state: byID[speaker.id])
                 // A name a cut reply leaves frozen is not up for grabs either: the resolver sees that speaker as
-                // protected, so the name is reserved and no other speaker takes it in this run. Only the plan
-                // sees the `.confirmed` status; the speaker is not `writable`, so the store writes nothing for
-                // it (review m3).
+                // protected, so the name, or the suggestion it shows (review n1), is reserved and no other speaker
+                // takes it in this run. Only the plan sees the `.confirmed` status; the speaker is not `writable`,
+                // so the store writes nothing for it (review m3).
                 if !speaker.isSelf, !writable.contains(speaker.id), byID[speaker.id]?.source == .transcript {
                     cluster.status = .confirmed
                 }

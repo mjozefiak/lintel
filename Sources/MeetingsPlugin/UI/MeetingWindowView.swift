@@ -169,12 +169,15 @@ struct MeetingWindowView: View {
     /// The scroll anchor of a segment; a string, so it never collides with a speaker row's id.
     static func segmentAnchor(_ id: Int64) -> String { "segment-\(id)" }
 
-    private var speakerActions: MeetingSpeakersList.Actions {
-        let model = model
-        return MeetingSpeakersList.Actions(
-            beginEditing: { model.beginEditing($0) },
+    private var speakerActions: MeetingSpeakersList.Actions { Self.speakerActions(for: model) }
+
+    /// What the list's buttons and name field do to the model. Each save names its speaker, so a field's late
+    /// focus loss saves only its own name (review m1 of rv6).
+    static func speakerActions(for model: MeetingWindowModel) -> MeetingSpeakersList.Actions {
+        MeetingSpeakersList.Actions(
+            beginEditing: { id in Task { await model.beginEditing(id) } },
             updateDraft: { model.updateDraft($0) },
-            commitEdit: { Task { await model.commitEdit() } },
+            commitEdit: { id in Task { await model.commitEdit(of: id) } },
             cancelEdit: { model.cancelEdit() },
             confirm: { id in Task { await model.confirmSuggestion(id) } },
             reject: { id in Task { await model.rejectSuggestion(id) } },
