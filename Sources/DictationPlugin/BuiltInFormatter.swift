@@ -11,6 +11,8 @@ struct BuiltInFormatter: TextFormatter {
 
     private let runtime: KeepWarmRuntime
     private let level: DictationSettings.CleanupLevel
+    private let vocabulary: @Sendable () -> [String]
+    private let checksTerms: Bool
     private let timeout: @Sendable (Int) -> Duration
     private let clock: any Clock<Duration>
     private let logger: Logger
@@ -19,14 +21,20 @@ struct BuiltInFormatter: TextFormatter {
     ///   - timeout: how long a chunk of this many words may take; tests shorten it.
     ///   - clock: the clock the time limit is measured on; a test passes a virtual one.
     ///   - level: the cleanup level whose prompt and guard limits are used (`.full` or `.standard`).
+    ///   - vocabulary: the vocabulary's terms and variants, which the guard's term check keeps in the text.
+    ///   - checksTerms: whether the guard runs the term check; the shipped switch unless a test turns it on.
     init(
         runtime: KeepWarmRuntime, level: DictationSettings.CleanupLevel = .standard,
+        vocabulary: @escaping @Sendable () -> [String] = { [] },
+        checksTerms: Bool = FormatterGuard.checksTerms,
         timeout: @escaping @Sendable (Int) -> Duration = BuiltInFormatter.timeout(forWords:),
         clock: any Clock<Duration> = ContinuousClock(),
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "dictation")
     ) {
         self.runtime = runtime
         self.level = level
+        self.vocabulary = vocabulary
+        self.checksTerms = checksTerms
         self.timeout = timeout
         self.clock = clock
         self.logger = logger
@@ -75,7 +83,9 @@ struct BuiltInFormatter: TextFormatter {
             logger.error("The built-in model failed: \(String(describing: type(of: error)), privacy: .public)")
             return raw.falling(Self.reason(for: error))
         case .success(let content):
-            switch FormatterGuard.check(input: chunk, output: content, level: level) {
+            switch FormatterGuard.check(
+                input: chunk, output: content, level: level, vocabulary: vocabulary(), checksTerms: checksTerms)
+            {
             case .accepted(let text):
                 return FormatResult(text: text, outcome: .formatted)
             case .rejected(let reason):

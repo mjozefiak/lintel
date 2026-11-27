@@ -1,0 +1,21 @@
+# id: pl02-sales
+# lang: pl
+# date: 2026-11-19
+# self: Paweł
+# title: Rozmowa z klientem Lumen
+[00:03] Paweł: Dzień dobry, pani Anno, dziękuję, że znalazła pani czas. Jest ze mną Kuba z działu wdrożeń.
+[00:10] Anna: Dzień dobry. Tak, mamy pół godziny, potem mam zarząd.
+[00:16] Kuba: Dzień dobry, Kuba Lis, będę prowadził wdrożenie, jeśli się dogadamy.
+[00:24] Anna: Konkretnie: potrzebujemy licencji na czterdzieści pięć stanowisk, docelowo może sześćdziesiąt.
+[00:35] Paweł: Rozumiem. Przy czterdziestu pięciu stanowiskach możemy zejść z ceną. Mówiliśmy o rabacie dziesięć procent, ale dam radę dwanaście.
+[00:48] Anna: Dwanaście procent brzmi dobrze. Proszę to przesłać na piśmie, żebym mogła pokazać zarządowi.
+[00:55] Paweł: Oczywiście. Wyślę pani ofertę z rabatem dwanaście procent na czterdzieści pięć stanowisk do jutra.
+[01:06] Anna: Świetnie. A jeśli zarząd zatwierdzi budżet, to chcielibyśmy zobaczyć demo dla całego zespołu, gdzieś w grudniu.
+[01:17] Paweł: Jasne, jak tylko pani da znać, że budżet jest zatwierdzony, wyślę zaproszenie na demo.
+[01:25] Kuba: Ja przygotuję w międzyczasie projekt umowy, żeby nie tracić czasu.
+[01:31] Anna: Dobrze. Jeszcze pytanie o szkolenia, czy są w cenie?
+[01:37] Paweł: Dwa szkolenia online są w cenie, kolejne płatne osobno.
+[01:44] Anna: Rozumiem. Myślałam jeszcze o wersji na serwer lokalny, ale nie, jednak chmura nam wystarczy.
+[01:53] Paweł: Dobrze, to zostajemy przy chmurze.
+[01:58] Anna: To na razie tyle, czekam na ofertę.
+[02:03] Paweł: Dziękujemy, do usłyszenia.

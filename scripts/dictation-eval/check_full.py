@@ -21,7 +21,10 @@ Checks per result file:
                 number written as digits counts, the guard's number check is the gate
   lost words    items that lost a content word (a stem of 5 letters; fillers and correction signals excluded), with the
                 total of lost stems; self-correction items listed apart (compare with Standard: only a difference counts)
-  one line      items under 25 words (outside the `list` category) whose output has a line break (target 0)
+  one line      items under 25 words (outside the `list` category) whose output has a line break and whose raw text has
+                no spoken greeting or sign-off (target 0). A short message that has one is laid out on purpose (spec
+                2026-11-26, Full v2: the layout follows what was said, not the length), so it is listed apart as
+                "short item with a spoken greeting or sign-off" and the literal count of both is printed as well
   greeting      mail items whose raw text starts with a greeting: how many have it alone on the first line
   paragraphs    mail and long items with at least two paragraphs; a proxy, because the raw transcripts carry no pauses
   fallback      chunks whose answer was rejected, by guard reason
@@ -76,6 +79,11 @@ def contains(seq, phrase):
     return any(seq[i : i + n] == phrase for i in range(len(seq) - n + 1))
 
 
+def has_layout_words(raw_tokens):
+    """Whether the raw text begins with a greeting or ends with a sign-off (the words Full lays out)."""
+    return any(contains(raw_tokens[:3], g) for g in GREETINGS) or any(contains(raw_tokens[-4:], s) for s in SIGN_OFFS)
+
+
 def lines_of(text):
     return [line for line in text.splitlines() if line.strip()]
 
@@ -108,7 +116,7 @@ def analyse(raw, out, categories):
     result = {"items": len(ids), "chunks": 0, "fell_back": 0, "rejections": {}, "ratios": {}}
     invented, lost_nums, lost_nums_sc, new_nums = [], [], [], []
     lost_words, lost_words_sc, lost_stem_total = [], [], 0
-    one_line, greeting_total, greeting_ok = [], 0, 0
+    one_line, one_line_laid_out, greeting_total, greeting_ok = [], [], 0, 0
     para_total, para_ok = 0, 0
     for item in ids:
         source, text = raw[item]["output"], out[item]["output"]
@@ -132,7 +140,7 @@ def analyse(raw, out, categories):
             (lost_words_sc if self_correction else lost_words).append(item)
             lost_stem_total += 0 if self_correction else len(missing)
         if len(source.split()) < SHORT_WORDS and category != "list" and "\n" in text.strip():
-            one_line.append(item)
+            (one_line_laid_out if has_layout_words(raw_tokens) else one_line).append(item)
         if category == "mail" and any(contains(raw_tokens[:3], g) for g in GREETINGS):
             greeting_total += 1
             blocks = re.split(r"\n\s*\n", text.strip())
@@ -150,6 +158,7 @@ def analyse(raw, out, categories):
     result.update(
         invented=invented, lost_nums=lost_nums, lost_nums_sc=lost_nums_sc, new_nums=new_nums,
         lost_words=lost_words, lost_words_sc=lost_words_sc, lost_stems=lost_stem_total, one_line=one_line,
+        one_line_laid_out=one_line_laid_out,
         greeting=(greeting_ok, greeting_total), paragraphs=(para_ok, para_total),
     )
     return result
@@ -171,7 +180,8 @@ def report(label, r, markdown):
         ("lost content word (items, not self-correction)", len(r["lost_words"])),
         ("lost content stems (total, not self-correction)", r["lost_stems"]),
         ("lost content word (self-correction items)", len(r["lost_words_sc"])),
-        ("short item with a line break (items)", len(r["one_line"])),
+        ("short item with a line break, no spoken greeting or sign-off (items)", len(r["one_line"])),
+        ("short item with a line break, spoken greeting or sign-off (laid out on purpose)", len(r["one_line_laid_out"])),
         ("mail greeting alone on the first line", "%d / %d" % r["greeting"]),
         ("mail+long with ≥ 2 paragraphs (proxy)", "%d / %d" % r["paragraphs"]),
         ("chunks, fell back", f"{r['chunks']}, {r['fell_back']}"),
@@ -187,7 +197,7 @@ def report(label, r, markdown):
     else:
         for name, value in rows:
             print(f"{name}: {value}")
-    ids = {k: r[k] for k in ("invented", "lost_nums", "new_nums", "one_line") if r[k]}
+    ids = {k: r[k] for k in ("invented", "lost_nums", "new_nums", "one_line", "one_line_laid_out") if r[k]}
     if ids:
         print("ids (no text): " + "; ".join(f"{k}: {', '.join(v)}" for k, v in ids.items()))
 
