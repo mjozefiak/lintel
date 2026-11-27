@@ -617,12 +617,12 @@
     },
     "notes.explorer\/narrow-stacked@light-m-en.png" : {
       "height" : 1040,
-      "sha256" : "8e6c0f8336744536aa3e378a2ef12a1e98f626ca2a27ee7dd8eeb24195680174",
+      "sha256" : "7aa4f3e2e2697a06e523a835ab651d5f72f3793d919cae0091510dbdf7884db1",
       "width" : 508
     },
     "notes.explorer\/narrow-stacked@light-xl-pl.png" : {
       "height" : 1040,
-      "sha256" : "15cfcb2e8ba20069ac515aef856e5f05bc28f9b6f47248b15f4fb6d19aa1e0fc",
+      "sha256" : "a6ba61cf178269af53d2fea468115c34a4e5cb8d7e4045493deab3eade35164f",
       "width" : 508
     },
     "notes.explorer\/search-no-results-meetings@dark-m-en.png" : {
@@ -1002,7 +1002,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45974338096",
+  "recordRun" : "45988583808",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
