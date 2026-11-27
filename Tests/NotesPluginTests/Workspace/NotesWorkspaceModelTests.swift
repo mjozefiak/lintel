@@ -65,6 +65,8 @@ private struct Rig {
                 library: library, pasteboard: pasteboard, saver: saver, sourceSetChanges: { stream },
                 openSettings: { counter.count += 1 },
                 now: { now }, calendar: utc, locale: english))
+        // The tests below read the Meetings list (the old Notes list without manual notes).
+        model.prepareCollection(.meetings)
     }
 }
 

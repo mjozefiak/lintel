@@ -11557,24 +11557,6 @@
         }
       }
     },
-    "Lintel can’t read the key to your notes. Nothing was deleted." : {
-      "comment" : "Notes: strip when the key to notes.sqlite cannot be read",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel can’t read the key to your notes. Nothing was deleted."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel nie może odczytać klucza do notatek. Nic nie zostało usunięte."
-          }
-        }
-      }
-    },
     "Lintel can’t read the key. Nothing was deleted." : {
       "comment" : "Settings → Clipboard banner detail when the keychain denied access to the key",
       "extractionState" : "manual",
@@ -26101,6 +26083,24 @@
         }
       }
     },
+    "Write Notes" : {
+      "comment" : "Preview: writes the notes of a meeting that has none",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Write Notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Napisz notatki"
+          }
+        }
+      }
+    },
     "Write notes after each meeting" : {
       "comment" : "Meetings settings toggle of automatic notes",
       "extractionState" : "manual",
@@ -26349,6 +26349,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wczoraj"
+          }
+        }
+      }
+    },
+    "Your own notes and edits can’t be opened right now. Nothing was deleted." : {
+      "comment" : "Notes: strip when the key to notes.sqlite cannot be read",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your own notes and edits can’t be opened right now. Nothing was deleted."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twoich notatek i zmian nie da się teraz otworzyć. Nic nie zostało usunięte."
+          }
+        }
+      }
+    },
+    "yesterday %@" : {
+      "comment" : "Row accessibility label: a time yesterday",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "yesterday %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "wczoraj %@"
           }
         }
       }
@@ -27380,7 +27416,7 @@
       }
     },
     "today %@" : {
-      "comment" : "Inspector, History: the time of a version made today",
+      "comment" : "A time today: a version in the inspector's History, and a list row's accessibility label",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -27735,6 +27771,816 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "✕ anuluje"
+          }
+        }
+      }
+    },
+    "All notes" : {
+      "comment" : "Sidebar and list heading: every note",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wszystkie notatki"
+          }
+        }
+      }
+    },
+    "Dictation is off." : {
+      "comment" : "Explorer empty state of Dictations, off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation is off."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie jest wyłączone."
+          }
+        }
+      }
+    },
+    "Hold %@ in any app and speak. Your dictations appear here." : {
+      "comment" : "Explorer empty state of Dictations; the shortcut",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold %@ in any app and speak. Your dictations appear here."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przytrzymaj %@ w dowolnej aplikacji i mów. Tu pojawią się Twoje dyktowania."
+          }
+        }
+      }
+    },
+    "Hold your dictation shortcut in any app and speak. Your dictations appear here." : {
+      "comment" : "Explorer empty state of Dictations, the shortcut is not known",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold your dictation shortcut in any app and speak. Your dictations appear here."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przytrzymaj skrót do dyktowania w dowolnej aplikacji i mów. Tu pojawią się Twoje dyktowania."
+          }
+        }
+      }
+    },
+    "Lintel can’t open your notes right now. Nothing was deleted." : {
+      "comment" : "Explorer: the notes cannot be opened",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel can’t open your notes right now. Nothing was deleted."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel nie może teraz otworzyć Twoich notatek. Nic nie zostało usunięte."
+          }
+        }
+      }
+    },
+    "Lintel couldn’t read this note. Nothing was deleted." : {
+      "comment" : "Preview: the source did not answer",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel couldn’t read this note. Nothing was deleted."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel nie mógł odczytać tej notatki. Nic nie zostało usunięte."
+          }
+        }
+      }
+    },
+    "Lintel is writing the notes." : {
+      "comment" : "Preview: the notes are being written",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel is writing the notes."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel pisze notatki."
+          }
+        }
+      }
+    },
+    "Meetings are off." : {
+      "comment" : "Explorer empty state of Meetings, off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meetings are off."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spotkania są wyłączone."
+          }
+        }
+      }
+    },
+    "Meetings you record appear here." : {
+      "comment" : "Explorer empty state of Meetings",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meetings you record appear here."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pojawią się nagrane spotkania."
+          }
+        }
+      }
+    },
+    "My notes" : {
+      "comment" : "Preview: the tab with your own notes",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moje notatki"
+          }
+        }
+      }
+    },
+    "No notes match “%@” in Dictations." : {
+      "comment" : "Explorer: a search in the Dictations list found nothing; the query",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No notes match “%@” in Dictations."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brak notatek dla „%@” w dyktowaniach."
+          }
+        }
+      }
+    },
+    "No notes match “%@” in Meetings." : {
+      "comment" : "Explorer: a search in the Meetings list found nothing; the query",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No notes match “%@” in Meetings."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brak notatek dla „%@” w spotkaniach."
+          }
+        }
+      }
+    },
+    "Notes are off for this meeting." : {
+      "comment" : "Preview: no notes were written",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes are off for this meeting."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki są wyłączone dla tego spotkania."
+          }
+        }
+      }
+    },
+    "Notes are off for this meeting. For new meetings, turn on “Write notes after each meeting” in Settings → Meetings." : {
+      "comment" : "Preview: no notes were written and they cannot be written from here",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes are off for this meeting. For new meetings, turn on “Write notes after each meeting” in Settings → Meetings."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki są wyłączone dla tego spotkania. Dla nowych spotkań włącz „Pisz notatki po każdym spotkaniu” w Ustawieniach → Spotkania."
+          }
+        }
+      }
+    },
+    "Notes not written" : {
+      "comment" : "Explorer row: the notes could not be written",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes not written"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki nie powstały"
+          }
+        }
+      }
+    },
+    "Now" : {
+      "comment" : "Explorer row: the meeting being recorded",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teraz"
+          }
+        }
+      }
+    },
+    "Open the note to write them." : {
+      "comment" : "Preview: where My notes can be written",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the note to write them."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otwórz notatkę, aby je napisać."
+          }
+        }
+      }
+    },
+    "Search All Notes" : {
+      "comment" : "Explorer: a search in one collection found nothing",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search All Notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szukaj we wszystkich notatkach"
+          }
+        }
+      }
+    },
+    "Search meetings" : {
+      "comment" : "Explorer: placeholder of the search field in the Meetings list",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search meetings"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szukaj spotkań"
+          }
+        }
+      }
+    },
+    "Select a note to read it here." : {
+      "comment" : "Preview: nothing is selected",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a note to read it here."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wybierz notatkę, aby przeczytać ją tutaj."
+          }
+        }
+      }
+    },
+    "Shows the note. Return opens it." : {
+      "comment" : "Explorer row: accessibility hint",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows the note. Return opens it."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pokazuje notatkę. Return otwiera ją."
+          }
+        }
+      }
+    },
+    "This note is no longer there." : {
+      "comment" : "Preview: the note was removed",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This note is no longer there."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tej notatki już nie ma."
+          }
+        }
+      }
+    },
+    "Turn on dictation in Settings." : {
+      "comment" : "Explorer empty state: dictation is switched off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on dictation in Settings."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włącz dyktowanie w Ustawieniach."
+          }
+        }
+      }
+    },
+    "Turn on meetings in Settings." : {
+      "comment" : "Explorer empty state: meetings are off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on meetings in Settings."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włącz spotkania w Ustawieniach."
+          }
+        }
+      }
+    },
+    "Turn on meetings or dictation in Settings." : {
+      "comment" : "Explorer empty state: both recording features are off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn on meetings or dictation in Settings."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Włącz spotkania lub dyktowanie w Ustawieniach."
+          }
+        }
+      }
+    },
+    "Waiting for a download" : {
+      "comment" : "Explorer row: the notes need something to download first",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for a download"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Czeka na pobranie"
+          }
+        }
+      }
+    },
+    "Your notes will appear here." : {
+      "comment" : "Explorer empty state, everything is off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your notes will appear here."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pojawią się Twoje notatki."
+          }
+        }
+      }
+    },
+    "Your notes will appear here. Hold %@ to dictate in any app." : {
+      "comment" : "Explorer empty state of All notes while meetings are off; the shortcut",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your notes will appear here. Hold %@ to dictate in any app."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pojawią się Twoje notatki. Przytrzymaj %@, by dyktować w dowolnej aplikacji."
+          }
+        }
+      }
+    },
+    "Your notes will appear here. Hold your dictation shortcut to dictate in any app." : {
+      "comment" : "Explorer empty state of All notes while meetings are off, no shortcut known",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your notes will appear here. Hold your dictation shortcut to dictate in any app."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pojawią się Twoje notatki. Przytrzymaj skrót do dyktowania, by dyktować w dowolnej aplikacji."
+          }
+        }
+      }
+    },
+    "Your notes will appear here. Record a meeting and Lintel writes the notes." : {
+      "comment" : "Explorer empty state of All notes while dictation is off",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your notes will appear here. Record a meeting and Lintel writes the notes."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pojawią się Twoje notatki. Nagraj spotkanie, a Lintel napisze notatki."
+          }
+        }
+      }
+    },
+    "Your notes will appear here. Record a meeting and Lintel writes the notes. Or hold %@ to dictate in any app." : {
+      "comment" : "Explorer empty state of All notes; the dictation shortcut",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your notes will appear here. Record a meeting and Lintel writes the notes. Or hold %@ to dictate in any app."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pojawią się Twoje notatki. Nagraj spotkanie, a Lintel napisze notatki. Albo przytrzymaj %@, by dyktować w dowolnej aplikacji."
+          }
+        }
+      }
+    },
+    "Your notes will appear here. Record a meeting and Lintel writes the notes. Or hold your dictation shortcut to dictate in any app." : {
+      "comment" : "Explorer empty state of All notes, the shortcut is not known",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your notes will appear here. Record a meeting and Lintel writes the notes. Or hold your dictation shortcut to dictate in any app."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pojawią się Twoje notatki. Nagraj spotkanie, a Lintel napisze notatki. Albo przytrzymaj skrót do dyktowania, by dyktować w dowolnej aplikacji."
+          }
+        }
+      }
+    },
+    "Your own notes about this meeting will appear here." : {
+      "comment" : "Preview: the My notes tab, nothing written yet",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your own notes about this meeting will appear here."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu pojawią się Twoje własne notatki z tego spotkania."
+          }
+        }
+      }
+    },
+    "%lld tasks" : {
+      "comment" : "Explorer row: how many tasks the notes carry",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld task"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tasks"
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld zadanie"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld zadania"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld zadań"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld zadania"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld words" : {
+      "comment" : "Explorer row: the length of a dictation",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld word"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld words"
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld słowo"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld słowa"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld słów"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld słowa"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld meetings" : {
+      "comment" : "Notes status bar: how many meetings the list holds",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld meeting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld meetings"
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld spotkanie"
+                }
+              },
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld spotkania"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld spotkań"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld spotkania"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. Try again, or read the transcript." : {
+      "comment" : "Preview: the notes failed and can be written again",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. Try again, or read the transcript."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel nie zdołał napisać notatek z tego spotkania. Nagranie i transkrypcja są bezpieczne. Spróbuj ponownie albo przeczytaj transkrypcję."
+          }
+        }
+      }
+    },
+    "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. You can read the transcript." : {
+      "comment" : "Preview: the notes failed and cannot be written from here",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel couldn’t write the notes for this meeting. The recording and transcript are safe. You can read the transcript."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel nie zdołał napisać notatek z tego spotkania. Nagranie i transkrypcja są bezpieczne. Możesz przeczytać transkrypcję."
+          }
+        }
+      }
+    },
+    "Notes are written once Lintel has downloaded what it needs." : {
+      "comment" : "Preview: the notes wait for a download",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes are written once Lintel has downloaded what it needs."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki powstaną, gdy Lintel pobierze to, czego potrzebuje."
           }
         }
       }

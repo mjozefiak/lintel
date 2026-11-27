@@ -61,6 +61,7 @@ private struct PaletteRig {
             ]
         }
         model = NotesWorkspaceModel(environment: environment)
+        model.prepareCollection(.meetings)
         await model.refresh()
     }
 }

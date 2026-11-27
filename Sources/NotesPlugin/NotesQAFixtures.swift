@@ -133,7 +133,7 @@ enum NotesQAFixtures {
                 summary: summary,
                 layers: [
                     NoteLayer(
-                        id: "notes", author: .agent, markdown: meetingNotes, version: "1"),
+                        id: "notes", author: .agent, markdown: meetingNotes, version: "1", writer: .claude),
                     NoteLayer(
                         id: "transcript", author: .stt, markdown: transcript, provenance: transcriptProvenance,
                         version: "1"),
@@ -146,7 +146,7 @@ enum NotesQAFixtures {
             return NoteContent(
                 summary: summary,
                 layers: [
-                    NoteLayer(id: "notes", author: .agent, markdown: summaryNotes, version: "1"),
+                    NoteLayer(id: "notes", author: .agent, markdown: summaryNotes, version: "1", writer: .thisMac),
                     NoteLayer(
                         id: "transcript", author: .stt,
                         markdown: segments.map { $0.text }.joined(separator: "\n\n"),
@@ -179,7 +179,8 @@ enum NotesQAFixtures {
                         id: "cleaned", author: .agent, markdown: "Reminder: renew the domain before Friday.",
                         version: "1")
                 ], speakers: [], details: [])
-        case needsModelID:
+        case needsModelID, failedID, writingID:
+            // As in a real meeting: the transcript exists, the notes do not (yet).
             return NoteContent(
                 summary: summary,
                 layers: [
@@ -241,7 +242,19 @@ struct NotesQAFixtureSource: NoteSource {
 
     func exists(_ keys: [NoteKey]) async throws -> Set<NoteKey> { Set(keys).intersection(items.map(\.id)) }
     func content(for key: NoteKey) async throws -> NoteContent? {
-        key.pluginID == pluginID ? NotesQAFixtures.content(for: key, now: now) : nil
+        guard key.pluginID == pluginID else { return nil }
+        switch contentStyle {
+        case .normal:
+            return NotesQAFixtures.content(for: key, now: now)
+        case .notesOff:
+            guard var content = NotesQAFixtures.content(for: key, now: now) else { return nil }
+            content.layers.removeAll { $0.id == "notes" }
+            return content
+        case .neverAnswers:
+            // Ends only when the reader gives up (the view goes away).
+            try await Task.sleep(for: .seconds(3600))
+            return nil
+        }
     }
     func delete(_ key: NoteKey) async throws {}
     /// The interrupted meeting offers "Finish Transcript" and "Finish with a Gap" (they do nothing here), the way Meetings does for a spooled one.
@@ -265,9 +278,20 @@ struct NotesQAFixtureSource: NoteSource {
 
     var isEmpty = false
 
-    static func all(now: Date = Date(), empty: Bool = false) -> [any NoteSource] {
+    /// The gallery's variants of what `content(for:)` answers.
+    enum ContentStyle: Sendable {
+        case normal
+        /// Every meeting without its notes layer: a finished meeting whose notes are off.
+        case notesOff
+        /// The text never arrives: the preview's loading skeleton.
+        case neverAnswers
+    }
+
+    var contentStyle: ContentStyle = .normal
+
+    static func all(now: Date = Date(), empty: Bool = false, contentStyle: ContentStyle = .normal) -> [any NoteSource] {
         ["meetings", "dictation"].map {
-            NotesQAFixtureSource(pluginID: PluginID(rawValue: $0), now: now, isEmpty: empty)
+            NotesQAFixtureSource(pluginID: PluginID(rawValue: $0), now: now, isEmpty: empty, contentStyle: contentStyle)
         }
     }
 }

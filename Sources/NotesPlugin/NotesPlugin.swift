@@ -97,6 +97,9 @@ public final class NotesPlugin: LintelPlugin {
             title: LocalizedStringResource("Notes", comment: "Main window section title"),
             symbolName: "note.text",
             order: Self.manifest.order,
+            sidebar: WorkspaceSidebar(makeView: { [self] context in
+                AnyView(NotesSidebarBlock(model: workspace, context: context))
+            }),
             makeView: { [self] in AnyView(NotesSectionView(model: workspace)) },
             handleRoute: { [self] route in workspace.handle(route) },
             willHide: { [self] in await documents.flushAll() },
@@ -277,6 +280,8 @@ public final class NotesPlugin: LintelPlugin {
             openSettings: context.openSettings, openModels: { context.openModels(nil) })
         environment.settings = context.settings
         environment.availableCommands = context.availableCommands
+        environment.dictationShortcut = { context.commandShortcut("dictation.record") }
+        environment.liveRecorder = context.liveRecorder
         environment.preferences = preferences
         // A recorded note's title is renamed in its owner (`NoteSourceEditing`), never in `notes.sqlite`.
         environment.renameTitle = { key, title in
@@ -332,6 +337,12 @@ public final class NotesPlugin: LintelPlugin {
         #if DEBUG
         openQAFixtureTabs(in: model)
         applyQAState(to: model)
+        if let raw = context.settings.string(NotesSettingsKey.qaSelect) {
+            let parts = raw.split(separator: "@", maxSplits: 1).map(String.init)
+            if let raw = parts.first, let id = NoteRoute.itemID(for: WorkspaceRoute(kind: NoteRoute.kind, id: raw)) {
+                model.initialSelection = (id, parts.count == 2 ? PreviewTab(rawValue: parts[1]) : nil)
+            }
+        }
         #endif
         return model
     }

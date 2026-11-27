@@ -34,6 +34,9 @@ struct NotesSearchTests {
             environment: NotesWorkspaceModel.Environment(
                 library: NoteLibrary(box: box), pasteboard: RecordingPasteboard(), saver: ScriptedSaver(),
                 now: { Fixtures.epoch }, calendar: utc, locale: Locale(identifier: "en_US"), pageSize: 2))
+        // These tests were written for the old Notes list (meetings and manual notes); the explorer's list that
+        // lists only meetings is the same data.
+        model.prepareCollection(.meetings)
         return (model, meetings, dictation)
     }
 
@@ -129,6 +132,41 @@ struct NotesSearchTests {
         #expect(NoteRowPresentation.highlightRanges(in: "abc", query: "").isEmpty)
         let touching = "abab"
         #expect(NoteRowPresentation.highlightRanges(in: touching, query: "ab ba").count == 1)
+    }
+
+    @Test("a snippet starts a few words before its first hit, so two lines never cut the matched word")
+    func focusedSnippet() {
+        let long = "The team agreed to ship the new onboarding on 12 Nov and to postpone the pricing page."
+        let cut = NoteRowPresentation.focusedSnippet(long, query: "postpone")
+        #expect(cut == "…on 12 Nov and to postpone the pricing page.")
+        #expect(NoteRowPresentation.highlightRanges(in: cut, query: "postpone").map { String(cut[$0]) } == ["postpone"])
+        // A hit near the start, no hit, or an empty query: the snippet stays as it is.
+        #expect(NoteRowPresentation.focusedSnippet("We postpone it.", query: "postpone") == "We postpone it.")
+        #expect(NoteRowPresentation.focusedSnippet(long, query: "invoice") == long)
+        #expect(NoteRowPresentation.focusedSnippet(long, query: "") == long)
+        // Polish, found without regard to accents; the cut starts at a whole word.
+        let polish = "Zespół ustalił, że wdrożenie nowego procesu przesuwamy na czas po serii spotkań z klientem."
+        let pl = NoteRowPresentation.focusedSnippet(polish, query: "spotkan")
+        #expect(pl == "…na czas po serii spotkań z klientem.")
+        #expect(NoteRowPresentation.highlightRanges(in: pl, query: "spotkan").count == 1)
+    }
+
+    @Test("a click selects the row and asks the list for the keyboard focus; an arrow key does not ask again")
+    func clickFocusesTheList() async {
+        let (model, _, _) = rig()
+        await model.refresh()
+        let second = model.rows[1].id
+        #expect(model.listFocusRequests == 0)
+        model.click(row: second)
+        #expect(model.explorer.selection == second)
+        #expect(model.listFocusRequests == 1)
+        #expect(model.handleListKey(.up))
+        #expect(model.explorer.selection == model.rows[0].id)
+        #expect(model.listFocusRequests == 1)
+        // A second click on the same row still asks for the focus (the user may have clicked into the search field).
+        model.click(row: second)
+        model.click(row: second)
+        #expect(model.listFocusRequests == 3)
     }
 
     @Test("a hit's label for VoiceOver reads the snippet instead of the time")

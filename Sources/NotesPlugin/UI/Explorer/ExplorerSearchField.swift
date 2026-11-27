@@ -7,6 +7,23 @@ struct ExplorerSearchField: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
     @FocusState private var focused: Bool
+    @Environment(\.notesCompact) private var compact
+
+    private var prompt: Text {
+        // A narrow list has no room for "Szukaj w dyktowaniach" at the largest text size; the heading already says
+        // what is searched.
+        guard !compact else {
+            return Text("Search", comment: "Explorer: short placeholder of the search field in a narrow window")
+        }
+        switch model.collection {
+        case .dictations:
+            return Text(
+                "Search dictations", comment: "Explorer: placeholder of the search field in the Dictations list")
+        case .meetings:
+            return Text("Search meetings", comment: "Explorer: placeholder of the search field in the Meetings list")
+        case .all: return Text("Search notes", comment: "Explorer: placeholder of the search field")
+        }
+    }
 
     var body: some View {
         @Bindable var model = model
@@ -15,11 +32,7 @@ struct ExplorerSearchField: View {
                 .accessibilityHidden(true)
             TextField(
                 text: $model.searchText,
-                prompt: model.collection == .dictations
-                    ? Text(
-                        "Search dictations", comment: "Explorer: placeholder of the search field in the Dictations list"
-                    )
-                    : Text("Search notes", comment: "Explorer: placeholder of the search field")
+                prompt: prompt
             ) {
                 Text("Search notes", comment: "Accessibility label of the explorer's search field")
             }
@@ -41,6 +54,8 @@ struct ExplorerSearchField: View {
         }
         .font(textSize.font(.callout))
         .foregroundStyle(LintelBrand.secondaryText)
+        // The text field's own height varies by a point between renders; a floor keeps the row, and every golden, steady.
+        .frame(minHeight: 18 * textSize.scale)
         .padding(.horizontal, 10 * textSize.scale)
         .padding(.vertical, 6 * textSize.scale)
         .background(LintelBrand.fill, in: RoundedRectangle(cornerRadius: 7))

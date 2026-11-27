@@ -5,6 +5,9 @@ import LintelKit
 enum NoteGrouping: String, Sendable, CaseIterable {
     case time
     case source
+    /// The notes explorer's list (spec `2026-11-24-notes-explorer-main-window`): Today, Yesterday, the weekday for the
+    /// rest of the week, then one group per date.
+    case day
 }
 
 /// The identity of a group. Titles are the UI's (step 3.2), so no string lives here.
@@ -16,6 +19,8 @@ enum NoteGroupKey: Hashable, Sendable {
     case earlier
     /// By plugin: Meetings, Dictation, Notes, then any other.
     case source(PluginID)
+    /// A calendar day that is neither today nor yesterday (the start of that day in the injected calendar).
+    case day(Date)
 }
 
 struct NoteGroup: Sendable, Equatable, Identifiable {
@@ -40,6 +45,15 @@ enum NoteGroupingRules {
                 buckets[timeKey(row.startedAt, now: now, calendar: calendar), default: []].append(row)
             }
             return order.compactMap { key in buckets[key].map { NoteGroup(key: key, rows: $0) } }
+        case .day:
+            var order: [NoteGroupKey] = []
+            var buckets: [NoteGroupKey: [NoteRow]] = [:]
+            for row in sorted {
+                let key = dayKey(row.startedAt, now: now, calendar: calendar)
+                if buckets[key] == nil { order.append(key) }
+                buckets[key, default: []].append(row)
+            }
+            return order.compactMap { key in buckets[key].map { NoteGroup(key: key, rows: $0) } }
         case .source:
             var buckets: [PluginID: [NoteRow]] = [:]
             for row in sorted { buckets[row.pluginID, default: []].append(row) }
@@ -48,6 +62,19 @@ enum NoteGroupingRules {
             return (known + others).compactMap { id in
                 buckets[id].map { NoteGroup(key: .source(id), rows: $0) }
             }
+        }
+    }
+
+    /// One group per calendar day: today and yesterday by name, any other day by its start. A date in the future
+    /// (a clock change) counts as today.
+    static func dayKey(_ date: Date, now: Date, calendar: Calendar) -> NoteGroupKey {
+        let today = calendar.startOfDay(for: now)
+        let day = calendar.startOfDay(for: date)
+        let days = calendar.dateComponents([.day], from: day, to: today).day ?? 0
+        switch days {
+        case ..<1: return .today
+        case 1: return .yesterday
+        default: return .day(day)
         }
     }
 

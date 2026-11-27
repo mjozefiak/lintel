@@ -202,4 +202,20 @@ struct NotesPaneWidthModelTests {
         #expect(section.contains("$0.animation = nil"))
         #expect(!divider.contains("withAnimation"))
     }
+
+    @Test("a section too narrow for the list beside the preview is compact; an unmeasured one never is")
+    func compactBreakpoint() {
+        // 180 (list minimum) + 300 (preview) at Medium.
+        #expect(!NotesPaneLayout.isCompact(sectionWidth: .infinity, textScale: 1))
+        #expect(NotesPaneLayout.isCompact(sectionWidth: 254, textScale: 1))
+        #expect(NotesPaneLayout.isCompact(sectionWidth: 479, textScale: 1))
+        #expect(!NotesPaneLayout.isCompact(sectionWidth: 480, textScale: 1))
+        // A large text size needs more room for the preview, so the breakpoint moves up.
+        #expect(NotesPaneLayout.isCompact(sectionWidth: 560, textScale: 1.3))
+        #expect(!NotesPaneLayout.isCompact(sectionWidth: 580, textScale: 1.3))
+        // The smallest window of the main window (880 pt) is never compact, at the largest text size either
+        // (its sidebar grows with the text: 220 × 1.3).
+        #expect(!NotesPaneLayout.isCompact(sectionWidth: 880 - 220, textScale: 1))
+        #expect(!NotesPaneLayout.isCompact(sectionWidth: 880 - 220 * 1.3, textScale: 1.3))
+    }
 }

@@ -110,7 +110,7 @@ jobs:
           mkdir -p "$out"
           cp -R Tests/MeetingsPluginTests/Gallery/Goldens "$out/goldens"
           cp -R "$RUNNER_TEMP/gallery-sheet" "$out/sheet"
-          cat "$out/goldens/goldens.json" | head -20
+          head -n 20 "$out/goldens/goldens.json"
 
       - name: Upload the sheet and the goldens
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

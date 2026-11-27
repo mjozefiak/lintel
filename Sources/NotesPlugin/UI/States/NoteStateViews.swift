@@ -9,38 +9,12 @@ struct NoteStripView: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
 
+    @Environment(\.notesCompact) private var compact
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Circle().fill(dot).frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
-                    .accessibilityHidden(true)
-                Text(verbatim: strip.text)
-                    .font(textSize.font(.callout))
-                    .foregroundStyle(LintelBrand.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                ForEach(strip.actions) { action in
-                    Button {
-                        Task { await model.perform(action.id) }
-                    } label: {
-                        Text(verbatim: action.title)
-                            .font(textSize.font(.callout, weight: .semibold))
-                            .foregroundStyle(LintelBrand.accentText)
-                            .lineLimit(1)
-                    }
-                    .buttonStyle(.plain)
-                }
-                if strip.isDismissible {
-                    Button {
-                        model.dismissStrip(strip.id)
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(textSize.font(.caption2, weight: .semibold))
-                            .foregroundStyle(LintelBrand.secondaryText)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text("Dismiss", comment: "Accessibility label of a strip's close button"))
-                }
+            Group {
+                if compact { stackedRow } else { row }
             }
             .padding(.horizontal, 16 * textSize.scale)
             .padding(.vertical, 4 * textSize.scale)
@@ -49,6 +23,70 @@ struct NoteStripView: View {
             LintelDivider()
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var sentence: some View {
+        Text(verbatim: strip.text)
+            .font(textSize.font(.callout))
+            .foregroundStyle(LintelBrand.ink)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var dotView: some View {
+        Circle().fill(dot).frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
+            .accessibilityHidden(true)
+    }
+
+    private func actionButton(_ action: NotesWorkspaceModel.Strip.Action) -> some View {
+        Button {
+            Task { await model.perform(action.id) }
+        } label: {
+            Text(verbatim: action.title)
+                .font(textSize.font(.callout, weight: .semibold))
+                .foregroundStyle(LintelBrand.accentText)
+                // The whole word, on one line when it fits; a title longer than the strip wraps, never cut.
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var dismissButton: some View {
+        Button {
+            model.dismissStrip(strip.id)
+        } label: {
+            Image(systemName: "xmark")
+                .font(textSize.font(.caption2, weight: .semibold))
+                .foregroundStyle(LintelBrand.secondaryText)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Dismiss", comment: "Accessibility label of a strip's close button"))
+    }
+
+    private var row: some View {
+        HStack(spacing: 10) {
+            dotView
+            sentence
+            Spacer(minLength: 0)
+            ForEach(strip.actions) { action in actionButton(action).lineLimit(1) }
+            if strip.isDismissible { dismissButton }
+        }
+    }
+
+    /// A narrow section (a window tiled to about 310 pt): the sentence has the width, the actions sit under it.
+    private var stackedRow: some View {
+        HStack(alignment: .top, spacing: 10) {
+            dotView.padding(.top, 6 * textSize.scale)
+            VStack(alignment: .leading, spacing: 4 * textSize.scale) {
+                sentence
+                if !strip.actions.isEmpty {
+                    WrappingRow(spacing: 14 * textSize.scale, lineSpacing: 2 * textSize.scale) {
+                        ForEach(strip.actions) { action in actionButton(action) }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if strip.isDismissible { dismissButton.padding(.top, 2 * textSize.scale) }
+        }
     }
 
     private var dot: Color {
@@ -231,75 +269,5 @@ struct NoteSkeletonDocument: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Loading notes", comment: "Accessibility label while the notes are read"))
-    }
-}
-
-/// The explorer body when there is no list to show (prototype `.nr`, `.skel` rows).
-struct ExplorerPlaceholder: View {
-    let screen: NotesWorkspaceModel.Screen
-    var collection: NoteCollection = .notes
-    @Environment(\.lintelTextSize) private var textSize
-
-    var body: some View {
-        switch screen {
-        case .loading:
-            VStack(spacing: 0) {
-                ForEach(0..<5, id: \.self) { _ in
-                    HStack(alignment: .top, spacing: 9 * textSize.scale) {
-                        Circle().fill(LintelBrand.hairline)
-                            .frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
-                            .padding(.top, 8 * textSize.scale)
-                        VStack(alignment: .leading, spacing: 0) {
-                            NoteSkeletonBar(width: 0.75)
-                            NoteSkeletonBar(width: 0.45)
-                        }
-                    }
-                    .padding(.horizontal, 16 * textSize.scale)
-                    .padding(.vertical, 6 * textSize.scale)
-                }
-                Spacer(minLength: 0)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text("Loading notes", comment: "Accessibility label while the notes are read"))
-        case .locked:
-            VStack(spacing: 6) {
-                Image(systemName: "lock").accessibilityHidden(true)
-                Text("Locked", comment: "Explorer: the notes are locked")
-            }
-            .font(textSize.font(.callout))
-            .foregroundStyle(LintelBrand.secondaryText)
-            .padding(18 * textSize.scale)
-            .frame(maxWidth: .infinity)
-            .accessibilityElement(children: .combine)
-        case .empty:
-            (collection == .dictations
-                ? Text("No dictations yet.", comment: "Dictation history empty state")
-                : Text("No notes yet.", comment: "Explorer: the library is empty"))
-                .font(textSize.font(.callout))
-                .foregroundStyle(LintelBrand.secondaryText)
-                .padding(18 * textSize.scale)
-                .frame(maxWidth: .infinity)
-        case .noResults(let query):
-            VStack(spacing: 0) {
-                if collection == .dictations {
-                    Text(
-                        "No dictations match “\(query)”.",
-                        comment: "Explorer: a search in the dictations found nothing; the query")
-                } else {
-                    Text("No notes match “\(query)”.", comment: "Explorer: a search found nothing; the query")
-                }
-                Text(
-                    "Search covers titles, notes, transcripts and dictations.",
-                    comment: "Explorer: what a search looks in")
-            }
-            .font(textSize.font(.callout))
-            .foregroundStyle(LintelBrand.secondaryText)
-            .multilineTextAlignment(.center)
-            .padding(18 * textSize.scale)
-            .frame(maxWidth: .infinity)
-            .accessibilityElement(children: .combine)
-        case .list:
-            EmptyView()
-        }
     }
 }

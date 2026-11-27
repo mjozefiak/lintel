@@ -52,6 +52,19 @@ extension EnvironmentValues {
     }
 }
 
+private struct NotesCompactKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// The note is shown in a narrow section (`NotesPaneLayout.isCompact`): smaller margins, a speaker above the
+    /// line instead of beside it.
+    var notesCompact: Bool {
+        get { self[NotesCompactKey.self] }
+        set { self[NotesCompactKey.self] = newValue }
+    }
+}
+
 private struct NotesAnimationModifier<Value: Equatable>: ViewModifier {
     let kind: NotesMotion.Kind
     let value: Value

@@ -342,7 +342,9 @@ final class AppCoordinator {
     }
 
     /// The active plugins' workspace sections, by `order`.
-    private static func activeWorkspaceSections(_ host: PluginHost) -> [WorkspaceSection] {
+    /// The workspace sections of the active plugins in their order; a plugin that is off contributes none, so the
+    /// sidebar has no row for it (tested in `MainSidebarTests`).
+    static func activeWorkspaceSections(_ host: PluginHost) -> [WorkspaceSection] {
         host.entries.filter(\.state.isActive).flatMap(\.plugin.workspaceSections).sorted { $0.order < $1.order }
     }
 
@@ -636,7 +638,11 @@ final class AppCoordinator {
                 }
                 guard let section = sections.first(where: { $0.id == state.section })
                 else { return AnyView(EmptyView()) }
-                return section.makeView()
+                return AnyView(
+                    MainWorkspaceView(
+                        sections: sections, section: section,
+                        select: { [weak self] id in _ = self?.mainWindow?.showWorkspace(id) },
+                        openSettings: { [weak self] in _ = self?.mainWindow?.showSettings() }))
             }
         )
         window.activatesApp = environment.registersGlobalHotkeys

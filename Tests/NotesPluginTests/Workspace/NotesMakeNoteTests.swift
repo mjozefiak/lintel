@@ -72,7 +72,7 @@ struct NotesMakeNoteTests {
         await rig.model.makeNote(from: id)
         // Only the cleaned layer, without the bidi control; the raw transcript stays in the dictation.
         #expect(rig.created.all == ["Buy milk."])
-        #expect(rig.model.collection == .notes)
+        #expect(rig.model.collection == .all)
         #expect(rig.model.currentID == .live(Fixtures.key("notes", "made-1")))
         #expect(rig.model.documents[rig.model.currentID ?? id]?.wantsEditing == true)
         #expect(rig.model.tabs.tabs.count == 1)

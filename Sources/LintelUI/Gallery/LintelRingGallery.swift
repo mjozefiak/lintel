@@ -58,7 +58,7 @@ private struct LintelRingSheet: View {
     private static let window = GalleryPresentation.window(width: 560)
 
     private static func state(
-        _ id: String, _ summary: String, _ states: [LintelRingState], motion: LintelRingMotion = .system,
+        _ id: String, _ summary: String, _ states: [LintelRingState], motion: LintelRingMotion = .frozen,
         onAccent: Bool = false
     ) -> GalleryState {
         GalleryState(
@@ -88,8 +88,8 @@ private struct LintelRingSheet: View {
                 [0, 0.25, 0.5, 0.75, 1].map { .processing(progress: $0) }),
             state(
                 "processing-unknown",
-                "Processing with no known progress: a short arc that sweeps round (the picture is one frame).",
-                [.processing(progress: nil)]),
+                "Processing with no known progress: live, a short arc sweeps round. The picture is drawn with Reduce Motion on (the static half ring), so it never depends on the setting of the machine that records it.",
+                [.processing(progress: nil)], motion: .reduced),
             state(
                 "error",
                 "Error: an open ring in the error colour with a wider opening than the idle ring, no dot, never colour alone. The row Notes not written, a failed recording.",

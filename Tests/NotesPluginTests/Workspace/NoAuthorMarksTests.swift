@@ -76,6 +76,23 @@ import Testing
         }
     }
 
+    /// Owner decision on #348 (Q10): the preview carries no line that says an AI wrote the notes. The contract
+    /// `NoteLayer.writer` stays (sources still map it), but no view reads it.
+    @Test func thePreviewDrawsNoWriterFooter() throws {
+        let files = try sources(["Sources/NotesPlugin/UI", "Sources/NotesPlugin/Editor"])
+        for (name, text) in files {
+            for word in ["wrote these notes", "stayed on this Mac", "NoteWriter", ".thisMac", ".claude", "footerText"] {
+                #expect(!text.contains(word), "\(name) mentions \(word)")
+            }
+            #expect(
+                text.range(of: #"selectedLayer\??\.writer|layer\.writer"#, options: .regularExpression) == nil,
+                "\(name) reads the layer's writer")
+        }
+        let catalog = try String(
+            contentsOf: Self.root.appending(path: "Resources/Localizable.xcstrings"), encoding: .utf8)
+        #expect(!catalog.contains("wrote these notes"))
+    }
+
     @Test func theSettingKeyStaysDeclaredButNothingReadsIt() throws {
         // Compatibility: the key is part of the contract. Nothing in the UI or model reads it.
         #expect(

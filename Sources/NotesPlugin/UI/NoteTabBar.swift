@@ -208,7 +208,7 @@ struct NotePathBar: View {
                 .accessibilityAddTraits(document.isEditing ? .isSelected : [])
                 .notesAnimation(.pen, value: document.isEditing)
             }
-            if let document = model.currentDocument, NoteCollection.of(document.id) == .dictations {
+            if let document = model.currentDocument, NoteCollection.isDictation(document.id) {
                 iconButton(
                     "note.text.badge.plus",
                     label: Text("Make note", comment: "Path bar and explorer: copies a dictation into a new note")
@@ -342,26 +342,44 @@ struct NotePathBar: View {
 struct NotesStatusBar: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
+    @Environment(\.notesCompact) private var compact
+
+    private var encryption: some View {
+        Label {
+            Text("Encrypted on this Mac", comment: "Notes status bar: where the notes are stored")
+        } icon: {
+            Image(systemName: "lock")
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             LintelDivider()
-            HStack(spacing: 14) {
-                if let line = model.statusLine { StatusLineView(line: line) }
-                if model.showsEncryptionNote {
-                    Label {
-                        Text("Encrypted on this Mac", comment: "Notes status bar: where the notes are stored")
-                    } icon: {
-                        Image(systemName: "lock")
+            Group {
+                if compact {
+                    // A narrow section: one part per line, so a part wraps between words and never into pieces.
+                    VStack(alignment: .leading, spacing: 2 * textSize.scale) {
+                        if let line = model.statusLine { StatusLineView(line: line) }
+                        if model.showsEncryptionNote { encryption }
+                        if !model.statusRight.isEmpty { Text(verbatim: model.statusRight) }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    HStack(spacing: 14) {
+                        if let line = model.statusLine { StatusLineView(line: line) }
+                        if model.showsEncryptionNote { encryption }
+                        Spacer(minLength: 0)
+                        Text(verbatim: model.statusRight)
                     }
                 }
-                Spacer(minLength: 0)
-                Text(verbatim: model.statusRight)
             }
             .font(textSize.font(.footnote))
             .foregroundStyle(LintelBrand.secondaryText)
             .padding(.horizontal, 12 * textSize.scale)
-            .frame(height: 26 * textSize.scale)
+            // At least the bar's height, more when the words wrap in a narrow window: nothing is cut off.
+            .padding(.vertical, 3 * textSize.scale)
+            .frame(minHeight: 26 * textSize.scale)
+            .fixedSize(horizontal: false, vertical: true)
             .background(LintelBrand.sidebarBackground)
         }
         .accessibilityElement(children: .combine)
@@ -373,30 +391,44 @@ struct StatusLineView: View {
     let line: NotesWorkspaceModel.StatusLine
     @Environment(\.lintelTextSize) private var textSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.notesCompact) private var compact
 
     var body: some View {
-        HStack(spacing: 6) {
-            switch line.kind {
-            case .busy:
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .foregroundStyle(LintelBrand.accentText)
-                    .accessibilityHidden(true)
-            default:
-                Circle().fill(color).frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
-                    .accessibilityHidden(true)
+        // The progress bar goes under the words in a narrow section, so the words keep the whole width.
+        let layout: AnyLayout =
+            compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(spacing: 6))
+        layout {
+            HStack(spacing: 6) {
+                marker
+                Text(verbatim: line.text)
             }
-            Text(verbatim: line.text)
-            if case .busy(let progress?) = line.kind {
-                ZStack(alignment: .leading) {
-                    Capsule().fill(LintelBrand.hairline)
-                    GeometryReader { proxy in
-                        Capsule().fill(LintelBrand.accent).frame(width: proxy.size.width * progress)
-                    }
-                }
-                .frame(width: 8 * 12.5 * textSize.scale, height: 4)
-                .padding(.leading, 2)
+            progressBar
+        }
+    }
+
+    @ViewBuilder private var marker: some View {
+        switch line.kind {
+        case .busy:
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .foregroundStyle(LintelBrand.accentText)
                 .accessibilityHidden(true)
+        default:
+            Circle().fill(color).frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
+                .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder private var progressBar: some View {
+        if case .busy(let progress?) = line.kind {
+            ZStack(alignment: .leading) {
+                Capsule().fill(LintelBrand.hairline)
+                GeometryReader { proxy in
+                    Capsule().fill(LintelBrand.accent).frame(width: proxy.size.width * progress)
+                }
             }
+            .frame(width: 8 * 12.5 * textSize.scale, height: 4)
+            .padding(.leading, compact ? 0 : 2)
+            .accessibilityHidden(true)
         }
     }
 
@@ -423,10 +455,11 @@ extension NotesWorkspaceModel {
     var newNoteAffordance: NewNoteAffordance { NewNoteAffordance(isEnabled: canCreateNote) }
 }
 
-/// "New note" (⌘N): the explorer's prominent button under the search field (owner request after manual testing)
-/// and the tab bar's plus tab (prototype `.tb.pl`). Both run `NotesWorkspaceModel.newNote`, like the menu item.
+/// "New note" (⌘N): the list header's plus button and the tab bar's plus tab (prototype `.tb.pl`). Both run
+/// `NotesWorkspaceModel.newNote`, like the menu item. Neither is filled: Record Meeting is the window's only filled
+/// button (C3).
 struct NewNoteButton: View {
-    enum Style { case prominent, tab }
+    enum Style { case icon, tab }
     let model: NotesWorkspaceModel
     let style: Style
     @Environment(\.lintelTextSize) private var textSize
@@ -444,25 +477,14 @@ struct NewNoteButton: View {
                     .padding(.horizontal, 12)
                     .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
-            case .prominent:
-                HStack(spacing: 8 * textSize.scale) {
-                    Image(systemName: "plus")
-                        .font(textSize.font(.callout, weight: .semibold))
-                        .accessibilityHidden(true)
-                    Text("New note", comment: "Explorer: the button that creates a note")
-                        .font(textSize.font(.callout, weight: .semibold))
-                    Spacer(minLength: 0)
-                    Text(verbatim: NewNoteAffordance.shortcutHint)
-                        .font(textSize.font(.caption1, weight: .semibold))
-                        .opacity(0.8)
-                        .accessibilityHidden(true)
-                }
-                .foregroundStyle(LintelBrand.onAccent)
-                .padding(.horizontal, 12 * textSize.scale)
-                .padding(.vertical, 7 * textSize.scale)
-                .background(LintelBrand.accent, in: RoundedRectangle(cornerRadius: 7))
-                .opacity(isEnabled ? 1 : 0.45)
-                .contentShape(RoundedRectangle(cornerRadius: 7))
+            case .icon:
+                Image(systemName: "plus")
+                    .font(textSize.font(.callout, weight: .semibold))
+                    .foregroundStyle(LintelBrand.ink)
+                    .frame(width: 26 * textSize.scale, height: 26 * textSize.scale)
+                    .background(LintelBrand.fill, in: RoundedRectangle(cornerRadius: 7))
+                    .contentShape(RoundedRectangle(cornerRadius: 7))
+                    .opacity(isEnabled ? 1 : 0.45)
             }
         }
         .buttonStyle(.plain)

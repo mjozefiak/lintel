@@ -93,7 +93,9 @@ struct NoteRowPresentation: Sendable {
     func historyTime(_ date: Date, now: Date) -> String {
         guard calendar.isDate(date, inSameDayAs: now) else { return dateTime(date) }
         let clock = time(date)
-        return String(localized: "today \(clock)", comment: "Inspector, History: the time of a version made today")
+        return String(
+            localized: "today \(clock)",
+            comment: "A time today: a version in the inspector's History, and a list row's accessibility label")
     }
 
     // MARK: State
@@ -144,6 +146,21 @@ struct NoteRowPresentation: Sendable {
     func accessibilityLabel(_ row: NoteRow, showsDate: Bool, snippet: String? = nil) -> String {
         [title(row.summary), snippet ?? subtitle(row.summary, showsDate: showsDate), Self.stateText(row.badge)]
             .compactMap { $0 }.joined(separator: ", ")
+    }
+
+    /// The snippet cut so that the first matched word starts near its beginning. A row shows two lines of it, and a
+    /// hit at the end of a long snippet was itself cut off ("postpon…", QA of #348). The cut starts at a word, at most
+    /// `lead` characters before the hit, and is marked with "…"; a snippet whose hit is already near the start is
+    /// returned as it is. Pure, like `highlightRanges`, which the view runs again on the result.
+    static func focusedSnippet(_ snippet: String, query: String, lead: Int = 24) -> String {
+        guard let hit = highlightRanges(in: snippet, query: query).first,
+            snippet.distance(from: snippet.startIndex, to: hit.lowerBound) > lead
+        else { return snippet }
+        var start = snippet.index(hit.lowerBound, offsetBy: -lead)
+        while start < hit.lowerBound, !snippet[snippet.index(before: start)].isWhitespace {
+            start = snippet.index(after: start)
+        }
+        return "…" + snippet[start...].trimmingCharacters(in: .whitespaces)
     }
 
     /// Where the words of a search stand in a snippet: every word of the query, found without regard to case or

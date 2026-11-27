@@ -11,6 +11,8 @@ final class TrashingNoteSource: NoteSourceTrash, Sendable {
         var trashed: [NoteKey: Date] = [:]
         var trashedKeysCalls: [[NoteKey]] = []
         var trashedKeysBehavior: ScriptedNoteSource.Behavior = .answers
+        var liveCountAnswer = 0
+        var liveCountBehavior: ScriptedNoteSource.Behavior = .answers
     }
 
     let inner: ScriptedNoteSource
@@ -30,6 +32,15 @@ final class TrashingNoteSource: NoteSourceTrash, Sendable {
         set { state.withLock { $0.trashedKeysBehavior = newValue } }
     }
     var trashedKeysCalls: [[NoteKey]] { state.withLock { $0.trashedKeysCalls } }
+    /// What `liveCount()` answers (the owner's `COUNT … WHERE deleted_at IS NULL`), and how.
+    var liveCountAnswer: Int {
+        get { state.withLock { $0.liveCountAnswer } }
+        set { state.withLock { $0.liveCountAnswer = newValue } }
+    }
+    var liveCountBehavior: ScriptedNoteSource.Behavior {
+        get { state.withLock { $0.liveCountBehavior } }
+        set { state.withLock { $0.liveCountBehavior = newValue } }
+    }
 
     func list(matching: NormalizedQuery?, after: NoteCursor?, limit: Int) async throws -> NotePage {
         try await inner.list(matching: matching, after: after, limit: limit)
@@ -55,7 +66,15 @@ final class TrashingNoteSource: NoteSourceTrash, Sendable {
         return []
     }
     func restoreBatch(deletedAt: Date) async throws -> Int { 0 }
-    func liveCount() async throws -> Int { 0 }
+    func liveCount() async throws -> Int {
+        switch liveCountBehavior {
+        case .answers: return liveCountAnswer
+        case .throwsError: throw ScriptedError()
+        case .hangs:
+            try await Task.sleep(for: .seconds(3600))
+            return liveCountAnswer
+        }
+    }
     func trashedCount() async throws -> Int { trashed.count }
     func trashed(after: NoteCursor?, limit: Int) async throws -> NotePage { NotePage() }
 

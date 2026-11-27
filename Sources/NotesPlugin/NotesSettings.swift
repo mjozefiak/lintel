@@ -17,6 +17,10 @@ enum NotesSettingsKey {
     /// means the default width (a double-click on the divider writes 0).
     static let explorerWidth = "explorerWidth"
     static let inspectorWidth = "inspectorWidth"
+    /// The collection the explorer's sidebar shows (`all`, `meetings` or `dictations`, default `all`; a value this build
+    /// does not know, such as a later release's `folder:<uuid>`, reads as `all`). Written only when the user picks a
+    /// row of the sidebar, never by a route or a search (notes explorer spec, Data Model).
+    static let explorerCollection = "explorer.collection"
     /// An `LLMModelCatalog` id; default: the first installed model, else the catalog default.
     static let builtInLLMModel = "builtInLLMModel"
     /// HIDDEN, no UI: the editor is read-only and no revision is ever written; export, copy and delete still
@@ -28,6 +32,9 @@ enum NotesSettingsKey {
     /// DEBUG only: note keys to open in tabs when the section is built, comma separated, each optionally with
     /// `@<layer id>` for the layer to show (`--qa-setting plugins.notes.qaOpen=meetings:<id>@transcript`).
     static let qaOpen = "qaOpen"
+    /// DEBUG only, with `--qa-notes`: the explorer row to select once the list is in, optionally with `@<tab>` for
+    /// the preview's tab (`notes`, `mine`, `transcript`), e.g. `meetings:<id>@transcript`. Not a contract.
+    static let qaSelect = "qaSelect"
     /// DEBUG only, with `--qa-notes`: shows one whole-section state: `loading` (never finishes reading), `empty`
     /// (no notes, recording on), `off` (no recording plugin), `locked` (nothing readable, `notes.sqlite` locked),
     /// `locked-rows` (the sources are listed, `notes.sqlite` is locked), `save-error` (the save-error strip).

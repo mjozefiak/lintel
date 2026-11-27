@@ -31,36 +31,63 @@ struct NoteCollectionTests {
 
     @Test("classification reads the plugin id and the kind only")
     func classification() {
-        #expect(NoteCollection.of(key: Fixtures.key("meetings", "a")) == .notes)
-        #expect(NoteCollection.of(key: Fixtures.key("notes", "x"), kind: .manual) == .notes)
-        #expect(NoteCollection.of(key: Fixtures.key("dictation", "s/1")) == .dictations)
-        #expect(NoteCollection.of(key: Fixtures.key("anything", "1"), kind: .dictation) == .dictations)
-        #expect(NoteCollection.of(.detached(Fixtures.key("dictation", "s/1"), startedAtMs: 1)) == .dictations)
+        let meeting = Fixtures.key("meetings", "a")
+        let manual = Fixtures.key("notes", "x")
+        let dictation = Fixtures.key("dictation", "s/1")
+        #expect(NoteCollection.meetings.contains(key: meeting))
+        #expect(!NoteCollection.meetings.contains(key: manual, kind: .manual))
+        #expect(!NoteCollection.meetings.contains(key: dictation))
+        #expect(NoteCollection.dictations.contains(key: dictation))
+        #expect(NoteCollection.dictations.contains(key: Fixtures.key("anything", "1"), kind: .dictation))
+        #expect(NoteCollection.dictations.contains(.detached(dictation, startedAtMs: 1)))
+        for key in [meeting, manual, dictation] { #expect(NoteCollection.all.contains(key: key)) }
     }
 
-    @Test("Notes lists meetings and manual notes, Dictations only dictations (live and kept copies)")
+    @Test("an unknown or missing stored collection reads as All notes")
+    func storedValue() {
+        #expect(NoteCollection(stored: nil) == .all)
+        #expect(NoteCollection(stored: "") == .all)
+        #expect(NoteCollection(stored: "folder:abc") == .all)
+        #expect(NoteCollection(stored: "meetings") == .meetings)
+        #expect(NoteCollection(stored: "dictations") == .dictations)
+    }
+
+    @Test("All lists everything, Meetings only meetings, Dictations only dictations (live and kept copies)")
     func split() async {
         let (library, meetings, dictation) = rig()
-        let notes = await library.list(matching: nil, after: nil, limit: 10, collection: .notes)
-        #expect(ids(notes.rows) == ["meetings:a", "notes:m", "meetings:c"])
-        #expect(notes.total == 3)
+        let all = await library.list(matching: nil, after: nil, limit: 10)
+        #expect(all.rows.count == 6)
+        let shown = await library.list(matching: nil, after: nil, limit: 10, collection: .meetings)
+        #expect(ids(shown.rows) == ["meetings:a", "meetings:c"])
+        #expect(shown.total == 2)
         let dictations = await library.list(matching: nil, after: nil, limit: 10, collection: .dictations)
         #expect(Set(ids(dictations.rows)) == ["dictation:s/1", "dictation:s/2", "dictation:s/9"])
         #expect(!ids(dictations.rows).contains("notes:m"))
         // The list that is not shown does not ask its sources at all.
-        #expect(meetings.listCalls == 1)
-        #expect(dictation.listCalls == 1)
-        let all = await library.list(matching: nil, after: nil, limit: 10)
-        #expect(all.rows.count == 6)
+        #expect(meetings.listCalls == 2)
+        #expect(dictation.listCalls == 2)
     }
 
-    @Test("a dictation source that is down does not touch the Notes list")
+    @Test("a dictation source that is down does not touch the Meetings list")
     func downSourceStaysInItsList() async {
         let (library, _, dictation) = rig()
         dictation.behavior = .throwsError
-        let notes = await library.list(matching: nil, after: nil, limit: 10, collection: .notes)
-        #expect(notes.unavailable.isEmpty)
+        let shown = await library.list(matching: nil, after: nil, limit: 10, collection: .meetings)
+        #expect(shown.unavailable.isEmpty)
         let dictations = await library.list(matching: nil, after: nil, limit: 10, collection: .dictations)
         #expect(dictations.unavailable.map(\.pluginID) == ["dictation"])
+    }
+
+    @Test("day grouping: today, yesterday, then one group per day")
+    func dayGroups() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Fixtures.epoch
+        let today = NoteGroupingRules.dayKey(now, now: now, calendar: calendar)
+        let yesterday = NoteGroupingRules.dayKey(
+            now.addingTimeInterval(-86_400), now: now, calendar: calendar)
+        let older = NoteGroupingRules.dayKey(now.addingTimeInterval(-3 * 86_400), now: now, calendar: calendar)
+        #expect(today == .today)
+        #expect(yesterday == .yesterday)
+        if case .day = older {} else { Issue.record("a day three days ago has its own group") }
     }
 }
