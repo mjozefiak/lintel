@@ -2,8 +2,9 @@ import Foundation
 import Testing
 
 /// C5 (no jargon) and C6 (help of at most 15 words, decided per sentence) of the foolproof checklist, over the
-/// strings the explorer and its preview own (their catalog comments start with "Explorer", "Preview" or
-/// "Sidebar and list"), in English and in Polish, except the older "Explorer: state line" strings.
+/// strings the explorer, its preview, My notes and the full window own (their catalog comments start with "Explorer",
+/// "Preview", "Sidebar and list", "My notes" or "Full window"), in English and in Polish, except the older
+/// "Explorer: state line" strings.
 @Suite("Explorer: copy rules (C5, C6)")
 struct ExplorerCopyTests {
     private struct Entry {
@@ -27,7 +28,9 @@ struct ExplorerCopyTests {
         var result: [Entry] = []
         for (key, value) in strings {
             let comment = value["comment"] as? String ?? ""
-            guard ["Explorer", "Preview", "Sidebar and list"].contains(where: comment.hasPrefix) else { continue }
+            guard
+                ["Explorer", "Preview", "Sidebar and list", "My notes", "Full window"].contains(where: comment.hasPrefix)
+            else { continue }
             // The older state lines (`NoteRowPresentation.stateText`) are not new copy: the explorer's rows say their
             // own words (`ExplorerRowText.state`), which this test does cover.
             if comment.hasPrefix("Explorer: state line") { continue }
@@ -46,6 +49,9 @@ struct ExplorerCopyTests {
     func bothLanguages() throws {
         let all = try Self.entries()
         #expect(all.count > 20)
+        // Phase 3b's own words are in it.
+        #expect(all.contains { $0.key == "Only you write here. Lintel never changes these notes." })
+        #expect(all.contains { $0.key == "Back to all notes (⌘[ or Esc)" })
         for entry in all {
             #expect(!entry.en.isEmpty && !entry.pl.isEmpty, "\(entry.key)")
         }
