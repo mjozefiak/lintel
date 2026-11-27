@@ -23,10 +23,11 @@ final class ThirdFeaturePlugin: LintelPlugin {
         env = try TestEnvironment()
     }
 
-    /// Plain, Other and Third in their manifest order.
+    /// Plain, Other and Third in their manifest order, all three on (a feature that is off is not listed, #288).
     private func controls() async -> SectionOrderControls {
         let host = env.makeHost([PlainFeaturePlugin.self, OtherFeaturePlugin.self, ThirdFeaturePlugin.self])
         await host.start()
+        await host.setEnabled(true, for: OtherFeaturePlugin.manifest.id)
         return SectionOrderControls(host: host, settings: AppSettings(store: env.settings))
     }
 
