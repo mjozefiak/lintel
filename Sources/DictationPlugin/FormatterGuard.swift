@@ -23,7 +23,15 @@ enum FormatterGuard {
         case inventedLayout
         /// Full only: a number the transcript holds is gone from the output (a dropped sentence or detail).
         case lostNumber
+        /// A word the speaker may not lose is gone: a vocabulary term or variant, or a name (`TermCheck`).
+        case lostTerm
     }
+
+    /// Whether the term check runs (spec phase 3). It ships only when it adds at most 2 points of fallback over the
+    /// baseline and keeps every term of the corpus: measured 2026-11-27 it adds one chunk on the owner's corpus (2.4 of
+    /// 42, so over the limit) and one on FLEURS EN, and keeps nothing the baseline did not (every term of the raw
+    /// transcript was already kept), so it is off. The code and the tests stay; turning it on is this constant.
+    static let checksTerms = false
 
     /// The output may hold 0.6 to 1.15 times the input's words when the speaker said something that may go
     /// (a filler, a repetition, "first, second") or a number the model writes shorter.
@@ -48,9 +56,15 @@ enum FormatterGuard {
         check(input: input, output: rawOutput, level: .standard)
     }
 
+    /// - Parameters:
+    ///   - vocabulary: the user's vocabulary terms and spoken variants; one the transcript holds must stay in the output.
+    ///   - checksTerms: Standard and Full only (Light never calls this); a chunk with a self-correction signal is exempt.
     /// - Parameter level: `.full` adds the invented greeting/sign-off check, the lost-number check and the wider plain
     ///   length range; every other level is Standard's check unchanged. Light has no model and never calls this.
-    static func check(input: String, output rawOutput: String, level: DictationSettings.CleanupLevel) -> Verdict {
+    static func check(
+        input: String, output rawOutput: String, level: DictationSettings.CleanupLevel,
+        vocabulary: [String] = [], checksTerms: Bool = FormatterGuard.checksTerms
+    ) -> Verdict {
         let isFull = level == .full
         let output = clean(rawOutput)
         guard !output.isEmpty else { return .rejected(.empty) }
@@ -64,6 +78,9 @@ enum FormatterGuard {
             return .rejected(.newNumber)
         }
         let kind = Removals.kind(of: input)
+        if checksTerms, kind != .correction, TermCheck.lostWord(input: input, output: output, vocabulary: vocabulary) {
+            return .rejected(.lostTerm)
+        }
         if isFull {
             if InventedLayout.adds(to: input, in: output) { return .rejected(.inventedLayout) }
             // A self-correction withdraws a number on purpose, so only the other chunks must keep every number.

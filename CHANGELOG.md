@@ -12,6 +12,8 @@ section (pre-releases use `x.y.z-beta.N`).
 
 - Dictation: a **Full** level of Tidy up my text (email layout, paragraphs for a long dictation, smoother style) is built and tested but not offered yet; it appears in the popup when it passes its quality checks.
 
+- Dictation: a check that a name or a vocabulary word survives the cleanup is built and tested but off; in the measurement it added more fallback than its limit, so nothing changes yet.
+
 ### Changed
 
 - Meeting notes now follow a topic layout: topics, decisions made and next steps. Notes written by a provider (Claude) start with a short intro; notes written by the model on this Mac, since notes prompt 7, have no intro, so the model never adds a sentence of its own about the meeting. They also show more of the points it checked (up to six per topic instead of ten in all). Notes written earlier stay as they are.

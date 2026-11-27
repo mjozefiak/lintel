@@ -9,7 +9,7 @@ import Testing
 /// `BuiltInFormatter` over a real GGUF → `CleanupPrompt` → `FormatterGuard`, chunks joined as
 /// `DictationSession.assembleChunks` does) and writes the same format back, so the benchmark scorer reads it
 /// like an app's result. `LINTEL_DICTATION_EVAL_LEVEL=light` runs `LightCleaner` alone (no model, so
-/// `LINTEL_DICTATION_EVAL_MODEL` is not needed); the default, `standard`, and `full` are the model path above, with
+/// `LINTEL_DICTATION_EVAL_MODEL` is not needed; `LINTEL_DICTATION_EVAL_VOCAB` names a JSON array of vocabulary words for the term check); the default, `standard`, and `full` are the model path above, with
 /// the level's prompt and guard limits. Off by default;
 /// `LINTEL_DICTATION_EVAL_INPUT` turns it on. Never prints text.
 @Suite struct DictationEvalTests {
@@ -63,6 +63,11 @@ import Testing
                 ? "lintel-offline-light"
                 : "lintel-offline-\(cleanupLevel == .full ? "full-" : "")v\(CleanupPrompt.version(for: cleanupLevel))")
 
+        // A user's vocabulary (terms and variants) for the guard's term check: a JSON array of strings.
+        let vocabulary: [String] =
+            try Self.environment["LINTEL_DICTATION_EVAL_VOCAB"].map {
+                try JSONDecoder().decode([String].self, from: Data(contentsOf: URL(fileURLWithPath: $0)))
+            } ?? []
         let records = try Self.records(at: URL(fileURLWithPath: input))
         let formatter: any TextFormatter
         var runtime: KeepWarmRuntime?
@@ -73,7 +78,7 @@ import Testing
             let warm = KeepWarmRuntime(
                 runtime: LlamaRuntime(), modelURL: URL(fileURLWithPath: model), keepWarm: { .seconds(3600) })
             runtime = warm
-            formatter = BuiltInFormatter(runtime: warm, level: cleanupLevel)
+            formatter = BuiltInFormatter(runtime: warm, level: cleanupLevel, vocabulary: { vocabulary })
             // The app loads the model while the user speaks; the measured time is the cleaning only.
             try await warm.warmUp()
         }

@@ -57,17 +57,21 @@ struct LocalLLMFormatter: TextFormatter {
     private let transport: any HTTPTransport
     private let target: @Sendable () -> Target?
     private let level: DictationSettings.CleanupLevel
+    private let vocabulary: @Sendable () -> [String]
     private let logger: Logger
 
-    /// - Parameter level: the cleanup level whose prompt and guard limits this formatter uses (`.full` or `.standard`).
+    /// - Parameters:
+    ///   - level: the cleanup level whose prompt and guard limits this formatter uses (`.full` or `.standard`).
+    ///   - vocabulary: the vocabulary's terms and variants, which the guard's term check keeps in the text.
     init(
         transport: any HTTPTransport, target: @escaping @Sendable () -> Target?,
-        level: DictationSettings.CleanupLevel = .standard,
+        level: DictationSettings.CleanupLevel = .standard, vocabulary: @escaping @Sendable () -> [String] = { [] },
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "dictation")
     ) {
         self.transport = transport
         self.target = target
         self.level = level
+        self.vocabulary = vocabulary
         self.logger = logger
     }
 
@@ -101,7 +105,7 @@ struct LocalLLMFormatter: TextFormatter {
         try Task.checkCancellation()
 
         guard let content = Self.content(of: data) else { return raw.falling(.badResponse) }
-        switch FormatterGuard.check(input: chunk, output: content, level: level) {
+        switch FormatterGuard.check(input: chunk, output: content, level: level, vocabulary: vocabulary()) {
         case .accepted(let text):
             return FormatResult(text: text, outcome: .formatted)
         case .rejected(let reason):

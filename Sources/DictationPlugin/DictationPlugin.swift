@@ -189,7 +189,7 @@ public final class DictationPlugin: LintelPlugin {
 
     /// The formatter for a new session, chosen by the level in force when the dictation starts: none when the cleanup is
     /// off, `LightCleaner` for Light (no model, no server, no lease), else the user's server or the built-in model.
-    /// `protectedWords` are the vocabulary's terms and variants, which Light never removes or changes.
+    /// `protectedWords` are the vocabulary's terms and variants, which Light never removes or changes and the guard's term check keeps at Standard and Full.
     nonisolated static func formatter(
         settings: DictationSettings, transport: any HTTPTransport, builtIn: KeepWarmRuntime, logger: Logger,
         protectedWords: @escaping @Sendable () -> [String] = { [] }
@@ -202,9 +202,10 @@ public final class DictationPlugin: LintelPlugin {
             switch settings.llmSource {
             case .server:
                 return LocalLLMFormatter(
-                    transport: transport, target: { settings.llmTarget }, level: level, logger: logger)
+                    transport: transport, target: { settings.llmTarget }, level: level, vocabulary: protectedWords,
+                    logger: logger)
             case .builtIn:
-                return BuiltInFormatter(runtime: builtIn, level: level, logger: logger)
+                return BuiltInFormatter(runtime: builtIn, level: level, vocabulary: protectedWords, logger: logger)
             }
         }
     }

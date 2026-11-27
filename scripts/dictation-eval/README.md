@@ -56,3 +56,14 @@ prompt, check out each commit and run the same input.
 The app cleans chunks while the user speaks, split by the speech segments and pauses; the raw transcripts here
 have no pauses, so `Segmenter` cuts only at 60 words (at a sentence end when there is one). The context of a
 chunk is the end of the previous raw chunk, as in the app. Vocabulary replacements are not applied.
+
+## Term check (Phase 3)
+
+`LINTEL_DICTATION_EVAL_VOCAB=<file>.json` (a JSON array of vocabulary words) is handed to the formatter's guard, so the
+term check sees a vocabulary like the app's. `check_terms.py` (stdlib only, numbers and item ids, never text) reads the
+raw transcripts, a result and the corpus and prints how many of the corpus `terms`/`code` words that the raw transcript
+holds are still in the output, and the chunks sent back raw by reason:
+
+```sh
+python3 -I scripts/dictation-eval/check_terms.py --raw <raw transcripts>.jsonl --out <result>.jsonl --corpus <corpus>.jsonl
+```
