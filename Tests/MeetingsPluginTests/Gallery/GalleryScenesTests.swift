@@ -20,7 +20,8 @@ struct GalleryScenesTests {
         let ids = Set(scenes.flatMap { $0.states.map(\.id) })
         // The states of the spec's pilot table (the host's banner states are the shell's, not this plugin's).
         for id in [
-            "local", "local-notes-off", "ready-sonnet", "ready-opus", "not-installed", "not-signed-in",
+            "local", "local-model-missing", "local-model-downloading", "local-notes-off", "ready-sonnet", "ready-opus",
+            "not-installed", "not-signed-in",
             "incompatible-version", "newer-version", "checking", "job-running", "confirm-use-local", "details-expanded",
             "earlier-mark", "failed-timed-out", "failed-network", "failed-rate-limited", "failed-other",
             "failed-too-long", "failed-model-not-available", "manual-binary", "try-running", "try-worked", "try-failed",

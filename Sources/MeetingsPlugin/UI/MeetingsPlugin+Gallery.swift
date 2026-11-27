@@ -18,6 +18,8 @@ extension MeetingsPlugin: GalleryProviding {
     /// The chosen provider and model; `nil` is Local.
     var provider: (id: ProviderID, model: String)?
     var notesEnabled = true
+    /// The place of the built-in notes model; `installed` keeps the older states as they were.
+    var notesModel = NotesDownloadQAState.installed
     /// What the fake probe finds; `nil` is a probe that never answers ("Checking…").
     var probe: ProviderStatusReport? = ProviderStatusReport(status: .ready, version: "2.1.329")
     var failure: ProviderJobFailure.Reason?
@@ -100,6 +102,7 @@ enum NotesProviderGalleryTryOut {
         self.control = control
         self.provider = provider
         self.notes = notes
+        notes.showQAState(scenario.notesModel)
         // What the pane's `.task` does when it appears (`MeetingsSettingsModel.refresh`).
         provider.reload()
         if scenario.confirmUseLocal { provider.useLocal() }
@@ -181,6 +184,14 @@ private struct NotesProviderGalleryPane: View {
             pane(
                 "local", "Local is chosen and notes are on: the two menus, nothing leaves the Mac.",
                 NotesProviderGalleryCase()),
+            pane(
+                "local-model-missing",
+                "Local is chosen, notes are on and the notes model is not on this Mac: the Model row says \"not installed\" with Get it in Models (#298).",
+                NotesProviderGalleryCase(notesModel: .missing)),
+            pane(
+                "local-model-downloading",
+                "Local is chosen and the notes model is downloading: the Model row says \"downloading\" with Manage in Models.",
+                NotesProviderGalleryCase(notesModel: .downloading)),
             pane(
                 "local-notes-off",
                 "Local is chosen and notes are off: the section is hidden (nothing to show).",

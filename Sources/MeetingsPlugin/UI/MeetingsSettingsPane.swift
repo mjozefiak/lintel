@@ -60,7 +60,7 @@ struct MeetingsPaneContent: View {
                 Text("Basics", comment: "Settings pane section title: the main settings of a pane")
                     .settingsSectionHeader()
             }
-            NotesWrittenBySections(provider: model.provider, notes: model.notes)
+            NotesWrittenBySections(provider: model.provider, notes: model.notes, openModels: openModels)
             Section {
                 recordingRows
             }
@@ -245,25 +245,6 @@ struct MeetingsPaneContent: View {
             "Use a real name, not a word like “I” or “Speaker 1”."
         case .tooLong:
             "The name is too long (60 characters at most)."
-        }
-    }
-
-    /// The notes model: the choice here, download and removal in Models.
-    @ViewBuilder private var notesModelRow: some View {
-        let notes = model.notes
-        MenuPicker(
-            selection: Binding(get: { notes.model.id }, set: { id in Task { await notes.choose(id) } }),
-            title: Text("Notes model", comment: "Settings → Meetings label of the model that writes the notes")
-        ) {
-            ForEach(notes.models) { entry in
-                Text(entry.package.title).font(textSize.font(.body)).tag(entry.id)
-            }
-        } label: {
-            Text("Notes model", comment: "Settings → Meetings label of the model that writes the notes")
-                .font(textSize.font(.body))
-            ModelChoiceRow(title: notes.model.package.title, state: notes.choiceState, style: .help) {
-                openModels(notes.model.id)
-            }
         }
     }
 

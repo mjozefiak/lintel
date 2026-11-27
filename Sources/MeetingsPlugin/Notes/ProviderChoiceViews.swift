@@ -220,11 +220,13 @@ struct ChoiceMenuList: View {
 struct NotesWrittenBySections: View {
     @Bindable var provider: ProviderChoiceModel
     let notes: NotesSettingsModel
+    /// `PluginContext.openModels`: the Models pane on the notes model's row.
+    var openModels: (String?) -> Void = { _ in }
 
     var body: some View {
         if ProviderChoiceModel.surfacesProvider(notesEnabled: notes.enabled, isLocal: provider.isLocal) {
             Section {
-                NotesWrittenByRows(provider: provider, notes: notes)
+                NotesWrittenByRows(provider: provider, notes: notes, openModels: openModels)
             } header: {
                 Text("Notes are written by", comment: "Settings → Meetings: provider menu label")
                     .settingsSectionHeader()
@@ -257,6 +259,7 @@ struct NotesWrittenBySections: View {
 struct NotesWrittenByRows: View {
     @Bindable var provider: ProviderChoiceModel
     let notes: NotesSettingsModel
+    var openModels: (String?) -> Void = { _ in }
 
     @Environment(\.lintelTextSize) private var textSize
     @State private var providerMenuOpen = false
@@ -335,10 +338,32 @@ struct NotesWrittenByRows: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Model", comment: "Settings → Meetings: model menu label").font(textSize.font(.body))
                 if provider.isLocal {
-                    Text("Used for every meeting.", comment: "Settings → Meetings: help under the local model")
-                        .font(textSize.font(.callout)).foregroundStyle(LintelBrand.secondaryText)
+                    switch Self.localModelHelp(state: notes.choiceState) {
+                    case .usedForEveryMeeting:
+                        Text("Used for every meeting.", comment: "Settings → Meetings: help under the local model")
+                            .font(textSize.font(.callout)).foregroundStyle(LintelBrand.secondaryText)
+                    case .summary(let state):
+                        // Like the speech model's row: the model is missing or on its way, and Models has it.
+                        ModelChoiceRow(title: notes.model.package.title, state: state, style: .help) {
+                            openModels(notes.model.package.id)
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    /// What the Model row says under its label while Local writes the notes: the usual line while the model is on
+    /// this Mac, else the model's state with the way to Models (#298).
+    enum LocalModelHelp: Equatable {
+        case usedForEveryMeeting
+        case summary(ModelChoiceRow.State)
+    }
+
+    static func localModelHelp(state: ModelChoiceRow.State) -> LocalModelHelp {
+        switch state {
+        case .installed, .customFolder: .usedForEveryMeeting
+        case .notInstalled, .downloading: .summary(state)
         }
     }
 
