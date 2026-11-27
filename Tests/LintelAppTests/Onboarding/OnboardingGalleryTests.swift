@@ -9,8 +9,8 @@ import Testing
 
 /// The gallery scenes of the onboarding pages (`docs/design-gallery.md`, "Adding a scene"; spec
 /// `2026-11-24-first-run-onboarding`, UI/UX, "Gallery states"). The pictures are compared by the app bundle in CI,
-/// not here: only the app bundle has the accent colour and the string catalog. There are no goldens in the
-/// repository yet; they come after the owner approves the sheet.
+/// not here: only the app bundle has the accent colour and the string catalog. Their goldens were recorded by the
+/// `gallery-goldens.yml` run the owner approved.
 @MainActor
 @Suite(.serialized)
 struct OnboardingGalleryTests {
@@ -133,15 +133,6 @@ struct OnboardingGalleryTests {
         let at80 = try await picture(.dictation(progress: 0.8))
         #expect(without != at40)
         #expect(at40 != at80, "the bar does not follow the progress")
-    }
-
-    @Test func noGoldenIsCommittedBeforeTheOwnerApprovesTheSheet() throws {
-        let root = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
-        let goldens = root.appending(path: "Tests/MeetingsPluginTests/Gallery/Goldens")
-        let walker = try #require(FileManager.default.enumerator(at: goldens, includingPropertiesForKeys: nil))
-        let onboarding = walker.compactMap { $0 as? URL }.filter { $0.path().contains("/onboarding.") }
-        #expect(onboarding.isEmpty, "onboarding goldens are committed only after approval: \(onboarding)")
     }
 
     private static func distinctColours(_ bitmap: NSBitmapImageRep) -> Int {
