@@ -43,8 +43,8 @@ final class NotesWorkspaceModel {
         var overlayHeads: @Sendable (NoteItemID) async -> [OverlayLayerHead] = { _ in [] }
         /// Reconciles a note's overlays with its source when it is opened.
         var reconcile: @Sendable (NoteKey) async -> Void = { _ in }
-        /// The detach sweep loop: runs on source activation and every 10 minutes while the section is alive.
-        var sweepLoop: @Sendable () async -> Void = {}
+        /// Asks for one trash pass now (the sweeps themselves run for the plugin's lifetime, `NotesPlugin`).
+        var requestTrashSweep: @Sendable () async -> Void = {}
         /// New notes and editing need the store (and `plugins.notes.readOnly` off); without it ⌘N and the pen are off.
         var canCreateNotes = false
         var canEditNotes = false
@@ -313,7 +313,7 @@ final class NotesWorkspaceModel {
         #if DEBUG
         if holdsLoading { return }
         #endif
-        let sweeps = Task { await environment.sweepLoop() }
+        let sweeps = Task { await environment.requestTrashSweep() }
         defer { sweeps.cancel() }
         await refresh()
         #if DEBUG

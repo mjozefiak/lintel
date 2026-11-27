@@ -1,6 +1,7 @@
 import Foundation
 import LintelCore
 import LintelKit
+import LintelProviders
 
 /// Pure rules that turn a meeting row into what the Notes workspace shows.
 enum MeetingNoteMapping {
@@ -34,11 +35,24 @@ enum MeetingNoteMapping {
         }
     }
 
+    /// Who wrote the notes, from the meeting's own record: notes exist (`ok`, `partial` or `stale`) and
+    /// `notes_provider IS NULL` is the built-in model; `claude-code` (`ProviderID.claudeCode`, the id the notes job
+    /// stores) is Claude; any other value, or no notes, is `nil`, so a build that does not know a provider shows no
+    /// footer instead of guessing.
+    static func writer(notesStatus: NotesStatus, hasNotes: Bool, provider: String?) -> NoteWriter? {
+        guard hasNotes, [.ok, .partial, .stale].contains(notesStatus) else { return nil }
+        guard let provider else { return .thisMac }
+        return provider == ProviderID.claudeCode.rawValue ? .claude : nil
+    }
+
+    /// `retentionDays` is the meeting retention setting (0 keeps everything): it only bounds `purgeAt` of a row in
+    /// Recently deleted.
     static func summary(
-        _ entry: MeetingLibraryEntry, board: NotesBoard?, appName: (String) -> String?
+        _ entry: MeetingLibraryEntry, board: NotesBoard?, appName: (String) -> String?, retentionDays: Int = 0
     ) -> NoteSummary {
         let snapshot = board?.snapshot
         let title = entry.title.map(MeetingEdits.visible).flatMap { $0.isEmpty ? nil : $0 }
+        let live = entry.status == .recording || entry.status == .processing
         return NoteSummary(
             id: NoteKey(pluginID: MeetingLibraryPresentation.pluginID, id: entry.uuid), kind: .meeting, title: title,
             startedAt: entry.startedAt, durationMs: entry.durationMs > 0 ? entry.durationMs : nil,
@@ -47,7 +61,12 @@ enum MeetingNoteMapping {
             },
             state: state(
                 status: entry.status, notesStatus: entry.notesStatus, phase: snapshot?.phases[entry.id],
-                needsModel: snapshot?.needsModel(for: entry.id) ?? false))
+                needsModel: snapshot?.needsModel(for: entry.id) ?? false),
+            deletedAt: entry.deletedAt,
+            purgeAt: entry.deletedAt.map {
+                TrashStamp.purgeAt(deletedAt: $0, startedAt: entry.startedAt, retentionDays: retentionDays)
+            },
+            taskCount: entry.taskCount, liveSince: live ? entry.startedAt : nil)
     }
 
     static func details(_ document: MeetingDocument) -> [NoteDetail] {

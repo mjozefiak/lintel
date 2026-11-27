@@ -13,13 +13,15 @@ extension DictationPlugin: GalleryProviding {
 /// The pane a state draws: only the row of "Tidy up my text", like in Settings → Dictation → Basics.
 private struct TidyUpGalleryPane: View {
     @State var choice: FormattingSettingsModel.TidyChoice
+    /// The line "Works best with the Recommended assistant." (Full on the smallest built-in model).
+    var showsSmallModelHint = false
     /// The host dims the pane of a plugin that is off and makes it inactive (`SettingsHost.bodyOpacity`).
     var dimmed = false
 
     var body: some View {
         SettingsPane {
             Section {
-                TidyUpRow(choice: $choice)
+                TidyUpRow(choice: $choice, showsSmallModelHint: showsSmallModelHint)
             }
         }
         .opacity(dimmed ? 0.5 : 1)
@@ -35,10 +37,11 @@ private struct TidyUpGalleryPane: View {
     }
 
     private static func state(
-        _ id: String, _ summary: String, _ choice: FormattingSettingsModel.TidyChoice, dimmed: Bool = false
+        _ id: String, _ summary: String, _ choice: FormattingSettingsModel.TidyChoice, dimmed: Bool = false,
+        smallModelHint: Bool = false
     ) -> GalleryState {
         GalleryState(id: id, summary: summary, presentation: window) {
-            AnyView(TidyUpGalleryPane(choice: choice, dimmed: dimmed))
+            AnyView(TidyUpGalleryPane(choice: choice, showsSmallModelHint: smallModelHint, dimmed: dimmed))
         }
     }
 
@@ -52,6 +55,14 @@ private struct TidyUpGalleryPane: View {
                 "standard",
                 "Standard: also keeps only the corrections and makes lists; the example shows a correction.",
                 .standard),
+            state(
+                "full",
+                "Full: also lays out emails and long texts and smooths the style; the example shows a message in paragraphs.",
+                .full),
+            state(
+                "full-small-model",
+                "Full on the smallest built-in model: the extra line “Works best with the Recommended assistant.”.",
+                .full, smallModelHint: true),
             state(
                 "standard-dimmed",
                 "Dictation is off: the row dimmed and inactive, as every row of a plugin that is switched off.",

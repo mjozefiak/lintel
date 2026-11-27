@@ -105,7 +105,8 @@ actor MeetingSession {
     /// Whether a microphone that does not start is started again (false for a system-audio-only recording,
     /// whose microphone is `UnavailableAudioInput`).
     private let retriesMicrophone: Bool
-    /// The default input as a log line (name, UID, sample rate, channels); read when the microphone fails.
+    /// The default input as a log line (name, UID, sample rate, channels); read when the microphone fails. The
+    /// name and the UID are hashed by `InputDeviceInfo.logDescription` (issue #269), so the line is public.
     private let inputDiagnostics: @Sendable () -> String
     private let defaultInputChanges: (@Sendable () -> AsyncStream<Void>)?
     /// The microphone that has not recorded a sample yet: its start failed, its spool stays open and it

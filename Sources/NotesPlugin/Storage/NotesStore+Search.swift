@@ -24,7 +24,9 @@ extension NotesStore {
     }
 
     /// Documents whose title or head body contain every word of the query as a prefix (rowid is `note_doc.id`).
-    /// Detached documents are returned too, marked; the caller never merges them into a live note.
+    /// Detached documents are returned too, marked; the caller never merges them into a live note. A document in
+    /// Recently deleted is never returned (the index drops it, `note_fts_trash`, and the query says so too); an
+    /// overlay whose owner trashed the note before the sweep marked it is hidden by `NoteTrashSweep.visibleHits`.
     func search(_ query: String, limit: Int = 100) throws -> [NoteSearchHit] {
         guard let words = Self.matchWords(query) else { return [] }
         let terms = words.map { "\"\($0.replacingOccurrences(of: "\"", with: ""))\"*" }
@@ -39,7 +41,7 @@ extension NotesStore {
                         d.id IN (SELECT rowid FROM note_fts WHERE note_fts MATCH ?) AS title_hit
                     FROM note_fts JOIN note_doc d ON d.id = note_fts.rowid
                     JOIN note_revision r ON r.id = d.head_revision_id
-                    WHERE note_fts MATCH ? ORDER BY d.updated_at DESC, d.id LIMIT ?
+                    WHERE note_fts MATCH ? AND d.deleted_at IS NULL ORDER BY d.updated_at DESC, d.id LIMIT ?
                     """,
                 arguments: [title, all, limit])
             return rows.compactMap { row -> NoteSearchHit? in

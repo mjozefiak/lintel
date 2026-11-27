@@ -200,7 +200,7 @@ import Testing
         #expect(throws: NotesError.schemaNewer) { try reopened.vacuum() }
         #expect(try reopened.manualOverlays().count == 1)
         let applied = try reopened.read { db in try String.fetchAll(db, sql: "SELECT identifier FROM grdb_migrations") }
-        #expect(Set(applied) == ["v1-notes", "v2-future"])
+        #expect(Set(applied) == ["v1-notes", "v2-explorer", "v2-future"])
         #expect(harness.log.errors.contains { $0.contains("schemaNewer") })
     }
 

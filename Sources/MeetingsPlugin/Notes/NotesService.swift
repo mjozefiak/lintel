@@ -126,6 +126,11 @@ final class NotesService: ProviderNotesControl {
         var providerRunner: ProviderRunner?
         /// Tests shorten the whole-transcript track's limits.
         var configureWhole: @Sendable (inout WholeNotesPipeline.Configuration) -> Void = { _ in }
+        /// Writes `meeting.notes_awaiting_model` (#295). Tests hold it to let the model arrive while the wait is
+        /// being saved (#308).
+        var markAwaiting: @Sendable (MeetingsStore, Int64) async -> Void = { store, id in
+            await AwaitingMarker.mark(store, id)
+        }
         var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
         var now: @Sendable () -> Date = { Date() }
         /// How long `shutDown` waits for a job that does not stop (a model load cannot be cancelled).
@@ -162,6 +167,10 @@ final class NotesService: ProviderNotesControl {
     /// Meetings whose notes must be written again right after the running job (a regenerate request, or a rename
     /// that made the finished notes `stale`).
     private var rerun: Set<Int64> = []
+    /// Meetings that were waiting for the notes model when it arrived while they were the running job (#308): the
+    /// job is written again right after this one as an automatic job, so a wait that ended while it was being saved
+    /// is not lost. Not a request: the re-run obeys the notes switch and the provider choice.
+    private var rerunAutomatic: Set<Int64> = []
     /// Bumped by `shutDown`: a job that did not stop in time must not touch the state of a later start.
     private var epoch = 0
     private var accepting = false
@@ -201,6 +210,7 @@ final class NotesService: ProviderNotesControl {
         accepting = false
         queue = []
         rerun = []
+        rerunAutomatic = []
         epoch += 1
         modelWatch?.cancel()
         modelWatch = nil
@@ -229,6 +239,7 @@ final class NotesService: ProviderNotesControl {
             deps.changed()
         }
         rerun = []
+        rerunAutomatic = []
         jobTask?.cancel()
     }
 
@@ -283,7 +294,7 @@ final class NotesService: ProviderNotesControl {
     private func queueArrivals(_ ids: [Int64]) {
         guard !ids.isEmpty else { return }
         deps.logger.notice("Notes model arrived: \(ids.count, privacy: .public) meetings queued")
-        for id in ids { enqueue(Job(meetingID: id, requested: false)) }
+        for id in ids { enqueueArrival(Job(meetingID: id, requested: false)) }
     }
 
     /// While a meeting of this session waits for the model, looks for its file every `modelWatchInterval`; ends when
@@ -352,6 +363,18 @@ final class NotesService: ProviderNotesControl {
         if worker == nil { worker = Task { await self.drain() } }
     }
 
+    /// A meeting whose notes waited for the model and whose model just arrived. When it is the running job (the
+    /// model came while that job was saving its wait, #308), the drop is not a duplicate: the job is written again
+    /// right after this one, and its wait stays on disk until then.
+    private func enqueueArrival(_ job: Job) {
+        guard accepting else { return }
+        if current?.meetingID == job.meetingID {
+            rerunAutomatic.insert(job.meetingID)
+            return
+        }
+        enqueue(job)
+    }
+
     private func drain() async {
         let epoch = epoch
         while !Task.isCancelled, epoch == self.epoch, !queue.isEmpty {
@@ -369,7 +392,13 @@ final class NotesService: ProviderNotesControl {
             current = nil
             board.update { $0.phases[job.meetingID] = nil }
             deps.changed()
-            if rerun.remove(job.meetingID) != nil { enqueue(Job(meetingID: job.meetingID, requested: true)) }
+            let requested = rerun.remove(job.meetingID) != nil
+            let automatic = rerunAutomatic.remove(job.meetingID) != nil
+            if requested {
+                enqueue(Job(meetingID: job.meetingID, requested: true))
+            } else if automatic {
+                enqueue(Job(meetingID: job.meetingID, requested: false))
+            }
         }
         if epoch == self.epoch { worker = nil }
     }
@@ -384,9 +413,10 @@ final class NotesService: ProviderNotesControl {
         let epoch = epoch
         await run(job)
         // A wait that this job did not end again is not kept on disk. Not after `shutDown`: the board was emptied
-        // on purpose, the wait must survive the restart (#295).
+        // on purpose, the wait must survive the restart (#295). Not while this meeting is written again right after
+        // this job (the model arrived as the wait was being saved, #308): the re-run ends the wait.
         guard epoch == self.epoch, !board.snapshot.awaitingModel.contains(job.meetingID),
-            let store = deps.library.store
+            !rerunAutomatic.contains(job.meetingID), let store = deps.library.store
         else { return }
         await AwaitingMarker.clear(store, job.meetingID)
     }
@@ -418,7 +448,7 @@ final class NotesService: ProviderNotesControl {
             }) {
                 deps.changed()
             }
-            if !job.requested { await AwaitingMarker.mark(store, id) }
+            if !job.requested { await deps.markAwaiting(store, id) }
             if job.requested { deps.openModels(model.id) }
             if !board.snapshot.awaitingModel.isEmpty { watchForModel() }
             return
@@ -630,7 +660,7 @@ final class NotesService: ProviderNotesControl {
                 }
             }
             logger.notice(
-                "Notes \(String(describing: result.status), privacy: .public): \(result.chunkCount, privacy: .public) chunks, \(result.verifiedPointCount, privacy: .public) points, \(result.droppedCount, privacy: .public) dropped"
+                "Notes \(String(describing: result.status), privacy: .public): \(result.chunkCount, privacy: .public) chunks, \(result.verifiedPointCount, privacy: .public) points, \(result.droppedCount, privacy: .public) dropped, \(result.cutFromOtherCount, privacy: .public) not shown (the closing topic's bound)"
             )
         }
         deps.library.refreshCount()

@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreAudio
+import CryptoKit
 import Foundation
 import os
 
@@ -51,9 +52,18 @@ public struct InputDeviceInfo: Equatable, Sendable {
         self.channels = channels
     }
 
-    /// `name=..., uid=..., sampleRate=..., channels=...`
+    /// `name=#<hash>, uid=#<hash>, sampleRate=<rate>, channels=<count>` (issue #269). A device's name often
+    /// carries a person's name ("Anna's AirPods Pro") and a Bluetooth device's UID its hardware address, so both
+    /// are hashed the way `NotesLog.hashedKey` does it (the first 4 bytes of SHA-256, in hex): two lines about
+    /// one device still match, neither the name nor the address is readable. The two numbers stay readable.
+    /// Safe to write with `privacy: .public`; the format is pinned by `InputDeviceInfoTests`.
     public var logDescription: String {
-        "name=\(name), uid=\(uid), sampleRate=\(Int(sampleRate)), channels=\(channels)"
+        "name=#\(Self.hashed(name)), uid=#\(Self.hashed(uid)), sampleRate=\(Int(sampleRate)), channels=\(channels)"
+    }
+
+    /// A value as it may appear in a log: the first 4 bytes of its SHA-256, in hex.
+    static func hashed(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8)).prefix(4).map { String(format: "%02x", $0) }.joined()
     }
 }
 

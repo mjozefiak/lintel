@@ -147,7 +147,8 @@ public final class DictationPlugin: LintelPlugin {
         vocabularyModel = VocabularyPanelModel(
             store: vocabulary, settings: settings,
             revealInFinder: { url in workspace.revealInFinder([url]) })
-        noteSource = DictationNoteSource(history: history, hub: noteChanges)
+        noteSource = DictationNoteSource(
+            history: history, hub: noteChanges, retentionDays: { settings.retentionDays })
         historyModel = HistorySettingsModel(settings: settings, history: history)
         let keptNoteCopies = context.keptNoteCopies
         let deleteKeptNoteCopies = context.deleteKeptNoteCopies
@@ -200,9 +201,10 @@ public final class DictationPlugin: LintelPlugin {
         case .standard, .full:
             switch settings.llmSource {
             case .server:
-                return LocalLLMFormatter(transport: transport, target: { settings.llmTarget }, logger: logger)
+                return LocalLLMFormatter(
+                    transport: transport, target: { settings.llmTarget }, level: level, logger: logger)
             case .builtIn:
-                return BuiltInFormatter(runtime: builtIn, logger: logger)
+                return BuiltInFormatter(runtime: builtIn, level: level, logger: logger)
             }
         }
     }

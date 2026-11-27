@@ -57,6 +57,7 @@ enum ReviseOutcome: Equatable, Sendable {
 ///   typed meanwhile, nothing is written (`conflict`). The document is unchanged after a cancel, a timeout, a
 ///   rejection, a conflict and a failure; quitting cancels (`cancelAll()` from `deactivate()`).
 /// - Nothing here logs a prompt, an answer, a note or a comment: codes, counts and durations only.
+/// - A run on the `mine` layer (My notes) ends with `nothingToRevise` before any model is looked for.
 @MainActor @Observable
 final class ReviseService {
     struct Dependencies {
@@ -205,6 +206,11 @@ final class ReviseService {
         // flushing: typed text is written and the document exists before anything else happens.
         var head = try await request.writer.ensureDocument()
         try Task.checkCancellation()
+        // My notes (`mine`) are the user's own words: the agent never plans a unit there, and nothing is asked of
+        // the model (notes explorer spec, Data Model).
+        if try request.store.document(id: head.docID)?.layer == NotesStore.mineLayer {
+            return complete(lock, .nothingToRevise(skipped: []))
+        }
         var threads = try await Self.threads(of: head.docID, in: request.store, only: request.threads)
         let first = ReviseUnitPlanner.plan(head: head.body, threads: threads)
         if first.units.isEmpty { return complete(lock, .nothingToRevise(skipped: first.skipped)) }

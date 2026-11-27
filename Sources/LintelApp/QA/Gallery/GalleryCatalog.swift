@@ -14,6 +14,12 @@ import LintelUI
     }
 
     static var groups: [Group] {
+        // The shared components of `LintelUI` first (the working ring), then the plugins'.
+        [Group(id: "lintel-ui", title: "Shared UI", scenes: LintelUIGallery.scenes)]
+            + pluginGroups
+    }
+
+    private static var pluginGroups: [Group] {
         PluginRegistry.all.compactMap { type in
             guard let provider = type as? any GalleryProviding.Type else { return nil }
             let scenes = provider.galleryScenes
