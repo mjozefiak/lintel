@@ -1,0 +1,14 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["email"], "evidence": [2, 3],
+     "fields": {"title": ["makiet"], "to": {"required": [["Iwona", "Mówca 2"]], "optional": []},
+                "due": ["2026-11-25"], "condition": false}},
+    {"id": "a2", "type": ["calendar"], "evidence": [6],
+     "fields": {"title": ["warsztat"], "date": ["2026-11-30"], "time": "09:00",
+                "participants": {"required": [], "optional": [["klient", "klientem"], ["Mówca 3"], ["Mówca 2"], ["Iwona"]]}, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "other_speaker", "evidence": [9]},
+    {"id": "t2", "kind": "rejected", "evidence": [11, 12]}
+  ]
+}

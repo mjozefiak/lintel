@@ -21,7 +21,9 @@ private struct TidyUpGalleryPane: View {
     var body: some View {
         SettingsPane {
             Section {
-                TidyUpRow(choice: $choice, showsSmallModelHint: showsSmallModelHint)
+                TidyUpRow(
+                    choice: $choice, choices: FormattingSettingsModel.TidyChoice.allCases,
+                    showsSmallModelHint: showsSmallModelHint)
             }
         }
         .opacity(dimmed ? 0.5 : 1)

@@ -1,0 +1,319 @@
+{
+  "format": "discovery-prototype-v1",
+  "skill": "om-mockup-prototype",
+  "slug": "minimal-hud",
+  "revision": 3,
+  "revisionPath": ".ai/specs/assets/minimal-hud",
+  "previousRevision": null,
+  "brief": "owner brief ux-minimal-hud (2026-11-25), not in the repository; spec .ai/specs/2026-11-25-minimal-hud.md",
+  "flow": "Every HUD pill state: dictation, meeting recording, meeting start/end messages, meeting suggestions",
+  "panelReport": null,
+  "verification": "incomplete",
+  "verificationNote": "Static review passed; rendered in headless Chrome from file:// for every toggle combination (en/pl, S/M/XL, hover, Reduce Motion, Increase Contrast) and measured for truncation (none). Not done: an interactive keyboard/pointer walk through a browser provider (chrome-devtools MCP was held by another session) and a real phone-width check (headless Chrome does not go below 500 px).",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "e989f2e2b4b63d1e36462547fca89609d3b8b40bee1dbd004d971afa7d3998d4"
+    },
+    {
+      "path": "before/dictation-allow-microphone-light-en.png",
+      "sha256": "1a19bc5a485cf21319494b699aa03550c8dd291b41b3690ae862e5cf0e9a3a16"
+    },
+    {
+      "path": "before/dictation-allow-microphone-light-pl.png",
+      "sha256": "4a70226398cdf99a1276c7a786b0c5b5c0005f80d07e7a15cd7d69c9a31a681d"
+    },
+    {
+      "path": "before/dictation-copied-no-accessibility-light-en.png",
+      "sha256": "099b83aa0457b456b6cf492942515e7982073011664f4cac81ea7344e5c18472"
+    },
+    {
+      "path": "before/dictation-copied-no-accessibility-light-pl.png",
+      "sha256": "3d01b6ded8c2407fdaf2b9c6649284384e15c776e8e88ab1f23a39f9412f883f"
+    },
+    {
+      "path": "before/dictation-countdown-light-en.png",
+      "sha256": "27fe4aa1b1e6b64dc2e4d5d5f64251c699d4bafc529d0f492f94a6763428203d"
+    },
+    {
+      "path": "before/dictation-countdown-light-pl.png",
+      "sha256": "5c22b8be4cf627947d33aebcbd8c620790e45126795e1fbe4f03b2fc3cafff79"
+    },
+    {
+      "path": "before/dictation-finishing-light-en.png",
+      "sha256": "405248622cf5b1adfbdadeebc065b63d13f5925c8330c467872694467829ca2b"
+    },
+    {
+      "path": "before/dictation-finishing-light-pl.png",
+      "sha256": "34be78ae8386abf4be9626710ca462041fd665b62a57e73e93c03c410dfcb2a1"
+    },
+    {
+      "path": "before/dictation-loading-model-light-en.png",
+      "sha256": "779fd4b21d49c34e1fc563f1b4c27f87c180de48e20e9d6eac7b1a9ec636ff0f"
+    },
+    {
+      "path": "before/dictation-loading-model-light-pl.png",
+      "sha256": "2fb0d918c593ac47b70ace7964b25e1282f1e3fb06377bd48043ce07a66fa263"
+    },
+    {
+      "path": "before/dictation-microphone-denied-light-en.png",
+      "sha256": "f8c9a05fa754467f0193f093f82e63d742a31b70ee1fb893521b1d090d64456f"
+    },
+    {
+      "path": "before/dictation-microphone-denied-light-pl.png",
+      "sha256": "595b6a3c83f7a7aa986f17d1701e6d47e1777c56d5ad1f1785960ed68410ad0f"
+    },
+    {
+      "path": "before/dictation-model-missing-light-en.png",
+      "sha256": "5672f4d5198134ec3b197302ad1b7732e19cb503b9c97ca9b95b2dea6451accd"
+    },
+    {
+      "path": "before/dictation-model-missing-light-pl.png",
+      "sha256": "b40dac27d563494d0a4189291e047be455bd40a000402671f28aa811edf75d98"
+    },
+    {
+      "path": "before/dictation-nothing-heard-light-en.png",
+      "sha256": "18705d2aaff63d0cfd9bea8dbcb8ed374fbc231156983a9a4f8b3f2697bdca5c"
+    },
+    {
+      "path": "before/dictation-nothing-heard-light-pl.png",
+      "sha256": "5038731e097a625044f43d4da76e3356adcaed23ece25659d68e45c4af137714"
+    },
+    {
+      "path": "before/dictation-pasted-light-en.png",
+      "sha256": "06c47e140f70c19bbf3173f9420bbbb0a3b5fea770ef7fb056b0d09f86330ed2"
+    },
+    {
+      "path": "before/dictation-pasted-light-pl.png",
+      "sha256": "3e6631ff63847759ecf14a987e36d41dcca0c9e0f9464e518f7bbaffda7c0e74"
+    },
+    {
+      "path": "before/dictation-pasted-unformatted-light-en.png",
+      "sha256": "88538d1fce983bfe19c97404448fc30db8b3d3a9fe05846e5ce5516cc367a383"
+    },
+    {
+      "path": "before/dictation-pasted-unformatted-light-pl.png",
+      "sha256": "f64ea580ccb67900c1dba26845ca4c896c7bf83860be46090ca8ed565f383111"
+    },
+    {
+      "path": "before/dictation-recording-light-en.png",
+      "sha256": "5ef8ad16126b106051c6851a9e65daaa342dde2ded9a9afc6ea51b241ad67281"
+    },
+    {
+      "path": "before/dictation-recording-light-pl.png",
+      "sha256": "f5030f0745bd4c29d1a2f26d3a168ee99a944099229edb2434a83afe0555f2ac"
+    },
+    {
+      "path": "before/dictation-recording-microphone-fallback-light-pl.png",
+      "sha256": "6bcd4626ed94c6313cfd3a2b8abb87880f90b2c9bcd54f4ffe20a625b3037866"
+    },
+    {
+      "path": "before/dictation-speech-model-busy-light-en.png",
+      "sha256": "19e9d3267e652430fd3ba3b6251b7ca17c8464943362e7ceace28bac2ea2a348"
+    },
+    {
+      "path": "before/dictation-speech-model-busy-light-pl.png",
+      "sha256": "0601cb62aa164be9884bb7cb7c71ec02154fe69a588e5214c4bb5890b8e13003"
+    },
+    {
+      "path": "before/meeting-failed-light-en.png",
+      "sha256": "077dc9b6bb3b1f0db86695e2224168a992f830941dcb5e36278fae5ee5d3cf41"
+    },
+    {
+      "path": "before/meeting-failed-light-pl.png",
+      "sha256": "001d8fccc74fafc1d41f21ffe371d2487c9706f43ca4e00a8eaa61ea1da79d6a"
+    },
+    {
+      "path": "before/meeting-microphone-denied-system-only-light-en.png",
+      "sha256": "398fcf380ed8f353e0809ac8814c08c2aa3edd976953780c8185d112979a8b64"
+    },
+    {
+      "path": "before/meeting-microphone-denied-system-only-light-pl.png",
+      "sha256": "3b5d2ae439ce392f57a33fa9767d7d406673eb6ae1218d22b6ebcdbba315dea5"
+    },
+    {
+      "path": "before/meeting-model-missing-light-en.png",
+      "sha256": "3c221d7439445d3e462fe4dc1e4c37b00094e22fe6684c305a85c19da4c9dc50"
+    },
+    {
+      "path": "before/meeting-model-missing-light-pl.png",
+      "sha256": "065a50e1afe45ae830455f36c21a727241804f674bb72d4ddd6227fdf68fad0c"
+    },
+    {
+      "path": "before/meeting-processing-transcribing-light-en.png",
+      "sha256": "d03074991ca8b0d6e2372da970f623d6ea0fe9a19ef7a1354d4eba9fdaff2692"
+    },
+    {
+      "path": "before/meeting-processing-transcribing-light-pl.png",
+      "sha256": "68bad8e9c7d6c53381211133a4dce5e447b39a97fb8160bcf6d64239fd96452c"
+    },
+    {
+      "path": "before/meeting-recording-consent-light-en.png",
+      "sha256": "b9f357eeedb016f527e9270240545354fea79978a4945657ea68cb75da7ed88f"
+    },
+    {
+      "path": "before/meeting-recording-consent-light-pl.png",
+      "sha256": "dc81cad9e663ae8a43695c19141ba836fcc93f0aa3d08397b0f465c8543baf7e"
+    },
+    {
+      "path": "before/meeting-recording-countdown-light-en.png",
+      "sha256": "a4b7cdcb9246ca0dc3fbc8efcfe408d9bef0caef50fd8e3850ae18025662ada5"
+    },
+    {
+      "path": "before/meeting-recording-countdown-light-pl.png",
+      "sha256": "0fcfa03a22305fb5e199f42907fa3a9a09881056baaf9f813e3495949fd1bf60"
+    },
+    {
+      "path": "before/meeting-recording-device-disconnected-light-en.png",
+      "sha256": "feb5ced1c497bc57ee11d98ebf62cf59205a03bb46509b5492578604dcc6c0ea"
+    },
+    {
+      "path": "before/meeting-recording-device-disconnected-light-pl.png",
+      "sha256": "bdef0a739d5d39ef111508517afe062ebdbdfb54153590dc7361c9301d6f4f38"
+    },
+    {
+      "path": "before/meeting-recording-light-en.png",
+      "sha256": "c068dd388d88fd6dbfb682de9d9a1bb1d10842e8727b25d2d1ee1d0b5d19a504"
+    },
+    {
+      "path": "before/meeting-recording-light-pl.png",
+      "sha256": "c3330bbdc1e84e7dbc45773edc7ac184d5db8561476ce0c973be7196d11a5795"
+    },
+    {
+      "path": "before/meeting-recording-loading-model-light-en.png",
+      "sha256": "bf10ca984dfd9ce820a04cc7413c3b36f084b4df1ff1f65a11c9e0bd9332de29"
+    },
+    {
+      "path": "before/meeting-recording-loading-model-light-pl.png",
+      "sha256": "3ac40f8c0568daa0de951c526bed612ff7774f8d6a11ff96a53fe1535b396646"
+    },
+    {
+      "path": "before/meeting-recording-low-disk-light-en.png",
+      "sha256": "e5a12c67024a1c29956ad5fc76162e947665ad1c21f0708d160058e0fbf6e572"
+    },
+    {
+      "path": "before/meeting-recording-low-disk-light-pl.png",
+      "sha256": "47ee22fe7ee5797c2d9128b986e7bd8ee96b3d5a151f4911d2cce90d413f3e33"
+    },
+    {
+      "path": "before/meeting-recording-microphone-fallback-light-pl.png",
+      "sha256": "cf61c315c74cb248731e6baffc74b81787e45dfe4536a09a6e49f47693e7fbf1"
+    },
+    {
+      "path": "before/meeting-recording-no-microphone-audio-light-en.png",
+      "sha256": "a37bb8a9acb662b3bec40dc994a7a37ba1d9bde8d8a5a5f3ee832558e751d22c"
+    },
+    {
+      "path": "before/meeting-recording-no-microphone-audio-light-pl.png",
+      "sha256": "ea72ad6db558787eedceb3e5a99d1d685e5482e01cd34b0f3580a9bd6bb328fe"
+    },
+    {
+      "path": "before/meeting-recording-no-system-audio-light-en.png",
+      "sha256": "a962a8285d93395944636e6a6c5ef4650436545bfedc1088e2b5d9b1ccb8eae0"
+    },
+    {
+      "path": "before/meeting-recording-no-system-audio-light-pl.png",
+      "sha256": "9d20d3b1fa7a949bfa07cf4147fec30d004b7697b3c477bb929eb5e6b7f6c567"
+    },
+    {
+      "path": "before/meeting-recording-system-audio-lost-light-en.png",
+      "sha256": "f2a498700f6b565dbfb684ec6bfebbc404d20e92650b07946defab8aad578f4a"
+    },
+    {
+      "path": "before/meeting-recording-system-audio-lost-light-pl.png",
+      "sha256": "03e4c1f7eda4625d6de7975f8876c701b0b19cd51e3d5fd78c23dbee7f09c203"
+    },
+    {
+      "path": "before/meeting-recording-write-problem-light-en.png",
+      "sha256": "a12bdad698f68fabf9851dcb88bc99418fa9986f83b774d21b88fdaf0bca99fa"
+    },
+    {
+      "path": "before/meeting-recording-write-problem-light-pl.png",
+      "sha256": "760d8e539121517b0d025258914645546374a5598cd3cbd1df3e828f055547e3"
+    },
+    {
+      "path": "before/meeting-saved-incomplete-light-en.png",
+      "sha256": "9e388a429e10adce33b38759ed4f539b85035ae61c4b9d9e46f5b773e26bd229"
+    },
+    {
+      "path": "before/meeting-saved-incomplete-light-pl.png",
+      "sha256": "5fe5f365efd99cf2d8da408fc5996f89084b493bdb167edb2956f3380fdc4a8c"
+    },
+    {
+      "path": "before/meeting-saved-light-en.png",
+      "sha256": "8d400b9934f056af3876a704b3ce24c3a54eade2424ca5a316562f4294341e25"
+    },
+    {
+      "path": "before/meeting-saved-light-pl.png",
+      "sha256": "06edfceb09460dadc8b16272164845f19f35eb0a87d34ef823db3bd63333f4ac"
+    },
+    {
+      "path": "before/meeting-still-processing-light-en.png",
+      "sha256": "9a6e2c24775c4ac6c7b457282b08e9cd28e5b5b25b7d1c57397ae083c466d9c8"
+    },
+    {
+      "path": "before/meeting-still-processing-light-pl.png",
+      "sha256": "1a3eeb5415e410f6272b1c2da75b4a25c1ae36a13522bb71eec8b368bee5d6ec"
+    },
+    {
+      "path": "before/recording-microphone-not-recorded-light-pl.png",
+      "sha256": "f645ff316ef982249217899d0e30594a6e1383f8da11d5adbe638b6b7fc30613"
+    },
+    {
+      "path": "before/recording-microphone-retrying-light-pl.png",
+      "sha256": "06598944eedee88cc7cf7e0d619d6e59493d70bf88d9027ef6474de48003c291"
+    },
+    {
+      "path": "before/suggestion-end-recording-light-pl.png",
+      "sha256": "8c9fa6b873685837952a596b963044c0dd2f344eb74e090b169227b1b137a117"
+    },
+    {
+      "path": "before/suggestion-meeting-light-pl.png",
+      "sha256": "eacb61748e4063ca632d1afb8694e950922fdd364a3164a07d6a778a09acf24d"
+    },
+    {
+      "path": "evidence/en-m-dictation.jpg",
+      "sha256": "962373bc10f8d8994b840fa373d15e94d4bc267e63db36251ce8928fb9f78d34"
+    },
+    {
+      "path": "evidence/en-m-family.jpg",
+      "sha256": "d35d5736a1d3d6346f92457d5c79cb76acccb4521e56328e77a2a10da37885fc"
+    },
+    {
+      "path": "evidence/en-m-meeting-start.jpg",
+      "sha256": "7ddff70056ea6661ce108ef01dbe79710572f5713d4f55771346bd88060a5b43"
+    },
+    {
+      "path": "evidence/en-m-meeting.jpg",
+      "sha256": "0b4098ab12c3e1ef1617dbd17fa56c8508974e01a054f92d89ffc48e4ca8b686"
+    },
+    {
+      "path": "evidence/en-m-suggestion.jpg",
+      "sha256": "b04164f66dfd702c18e4ae9903eaca3329e265fe65e7276575381d2baa1dc39b"
+    },
+    {
+      "path": "evidence/pl-s-reduce-motion-contrast-meeting.jpg",
+      "sha256": "4154fd867f3b7c55d9663ba791835cbf05591beb6a7d5acf8b2f2eef459b8eb6"
+    },
+    {
+      "path": "evidence/pl-xl-hover-dictation.jpg",
+      "sha256": "094c3cf1d158e1a8c60ce7d4905a3c71862607be9651b7d7763c0b976c823f3b"
+    },
+    {
+      "path": "evidence/pl-xl-hover-meeting-start.jpg",
+      "sha256": "fc285c2508014d3ec28fbe5f773eb1063e3138620c2718658fc27ef8eb58d1b2"
+    },
+    {
+      "path": "evidence/pl-xl-hover-meeting.jpg",
+      "sha256": "cb2a2ff824482c5c87c9ae26c784e31ed87f2ff625aa738cdda273df159a905c"
+    },
+    {
+      "path": "evidence/pl-xl-hover-suggestion.jpg",
+      "sha256": "66f82d8b99588b10c4b35f16e749f8bb17606100da91ffc03532181094b1cf06"
+    },
+    {
+      "path": "index.html",
+      "sha256": "37b7c17692642e0c7bc2a380a104ca71e12e4d5a1b2f20eed020bba24733a5d3"
+    }
+  ]
+}

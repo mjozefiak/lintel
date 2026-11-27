@@ -129,10 +129,31 @@ struct GalleryScenesTests {
     }
 }
 
+/// A Git LFS pointer: the whole file a checkout without the LFS objects has (`version`, `oid`, `size`).
+struct LFSPointer: Equatable {
+    static let signature = "version https://git-lfs.github.com/spec/v1"
+
+    var size: Int
+
+    /// `nil` for anything that is not a pointer: a real picture, or a file only shaped like one.
+    init?(data: Data) {
+        guard let text = String(data: data, encoding: .utf8) else { return nil }
+        let lines = text.split(whereSeparator: \.isNewline)
+        guard lines.first.map(String.init) == Self.signature else { return nil }
+        guard let sizeLine = lines.first(where: { $0.hasPrefix("size ") }) else { return nil }
+        guard let size = Int(sizeLine.dropFirst("size ".count)) else { return nil }
+        self.size = size
+    }
+}
+
 @MainActor
 struct GoldenBudgetTests {
-    /// 25 MB per folder of golden images (Q5): past it, the decision is LFS or fewer variants.
-    static let budget = 25 * 1_024 * 1_024
+    /// The pictures' own budget (spec `2026-11-23-swiftui-design-gallery` Q5, owner decision 2026-11-27): past it, the
+    /// catalogue grew by accident and needs a decision. The pictures are Git LFS objects now, so this is not the
+    /// repository's size: the account's Git LFS plan includes 10 GiB of storage, the budget is under 1 % of it, and the
+    /// folder held 17.8 MiB on main before the two open gallery PRs (~31 MiB with both). A budget of plain git blobs
+    /// (25 MB) no longer applies: recording a scene rewrites its pictures, and their versions stay in LFS.
+    static let budget = 96 * 1_024 * 1_024
 
     private func files() throws -> [URL] {
         guard
@@ -141,12 +162,163 @@ struct GoldenBudgetTests {
         return walker.compactMap { $0 as? URL }.filter { $0.pathExtension == "png" }
     }
 
+    /// The size of a picture in the repository: the PNG itself, or the `size` line of its Git LFS pointer when the
+    /// checkout has no LFS objects (a CI job that did not pull them, a clone without `git lfs install`).
+    static func byteCount(ofGoldenAt url: URL) throws -> Int {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        if let head = try handle.read(upToCount: 256), let pointer = LFSPointer(data: head) { return pointer.size }
+        return try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+    }
+
     @Test("the golden images fit the size budget")
     func underBudget() throws {
-        let total = try files().reduce(0) { sum, url in
-            sum + (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+        var total = 0
+        var counted = 0
+        for url in try files() {
+            total += try Self.byteCount(ofGoldenAt: url)
+            counted += 1
         }
+        #expect(counted > 0, "no golden PNG was found: \(GalleryTestSupport.goldens.path)")
         #expect(total <= Self.budget, "the goldens take \(total) bytes; the budget is \(Self.budget)")
+    }
+
+    @Test("a golden counts as its picture whether the checkout holds the picture or its LFS pointer")
+    func pointerSizesCount() throws {
+        let folder = FileManager.default.temporaryDirectory.appending(
+            path: "golden-budget-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let pointer = """
+            version https://git-lfs.github.com/spec/v1
+            oid sha256:\(String(repeating: "a", count: 64))
+            size 123456
+
+            """
+        let pointerURL = folder.appending(path: "pointer.png")
+        try Data(pointer.utf8).write(to: pointerURL)
+        #expect(try Self.byteCount(ofGoldenAt: pointerURL) == 123_456)
+        let picture = Data(repeating: 0x89, count: 3_000)
+        let pictureURL = folder.appending(path: "picture.png")
+        try picture.write(to: pictureURL)
+        #expect(try Self.byteCount(ofGoldenAt: pictureURL) == 3_000)
+        // A file only shaped like a pointer is measured as it is.
+        let broken = Data(pointer.replacingOccurrences(of: "size 123456", with: "size lots").utf8)
+        let brokenURL = folder.appending(path: "broken.png")
+        try broken.write(to: brokenURL)
+        #expect(try Self.byteCount(ofGoldenAt: brokenURL) == broken.count)
+    }
+
+    @Test("every golden picture is stored as a Git LFS pointer, and .gitattributes covers it")
+    func everyGoldenIsAnLFSObject() throws {
+        let root = TestPaths.repoRoot.standardizedFileURL.path + "/"
+        let paths = try files().map { url -> String in
+            let path = url.standardizedFileURL.path
+            #expect(path.hasPrefix(root), "\(path) is outside \(root)")
+            return String(path.dropFirst(root.count))
+        }
+        #expect(!paths.isEmpty)
+
+        // 1. The attribute: without a matching `.gitattributes` line a new picture is stored as a plain blob.
+        let attributes = try Self.git(["check-attr", "filter", "diff", "merge", "--"] + paths, in: TestPaths.repoRoot)
+        var attributeProblems: [String] = []
+        var attributeSeen = Set<String>()
+        for line in attributes.split(separator: "\n") {
+            guard let match = line.firstMatch(of: /^(.+): (filter|diff|merge): (.*)$/) else {
+                attributeProblems.append(String(line))
+                continue
+            }
+            attributeSeen.insert(String(match.1))
+            if match.3 != "lfs" { attributeProblems.append(String(line)) }
+        }
+        #expect(
+            attributeProblems.isEmpty,
+            "a golden PNG is not covered by the Git LFS attributes: \(attributeProblems.sorted().prefix(5))")
+        #expect(attributeSeen == Set(paths), "git check-attr did not answer for every golden")
+
+        // 2. The stored blob: `git check-attr` reads `.gitattributes` only, so it answers `lfs` for a picture that was
+        //    committed as a plain blob too. Read what the index holds and require a pointer — the check that the
+        //    attribute one cannot make. Works without git-lfs and with the filters installed.
+        let blobs = try Self.indexedBlobs(for: paths)
+        let missing = Set(paths).subtracting(blobs.keys)
+        #expect(
+            missing.isEmpty,
+            "a golden PNG is not staged in the Git index (git add): \(missing.sorted().prefix(5))")
+        var pointerProblems: [String] = []
+        for (path, data) in blobs where LFSPointer(data: data) == nil {
+            pointerProblems.append("\(path) (\(data.count) bytes)")
+        }
+        #expect(
+            pointerProblems.isEmpty,
+            "a golden PNG is stored as a plain blob, not a Git LFS pointer: \(pointerProblems.sorted().prefix(5))")
+    }
+
+    /// The bytes of the blobs the index holds for `paths`, keyed by repo-relative path. Reads the index
+    /// (`git ls-files -s`) and the stored objects (`git cat-file --batch`), never the working tree: with the LFS
+    /// filters installed the working tree holds the pictures even when a plain blob was committed, so only the stored
+    /// object tells the truth. Needs neither git-lfs nor the filters.
+    private static func indexedBlobs(for paths: [String]) throws -> [String: Data] {
+        let listing = try git(["ls-files", "-s", "--"] + paths, in: TestPaths.repoRoot)
+        var entries: [(path: String, oid: String)] = []
+        for line in listing.split(separator: "\n") {
+            // "<mode> <oid> <stage>\t<path>"
+            guard let tab = line.firstIndex(of: "\t") else { continue }
+            let fields = line[..<tab].split(separator: " ")
+            guard fields.count >= 2 else { continue }
+            entries.append((String(line[line.index(after: tab)...]), String(fields[1])))
+        }
+        guard !entries.isEmpty else { return [:] }
+        let input = Data(entries.map { $0.oid + "\n" }.joined().utf8)
+        let batch = try gitData(["cat-file", "--batch"], stdin: input, in: TestPaths.repoRoot)
+        var blobs: [String: Data] = [:]
+        var cursor = batch.startIndex
+        for entry in entries {
+            guard let newline = batch[cursor...].firstIndex(of: 0x0A) else { break }
+            let header = batch[cursor..<newline]
+            let fields = String(decoding: header, as: UTF8.self).split(separator: " ")
+            let contentStart = batch.index(after: newline)
+            guard fields.count == 3, let size = Int(fields[2]) else {
+                // "<oid> missing": the object is not in the repository, so the path counts as missing.
+                cursor = contentStart
+                continue
+            }
+            let available = batch.distance(from: contentStart, to: batch.endIndex)
+            let contentEnd = batch.index(contentStart, offsetBy: min(size, available))
+            blobs[entry.path] = Data(batch[contentStart..<contentEnd])
+            cursor = contentEnd < batch.endIndex ? batch.index(after: contentEnd) : batch.endIndex
+        }
+        return blobs
+    }
+
+    /// `git` in the repository, for the checks that read its attributes and its stored objects.
+    private static func git(_ arguments: [String], in directory: URL) throws -> String {
+        String(decoding: try gitData(arguments, stdin: Data(), in: directory), as: UTF8.self)
+    }
+
+    private static func gitData(_ arguments: [String], stdin: Data, in directory: URL) throws -> Data {
+        let process = Process()
+        process.executableURL = URL(filePath: "/usr/bin/env")
+        process.arguments = ["git", "-C", directory.path] + arguments
+        process.standardError = FileHandle.nullDevice
+        let input = Pipe()
+        let output = Pipe()
+        process.standardInput = input
+        process.standardOutput = output
+        try process.run()
+        input.fileHandleForWriting.write(stdin)
+        try input.fileHandleForWriting.close()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw GitFailure(status: process.terminationStatus, command: arguments.first ?? "")
+        }
+        return data
+    }
+
+    struct GitFailure: Error, CustomStringConvertible {
+        var status: Int32
+        var command: String
+        var description: String { "git \(command) exited with \(status)" }
     }
 
     /// The folder is shared by every plugin's scenes (CI compares one folder); each plugin's test owns the scenes whose id
@@ -174,6 +346,9 @@ struct GoldenBudgetTests {
         if let manifest = GalleryGoldens.loadManifest(in: GalleryTestSupport.goldens) {
             let listed = Set(manifest.files.keys).filter { $0.hasPrefix(prefix) }
             #expect(listed.subtracting(expected).isEmpty, "goldens.json lists \(listed.subtracting(expected).sorted())")
+            #expect(
+                expected.subtracting(listed).isEmpty,
+                "goldens.json does not list \(expected.subtracting(listed).sorted())")
         }
     }
 }
