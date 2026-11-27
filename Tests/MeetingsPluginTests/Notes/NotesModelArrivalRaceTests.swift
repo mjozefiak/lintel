@@ -7,6 +7,10 @@ import Testing
 /// #308: the notes model can arrive while the job that waited for it is saving that wait. The arrival is not a
 /// duplicate of the running job, so the meeting must be written again right after it, and its wait must stay on
 /// disk until then. All data is synthetic.
+///
+/// The waits use the shared default guard (60 s): what the test waits for runs on the main actor, which every other
+/// `@MainActor` suite shares, and on the CI runner the keychain suites hold it for tens of seconds — a 10 s guard
+/// failed there twice in a row (#240).
 @MainActor
 @Suite struct NotesModelArrivalRaceTests {
     private static let model = URL(filePath: "/models/llm/notes-test.gguf")
@@ -31,7 +35,7 @@ import Testing
         let id = try await rig.addMeeting()
         rig.library.meetingReady(id)
 
-        #expect(await marks.wait(atLeast: 1, guard: .seconds(10), "the wait to be saved"))
+        #expect(await marks.wait(atLeast: 1, "the wait to be saved"))
         rig.file.update { $0 = Self.model }
         await rig.service.refreshAvailability()
         #expect(rig.service.board.snapshot.awaitingModel.isEmpty)
@@ -39,7 +43,7 @@ import Testing
 
         // The arrival was not dropped as a duplicate: the meeting is written again right after the job, and its
         // wait is still on disk while that run has not finished.
-        #expect(await llmCalls.wait(atLeast: 1, guard: .seconds(10), "the meeting to be written again"))
+        #expect(await llmCalls.wait(atLeast: 1, "the meeting to be written again"))
         #expect(try rig.store.meetingsAwaitingNotesModel() == [id])
         releaseLLM.open()
 
