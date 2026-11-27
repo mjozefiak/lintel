@@ -85,6 +85,7 @@ final class RevisionWriter: Sendable {
         var failed = false
         var retired = false
         var onSaveFailed: (@Sendable (Bool) -> Void)?
+        var onWritten: (@Sendable () -> Void)?
     }
 
     private let core: Core
@@ -206,6 +207,7 @@ final class RevisionWriter: Sendable {
                 outcome = try await core.writeHuman(taken.text, serial: taken.serial)
                 observer.wrote(outcome)
                 reportSave(failed: false)
+                if let written = pending.withLock({ $0.text == nil ? $0.onWritten : nil }) { written() }
             } catch {
                 pending.withLock { if $0.text == nil { $0.text = taken.text } }
                 reportSave(failed: true)
@@ -246,6 +248,12 @@ final class RevisionWriter: Sendable {
     /// The UI's hook for the save state (the editing session); replaces an earlier one.
     func setSaveFailureHandler(_ handler: (@Sendable (Bool) -> Void)?) {
         pending.withLock { $0.onSaveFailed = handler }
+    }
+
+    /// The UI's hook for "everything typed is written" (My notes' saving line); replaces an earlier one. Called
+    /// after a write that left nothing buffered.
+    func setWrittenHandler(_ handler: (@Sendable () -> Void)?) {
+        pending.withLock { $0.onWritten = handler }
     }
 
     /// Retries a failed write on the injected clock with doubling delays; ends when a write succeeds, nothing is

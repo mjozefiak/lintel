@@ -61,6 +61,13 @@ final class NotesWorkspaceModel {
         var makeEditingSession: @MainActor (NoteContent, String, NoteDocumentModel) -> NoteEditingSession? = {
             _, _, _ in nil
         }
+        /// My notes' session for a loaded recorded note (the `mine` layer, written only by `human`); `nil` when
+        /// nothing can write here (no store wired, or Notes is read-only).
+        var makeMineSession: @MainActor (NoteContent) -> NoteEditingSession? = { _ in nil }
+        /// Writes and forgets one layer document's writer (My notes of a note that left the screen).
+        var releaseWriter: @MainActor (NoteDocumentID) async -> Void = { _ in }
+        /// `plugins.notes.readOnly` was on when the section was built: My notes says so instead of "unavailable".
+        var notesReadOnly = false
         /// The history of a layer (its revisions) from `notes.sqlite`; `.none` when the layer has no overlay.
         var loadHistory: @MainActor (NoteItemID, String) async -> HistoryState = { _, _ in .none }
         /// Restore: a new `human` revision with the text and authors of the revision, through the layer's one
@@ -352,8 +359,11 @@ final class NotesWorkspaceModel {
     /// A click on the preview's Notes, My notes or Transcript tab. A tab whose layer the note does not have stays
     /// on and says what is missing (`PreviewNotice`).
     func selectPreviewTab(_ tab: PreviewTab) {
+        let leavesMine = previewTab == .mine && tab != .mine
         previewTab = tab
         guard let document = previewDocument else { return }
+        if leavesMine { flushMyNotes(document) }
+        if tab == .mine { prepareMyNotes(document) }
         document.preferredLayerID = tab.layerID ?? document.preferredLayerID
         if let layer = tab.layerID { document.selectLayer(layer) }
     }
@@ -417,6 +427,7 @@ final class NotesWorkspaceModel {
         guard id != openedID, id != explorer.selection, let document = documents[id] else { return }
         guard !document.lock.isActive else { return }
         if document.isEditing { document.leaveEditing() }
+        closeMyNotes(document)
         documents[id] = nil
         contentEpochs[id] = nil
     }
@@ -558,6 +569,7 @@ final class NotesWorkspaceModel {
         // The full window shows what the preview's tab showed (My notes included); after that the layer is the
         // user's choice, so a reload never switches it back.
         document.showsMine = previewTab == .mine
+        if document.showsMine { prepareMyNotes(document) }
         if let layer = previewTab.layerID, document.phase == .loaded { document.selectLayer(layer) }
         document.preferredLayerID = nil
         openedID = id
@@ -588,6 +600,7 @@ final class NotesWorkspaceModel {
         guard let document = documents[id] else { return }
         if document.isEditing { document.leaveEditing() }
         if document.compare != nil { document.setCompare(nil) }
+        flushMyNotes(document)
         guard explorer.selection == id else { return }
         previewTab =
             document.showsMine
@@ -647,7 +660,9 @@ final class NotesWorkspaceModel {
                 document.apply(
                     content, attributions: NoteOverlayContent.attributions(heads: heads),
                     proposals: NoteOverlayContent.proposals(heads: heads))
+                document.mineMarkdown = NoteOverlayContent.mine(heads: heads)
                 document.setActions([])
+                prepareMyNotesIfShown(document)
                 await refreshPanes(id)
             } else {
                 document.markUnavailable()
@@ -692,8 +707,10 @@ final class NotesWorkspaceModel {
                 NoteOverlayContent.compose(item: id, source: read, heads: heads, summary: nil),
                 attributions: NoteOverlayContent.attributions(heads: heads),
                 proposals: NoteOverlayContent.proposals(heads: heads))
+            document.mineMarkdown = NoteOverlayContent.mine(heads: heads)
             document.setActions(source.actions(for: key))
             document.canRenameTitle = source is any NoteSourceEditing
+            prepareMyNotesIfShown(document)
             await refreshPanes(id)
             #if DEBUG
             if qaMixedAuthors { document.qaMixAuthors() }
@@ -866,7 +883,7 @@ final class NotesWorkspaceModel {
     /// Whether the pen is on for the open layer (spec: seeding only in the states it allows, an overlay or a manual
     /// note always, never with `plugins.notes.readOnly`, never beyond the size limit or on a detached note).
     func canEdit(_ document: NoteDocumentModel) -> Bool {
-        guard environment.canEditNotes, document.phase == .loaded, let content = document.content,
+        guard environment.canEditNotes, document.phase == .loaded, !document.showsMine, let content = document.content,
             let layer = document.selectedLayer
         else { return false }
         if case .detached = document.id { return false }
@@ -1009,7 +1026,7 @@ final class NotesWorkspaceModel {
     /// ⌘⇧C: the Markdown of the layer on screen goes to the pasteboard with the transient and concealed markers,
     /// for this Mac only.
     func copyMarkdown() {
-        guard let text = currentDocument?.markdown else { return }
+        guard let document = currentDocument, let text = shownMarkdown(document), !text.isEmpty else { return }
         NoteClipboard.copy(text, to: environment.pasteboard)
         show(.copied)
     }
@@ -1017,7 +1034,7 @@ final class NotesWorkspaceModel {
     /// Save .md…: a save panel, then the file. A cancelled panel says nothing; a failed write says so. `retry`
     /// writes to the place that just failed instead of asking again ("Try again" of the save-error strip).
     func saveMarkdown(retry: Bool = false) async {
-        guard let document = currentDocument, let text = document.markdown, let summary = document.summary else {
+        guard let document = currentDocument, let text = shownMarkdown(document), let summary = document.summary else {
             return
         }
         // One save panel at a time: a second ⌘S while the panel is open would stack another.

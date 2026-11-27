@@ -92,6 +92,46 @@ final class NoteEditingSession {
             comments: CommentService(store: store, now: now))
     }
 
+    /// My notes (phase 3b): the `mine` layer of a recorded note, written only by `human`. No source offers it, so
+    /// the seed is built here (an empty snapshot by `human`) instead of by `OverlaySeeder`; the row is created by
+    /// the first write that holds a character, never before (typing and deleting it again writes nothing). The
+    /// recording's start time is checked before that first write like for any seed.
+    static func makeMine(
+        content: NoteContent, store: NotesStore?, storeProvider: (@Sendable () async -> NotesStore?)? = nil,
+        registry: NoteDocumentRegistry, readOnly: Bool, readOnlyNow: (@MainActor () -> Bool)? = nil,
+        sourceStartedAtMs: (@Sendable () async -> Int64?)? = nil, clock: any Clock<Duration> = ContinuousClock(),
+        now: @escaping @Sendable () -> Date = { Date() }, timing: RevisionWriter.Timing = .init(),
+        log: any NotesLogging = OSNotesLog()
+    ) -> NoteEditingSession? {
+        let key = content.summary.id
+        guard key.pluginID != NotesStore.manualPluginID else { return nil }
+        let layer = NotesStore.mineLayer
+        let id = NoteDocumentID.live(key, layer: layer)
+        let target: RevisionWriter.Target
+        if let existing = try? store?.liveDocument(key: key, layer: layer) {
+            target = .existing(docID: existing.id)
+        } else {
+            target = .seed(
+                SeedPlan(
+                    key: key, layerID: layer, kind: content.summary.kind, pluginID: key.pluginID,
+                    startedAtMs: NoteTime.milliseconds(content.summary.startedAt),
+                    snapshot: NoteLayer(id: layer, author: .human, markdown: "", version: ""), speakers: []))
+        }
+        let writer = registry.writer(for: id, item: .live(key)) {
+            if let store {
+                return RevisionWriter(
+                    store: store, target: target, clock: clock, now: now, timing: timing,
+                    sourceStartedAtMs: sourceStartedAtMs, log: log)
+            }
+            return RevisionWriter(
+                storeProvider: storeProvider ?? { nil }, target: target, clock: clock, now: now, timing: timing,
+                sourceStartedAtMs: sourceStartedAtMs, log: log)
+        }
+        let blocked: Block? = readOnly || store?.blockedReason != nil ? .readOnly : nil
+        return NoteEditingSession(
+            documentID: id, writer: writer, model: nil, block: blocked, readOnlyNow: readOnlyNow, comments: nil)
+    }
+
     /// Wires the editor: every edit goes to the writer, losing focus is a save point.
     func attach(to controller: NoteEditorController) {
         self.controller = controller

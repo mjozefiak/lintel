@@ -309,6 +309,7 @@ public final class NotesPlugin: LintelPlugin {
                 exists: hasLibrary)
         }
         if usesStore {
+            environment.notesReadOnly = NotesSettings(context.settings).readOnly
             environment.registry = registry
             environment.installHistory(store: storeProvider, exists: hasLibrary)
             environment.installComments(store: storeProvider, exists: hasLibrary)

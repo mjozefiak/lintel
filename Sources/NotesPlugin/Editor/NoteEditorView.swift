@@ -27,6 +27,8 @@ struct NoteEditorSurface<Header: View>: View {
     @State private var draft: CommentDraft?
     /// Told when the shortcut finds a selection a comment cannot point at (it shows a strip and VoiceOver speaks it).
     var onCommentRefused: ((CommentFailure) -> Void)?
+    /// The format bar above the text; My notes is a plain pad and leaves it out.
+    var showsFormatBar = true
     #if DEBUG
     /// QA: select this text and open the popover once the editor is on screen (`plugins.notes.qaComments=popover`).
     var qaSelect: String?
@@ -55,7 +57,7 @@ struct NoteEditorSurface<Header: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isReadOnly {
+            if !isReadOnly && showsFormatBar {
                 NoteFormatBar(
                     controller: controller, showsFormatting: mode.offersFormatting,
                     canComment: onAddComment != nil && selection.length > 0 && draft == nil,

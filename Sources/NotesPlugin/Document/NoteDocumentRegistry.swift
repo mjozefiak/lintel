@@ -105,6 +105,11 @@ final class NoteDocumentRegistry {
     /// A tab closed: flushes its documents, forgets them, then runs the deferred delete of detached rows. A
     /// document whose flush fails is NOT forgotten (its text would be lost): it lingers, is retried by the next
     /// flush point or quit, and `onSaveFailure` says so. A document re-opened while the flush ran is kept.
+    /// Writes and forgets one layer document's writer (a new acquisition in between keeps it).
+    func release(_ id: NoteDocumentID) async {
+        await release(ids: [id])
+    }
+
     func release(item: NoteItemID) async {
         await release(ids: entries.filter { $0.value.item == item }.map(\.key))
     }

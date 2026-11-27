@@ -304,6 +304,8 @@ extension NotesWorkspaceModel {
         case "save.other": await saveMarkdown()
         case "models.open": environment.openModels()
         case "edit.save.retry": await currentDocument?.session?.retry()
+        case "mine.retry":
+            if let document = currentDocument ?? previewDocument { await retryMyNotes(document) }
         case "proposal.compare": await showProposalCompare()
         case "revise.cancel", "revise.retry": _ = await performRevise(actionID)
         default:
