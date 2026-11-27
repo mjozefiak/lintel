@@ -261,7 +261,7 @@ struct SpeakerSuggestionLine: View {
             Spacer(minLength: 0)
         }
         .disabled(isAnswering)
-        // Under the words, past the speaker's name and the time.
+        // Under the words, lined up with the time chip: the speaker's column plus the line's spacing.
         .padding(.leading, document.speakerColumnWidth(textSize: textSize) + 12 * textSize.scale)
         .padding(.vertical, 2)
         .focusable()
