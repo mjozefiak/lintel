@@ -73,6 +73,9 @@ struct ResumeSpeech: Sendable {
 /// - The speech that is missing from the library is found by running voice activity detection over the spool
 ///   (silence is never transcribed) and keeping the ranges that stored segments of that track do not already
 ///   cover, so running it again after a partial run neither duplicates nor skips text.
+/// - The speech model is the one stored with the meeting (`RecoverableMeeting.speechModelID`), not the one
+///   chosen in Settings now (#314): a meeting never mixes two engines, and the detector comes from that model's
+///   folder too. When that model is not installed any more the meeting stays `incomplete` with its spool.
 /// - The system track goes first so the microphone's echo check sees all of it.
 /// - The spool is never deleted before the meeting really is `ready`. A segment that cannot be transcribed or
 ///   read back, or a model that is not available, leaves the meeting `incomplete` with the spool kept.
@@ -81,9 +84,10 @@ struct MeetingResumer: MeetingResuming {
     let store: MeetingsStore
     let keys: MeetingKeys
     let spool: SpoolStorage
-    let makeVAD: @Sendable () -> any VoiceActivityDetector
-    /// `nil` when no speech model is installed.
-    let speech: @Sendable () async -> ResumeSpeech?
+    /// A detector whose model sits next to the speech model with this id (the one stored with the meeting).
+    let makeVAD: @Sendable (_ modelID: String) -> any VoiceActivityDetector
+    /// The speech setup for the model stored with the meeting; `nil` when that model is not installed any more.
+    let speech: @Sendable (_ modelID: String) async -> ResumeSpeech?
     let lease: SpeechEngineLease
     let keepWarm: @Sendable () -> Duration
     /// `MeetingFinalizer.hook`: diarization and speaker assignment; never throws.
@@ -99,8 +103,9 @@ struct MeetingResumer: MeetingResuming {
 
     init(
         store: MeetingsStore, keys: MeetingKeys, spool: SpoolStorage,
-        makeVAD: @escaping @Sendable () -> any VoiceActivityDetector,
-        speech: @escaping @Sendable () async -> ResumeSpeech?, lease: SpeechEngineLease = .shared,
+        makeVAD: @escaping @Sendable (_ modelID: String) -> any VoiceActivityDetector,
+        speech: @escaping @Sendable (_ modelID: String) async -> ResumeSpeech?,
+        lease: SpeechEngineLease = .shared,
         keepWarm: @escaping @Sendable () -> Duration = { .seconds(600) },
         finalize: @escaping @Sendable (Int64, UUID) async -> Void, echo: EchoSuppressor = EchoSuppressor(),
         now: @escaping @Sendable () -> Date = { Date() }, keepAudio: @escaping @Sendable () -> Bool = { false },
@@ -169,7 +174,7 @@ struct MeetingResumer: MeetingResuming {
             }
             events(.scanning(channel))
             do {
-                let scan = try await scan(track, uuid: uuid)
+                let scan = try await scan(track, uuid: uuid, modelID: meeting.speechModelID)
                 scans[channel] = scan
                 if scan.damaged { gaps += 1 }
                 missing[channel] = Self.uncovered(scan.ranges, by: stored[channel] ?? [])
@@ -222,9 +227,9 @@ struct MeetingResumer: MeetingResuming {
 
     /// Runs a voice activity detector over the whole track, a chunk at a time, and returns the speech ranges
     /// (at most `MeetingSession.longestSegment` long) in samples.
-    private func scan(_ track: SpoolTrack, uuid: UUID) async throws -> TrackScan {
+    private func scan(_ track: SpoolTrack, uuid: UUID, modelID: String) async throws -> TrackScan {
         let reader = try SpoolReader(file: spool.file(for: uuid, track: track), meeting: uuid, track: track, keys: keys)
-        let vad = makeVAD()
+        let vad = makeVAD(modelID)
         let longest = MeetingSession.longestSegment
         var scan = TrackScan()
         var start: Int?
@@ -301,8 +306,8 @@ struct MeetingResumer: MeetingResuming {
         _ meeting: RecoverableMeeting, uuid: UUID, missing: [AudioChannel: [Range<Int>]], total: Int,
         events: @escaping @Sendable (ResumeEvent) -> Void
     ) async -> ReplayResult {
-        guard let setup = await speech() else {
-            logger.notice("Recovery: the speech model is not installed")
+        guard let setup = await speech(meeting.speechModelID) else {
+            logger.notice("Recovery: the speech model of the meeting is not installed")
             return .stop(.incomplete(.modelUnavailable(busy: false)))
         }
         let handle: SpeechLease
