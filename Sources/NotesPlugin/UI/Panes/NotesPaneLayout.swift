@@ -27,6 +27,19 @@ enum NotesPaneLayout {
         min(base(pane).factor * 12.5 * textScale, base(pane).cap)
     }
 
+    /// What the preview needs beside the list before the two stack (about the width of a sentence of the notice and
+    /// its button at Medium).
+    static let previewMinimumWidth: CGFloat = 300
+
+    /// `true` when the section is too narrow for the list and the preview side by side, as in a tiling window
+    /// manager that tiles the window to about 310 pt. The list then sits over the preview and every pane takes
+    /// the width it has (spec 3a, owner decision on #348: wrap and lay out, not a minimum window width). An unmeasured
+    /// section (`.infinity`, before the first layout) is never compact.
+    static func isCompact(sectionWidth: CGFloat, textScale: CGFloat) -> Bool {
+        sectionWidth.isFinite
+            && sectionWidth < minimumWidth(.explorer, textScale: textScale) + previewMinimumWidth * max(textScale, 1)
+    }
+
     /// What the centre column needs at Medium (`NotesWorkspaceModel.centreMinimumWidth` is this value).
     static let centreMinimumWidth: CGFloat = 420
 

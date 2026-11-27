@@ -8,7 +8,13 @@ import SwiftUI
 /// notes says so in words, and "Try Again" appears only when a recorder can really write them again.
 struct NotePreviewView: View {
     let model: NotesWorkspaceModel
+    /// The preview sits under the list in a narrow section (`NotesPaneLayout.isCompact`): smaller side margins and
+    /// the title's buttons under it, so nothing is cut off.
+    var compact = false
     @Environment(\.lintelTextSize) private var textSize
+
+    /// The side margin of everything in the preview.
+    private var gutter: CGFloat { (compact ? 14 : 24) * textSize.scale }
 
     var body: some View {
         Group {
@@ -32,6 +38,7 @@ struct NotePreviewView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(LintelBrand.windowBackground)
+        .environment(\.notesCompact, compact)
         .hiddenContent(model.hidesContent)
     }
 
@@ -74,7 +81,6 @@ struct NotePreviewView: View {
             } else {
                 blocks(document)
             }
-            if notice == nil { footer(document) }
         }
     }
 
@@ -82,14 +88,13 @@ struct NotePreviewView: View {
 
     /// - Parameter showsText: Copy is offered only while the text it would copy is the text on screen.
     private func header(_ document: NoteDocumentModel, showsText: Bool) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8 * textSize.scale) {
-            Text(verbatim: model.shown(title(document)))
-                .font(textSize.font(.title2, weight: .semibold))
-                .foregroundStyle(LintelBrand.ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineLimit(3)
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
+        let titleText = Text(verbatim: model.shown(title(document)))
+            .font(textSize.font(.title2, weight: .semibold))
+            .foregroundStyle(LintelBrand.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .lineLimit(3)
+            .accessibilityAddTraits(.isHeader)
+        let buttons = HStack(spacing: 8 * textSize.scale) {
             Button {
                 model.open(document.id)
             } label: {
@@ -106,7 +111,22 @@ struct NotePreviewView: View {
                 .buttonStyle(LintelSecondaryButtonStyle())
             }
         }
-        .padding(.horizontal, 24 * textSize.scale)
+        return Group {
+            if compact {
+                VStack(alignment: .leading, spacing: 8 * textSize.scale) {
+                    titleText
+                    buttons
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8 * textSize.scale) {
+                    titleText
+                    Spacer(minLength: 0)
+                    buttons
+                }
+            }
+        }
+        .padding(.horizontal, gutter)
         .padding(.top, 16 * textSize.scale)
         .padding(.bottom, 8 * textSize.scale)
     }
@@ -117,7 +137,7 @@ struct NotePreviewView: View {
     }
 
     private func tabs(_ document: NoteDocumentModel) -> some View {
-        HStack(spacing: 4 * textSize.scale) {
+        WrappingRow(spacing: 4 * textSize.scale, lineSpacing: 2 * textSize.scale) {
             ForEach(PreviewTab.allCases, id: \.self) { tab in
                 let selected = model.previewTab == tab
                 Button {
@@ -135,9 +155,8 @@ struct NotePreviewView: View {
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20 * textSize.scale)
+        .padding(.horizontal, gutter - 4 * textSize.scale)
         .padding(.bottom, 6 * textSize.scale)
     }
 
@@ -183,7 +202,7 @@ struct NotePreviewView: View {
         }
         .font(textSize.font(.callout))
         .foregroundStyle(LintelBrand.secondaryText)
-        .padding(.horizontal, 24 * textSize.scale)
+        .padding(.horizontal, gutter)
         .padding(.vertical, 12 * textSize.scale)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -277,39 +296,50 @@ struct NotePreviewView: View {
                     .buttonStyle(LintelSecondaryButtonStyle())
             }
         }
-        .padding(.horizontal, 24 * textSize.scale)
+        .padding(.horizontal, gutter)
         .padding(.vertical, 12 * textSize.scale)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityElement(children: .contain)
     }
+}
 
-    // MARK: Footer
+/// A row that wraps onto more lines when its children do not fit the width, left aligned. It measures like an
+/// `HStack` while everything fits, so the wide layout does not change.
+struct WrappingRow: Layout {
+    var spacing: CGFloat
+    var lineSpacing: CGFloat
 
-    @ViewBuilder private func footer(_ document: NoteDocumentModel) -> some View {
-        if let text = footerText(document) {
-            LintelDivider()
-            Text(verbatim: text)
-                .font(textSize.font(.footnote))
-                .foregroundStyle(LintelBrand.secondaryText)
-                .padding(.horizontal, 24 * textSize.scale)
-                .padding(.vertical, 8 * textSize.scale)
-                .frame(maxWidth: .infinity, alignment: .leading)
+    private func lines(_ subviews: Subviews, width: CGFloat) -> (frames: [CGRect], size: CGSize) {
+        var frames: [CGRect] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var widest: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > width {
+                y += lineHeight + lineSpacing
+                x = 0
+                lineHeight = 0
+            }
+            frames.append(CGRect(x: x, y: y, width: size.width, height: size.height))
+            x += size.width + spacing
+            widest = max(widest, x - spacing)
+            lineHeight = max(lineHeight, size.height)
         }
+        return (frames, CGSize(width: widest, height: y + lineHeight))
     }
 
-    private func footerText(_ document: NoteDocumentModel) -> String? {
-        if showsMine(document) { return nil }
-        if NoteCollection.isDictation(document.id) { return nil }
-        guard document.layerID == "notes", let writer = document.selectedLayer?.writer else { return nil }
-        switch writer {
-        case .thisMac:
-            return String(
-                localized: "Lintel wrote these notes from the recording, on this Mac.",
-                comment: "Preview footer: built-in model")
-        case .claude:
-            return String(
-                localized: "Claude wrote these notes from the transcript. The recording stayed on this Mac.",
-                comment: "Preview footer: the external provider")
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = lines(subviews, width: proposal.width ?? .infinity)
+        return CGSize(width: min(result.size.width, proposal.width ?? .infinity), height: result.size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = lines(subviews, width: bounds.width)
+        for (subview, frame) in zip(subviews, result.frames) {
+            subview.place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: .unspecified)
         }
     }
 }

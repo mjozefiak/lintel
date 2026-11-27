@@ -40,6 +40,11 @@ extension NotesWorkspaceModel {
         }
     }
 
+    /// The section is too narrow for the list beside the preview: they stack (`NotesPaneLayout.isCompact`).
+    func isCompact(textScale: CGFloat) -> Bool {
+        NotesPaneLayout.isCompact(sectionWidth: sectionWidth, textScale: textScale)
+    }
+
     /// The width to draw for a pane: a drag in progress, else the stored or default one, kept inside the limits
     /// and the room the section has.
     func paneWidth(_ pane: NotesPane, textScale: CGFloat) -> CGFloat {

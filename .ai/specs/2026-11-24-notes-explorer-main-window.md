@@ -228,7 +228,7 @@ Per the gallery spec, **the gallery snapshots become the source of truth** once 
 - **Sidebar**: All notes · Meetings · Dictations with counts → Folders (each with count) and "+ New Folder" → Recently Deleted (only while not empty) → Dictionary (Dictation's section row). Add-ons never appear.
 - **List**: day groups (Today, Yesterday, weekday, then dates); each row: type ring, the word "Meeting" / "Dictation" / "Note" in the meta line, title up to 3 lines (never truncated to 1), meta ("Meeting · 42 min · 3 tasks", "Dictation · 118 words · pasted into Mail"), time. Row states: ready; writing notes (closing ring, "Writing notes…"); notes not written (warning text "Notes not written"); recording ("Now", live ring, selected).
 - **Preview**: title, meta, "On this Mac" chip, Open, Copy, More (Move to Folder, Delete). Tabs **Notes · My notes · Transcript** for a meeting; a dictation shows its text and "pasted into <app>" (no tabs); a manual note shows its text (editable in place).
-  - Notes: summary, decisions, tasks with their owner, then the footer: "Lintel wrote these notes from the recording, on this Mac." or "Claude wrote these notes from the transcript. The recording stayed on this Mac." No per-line marks (owner 2026-11-19).
+  - Notes: summary, decisions, tasks with their owner, then (the footer was removed by owner decision 2026-11-27, #348; it read) "Lintel wrote these notes from the recording, on this Mac." or "Claude wrote these notes from the transcript. The recording stayed on this Mac." No per-line marks (owner 2026-11-19).
   - My notes: "Only you write here. Lintel never changes these notes." above the editor; empty: "Type your own notes. Lintel keeps them exactly as you write them."
   - Transcript: speakers by name, as today.
 - **Full window** (Open, double-click, Return on a row): sidebar and list hidden, "‹ All notes" (⌘[ or Esc), the inspector button for Details / History / comments.
@@ -405,7 +405,7 @@ Phases 4, 5 and 7 are independent of each other once Phase 3b is in (7 needs onl
 1. **3.1 Gallery scenes** for every Explorer, Search, Preview and Full window row of the states table (including pl + XL); owner approval.
 2. **3.2 `MainSidebar`** in the shell over `WorkspaceSection.sidebar`; Notes' block (collections with counts; Folders header hidden until Phase 6); `plugins.notes.explorer.collection`. Tests: block order, add-on sections absent while off, unknown collection → All.
 3. **3.3 `ExplorerModel` + list** replacing `NoteCollection` and the tab state: day groups, rows with ring and meta, row states, keyboard; search scoped to the collection with Search All Notes. Unit tests for grouping, scoping, counts, selection after reload.
-4. **3.4 Preview and tabs**: `NotePreviewView` with Notes · My notes (read-only until 3b) · Transcript, writer footer, dictation and manual variants, failed state with Try Again (through `retryNotes` when a `LiveRecorder` exists, hidden otherwise).
+4. **3.4 Preview and tabs**: `NotePreviewView` with Notes · My notes (read-only until 3b) · Transcript, dictation and manual variants, failed state with Try Again (through `retryNotes` when a `LiveRecorder` exists, hidden otherwise).
 5. **3.4b Empty states** for the four collections and search, with the dictation shortcut read live and the off-plugin variants. C1–C19 table, VoiceOver walk, screenshots.
 ### Phase 3b: My notes and the full window
 

@@ -23,48 +23,58 @@ struct NotesSectionView: View {
         return document
     }
 
+    private var compact: Bool { model.isCompact(textScale: textSize.scale) }
+
     var body: some View {
         VStack(spacing: 0) {
             ForEach(model.explorerStrips) { strip in NoteStripView(strip: strip, model: model) }
-            HStack(spacing: 0) {
-                NoteListView(model: model, width: model.paneWidth(.explorer, textScale: textSize.scale))
-                    .transaction(value: model.paneWidth(.explorer, textScale: textSize.scale)) { $0.animation = nil }
-                NotesPaneDivider(model: model, pane: .explorer)
-                if model.tabs.tabs.isEmpty {
-                    NotePreviewView(model: model)
-                } else {
-                    VStack(spacing: 0) {
-                        NoteTabBar(model: model)
-                        NotePathBar(model: model)
-                        NoteCenter(model: model)
-                            .hiddenContent(model.hidesContent)
+            if compact && model.tabs.tabs.isEmpty {
+                NoteStackedExplorer(model: model)
+            } else {
+                HStack(spacing: 0) {
+                    if !compact {
+                        NoteListView(model: model, width: model.paneWidth(.explorer, textScale: textSize.scale))
+                            .transaction(value: model.paneWidth(.explorer, textScale: textSize.scale)) {
+                                $0.animation = nil
+                            }
+                        NotesPaneDivider(model: model, pane: .explorer)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(LintelBrand.windowBackground)
-                    // Next to the document when there is room; over its right edge when the section is narrow (the
-                    // path bar's button asked for it), so Comments and History stay reachable at the largest text size.
-                    .overlay(alignment: .trailing) {
-                        if let document = inspectorDocument, !model.inspectorFits {
+                    if model.tabs.tabs.isEmpty {
+                        NotePreviewView(model: model, compact: compact)
+                    } else {
+                        VStack(spacing: 0) {
+                            NoteTabBar(model: model)
+                            NotePathBar(model: model)
+                            NoteCenter(model: model)
+                                .hiddenContent(model.hidesContent)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(LintelBrand.windowBackground)
+                        // Next to the document when there is room; over its right edge when the section is narrow (the
+                        // path bar's button asked for it), so Comments and History stay reachable at the largest text size.
+                        .overlay(alignment: .trailing) {
+                            if let document = inspectorDocument, !model.inspectorFits {
+                                NoteInspector(
+                                    model: model, document: document,
+                                    width: model.paneWidth(.inspector, textScale: textSize.scale)
+                                )
+                                .hiddenContent(model.hidesContent)
+                                .shadow(color: LintelBrand.ink.opacity(0.2), radius: 14, x: -4)
+                                .notesFade(.inspector)
+                            }
+                        }
+                        if let document = inspectorDocument, model.inspectorFits {
                             NoteInspector(
                                 model: model, document: document,
                                 width: model.paneWidth(.inspector, textScale: textSize.scale)
                             )
                             .hiddenContent(model.hidesContent)
-                            .shadow(color: LintelBrand.ink.opacity(0.2), radius: 14, x: -4)
                             .notesFade(.inspector)
                         }
                     }
-                    if let document = inspectorDocument, model.inspectorFits {
-                        NoteInspector(
-                            model: model, document: document,
-                            width: model.paneWidth(.inspector, textScale: textSize.scale)
-                        )
-                        .hiddenContent(model.hidesContent)
-                        .notesFade(.inspector)
-                    }
                 }
+                .notesAnimation(.inspector, value: inspectorDocument != nil)
             }
-            .notesAnimation(.inspector, value: inspectorDocument != nil)
             NotesStatusBar(model: model)
         }
         .background(LintelBrand.windowBackground)
@@ -92,6 +102,26 @@ struct NotesSectionView: View {
             guard let request = model.pendingDelete else { return }
             Task { await model.confirmDelete(request) }
         }
+    }
+}
+
+/// A section too narrow for two columns (a window tiled to about 310 pt): the list on top and, when a note is
+/// selected, its preview under it. Everything takes the width it has and wraps; nothing is cut off.
+struct NoteStackedExplorer: View {
+    let model: NotesWorkspaceModel
+    @Environment(\.lintelTextSize) private var textSize
+
+    var body: some View {
+        let hasPreview = model.explorer.selection != nil
+        VStack(spacing: 0) {
+            NoteListView(model: model, width: nil)
+                .frame(maxHeight: hasPreview ? 240 * textSize.scale : .infinity)
+            if hasPreview {
+                LintelDivider()
+                NotePreviewView(model: model, compact: true)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

@@ -32,14 +32,15 @@ struct NotesGalleryTests {
         #expect(
             explorer == [
                 "all-notes", "meetings", "dictations", "search", "search-no-results-meetings", "empty-all",
-                "empty-all-off", "empty-meetings", "empty-dictations", "empty-dictations-no-shortcut", "locked",
+                "empty-all-off", "narrow-stacked", "empty-meetings", "empty-dictations", "empty-dictations-no-shortcut",
+                "locked",
                 "loading",
             ])
         let preview = Set(try #require(scenes.first { $0.id == "notes.preview" }).states.map(\.id))
         #expect(
             preview == [
                 "meeting-notes", "meeting-transcript", "my-notes", "dictation", "own-note", "writing", "needs-model",
-                "failed-with-retry", "failed-no-retry", "notes-off", "loading", "unreadable",
+                "failed-with-retry", "narrow-failed", "notes-off", "loading", "unreadable",
             ])
     }
 

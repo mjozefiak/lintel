@@ -46,6 +46,8 @@ extension NotesPlugin: GalleryProviding {
     var dictationShortcut: KeyShortcut? = KeyShortcut(key: " ", modifiers: [.option])
     /// A recorder that can write the notes again (the "Try Again" button of a failed meeting).
     var canRetry = false
+    /// The preview as a narrow section draws it (a window tiled to about 310 pt).
+    var compact = false
 }
 
 /// A fixed moment (3 Nov 2024, noon UTC) and calendar, so no picture carries the date of the day it was made.
@@ -149,7 +151,8 @@ private struct GalleryPasteboard: PasteboardClient {
 /// One of the two views over one model: the list column or the preview. They are drawn apart (the pictures stay
 /// inside the golden budget); the live window shows them side by side.
 private struct NotesExplorerGalleryHost: View {
-    enum Part { case list, preview }
+    /// `stacked` is a section too narrow for two columns: the list over the preview.
+    enum Part { case list, preview, stacked }
 
     let model: NotesWorkspaceModel
     let scenario: NotesExplorerGalleryCase
@@ -159,7 +162,8 @@ private struct NotesExplorerGalleryHost: View {
         Group {
             switch part {
             case .list: NoteListView(model: model, width: 320)
-            case .preview: NotePreviewView(model: model)
+            case .preview: NotePreviewView(model: model, compact: scenario.compact)
+            case .stacked: NoteStackedExplorer(model: model)
             }
         }
         .background(LintelBrand.windowBackground)
@@ -205,12 +209,24 @@ private struct NotesSidebarGalleryHost: View {
 @MainActor enum NotesExplorerGallery {
     private static let listWindow = GalleryPresentation.window(width: 320, height: 620)
     private static let previewWindow = GalleryPresentation.window(width: 560, height: 500)
+    /// What a window tiled to about 310 pt leaves the section after the slim sidebar (132 pt).
+    private static let narrowWindow = GalleryPresentation.window(width: 178, height: 520)
+    /// Only the worst cases: Medium light English and Extra Large Polish (the wrapping that matters).
+    private static let narrowVariants = [
+        GalleryVariant(appearance: .light, textSize: .medium, language: "en"),
+        GalleryVariant(appearance: .light, textSize: .extraLarge, language: "pl"),
+    ]
 
     private static func state(
         _ id: String, _ summary: String, _ scenario: NotesExplorerGalleryCase,
         part: NotesExplorerGalleryHost.Part = .list
     ) -> GalleryState {
-        GalleryState(id: id, summary: summary, presentation: part == .list ? listWindow : previewWindow) {
+        let narrow = scenario.compact || part == .stacked
+        return GalleryState(
+            id: id, summary: summary,
+            presentation: narrow ? narrowWindow : part == .list ? listWindow : previewWindow,
+            variants: narrow ? narrowVariants : GalleryVariant.ciSubset
+        ) {
             AnyView(NotesExplorerGalleryHost(model: galleryModel(scenario), scenario: scenario, part: part))
         }
     }
@@ -235,6 +251,10 @@ private struct NotesSidebarGalleryHost: View {
                     "search",
                     "A search in All notes: the matching word is marked in the snippet of the one note that holds it.",
                     NotesExplorerGalleryCase(query: "postpone", selected: NotesQAFixtures.meetingID)),
+                state(
+                    "narrow-stacked",
+                    "A narrow window (about 310 pt): the list on top, the selected note's preview under it, both as wide as the window.",
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, compact: true), part: .stacked),
                 state(
                     "search-no-results-meetings",
                     "A search in Meetings that finds nothing: one sentence and Search All Notes.",
@@ -276,7 +296,7 @@ private struct NotesSidebarGalleryHost: View {
             states: [
                 state(
                     "meeting-notes",
-                    "A meeting's notes with the tabs Notes, My notes and Transcript and the footer that says who wrote them.",
+                    "A meeting's notes with the tabs Notes, My notes and Transcript as the note's own text.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.summaryID), part: .preview),
                 state(
                     "meeting-transcript",
@@ -292,7 +312,7 @@ private struct NotesSidebarGalleryHost: View {
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.dictationID), part: .preview),
                 state(
                     "own-note",
-                    "A note you wrote: its text, no tabs and no footer.",
+                    "A note you wrote: its text, no tabs.",
                     NotesExplorerGalleryCase(sources: .withManualNote, selected: GalleryManualNote.key),
                     part: .preview),
                 state(
@@ -308,9 +328,10 @@ private struct NotesSidebarGalleryHost: View {
                     "The notes failed and a recorder can write them again: the Notes tab says the transcript is safe, Try Again.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID, canRetry: true), part: .preview),
                 state(
-                    "failed-no-retry",
-                    "The notes failed and Meetings is off: no button, the sentence says the transcript can be read.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID), part: .preview),
+                    "narrow-failed",
+                    "The notes failed in a narrow window (about 310 pt): the sentences wrap, the transcript is safe, Try Again sits under them; nothing is cut off.",
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.failedID, canRetry: true, compact: true),
+                    part: .preview),
                 state(
                     "notes-off",
                     "A finished meeting without notes, Meetings off: “Notes are off for this meeting.” and no button.",

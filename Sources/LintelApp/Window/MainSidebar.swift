@@ -25,7 +25,21 @@ struct MainSidebar: View {
     let selectedSection: String
     let select: @MainActor (String) -> Void
     let openSettings: @MainActor () -> Void
+    /// The room the window gives the sidebar and the section together; `nil` is unmeasured (the full width).
+    var windowWidth: CGFloat?
     @Environment(\.lintelTextSize) private var textSize
+
+    /// A window tiled narrower than this (a tiling window manager ignores the minimum size) gets a slimmer
+    /// sidebar, so the section beside it keeps its room and nothing is cut off (owner decision on #348).
+    static let compactBreakpoint: CGFloat = 640
+
+    /// The sidebar's width at Medium: 220 pt, or 132 pt in a narrow window.
+    static func width(windowWidth: CGFloat?) -> CGFloat {
+        guard let windowWidth, windowWidth.isFinite, windowWidth > 0, windowWidth < compactBreakpoint else {
+            return 220
+        }
+        return 132
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -48,7 +62,7 @@ struct MainSidebar: View {
             .padding(.horizontal, SidebarRow.rowInset)
             .padding(.vertical, 8 * textSize.scale)
         }
-        .frame(width: 220 * textSize.scale)
+        .frame(width: Self.width(windowWidth: windowWidth) * textSize.scale)
         .frame(maxHeight: .infinity)
         .background(LintelBrand.sidebarBackground)
         .overlay(alignment: .trailing) { LintelDivider(axis: .vertical) }

@@ -10,6 +10,7 @@ struct NoteBlockRow: View {
     let block: NoteBlock
     let previous: NoteBlock?
     @Environment(\.lintelTextSize) private var textSize
+    @Environment(\.notesCompact) private var compact
 
     private var isTranscript: Bool { document.layerID == NoteDocumentModel.transcriptLayerID }
 
@@ -24,8 +25,8 @@ struct NoteBlockRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 2)
         // The text starts where the header's does (prototype: the gutter's width, now left empty).
-        .padding(.leading, 5.4 * 12.5 * textSize.scale)
-        .padding(.trailing, 28 * textSize.scale)
+        .padding(.leading, (compact ? 14 : 5.4 * 12.5) * textSize.scale)
+        .padding(.trailing, (compact ? 14 : 28) * textSize.scale)
     }
 }
 
@@ -189,15 +190,22 @@ struct TranscriptLine: View {
 
     private var isHighlighted: Bool { document.highlightedBlock == block.index }
 
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12 * textSize.scale) {
+    @Environment(\.notesCompact) private var compact
+
+    private var speaker: some View {
+        Group {
             if let name = document.speakerName(of: block) {
                 Text(verbatim: name)
                     .font(textSize.font(.callout, weight: .bold))
                     .foregroundStyle(LintelBrand.ink)
                     .lineLimit(1)
-                    .frame(width: 5.5 * 12.5 * textSize.scale, alignment: .leading)
+                    .frame(width: compact ? nil : 5.5 * 12.5 * textSize.scale, alignment: .leading)
             }
+        }
+    }
+
+    private var time: some View {
+        Group {
             if let start = block.startMs {
                 Text(verbatim: NoteQuote.clock(milliseconds: start))
                     .font(textSize.font(.footnote).monospaced())
@@ -205,12 +213,37 @@ struct TranscriptLine: View {
                     .padding(.horizontal, 6)
                     .background(LintelBrand.fill, in: RoundedRectangle(cornerRadius: 4))
             }
-            Text(NoteInline.attributed(block.source))
-                .font(textSize.font(.callout))
-                .foregroundStyle(LintelBrand.ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-            Spacer(minLength: 0)
+        }
+    }
+
+    private var text: some View {
+        Text(NoteInline.attributed(block.source))
+            .font(textSize.font(.callout))
+            .foregroundStyle(LintelBrand.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
+    }
+
+    var body: some View {
+        Group {
+            if compact {
+                // Narrow: who and when on one line, the words under it, so the words keep the whole width.
+                VStack(alignment: .leading, spacing: 2 * textSize.scale) {
+                    HStack(spacing: 8 * textSize.scale) {
+                        speaker
+                        time
+                    }
+                    text
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 12 * textSize.scale) {
+                    speaker
+                    time
+                    text
+                    Spacer(minLength: 0)
+                }
+            }
         }
         .padding(.vertical, 2)
         .background(

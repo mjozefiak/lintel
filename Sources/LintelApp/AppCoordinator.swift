@@ -614,13 +614,10 @@ final class AppCoordinator {
                 guard let section = sections.first(where: { $0.id == state.section })
                 else { return AnyView(EmptyView()) }
                 return AnyView(
-                    HStack(spacing: 0) {
-                        MainSidebar(
-                            sections: sections, selectedSection: section.id,
-                            select: { [weak self] id in _ = self?.mainWindow?.showWorkspace(id) },
-                            openSettings: { [weak self] in _ = self?.mainWindow?.showSettings() })
-                        section.makeView()
-                    })
+                    MainWorkspaceView(
+                        sections: sections, section: section,
+                        select: { [weak self] id in _ = self?.mainWindow?.showWorkspace(id) },
+                        openSettings: { [weak self] in _ = self?.mainWindow?.showSettings() }))
             }
         )
         window.activatesApp = environment.registersGlobalHotkeys

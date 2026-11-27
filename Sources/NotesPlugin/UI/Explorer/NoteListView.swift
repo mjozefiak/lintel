@@ -11,8 +11,9 @@ struct NoteListView: View {
     @Environment(\.lintelTextSize) private var textSize
     @FocusState private var listFocused: Bool
 
-    /// Set by the section from `NotesWorkspaceModel.paneWidth` (a dragged width, else the default).
-    let width: CGFloat
+    /// Set by the section from `NotesWorkspaceModel.paneWidth` (a dragged width, else the default); `nil` in a narrow
+    /// section, where the list takes the whole width.
+    let width: CGFloat?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,6 +22,7 @@ struct NoteListView: View {
             list
         }
         .frame(width: width)
+        .frame(maxWidth: width == nil ? .infinity : nil)
         .background(LintelBrand.windowBackground)
     }
 

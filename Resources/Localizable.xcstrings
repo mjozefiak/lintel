@@ -5005,24 +5005,6 @@
         }
       }
     },
-    "Claude wrote these notes from the transcript. The recording stayed on this Mac." : {
-      "comment" : "Preview footer: the external provider",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claude wrote these notes from the transcript. The recording stayed on this Mac."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claude napisał te notatki z transkrypcji. Nagranie zostało na tym Macu."
-          }
-        }
-      }
-    },
     "Cleaned" : {
       "comment" : "Document: switch to the cleaned text of a dictation",
       "extractionState" : "manual",
@@ -11841,24 +11823,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lintel odtworzy krótki sygnał przez głośniki i sprawdzi, czy go słyszy. macOS może najpierw zapytać o zgodę na nagrywanie dźwięku systemu. Możesz wcześniej ściszyć dźwięk."
-          }
-        }
-      }
-    },
-    "Lintel wrote these notes from the recording, on this Mac." : {
-      "comment" : "Preview footer: built-in model",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel wrote these notes from the recording, on this Mac."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel napisał te notatki z nagrania, na tym Macu."
           }
         }
       }

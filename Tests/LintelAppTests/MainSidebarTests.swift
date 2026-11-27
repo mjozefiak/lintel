@@ -26,6 +26,18 @@ struct MainSidebarTests {
             ])
     }
 
+    @Test("a window tiled narrower than the layout gets a slim sidebar, so the section keeps its room")
+    func narrowWindowSlimsTheSidebar() {
+        #expect(MainSidebar.width(windowWidth: nil) == 220)
+        #expect(MainSidebar.width(windowWidth: 0) == 220)
+        #expect(MainSidebar.width(windowWidth: 1180) == 220)
+        #expect(MainSidebar.width(windowWidth: 640) == 220)
+        #expect(MainSidebar.width(windowWidth: 639) == 132)
+        // About 310 pt (AeroSpace): the slim sidebar leaves the section more than half the window.
+        #expect(MainSidebar.width(windowWidth: 310) == 132)
+        #expect(310 - MainSidebar.width(windowWidth: 310) > 310 / 2)
+    }
+
     @Test("an add-on that is off has no row; switched on, its row appears in its order")
     func offPluginsAreAbsent() async throws {
         let env = try TestEnvironment()
