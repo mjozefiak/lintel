@@ -274,8 +274,11 @@ Outside the phases: the owner's decision on A3 (model assist for Light), taken f
 
 ### Phase 3 — term check
 
-1. `FormatterGuard` term check (vocabulary terms and mid-sentence capitalised words must survive, diacritics-insensitive) for Standard and Full. Tests incl. a Polish inflected name ("Anna" → "Anny" counts as kept by stem of ≥ 4 letters).
+1. `FormatterGuard` term check (vocabulary terms and mid-sentence capitalised words must survive, diacritics-insensitive) for Standard and Full. Tests incl. a Polish inflected name ("Anna" → "Anny" counts as kept by stem: a name of 4 letters or more is compared by its stem of at least 3).
 2. Baseline first (fallback rate per chunk without the check), then with it; ships when the added fallback is ≤ 2 points and every corpus `terms` item keeps its terms. Table in the PR body.
+
+   **Result (2026-11-27, built-in Qwen3 4B, stored raw transcripts, the owner's corpus of 40 items = 42 chunks and FLEURS 60 PL + 60 EN; numbers only):** fallback per chunk, baseline → with the check: Standard v2 corpus 2.4 % → 4.8 %, FLEURS PL 1.7 % → 1.7 %, FLEURS EN 1.7 % → 3.3 %; Full v1 the same (2.4 → 4.8, 1.7 → 1.7, 1.7 → 3.3). The corpus adds one chunk, which is 2.4 points of 42 and over the limit of 2; pooled over the 162 chunks it is 1.2 points. The same with a vocabulary of the corpus `terms` and `code` words gave the same numbers. Terms kept of those the raw transcript holds on the `terms` and `code` items: 11 of 11 in the baseline and with the check, so **the check keeps nothing the baseline did not**. The two chunks it rejected (one on the `code` item `pl-code-01`, one on a FLEURS EN sentence) each held capitalised words that the model's answer did not repeat as spoken: both words came from speech-recognition errors (a garbled identifier part, an acronym), and the guard's answer was the raw chunk, which is the cost the check has by design when the model changes such a word.
+   **Decision per this spec: the check is not enabled.** `FormatterGuard.checksTerms` is `false` (the code, the vocabulary plumbing and the tests stay; Standard's and Full's behaviour is unchanged). The criterion is not lowered. The owner decides whether the pooled reading (+1.2 points) is enough to turn it on, or whether the check should wait for a vocabulary-heavy corpus where a model rewrites a spoken variant, which this corpus does not exercise (its terms never reach the guard as a vocabulary).
 
 ### Phase 4 — provider measurement
 
