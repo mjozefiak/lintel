@@ -8,12 +8,14 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ### Added
 
+- Notes: **My notes**. Each meeting has a My notes tab where you write your own notes, next to the notes Lintel writes and the transcript. Only you write there: Lintel never changes them. They are saved as you type, and if saving fails Lintel says so, keeps your text and keeps trying.
 - Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
 
 - Dictation: a **Full** level of Tidy up my text (email layout, paragraphs for a long dictation, smoother style) is built and tested but not offered yet; it appears in the popup when it passes its quality checks.
 
 ### Changed
 
+- Notes: a note now opens across the whole window (Return, a double click or Open), with "‹ All notes" to go back (⌘[ or Esc; ⌘W also goes back first). The note tabs and the path bar are gone: one note is open at a time, and the list remembers which one you were reading. An "Ask agent" run keeps going when you go back to the list.
 - Notes: the Notes section now has a sidebar with All notes, Meetings and Dictations (with counts), a list grouped by day with a ring and one line of facts per note, and a preview of the selected note with the tabs Notes, My notes and Transcript. A search stays in the list you are in, and "Search All Notes" widens it. Empty lists say what to do next. The window has a Settings row at the bottom of the sidebar.
 - Meeting notes now follow a topic layout: topics, decisions made and next steps. Notes written by a provider (Claude) start with a short intro; notes written by the model on this Mac, since notes prompt 7, have no intro, so the model never adds a sentence of its own about the meeting. They also show more of the points it checked (up to six per topic instead of ten in all). Notes written earlier stay as they are.
 - On a new install, Dictation and Meetings are on, and app search, file search and clipboard history are add-ons that you turn on in Settings → Features. If you used Lintel before this version, every switch stays as it was.

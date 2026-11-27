@@ -146,20 +146,19 @@ struct NotesCollectionSwitchTests {
         await waitUntil { rig.model.loadState == .loaded }
         #expect(rig.model.rows.count == 4)
         #expect(rig.model.explorer.selection == .live(key))
-        #expect(rig.model.tabs.tabs.first?.kind == .dictation)
-        // A note the collection lists changes nothing; both tabs stay open.
+        // A note the collection lists changes nothing; it replaces the first in the full window.
         #expect(rig.model.handle(NoteRoute.route(for: Fixtures.key("meetings", "a"))))
         #expect(rig.model.collection == .all)
-        #expect(rig.model.tabs.tabs.count == 2)
+        #expect(rig.model.currentID == .live(Fixtures.key("meetings", "a")))
     }
 
-    @Test("switching lists keeps the open tabs")
-    func tabsSurvive() async {
+    @Test("switching lists keeps the note open in the full window")
+    func openNoteSurvives() async {
         let rig = SwitchRig()
         await rig.model.refresh()
         rig.model.open(.live(Fixtures.key("meetings", "a")))
         await rig.model.setCollection(.dictations)
-        #expect(rig.model.tabs.tabs.count == 1)
+        #expect(rig.model.isFullWindow)
         #expect(rig.model.currentID == .live(Fixtures.key("meetings", "a")))
     }
 }

@@ -39,8 +39,8 @@ struct NoteEditorModeSwitch: View {
 
     private func label(_ mode: NoteEditorMode) -> Text {
         switch mode {
-        case .formatted: Text("Formatted", comment: "Path bar: the editor shows the Markdown styled")
-        case .raw: Text("Raw", comment: "Path bar: the editor shows the plain Markdown source")
+        case .formatted: Text("Formatted", comment: "Full window: the editor shows the Markdown styled")
+        case .raw: Text("Raw", comment: "Full window: the editor shows the plain Markdown source")
         }
     }
 }

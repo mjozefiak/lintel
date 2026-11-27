@@ -3,11 +3,12 @@ import LintelCore
 import LintelKit
 import Observation
 
-/// The state of the Notes section (spec step 3.2): the explorer's rows and groups, the open tabs and one
-/// `NoteDocumentModel` per open note. The model never writes anything; the text stays with the sources.
+/// The state of the Notes section (spec step 3.2, notes explorer phase 3b): the explorer's rows and groups, the note
+/// open in the full window and one `NoteDocumentModel` per note on screen. The model never writes anything; the text
+/// stays with the sources.
 ///
-/// Everything is keyed by `NoteItemID`: a tab, an explorer row and a route name the same thing, so a note opened
-/// from a route and from the explorer is one tab.
+/// Everything is keyed by `NoteItemID`: an explorer row, the full window and a route name the same thing, so a note
+/// opened from a route and from the explorer is one document.
 @MainActor @Observable
 final class NotesWorkspaceModel {
     /// What the model needs from the outside, replaced by fakes in tests.
@@ -33,7 +34,7 @@ final class NotesWorkspaceModel {
         /// The Details toggles shared with Settings → Notes; `nil` makes them from `settings`.
         var preferences: NoteViewPreferences?
         /// The clock and budget of a source's `content(for:)`, like the listing's: a source that does not answer in
-        /// time leaves the tab "unavailable" and does not hold up the other tabs.
+        /// time leaves the note "unavailable" and does not hold up the others.
         var clock: any Clock<Duration> = ContinuousClock()
         var contentBudget: Duration = SourceFanOut.defaultBudget
         /// The open documents (one writer each). `nil` until the store is wired (tests, QA without a store).
@@ -60,6 +61,11 @@ final class NotesWorkspaceModel {
         var makeEditingSession: @MainActor (NoteContent, String, NoteDocumentModel) -> NoteEditingSession? = {
             _, _, _ in nil
         }
+        /// My notes' session for a loaded recorded note (the `mine` layer, written only by `human`); `nil` when
+        /// nothing can write here (no store wired, or Notes is read-only).
+        var makeMineSession: @MainActor (NoteContent) -> NoteEditingSession? = { _ in nil }
+        /// `plugins.notes.readOnly` was on when the section was built: My notes says so instead of "unavailable".
+        var notesReadOnly = false
         /// The history of a layer (its revisions) from `notes.sqlite`; `.none` when the layer has no overlay.
         var loadHistory: @MainActor (NoteItemID, String) async -> HistoryState = { _, _ in .none }
         /// Restore: a new `human` revision with the text and authors of the revision, through the layer's one
@@ -89,7 +95,8 @@ final class NotesWorkspaceModel {
         /// "Revise with N comments" and "Ask agent" (step 6.2): runs the revise service for a layer document and says
         /// how the run ended; `nil` without the store or the agent, and the button stays off.
         var revise: (@MainActor (ReviseCall) async -> ReviseOutcome)?
-        /// Cancel in the lock strip, a closed tab: stops the note's run (the document stays as it was).
+        /// Cancel in the lock strip, a deleted note: stops the note's run (the document stays as it was). Going back to
+        /// the list never cancels a run: it goes on and its result is applied (phase 3b).
         var cancelRevise: @MainActor (NoteItemID) -> Void = { _ in }
         /// Whether "Ask agent" on this thread waits behind a running run.
         var isReviseQueued: @MainActor (NoteItemID, Int64) -> Bool = { _, _ in false }
@@ -196,7 +203,6 @@ final class NotesWorkspaceModel {
     /// QA runs (`--qa-notes`) show no animation, so a snapshot never catches one half way (`NotesMotion`).
     var animationsDisabled = false
 
-    private(set) var tabs = NoteTabSet()
     private(set) var documents: [NoteItemID: NoteDocumentModel] = [:]
 
     init(environment: Environment) {
@@ -230,7 +236,6 @@ final class NotesWorkspaceModel {
         loadState = .loaded
         pageToken += 1
         regroup()
-        syncTabs()
         reconcileSelection()
         await refreshCounts()
         await reloadOpenDocuments()
@@ -264,7 +269,6 @@ final class NotesWorkspaceModel {
         unavailable = listing.unavailable
         pageToken += 1
         regroup()
-        syncTabs()
         reconcileSelection()
     }
 
@@ -278,7 +282,7 @@ final class NotesWorkspaceModel {
     }
 
     /// The switch itself, without the read; `false` when nothing changes. The rows are dropped at once, so a
-    /// dictation never flashes in the Meetings list. Opened tabs stay open.
+    /// dictation never flashes in the Meetings list. A note open in the full window stays open.
     @discardableResult
     func prepareCollection(_ next: NoteCollection, persist: Bool = false) -> Bool {
         guard explorer.setCollection(next, persist: persist) else { return false }
@@ -317,13 +321,16 @@ final class NotesWorkspaceModel {
     }
 
     private func reconcileSelection() {
+        // The note in the full window stays selected while it is open, even when the list no longer shows it (a
+        // search, another collection): the list gets it back when the user goes back.
+        guard openedID == nil else { return }
         let previous = explorer.selection
         let next = explorer.reconcile(order: visibleRows.map(\.id))
         guard next != previous else { return }
         previewTab = .notes
         previewRetryFailed = false
-        // The row that was selected left the list: its preview goes (unless it is open in a tab). The view that
-        // shows the new selection reads it (`loadPreview`).
+        // The row that was selected left the list: its preview goes. The view that shows the new selection reads it
+        // (`loadPreview`).
         if let previous { dropPreview(previous) }
     }
 
@@ -337,7 +344,7 @@ final class NotesWorkspaceModel {
         listFocusRequests += 1
     }
 
-    /// A click or an arrow key: the preview shows this note. It opens no tab.
+    /// A click or an arrow key: the preview shows this note. It does not open the full window.
     func select(row id: NoteItemID) {
         let previous = explorer.selection
         guard previous != id else { return }
@@ -350,8 +357,11 @@ final class NotesWorkspaceModel {
     /// A click on the preview's Notes, My notes or Transcript tab. A tab whose layer the note does not have stays
     /// on and says what is missing (`PreviewNotice`).
     func selectPreviewTab(_ tab: PreviewTab) {
+        let leavesMine = previewTab == .mine && tab != .mine
         previewTab = tab
         guard let document = previewDocument else { return }
+        if leavesMine { flushMyNotes(document) }
+        if tab == .mine { prepareMyNotes(document) }
         document.preferredLayerID = tab.layerID ?? document.preferredLayerID
         if let layer = tab.layerID { document.selectLayer(layer) }
     }
@@ -383,7 +393,7 @@ final class NotesWorkspaceModel {
     /// The model of the note the preview shows; `nil` while nothing is selected.
     var previewDocument: NoteDocumentModel? { explorer.selection.flatMap { documents[$0] } }
 
-    /// Reads the selected note once for the preview (its document is the one a tab would use). The preview view calls
+    /// Reads the selected note once for the preview (its document is the one the full window uses). The preview view calls
     /// it for the selection it shows, so no read runs in the background of a model nobody looks at.
     ///
     /// One read per note at a time: a second caller (the gallery host, a second `.task`) waits for the running one,
@@ -407,10 +417,17 @@ final class NotesWorkspaceModel {
     }
 
     @ObservationIgnored private var previewReads: [NoteItemID: Task<Void, Never>] = [:]
+    /// Notes that left the screen whose writers are still being written and let go (`releaseDocuments`).
+    @ObservationIgnored var documentReleases: [NoteItemID: (token: UUID, task: Task<Void, Never>)] = [:]
 
-    /// Forgets a preview nobody sees; a note that has a tab keeps its document.
-    private func dropPreview(_ id: NoteItemID) {
-        guard !tabs.tabs.contains(where: { $0.id == id }) else { return }
+    /// Forgets a preview nobody sees. The note open in the full window keeps its document, and so does a note whose
+    /// agent run is going on: the run is never cancelled by a click elsewhere, and its document is dropped once the
+    /// run has ended (`runRevise`).
+    func dropPreview(_ id: NoteItemID) {
+        guard id != openedID, id != explorer.selection, let document = documents[id] else { return }
+        guard !document.lock.isActive else { return }
+        if document.isEditing { document.leaveEditing() }
+        releaseDocuments(document)
         documents[id] = nil
         contentEpochs[id] = nil
     }
@@ -517,22 +534,45 @@ final class NotesWorkspaceModel {
         }
     }
 
-    // MARK: Tabs
+    // MARK: Full window
 
-    var currentID: NoteItemID? { tabs.current }
-    var currentDocument: NoteDocumentModel? { tabs.current.flatMap { documents[$0] } }
+    /// The note shown in the full window (Open, a double click, Return, a route, the palette), `nil` while the
+    /// explorer's list and preview are shown. One note at a time: the tab bar of the workspace is gone (notes explorer
+    /// spec, phase 3b). The note stays selected in the list, so going back shows it there.
+    private(set) var openedID: NoteItemID?
 
-    /// Opens a note in its one tab, or selects that tab. The text is read by `loadContent`.
+    /// The shell hides its sidebar and the section hides its list while a note fills the window.
+    var isFullWindow: Bool { openedID != nil }
+
+    var currentID: NoteItemID? { openedID }
+    var currentDocument: NoteDocumentModel? { openedID.flatMap { documents[$0] } }
+
+    /// Opens a note in the full window: it is selected in the list (the list moves to All notes when the shown
+    /// collection does not have it) and its document is the one the preview used. The text is read by
+    /// `loadContent`. A note that was open before is left the way "‹ All notes" leaves it: its typing is written
+    /// and an agent run on it goes on.
     func open(_ id: NoteItemID) {
+        if let previous = openedID, previous != id {
+            leave(previous)
+            openedID = nil
+        }
+        let previousSelection = explorer.selection
+        if previousSelection != id {
+            // A note opened from a route, the palette or "Make note" starts on its Notes, like a new selection.
+            previewTab = .notes
+            previewRetryFailed = false
+        }
         showCollection(of: id)
-        let row = row(for: id)
-        let title = row.map(title(of:)) ?? id.key.rawValue
-        let fallbackKind: NoteKind = NoteCollection.isDictation(id) ? .dictation : .manual
-        tabs.open(
-            NoteTab(id: id, kind: row?.summary.kind ?? fallbackKind, title: title, isBusy: Self.isBusy(row?.badge)))
-        if documents[id] == nil { documents[id] = makeDocument(id) }
-        // A tab keeps the layer the user picks; the preview's wish no longer applies.
-        documents[id]?.preferredLayerID = nil
+        if let previousSelection, previousSelection != id { dropPreview(previousSelection) }
+        let document = documents[id] ?? makeDocument(id)
+        documents[id] = document
+        // The full window shows what the preview's tab showed (My notes included); after that the layer is the
+        // user's choice, so a reload never switches it back.
+        document.showsMine = previewTab == .mine
+        if document.showsMine { prepareMyNotes(document) }
+        if let layer = previewTab.layerID, document.phase == .loaded { document.selectLayer(layer) }
+        document.preferredLayerID = nil
+        openedID = id
     }
 
     /// A document model whose editor, when it ends, writes what is typed and reads the note again.
@@ -544,77 +584,78 @@ final class NotesWorkspaceModel {
         return document
     }
 
-    func select(_ id: NoteItemID) {
-        tabs.select(id)
+    /// "‹ All notes" (⌘[, Esc) and ⌘W: back to the list with the note still selected and its preview on the tab it
+    /// showed. What is typed is written first; an agent run on the note is NOT cancelled (it goes on, the lock strip
+    /// shows again when the note is opened, and its result is applied).
+    func closeFullWindow() {
+        guard let id = openedID else { return }
+        leave(id)
+        openedID = nil
+        listFocusRequests += 1
     }
 
-    /// Moves a tab to `index` (a drop, or Move Left / Move Right). The open-tabs state is the same `NoteTabSet`,
-    /// so the current tab stays current and nothing else changes. Not persisted: the workspace does not keep its
-    /// tabs between launches.
-    @discardableResult
-    func moveTab(_ id: NoteItemID, toIndex index: Int) -> Bool { tabs.move(id, toIndex: index) }
-
-    @discardableResult
-    func moveTab(_ id: NoteItemID, by offset: Int) -> Bool { tabs.move(id, by: offset) }
-
-    func close(_ id: NoteItemID) {
-        // A run for a note whose tab closes is cancelled: nothing is applied to a document nobody sees.
-        environment.cancelRevise(id)
-        tabs.close(id)
-        documents[id] = nil
-        contentEpochs[id] = nil
-        // The buffer is written before the document is forgotten, then the deferred delete of a detached row runs.
-        if let registry = environment.registry { Task { await registry.release(item: id) } }
+    /// Leaves the full window of `id`: the editor ends (which writes), a comparison closes, and the preview's tab
+    /// follows what was shown.
+    private func leave(_ id: NoteItemID) {
+        guard let document = documents[id] else { return }
+        if document.isEditing { document.leaveEditing() }
+        if document.compare != nil { document.setCompare(nil) }
+        flushMyNotes(document)
+        guard explorer.selection == id else { return }
+        previewTab =
+            document.showsMine
+            ? .mine : (document.layerID == NoteDocumentModel.transcriptLayerID ? .transcript : .notes)
+        document.preferredLayerID = previewTab.layerID ?? document.layerID
     }
 
-    /// A detach re-keyed an open note: its tab and document move from `.live(key)` to
-    /// `.detached(key, startedAtMs:)` and are labelled "Recording removed". A new live note with the same key
-    /// (a recreated store's row 1) is a different identity and opens in its own tab.
+    /// A detach re-keyed an open note: its document moves from `.live(key)` to `.detached(key, startedAtMs:)` and
+    /// is labelled "Recording removed". A new live note with the same key (a recreated store's row 1) is a
+    /// different identity.
     @discardableResult
     func rekeyDetached(key: NoteKey, startedAtMs: Int64) -> Bool {
         let old = NoteItemID.live(key)
         let new = NoteItemID.detached(key, startedAtMs: startedAtMs)
-        guard tabs.rekey(from: old, to: new) else { return false }
+        guard openedID == old || explorer.selection == old, documents[new] == nil else { return false }
         documents[new] = documents.removeValue(forKey: old).map { _ in makeDocument(new) }
         contentEpochs[old] = nil
-        let title = tabs.tabs.first { $0.id == new }?.title ?? key.rawValue
-        tabs.update(new, title: title, isBusy: false)
+        if openedID == old { openedID = new }
+        if explorer.selection == old { explorer.select(new) }
         Task { await loadContent(new) }
         return true
     }
 
-    /// ⌘W: closes the current tab. Returns `true` when other tabs stay, so the window stays; the last tab closes
-    /// with the window (`WorkspaceSection.handleClose`).
+    /// ⌘W (`WorkspaceSection.handleClose`): leaves the full window and keeps the window open (`true`); in the list
+    /// it does nothing, so the window closes.
     @discardableResult
-    func closeCurrentTab() -> Bool {
-        guard let id = tabs.current else { return false }
-        let keepsWindow = tabs.tabs.count > 1
-        close(id)
-        return keepsWindow
+    func handleClose() -> Bool {
+        guard isFullWindow else { return false }
+        closeFullWindow()
+        return true
     }
 
-    /// `WorkspaceSection.handleRoute`: an `openNote` route opens the note and selects it. Any other route, or an
-    /// id that is not a note key, is not handled.
+    /// Esc in the full window (owner decision on M1 of the QA of #360): back to the list ("‹ All notes") unless the
+    /// focus is in text (the My notes pad, a layer editor, a field), where Esc stays with the text, so typing never
+    /// leaves the note; also unless the palette or a comparison is open, which Esc closes first. Returns `true`
+    /// when it went back, and the key is then consumed. ⌘[ and ⌘W do not ask: they always go back.
+    @discardableResult
+    func handleEscape(textHasFocus: Bool) -> Bool {
+        guard isFullWindow, !textHasFocus, palette == nil else { return false }
+        if let document = currentDocument, document.compare != nil { return false }
+        closeFullWindow()
+        return true
+    }
+
+    /// `WorkspaceSection.handleRoute`: an `openNote` route selects the note and opens it in the full window. Any
+    /// other route, or an id that is not a note key, is not handled.
     func handle(_ route: WorkspaceRoute) -> Bool {
         guard let id = NoteRoute.itemID(for: route) else { return false }
         open(id)
         return true
     }
 
-    private func syncTabs() {
-        for tab in tabs.tabs {
-            guard let row = row(for: tab.id) else { continue }
-            tabs.update(tab.id, title: title(of: row), isBusy: Self.isBusy(row.badge))
-        }
-    }
-
-    private static func isBusy(_ badge: NoteBadge?) -> Bool {
-        NoteRowPresentation.level(badge) == .active
-    }
-
     // MARK: Documents
 
-    /// Reads a note's content from its source. A source that is off or slow leaves the tab "unavailable"; only
+    /// Reads a note's content from its source. A source that is off or slow leaves the note "unavailable"; only
     /// an answer of "no such note" makes it gone.
     func loadContent(_ id: NoteItemID) async {
         guard let document = documents[id] else { return }
@@ -631,7 +672,9 @@ final class NotesWorkspaceModel {
                 document.apply(
                     content, attributions: NoteOverlayContent.attributions(heads: heads),
                     proposals: NoteOverlayContent.proposals(heads: heads))
+                document.mineMarkdown = NoteOverlayContent.mine(heads: heads)
                 document.setActions([])
+                prepareMyNotesIfShown(document)
                 await refreshPanes(id)
             } else {
                 document.markUnavailable()
@@ -666,7 +709,7 @@ final class NotesWorkspaceModel {
         let outcome = await SourceFanOut.call(budget: environment.contentBudget, clock: environment.clock) {
             try await source.content(for: key)
         }
-        // The tab was closed, or a newer read of this note began: its answer wins.
+        // The note was left, or a newer read of this note began: its answer wins.
         guard isCurrent(epoch, id, document) else { return }
         switch outcome {
         case .value(let read):
@@ -676,8 +719,10 @@ final class NotesWorkspaceModel {
                 NoteOverlayContent.compose(item: id, source: read, heads: heads, summary: nil),
                 attributions: NoteOverlayContent.attributions(heads: heads),
                 proposals: NoteOverlayContent.proposals(heads: heads))
+            document.mineMarkdown = NoteOverlayContent.mine(heads: heads)
             document.setActions(source.actions(for: key))
             document.canRenameTitle = source is any NoteSourceEditing
+            prepareMyNotesIfShown(document)
             await refreshPanes(id)
             #if DEBUG
             if qaMixedAuthors { document.qaMixAuthors() }
@@ -690,11 +735,14 @@ final class NotesWorkspaceModel {
         }
     }
 
-    /// The note is gone (deleted): its tab and document go without writing anything again (the registry already
-    /// discarded the writers).
-    func dropTab(_ id: NoteItemID) {
+    /// The note is gone (deleted): the full window goes back to the list and the document goes without writing
+    /// anything again (the registry already discarded the writers).
+    func dropDocument(_ id: NoteItemID) {
         environment.cancelRevise(id)
-        tabs.close(id)
+        if openedID == id {
+            openedID = nil
+            listFocusRequests += 1
+        }
         documents[id] = nil
         contentEpochs[id] = nil
     }
@@ -703,25 +751,23 @@ final class NotesWorkspaceModel {
         contentEpochs[id] == epoch && documents[id] === document
     }
 
-    /// Every open tab is read on its own, so a source that does not answer holds up only its own tabs.
+    /// Every document on screen (the full window, the preview, a note whose agent run goes on) is read on its own,
+    /// so a source that does not answer holds up only its own note.
     private func reloadOpenDocuments() async {
-        var ids = tabs.tabs.map(\.id)
-        if let selected = explorer.selection, !ids.contains(selected), documents[selected] != nil {
-            ids.append(selected)
-        }
+        let ids = documents.keys.sorted { $0.key.rawValue < $1.key.rawValue }
         let reads = ids.map { id in Task { await loadContent(id) } }
         for read in reads { await read.value }
     }
 
     // MARK: New notes (step 4.4)
 
-    /// ⌘N, the explorer's "New note" button and the tab bar's plus: possible with the store open for writing.
+    /// ⌘N and the explorer's "New note" button: possible with the store open for writing.
     var canCreateNote: Bool { environment.canCreateNotes && overlaysAvailable && !isCreatingNote }
 
     private var isCreatingNote = false
 
-    /// Creates a manual note, lists it, and opens it in its tab with the editor ready. A search in the explorer
-    /// is cleared first, so the new row is visible.
+    /// Creates a manual note, lists it, and opens it in the full window with the editor ready. A search in the
+    /// explorer is cleared first, so the new row is visible.
     func newNote() async {
         guard canCreateNote else { return }
         isCreatingNote = true
@@ -766,8 +812,8 @@ final class NotesWorkspaceModel {
         return NoteCollection.isDictation(id)
     }
 
-    /// Copies the dictation's text into a NEW manual note, opens it in the editor in its tab and shows the Notes
-    /// list. The note is independent: no link back, so deleting either never touches the other, and the dictation
+    /// Copies the dictation's text into a NEW manual note, opens it in the editor in the full window and shows the
+    /// Notes list. The note is independent: no link back, so deleting either never touches the other, and the dictation
     /// gets no overlay, revision or comment. A second call after this one ended makes a second note. When the note
     /// cannot be written nothing changes and a strip says so; the dictation still holds the text.
     func makeNote(from id: NoteItemID) async {
@@ -821,8 +867,8 @@ final class NotesWorkspaceModel {
         await setTitle(of: document, to: text)
     }
 
-    /// The same for the document the title field belongs to, which may already be closed: the field writes its
-    /// last draft when it disappears (⌘W, the tab's ×, the window), after `close` forgot the document.
+    /// The same for the document the title field belongs to, which may already be gone: the field writes its last
+    /// draft when it disappears (⌘W, "‹ All notes", the window), after the document was left.
     func setTitle(of document: NoteDocumentModel, to text: String) async {
         guard document.isManual || canRenameTitle(document) else { return }
         let id = document.id
@@ -849,7 +895,7 @@ final class NotesWorkspaceModel {
     /// Whether the pen is on for the open layer (spec: seeding only in the states it allows, an overlay or a manual
     /// note always, never with `plugins.notes.readOnly`, never beyond the size limit or on a detached note).
     func canEdit(_ document: NoteDocumentModel) -> Bool {
-        guard environment.canEditNotes, document.phase == .loaded, let content = document.content,
+        guard environment.canEditNotes, document.phase == .loaded, !document.showsMine, let content = document.content,
             let layer = document.selectedLayer
         else { return false }
         if case .detached = document.id { return false }
@@ -858,7 +904,7 @@ final class NotesWorkspaceModel {
         return OverlaySeeder.canSeed(state: content.summary.state, layer: layer)
     }
 
-    /// The pen of the path bar: the editor for the shown layer, or back to reading.
+    /// The pen of the full window's bar: the editor for the shown layer, or back to reading.
     func toggleEditing() {
         guard let id = currentID, let document = documents[id] else { return }
         if document.isEditing {
@@ -884,27 +930,7 @@ final class NotesWorkspaceModel {
         await loadContent(id)
     }
 
-    // MARK: Path bar and status bar
-
-    /// Where the open note sits: its group, its title and, past the first layer, the layer shown.
-    var pathComponents: [String]? {
-        guard let id = tabs.current else { return nil }
-        var parts: [String] = []
-        let row = row(for: id)
-        if let group = groups.first(where: { $0.rows.contains { $0.id == id } }) { parts.append(title(of: group)) }
-        let fallback = tabs.tabs.first { $0.id == id }?.title ?? id.key.rawValue
-        parts.append(row.map { presentation.pathTitle($0.summary) } ?? fallback)
-        if documents[id]?.layerID == NoteDocumentModel.transcriptLayerID {
-            parts.append(NoteDocumentModel.title(ofLayer: NoteDocumentModel.transcriptLayerID))
-        }
-        if documents[id]?.compare != nil {
-            parts.append(
-                String(
-                    localized: "compare.title", defaultValue: "Compare",
-                    comment: "Path bar: the note's versions are being compared"))
-        }
-        return parts
-    }
+    // MARK: Status bar
 
     /// "27 notes · 1 writing".
     var statusSummary: String {
@@ -938,7 +964,7 @@ final class NotesWorkspaceModel {
         case needsConfirmation
     }
 
-    /// What the path bar just did, in words for the screen and for VoiceOver.
+    /// What the full window's bar just did, in words for the screen and for VoiceOver.
     enum Feedback: Equatable {
         case copied
         case saved
@@ -955,7 +981,7 @@ final class NotesWorkspaceModel {
         case restoreReadOnly
         /// The version is not an earlier applied version of this note.
         case restoreTargetInvalid
-        /// A proposal was applied or discarded (a short message on the path bar).
+        /// A proposal was applied or discarded (a short message on the bar).
         case proposalApplied
         case proposalDiscarded
         /// The note changed after the comparison: nothing was applied.
@@ -977,7 +1003,7 @@ final class NotesWorkspaceModel {
         /// The selection is empty, blank or no longer inside the note.
         case commentSelectionInvalid
 
-        /// A message that stays as a strip until dismissed, instead of fading from the path bar.
+        /// A message that stays as a strip until dismissed, instead of fading from the bar.
         var isStrip: Bool {
             switch self {
             case .saveFailed, .makeNoteFailed, .restoreFailed, .restoreChanged, .restoreReadOnly, .restoreTargetInvalid,
@@ -1012,7 +1038,7 @@ final class NotesWorkspaceModel {
     /// ⌘⇧C: the Markdown of the layer on screen goes to the pasteboard with the transient and concealed markers,
     /// for this Mac only.
     func copyMarkdown() {
-        guard let text = currentDocument?.markdown else { return }
+        guard let document = currentDocument, let text = shownMarkdown(document), !text.isEmpty else { return }
         NoteClipboard.copy(text, to: environment.pasteboard)
         show(.copied)
     }
@@ -1020,7 +1046,7 @@ final class NotesWorkspaceModel {
     /// Save .md…: a save panel, then the file. A cancelled panel says nothing; a failed write says so. `retry`
     /// writes to the place that just failed instead of asking again ("Try again" of the save-error strip).
     func saveMarkdown(retry: Bool = false) async {
-        guard let document = currentDocument, let text = document.markdown, let summary = document.summary else {
+        guard let document = currentDocument, let text = shownMarkdown(document), let summary = document.summary else {
             return
         }
         // One save panel at a time: a second ⌘S while the panel is open would stack another.

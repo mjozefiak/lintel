@@ -97,9 +97,15 @@ enum NoteOverlayContent {
         }
     }
 
-    /// The layers of a note that has no source to ask (manual, detached): the heads themselves.
+    /// My notes as written (the head of the `mine` document), or `nil` when there is none. My notes is never one of
+    /// the note's layers: it is shown on its own tab.
+    static func mine(heads: [OverlayLayerHead]) -> String? {
+        heads.first { $0.layerID == NotesStore.mineLayer }?.markdown
+    }
+
+    /// The layers of a note that has no source to ask (manual, detached): the heads themselves, My notes aside.
     private static func ownLayers(_ heads: [OverlayLayerHead]) -> [NoteLayer] {
-        heads.sorted { $0.layerID < $1.layerID }.map {
+        heads.filter { $0.layerID != NotesStore.mineLayer }.sorted { $0.layerID < $1.layerID }.map {
             NoteLayer(id: $0.layerID, author: .human, markdown: $0.markdown, provenance: $0.provenance, version: "")
         }
     }

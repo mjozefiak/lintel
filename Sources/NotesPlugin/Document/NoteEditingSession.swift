@@ -28,6 +28,10 @@ final class NoteEditingSession {
     private(set) var keptAsProposal = false
     /// The last write failed; the text is still buffered and `retry()` saves it.
     private(set) var saveFailed = false
+    /// The text the editor starts from, read by `make` / `makeMine` in the same main-actor turn as the registry
+    /// handed out the writer: the writer's unsaved text, else the stored head. `nil` when there is none to read (a
+    /// layer that was never written) or it could not be read: the editor then takes the text the note was read with.
+    let startText: String?
 
     /// Asked at every edit and save point, so `plugins.notes.readOnly` flipping while the editor is open is seen.
     private let readOnlyNow: (@MainActor () -> Bool)?
@@ -38,8 +42,9 @@ final class NoteEditingSession {
 
     init(
         documentID: NoteDocumentID, writer: RevisionWriter, model: NoteDocumentModel?, block: Block?,
-        readOnlyNow: (@MainActor () -> Bool)? = nil, comments: CommentService? = nil
+        readOnlyNow: (@MainActor () -> Bool)? = nil, comments: CommentService? = nil, startText: String? = nil
     ) {
+        self.startText = startText
         self.comments = comments
         self.documentID = documentID
         self.writer = writer
@@ -66,7 +71,12 @@ final class NoteEditingSession {
     ) -> NoteEditingSession? {
         let key = content.summary.id
         let id = NoteDocumentID.live(key, layer: layerID)
-        let existing = try? store?.liveDocument(key: key, layer: layerID)
+        var existing: DocumentRecord?
+        var storedText: String?
+        if let store, let found = try? store.liveDocument(key: key, layer: layerID) {
+            existing = found
+            storedText = try? store.headRevision(of: found.id)?.body
+        }
         let target: RevisionWriter.Target
         var block: Block?
         if let existing {
@@ -87,9 +97,75 @@ final class NoteEditingSession {
                 storeProvider: storeProvider ?? { nil }, target: target, clock: clock, now: now, timing: timing,
                 sourceStartedAtMs: sourceStartedAtMs, log: log)
         }
+        // A writer that outlived its editor (a failed write that lingers, a write still running) holds text the head
+        // does not have yet; otherwise the head read above, in this turn, is the newest text. Restore, Apply and a
+        // reconciliation move the head without typing, so the writer's last typed text is not used once written.
         return NoteEditingSession(
             documentID: id, writer: writer, model: model, block: block, readOnlyNow: readOnlyNow,
-            comments: CommentService(store: store, now: now))
+            comments: CommentService(store: store, now: now), startText: writer.unsettledText ?? storedText)
+    }
+
+    /// My notes (phase 3b): the `mine` layer of a recorded note, written only by `human`. No source offers it, so
+    /// the seed is built here (an empty snapshot by `human`) instead of by `OverlaySeeder`; the row is created by
+    /// the first write that holds a character, never before (typing and deleting it again writes nothing). The
+    /// recording's start time is checked before that first write like for any seed.
+    static func makeMine(
+        content: NoteContent, store: NotesStore?, storeProvider: (@Sendable () async -> NotesStore?)? = nil,
+        registry: NoteDocumentRegistry, readOnly: Bool, readOnlyNow: (@MainActor () -> Bool)? = nil,
+        sourceStartedAtMs: (@Sendable () async -> Int64?)? = nil, clock: any Clock<Duration> = ContinuousClock(),
+        now: @escaping @Sendable () -> Date = { Date() }, timing: RevisionWriter.Timing = .init(),
+        log: any NotesLogging = OSNotesLog()
+    ) -> NoteEditingSession? {
+        let key = content.summary.id
+        guard key.pluginID != NotesStore.manualPluginID else { return nil }
+        let layer = NotesStore.mineLayer
+        let id = NoteDocumentID.live(key, layer: layer)
+        // The stored head, read now: `nil` when it cannot be read (never "" then: an empty pad and one keystroke
+        // would replace the text).
+        var existing: DocumentRecord?
+        var storedText: String?
+        if let store {
+            do {
+                existing = try store.liveDocument(key: key, layer: layer)
+                if let existing {
+                    storedText = try store.headRevision(of: existing.id)?.body
+                } else {
+                    storedText = ""
+                }
+            } catch {
+                existing = nil
+                storedText = nil
+            }
+        }
+        let target: RevisionWriter.Target
+        if let existing {
+            target = .existing(docID: existing.id)
+        } else {
+            target = .seed(
+                SeedPlan(
+                    key: key, layerID: layer, kind: content.summary.kind, pluginID: key.pluginID,
+                    startedAtMs: NoteTime.milliseconds(content.summary.startedAt),
+                    snapshot: NoteLayer(id: layer, author: .human, markdown: "", version: ""), speakers: []))
+        }
+        let writer = registry.writer(for: id, item: .live(key)) {
+            if let store {
+                return RevisionWriter(
+                    store: store, target: target, clock: clock, now: now, timing: timing,
+                    sourceStartedAtMs: sourceStartedAtMs, log: log)
+            }
+            return RevisionWriter(
+                storeProvider: storeProvider ?? { nil }, target: target, clock: clock, now: now, timing: timing,
+                sourceStartedAtMs: sourceStartedAtMs, log: log)
+        }
+        let blocked: Block? = readOnly || store?.blockedReason != nil ? .readOnly : nil
+        // Only the user writes `mine`, and only through the registry's one writer. A writer the registry still
+        // holds knows the newest text (`latestText`: a failed write that lingers, a write still running). A writer
+        // it forgot was let go only after its write was in the store (`flush` waits for a running write), so with
+        // no text typed into this writer the head read above, in this same turn, is the newest text.
+        let startText = writer.latestText ?? storedText
+        return NoteEditingSession(
+            documentID: id, writer: writer, model: nil, block: blocked, readOnlyNow: readOnlyNow, comments: nil,
+            startText: startText)
     }
 
     /// Wires the editor: every edit goes to the writer, losing focus is a save point.

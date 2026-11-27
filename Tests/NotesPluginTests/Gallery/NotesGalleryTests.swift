@@ -38,7 +38,8 @@ struct NotesGalleryTests {
         let preview = Set(try #require(scenes.first { $0.id == "notes.preview" }).states.map(\.id))
         #expect(
             preview == [
-                "meeting-notes", "meeting-transcript", "my-notes", "dictation", "own-note", "writing", "needs-model",
+                "meeting-notes", "meeting-transcript", "my-notes", "my-notes-saving", "my-notes-failed", "dictation",
+                "own-note", "writing", "needs-model",
                 "failed-with-retry", "failed-no-retry", "notes-off", "loading", "unreadable",
             ])
     }

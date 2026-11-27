@@ -48,7 +48,7 @@ struct NewNoteButtonTests {
         let off = model(canCreate: false, created: created)
         await off.newNote()
         #expect(created.count == 0)
-        #expect(off.tabs.tabs.isEmpty)
+        #expect(!off.isFullWindow)
 
         let on = model(canCreate: true, created: created)
         await on.newNote()

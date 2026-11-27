@@ -22,13 +22,6 @@ extension NotesWorkspaceModel {
     /// A title as the screen may show it: masked while content is hidden.
     func shown(_ title: String) -> String { hidesContent ? Self.maskedTitle : title }
 
-    /// The path bar's parts with the note's own title masked (the group and the layer name stay).
-    func shownPath(_ parts: [String]) -> [String] {
-        guard hidesContent, let id = tabs.current else { return parts }
-        let title = row(for: id).map { presentation.pathTitle($0.summary) } ?? tabs.tabs.first { $0.id == id }?.title
-        return parts.map { $0 == title ? Self.maskedTitle : $0 }
-    }
-
     // MARK: Inspector width
 
     /// What the centre column needs next to the explorer and the inspector, in points at Medium; it grows with
@@ -45,12 +38,12 @@ extension NotesWorkspaceModel {
         sectionWidth >= explorer + inspector + centreMinimumWidth * max(textScale, 1)
     }
 
-    /// Called by the section with its width: a narrow section hides the inspector (the path bar's button shows it
-    /// over the document again) and a wide one brings back what it hid.
+    /// Called by the section with its width: a narrow section hides the inspector (the bar's button shows it over
+    /// the document again) and a wide one brings back what it hid. The full window has no list beside the document.
     func updateInspectorFit(sectionWidth: CGFloat, textScale: CGFloat) {
         self.sectionWidth = sectionWidth
         let fits = Self.inspectorFits(
-            sectionWidth: sectionWidth, textScale: textScale, explorer: desiredPaneWidth(.explorer),
+            sectionWidth: sectionWidth, textScale: textScale, explorer: isFullWindow ? 0 : desiredPaneWidth(.explorer),
             inspector: desiredPaneWidth(.inspector))
         guard fits != inspectorFits else { return }
         inspectorFits = fits

@@ -123,15 +123,22 @@ import Testing
         }
     }
 
-    @Test func theSectionHandlesAnOpenNoteRouteAndClosesATabBeforeTheWindow() throws {
+    @Test func theSectionHandlesAnOpenNoteRouteAndLeavesTheFullWindowBeforeTheWindowCloses() throws {
         let plugin = NotesPlugin(context: makeContext())
         let section = try #require(plugin.workspaceSections.first)
         #expect(!section.handleRoute(WorkspaceRoute(kind: "openModels", id: "x")))
         #expect(!section.handleClose())
+        #expect(!section.hidesSidebar())
         #expect(section.handleRoute(NoteRoute.route(for: NotesQAFixtures.meetingID)))
         #expect(section.handleRoute(NoteRoute.route(for: NotesQAFixtures.dictationID)))
-        #expect(plugin.workspace.tabs.tabs.count == 2)
+        // One note at a time: the second route replaced the first and is selected in the list.
+        #expect(plugin.workspace.currentID == .live(NotesQAFixtures.dictationID))
+        #expect(plugin.workspace.explorer.selection == .live(NotesQAFixtures.dictationID))
+        #expect(section.hidesSidebar())
+        // ⌘W leaves the full window first (the window stays), then closes the window.
         #expect(section.handleClose())
+        #expect(!plugin.workspace.isFullWindow)
+        #expect(!section.hidesSidebar())
         #expect(!section.handleClose())
     }
 

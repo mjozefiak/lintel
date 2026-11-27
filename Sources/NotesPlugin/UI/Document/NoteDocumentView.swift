@@ -42,6 +42,18 @@ struct NoteDocumentView: View {
             if let compare = document.compare {
                 NoteCompareView(model: model, document: document, compare: compare)
                     .notesFade(.editorSwitch)
+            } else if document.showsMine {
+                VStack(alignment: .leading, spacing: 0) {
+                    if let summary = document.summary {
+                        NoteDocumentHeader(model: model, document: document, summary: summary)
+                    }
+                    if let pad = document.myNotes {
+                        MyNotesEditor(model: model, document: document, pad: pad).id(ObjectIdentifier(pad))
+                    } else {
+                        Color.clear.task { model.prepareMyNotes(document) }
+                    }
+                }
+                .notesFade(.editorSwitch)
             } else if let session = document.session {
                 NoteEditingDocument(model: model, document: document, session: session)
                     .id(document.layerID)
@@ -53,6 +65,7 @@ struct NoteDocumentView: View {
         }
         .notesAnimation(.editorSwitch, value: document.isEditing)
         .notesAnimation(.editorSwitch, value: document.compare != nil)
+        .notesAnimation(.editorSwitch, value: document.showsMine)
     }
 
     private func message(_ text: Text) -> some View {
@@ -136,8 +149,9 @@ struct NoteDocumentHeader: View {
                         .padding(.horizontal, 8)
                         .overlay(RoundedRectangle(cornerRadius: 6).stroke(LintelBrand.hairline))
                 }
-                if document.layers.count > 1 {
-                    LayerSwitch(document: document).layoutValue(key: NoteWrapTrailingKey.self, value: true)
+                if LayerSwitch.segments(of: document).count > 1 {
+                    LayerSwitch(model: model, document: document)
+                        .layoutValue(key: NoteWrapTrailingKey.self, value: true)
                 }
             }
         }
@@ -161,25 +175,38 @@ struct NoteDocumentHeader: View {
 
 /// The segmented switch between layers (prototype `.vs`): Notes and Transcript, Cleaned and Original.
 struct LayerSwitch: View {
+    let model: NotesWorkspaceModel
     let document: NoteDocumentModel
     @Environment(\.lintelTextSize) private var textSize
 
+    /// One segment per layer, and for a meeting My notes after its notes (Notes · My notes · Transcript, like the
+    /// preview's tabs). `nil` is My notes.
+    static func segments(of document: NoteDocumentModel) -> [String?] {
+        var result: [String?] = document.layers.map(\.id)
+        guard NotesWorkspaceModel.isMeeting(document), !document.isManual else { return result }
+        let notes = result.firstIndex { $0 == "notes" }.map { $0 + 1 } ?? 0
+        result.insert(nil, at: min(notes, result.count))
+        return result
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(document.layers) { layer in
-                let isOn = layer.id == document.layerID
+            ForEach(Self.segments(of: document), id: \.self) { layer in
+                let isOn = layer == nil ? document.showsMine : (!document.showsMine && layer == document.layerID)
                 Button {
-                    document.selectLayer(layer.id)
+                    if let layer { model.showLayer(layer, of: document) } else { model.showMyNotes(document) }
                 } label: {
-                    Text(verbatim: NoteDocumentModel.title(ofLayer: layer.id))
-                        .font(textSize.font(.callout, weight: isOn ? .semibold : .regular))
-                        .foregroundStyle(isOn ? LintelBrand.ink : LintelBrand.secondaryText)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 12 * textSize.scale)
-                        .padding(.vertical, 2 * textSize.scale)
-                        .background(isOn ? LintelBrand.card : Color.clear, in: RoundedRectangle(cornerRadius: 5))
-                        .contentShape(Rectangle())
+                    Text(
+                        verbatim: layer.map { NoteDocumentModel.title(ofLayer: $0) } ?? NotePreviewView.title(of: .mine)
+                    )
+                    .font(textSize.font(.callout, weight: isOn ? .semibold : .regular))
+                    .foregroundStyle(isOn ? LintelBrand.ink : LintelBrand.secondaryText)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 12 * textSize.scale)
+                    .padding(.vertical, 2 * textSize.scale)
+                    .background(isOn ? LintelBrand.card : Color.clear, in: RoundedRectangle(cornerRadius: 5))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(isOn ? .isSelected : [])

@@ -88,6 +88,14 @@ final class NoteDocumentModel {
     private(set) var session: NoteEditingSession?
     /// A new note opens straight in the editor: set before its content is read, taken once it is loaded.
     var wantsEditing = false
+    /// The full window shows My notes (the `mine` layer of a meeting) instead of a layer of the source. My notes is
+    /// not one of `layers`: no source offers it and nothing but the user writes it (phase 3b).
+    var showsMine = false
+    /// The head of My notes as read with the note (`nil`: nothing written yet). Only the pad's first text: once
+    /// the pad exists it holds what the user types.
+    var mineMarkdown: String?
+    /// My notes of this note, made when its tab is first shown (`MyNotesPad`).
+    var myNotes: MyNotesPad?
     /// Editing ended (the pen, another layer): the session still has text to write. Set by the workspace model.
     var onEditingEnded: ((NoteEditingSession) -> Void)?
 
@@ -103,6 +111,9 @@ final class NoteDocumentModel {
     func startEditing(_ session: NoteEditingSession) {
         self.session = session
         wantsEditing = false
+        // The editor starts from the writer's text, which can differ from the layer as it was read: the comment
+        // highlights are found in the text the editor shows.
+        if let start = session.startText, start != selectedLayer?.markdown { setEditorText(start) }
     }
 
     /// Leaves the editor. The session is handed to `onEditingEnded`, which writes what is typed and reloads.

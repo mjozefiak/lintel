@@ -46,6 +46,19 @@ extension NotesPlugin: GalleryProviding {
     var dictationShortcut: KeyShortcut? = KeyShortcut(key: " ", modifiers: [.option])
     /// A recorder that can write the notes again (the "Try Again" button of a failed meeting).
     var canRetry = false
+    /// My notes as the user sees them while typing (phase 3b): `nil` leaves the pad the section makes.
+    var myNotes: GalleryMyNotes?
+}
+
+/// The My notes pad of a gallery state: what is typed and whether it is being written or failed to be.
+enum GalleryMyNotes {
+    case empty, saving, failed
+
+    static let text = """
+        Ask Ola for the budget numbers before Friday.
+        - Send Marek the export deck
+        - Check the pricing page copy
+        """
 }
 
 /// A fixed moment (3 Nov 2024, noon UTC) and calendar, so no picture carries the date of the day it was made.
@@ -180,6 +193,12 @@ private struct NotesExplorerGalleryHost: View {
             // for, so the picture is never taken half way.
             guard scenario.sources != .slowText else { return }
             await model.loadPreview(id)
+            // The pad without a store: editable, with the saving line or the failed strip as the state asks.
+            if let mine = scenario.myNotes, let document = model.previewDocument {
+                let pad = MyNotesPad(text: mine == .empty ? "" : GalleryMyNotes.text, session: nil)
+                pad.showForGallery(saving: mine == .saving, failed: mine == .failed)
+                document.myNotes = pad
+            }
         }
     }
 }
@@ -208,9 +227,11 @@ private struct NotesSidebarGalleryHost: View {
 
     private static func state(
         _ id: String, _ summary: String, _ scenario: NotesExplorerGalleryCase,
-        part: NotesExplorerGalleryHost.Part = .list
+        part: NotesExplorerGalleryHost.Part = .list, variants: [GalleryVariant] = GalleryVariant.ciSubset
     ) -> GalleryState {
-        GalleryState(id: id, summary: summary, presentation: part == .list ? listWindow : previewWindow) {
+        GalleryState(
+            id: id, summary: summary, presentation: part == .list ? listWindow : previewWindow, variants: variants
+        ) {
             AnyView(NotesExplorerGalleryHost(model: galleryModel(scenario), scenario: scenario, part: part))
         }
     }
@@ -284,8 +305,26 @@ private struct NotesSidebarGalleryHost: View {
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .transcript), part: .preview),
                 state(
                     "my-notes",
-                    "The My notes tab, read-only in this phase: what will be here and where to write it.",
-                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .mine), part: .preview),
+                    "The My notes tab, empty: “Only you write here…” above the pad and what the pad is for.",
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .mine, myNotes: .empty),
+                    part: .preview,
+                    variants: [
+                        GalleryVariant(appearance: .light, textSize: .medium, language: "en"),
+                        GalleryVariant(appearance: .light, textSize: .extraLarge, language: "pl"),
+                    ]),
+                // The 25 MiB budget: the three My notes states share the CI subset (dark is the saving pad's, pl + XL
+                // the failed one's) instead of three goldens each; the contact sheet shows every variant.
+                state(
+                    "my-notes-saving",
+                    "My notes while what was typed is being written: “Saving…” on the right of the line.",
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .mine, myNotes: .saving),
+                    part: .preview, variants: [GalleryVariant(appearance: .dark, textSize: .medium, language: "en")]),
+                state(
+                    "my-notes-failed",
+                    "My notes could not be written: the strip “Your notes weren’t saved. Lintel keeps trying.” with Try Now; the text stays.",
+                    NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .mine, myNotes: .failed),
+                    part: .preview,
+                    variants: [GalleryVariant(appearance: .light, textSize: .extraLarge, language: "pl")]),
                 state(
                     "dictation",
                     "A dictation: its cleaned text, no tabs.",

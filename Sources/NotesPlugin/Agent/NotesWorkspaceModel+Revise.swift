@@ -58,13 +58,16 @@ extension NotesWorkspaceModel {
         if outcome == .queued { return }
         document.lock.reset()
         guard documents[id] === document else { return }
+        // The user went back to the list and chose another note while the agent wrote: the run was not cancelled
+        // (phase 3b) and its result is in the store; the document nobody looks at goes now.
+        defer { if id != openedID, id != explorer.selection { dropPreview(id) } }
         if outcome != .cancelled { document.setReviseReport(outcome) }
         if case .applied = outcome {
             // The editor is built again on the new text: its undo stack is cleared (spec "Edit lock and revise run").
             document.leaveEditing(notifying: false)
             await loadContent(id)
             await loadHistory(for: id)
-            if wasEditing { beginEditing(id) }
+            if wasEditing, id == openedID { beginEditing(id) }
         } else {
             await refreshComments(id)
         }
@@ -75,7 +78,8 @@ extension NotesWorkspaceModel {
     /// The lock strip while a run is going on, and how the last run ended.
     func reviseStrips(for document: NoteDocumentModel) -> [Strip] {
         var result: [Strip] = []
-        switch document.lock.phase {
+        // A run never writes My notes and its pad stays editable, so the lock strips are not shown there.
+        switch document.showsMine ? .idle : document.lock.phase {
         case .flushing, .waitingForModel:
             result.append(
                 Strip(

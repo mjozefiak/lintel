@@ -89,6 +89,30 @@ extension NotesWorkspaceModel.Environment {
         }
         let library = self.library
         let budget = contentBudget
+        makeMineSession = { content in
+            // Like the editor: nothing is opened for a profile without a library; the writer opens (and creates)
+            // it at the first typed character.
+            let opened: NotesStore?
+            if exists() {
+                guard let found = store() else { return nil }
+                opened = found
+            } else {
+                opened = nil
+            }
+            let key = content.summary.id
+            let startedAt: @Sendable () async -> Int64? = {
+                guard let source = await library.source(for: key) else { return nil }
+                let outcome = await SourceFanOut.call(budget: budget, clock: clock) {
+                    try await source.content(for: key)
+                }
+                if case .value(let current?) = outcome { return NoteTime.milliseconds(current.summary.startedAt) }
+                return nil
+            }
+            return NoteEditingSession.makeMine(
+                content: content, store: opened, storeProvider: { await store() }, registry: registry,
+                readOnly: NotesSettings(settings).readOnly, readOnlyNow: { NotesSettings(settings).readOnly },
+                sourceStartedAtMs: startedAt, clock: clock, now: now)
+        }
         makeEditingSession = { content, layerID, document in
             // Entering edit mode opens nothing on a profile without a library: the writer opens it at the first
             // real write (the first typed character, comment or save), as the lazy-store rule says.

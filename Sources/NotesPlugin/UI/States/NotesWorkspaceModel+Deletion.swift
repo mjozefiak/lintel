@@ -40,13 +40,14 @@ extension NotesWorkspaceModel {
         case .live(let key) where key.pluginID == NotesStore.manualPluginID: subject = .manual
         case .live: subject = (summary?.kind ?? .meeting) == .dictation ? .dictation : .meeting
         }
-        let title = summary.map(presentation.title) ?? tabs.tabs.first { $0.id == id }?.title ?? id.key.rawValue
+        let title = summary.map(presentation.title) ?? id.key.rawValue
         pendingDelete = DeleteRequest(id: id, title: shown(title), subject: subject, hasEdits: !heads.isEmpty)
     }
 
     func cancelDelete() { pendingDelete = nil }
 
-    /// The sheet's confirm button. The owner deletes first; only on success the tab closes and the copy goes.
+    /// The sheet's confirm button. The owner deletes first; only on success the note leaves the screen (the full
+    /// window goes back to the list) and the copy goes.
     /// The sheet hands the request over itself: closing the sheet clears `pendingDelete` before this task runs.
     func confirmDelete(_ request: DeleteRequest) async {
         pendingDelete = nil
@@ -56,7 +57,7 @@ extension NotesWorkspaceModel {
             switch failure {
             case .overlaysNotRemoved:
                 // The owner deleted it: the note is gone, only the copy in Notes stays until the next sweep.
-                dropTab(request.id)
+                dropDocument(request.id)
                 show(.copyNotRemoved)
                 await refresh()
             default:
@@ -67,14 +68,14 @@ extension NotesWorkspaceModel {
             show(.deleteFailed)
             return
         }
-        dropTab(request.id)
+        dropDocument(request.id)
         show(.deleted)
         await refresh()
     }
 
-    /// The registry discarded these documents behind the UI's back: their tabs close and the list is read again.
+    /// The registry discarded these documents behind the UI's back: they leave the screen and the list is read again.
     func documentsDiscarded(_ items: Set<NoteItemID>) {
-        for id in items { dropTab(id) }
+        for id in items { dropDocument(id) }
         Task { await refresh() }
     }
 }

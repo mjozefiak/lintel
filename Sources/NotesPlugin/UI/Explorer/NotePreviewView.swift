@@ -2,8 +2,8 @@ import LintelKit
 import LintelUI
 import SwiftUI
 
-/// The preview of the selected note (spec "Layout", phase 3a): the notes, My notes (read-only for now) and the
-/// transcript of a meeting as tabs; the cleaned text of a dictation and the text of a note you wrote without tabs.
+/// The preview of the selected note (spec "Layout", phases 3a and 3b): the notes, My notes (the user's own pad,
+/// `MyNotesEditor`) and the transcript of a meeting as tabs; the cleaned text of a dictation and the text of a note you wrote without tabs.
 /// It reads the same `NoteDocumentModel` a tab would use, so nothing is read twice. A failed or switched-off set of
 /// notes says so in words, and "Try Again" appears only when a recorder can really write them again.
 struct NotePreviewView: View {
@@ -70,7 +70,11 @@ struct NotePreviewView: View {
             if let notice {
                 self.notice(problem(notice, id: id))
             } else if showsMine(document) {
-                mineBody
+                if let pad = document.myNotes {
+                    MyNotesEditor(model: model, document: document, pad: pad).id(ObjectIdentifier(pad))
+                } else {
+                    Color.clear.task { model.prepareMyNotes(document) }
+                }
             } else {
                 blocks(document)
             }
@@ -170,22 +174,6 @@ struct NotePreviewView: View {
             }
             .padding(.vertical, 8 * textSize.scale)
         }
-    }
-
-    /// My notes is read-only in this phase: the line says so and what will be here.
-    private var mineBody: some View {
-        VStack(alignment: .leading, spacing: 6 * textSize.scale) {
-            Text(
-                "Your own notes about this meeting will appear here.",
-                comment: "Preview: the My notes tab, nothing written yet")
-            Text(
-                "Open the note to write them.", comment: "Preview: where My notes can be written")
-        }
-        .font(textSize.font(.callout))
-        .foregroundStyle(LintelBrand.secondaryText)
-        .padding(.horizontal, 24 * textSize.scale)
-        .padding(.vertical, 12 * textSize.scale)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     // MARK: States of the notes

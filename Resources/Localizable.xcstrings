@@ -4807,24 +4807,6 @@
         }
       }
     },
-    "Choose a note in the list." : {
-      "comment" : "Notes: hint under the title when no tab is open",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose a note in the list."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wybierz notatkę z listy."
-          }
-        }
-      }
-    },
     "Choose another model. Nothing was written for the last meeting." : {
       "comment" : "Settings → Meetings banner detail: the plan does not include the model",
       "extractionState" : "manual",
@@ -7166,7 +7148,7 @@
       }
     },
     "Done editing" : {
-      "comment" : "Path bar: leaves the editor",
+      "comment" : "Full window: leaves the editor",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -12134,7 +12116,7 @@
       }
     },
     "Make note" : {
-      "comment" : "Path bar and explorer: copies a dictation into a new note",
+      "comment" : "Full window and explorer: copies a dictation into a new note",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -13753,24 +13735,6 @@
         }
       }
     },
-    "No note open" : {
-      "comment" : "Notes: centre column when no tab is open",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No note open"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Brak otwartej notatki"
-          }
-        }
-      }
-    },
     "No notes match “%@”." : {
       "comment" : "Explorer: a search found nothing; the query",
       "extractionState" : "manual",
@@ -14438,7 +14402,7 @@
       }
     },
     "Note created" : {
-      "comment" : "Path bar: a dictation was copied into a new note",
+      "comment" : "Full window: a dictation was copied into a new note",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -16508,7 +16472,7 @@
       }
     },
     "Proposal applied" : {
-      "comment" : "Path bar: a proposed version became the current text",
+      "comment" : "Full window: a proposed version became the current text",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -16526,7 +16490,7 @@
       }
     },
     "Proposal discarded" : {
-      "comment" : "Path bar: a proposed version was set aside",
+      "comment" : "Full window: a proposed version was set aside",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -18722,7 +18686,7 @@
       }
     },
     "Saved" : {
-      "comment" : "Path bar: the Markdown file was saved",
+      "comment" : "Full window: the Markdown file was saved",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -19442,7 +19406,7 @@
       }
     },
     "Show the inspector" : {
-      "comment" : "Path bar: shows the inspector",
+      "comment" : "Full window: shows the inspector",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -25274,7 +25238,7 @@
       }
     },
     "Version restored" : {
-      "comment" : "Path bar: an earlier version became the current text",
+      "comment" : "Full window: an earlier version became the current text",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -27290,7 +27254,7 @@
       }
     },
     "note.deleted" : {
-      "comment" : "Path bar: the note was deleted",
+      "comment" : "Full window: the note was deleted",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -28081,24 +28045,6 @@
         }
       }
     },
-    "Open the note to write them." : {
-      "comment" : "Preview: where My notes can be written",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open the note to write them."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Otwórz notatkę, aby je napisać."
-          }
-        }
-      }
-    },
     "Search All Notes" : {
       "comment" : "Explorer: a search in one collection found nothing",
       "extractionState" : "manual",
@@ -28369,24 +28315,6 @@
         }
       }
     },
-    "Your own notes about this meeting will appear here." : {
-      "comment" : "Preview: the My notes tab, nothing written yet",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Your own notes about this meeting will appear here."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu pojawią się Twoje własne notatki z tego spotkania."
-          }
-        }
-      }
-    },
     "%lld tasks" : {
       "comment" : "Explorer row: how many tasks the notes carry",
       "extractionState" : "manual",
@@ -28599,6 +28527,204 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Notatki powstaną, gdy Lintel pobierze to, czego potrzebuje."
+          }
+        }
+      }
+    },
+    "Back to All Notes" : {
+      "comment" : "Full window: the Notes menu item that goes back to the list",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to All Notes"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wróć do wszystkich notatek"
+          }
+        }
+      }
+    },
+    "Back to all notes (⌘[ or Esc)" : {
+      "comment" : "Full window: tooltip of the way back to the list",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to all notes (⌘[ or Esc)"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wróć do wszystkich notatek (⌘[ lub Esc)"
+          }
+        }
+      }
+    },
+    "Goes back to the list of notes." : {
+      "comment" : "Full window: hint of the way back",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Goes back to the list of notes."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wraca do listy notatek."
+          }
+        }
+      }
+    },
+    "Saving…" : {
+      "comment" : "My notes: what was typed is being written",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zapisywanie…"
+          }
+        }
+      }
+    },
+    "Type your own notes. Lintel keeps them exactly as you write them." : {
+      "comment" : "My notes: the empty pad",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type your own notes. Lintel keeps them exactly as you write them."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pisz własne notatki. Lintel zachowa je dokładnie tak, jak je napiszesz."
+          }
+        }
+      }
+    },
+    "Only you write here. Lintel never changes these notes." : {
+      "comment" : "My notes: the line above the pad",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only you write here. Lintel never changes these notes."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu piszesz tylko Ty. Lintel nigdy nie zmienia tych notatek."
+          }
+        }
+      }
+    },
+    "Notes are read-only on this Mac, so My notes can’t be changed now." : {
+      "comment" : "My notes: plugins.notes.readOnly is on",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes are read-only on this Mac, so My notes can’t be changed now."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki są na tym Macu tylko do odczytu, więc nie możesz teraz zmienić Moich notatek."
+          }
+        }
+      }
+    },
+    "Lintel can’t open your notes right now, so My notes can’t be changed. Nothing was deleted." : {
+      "comment" : "My notes: the notes library cannot be opened",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel can’t open your notes right now, so My notes can’t be changed. Nothing was deleted."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lintel nie może teraz otworzyć Twoich notatek, więc nie możesz zmienić Moich notatek. Nic nie zostało usunięte."
+          }
+        }
+      }
+    },
+    "The recording was removed. Your notes are kept as you wrote them." : {
+      "comment" : "My notes: the kept copy of a removed recording",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording was removed. Your notes are kept as you wrote them."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nagranie zostało usunięte. Twoje notatki zostały zachowane bez zmian."
+          }
+        }
+      }
+    },
+    "Your notes weren’t saved. Lintel keeps trying." : {
+      "comment" : "My notes: a write failed; the text stays in the pad",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your notes weren’t saved. Lintel keeps trying."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twoje notatki nie zostały zapisane. Lintel próbuje dalej."
+          }
+        }
+      }
+    },
+    "Try Now" : {
+      "comment" : "My notes: writes the unsaved text at once",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try Now"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spróbuj teraz"
           }
         }
       }

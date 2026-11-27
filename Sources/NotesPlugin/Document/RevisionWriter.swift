@@ -8,8 +8,9 @@ import Synchronization
 ///
 /// - The editor hands every change to `submit`, which only stores the buffer and (re)starts a 1 s timer on the
 ///   INJECTED clock; the timer, a blur, a tab close, a mode switch, a window close, `deactivate()` and any other
-///   write call `flush`, which takes the buffer and writes it. Writes are serialised by an actor and run off the
-///   main thread; a write older than one already applied is dropped.
+///   write call `flush`, which takes the buffer and writes it. Writes run one after the other on an actor, off the
+///   main thread (a flush with nothing buffered waits for the write in flight); a write older than one already
+///   applied is dropped.
 /// - Writes in one edit session amend that session's `human` revision until it is referenced (a comment anchor,
 ///   `base_head_id`, `restored_from`). A comment, Revise, Apply, Restore and a reconciliation close the session
 ///   (`flush(closingSession:)`); one also closes after the idle time (5 min, on the injected clock).
@@ -41,6 +42,8 @@ final class RevisionWriter: Sendable {
         /// The save state changed: `true` after a write failed (the text stays buffered and is retried with
         /// backoff), `false` once a write succeeded again.
         var saveFailed: @Sendable (Bool) -> Void = { _ in }
+        /// A flush waits for the write that runs now: it found nothing buffered, or its own write queues behind it.
+        var waitsForWrite: @Sendable () -> Void = {}
     }
 
     enum Target: Sendable {
@@ -77,6 +80,8 @@ final class RevisionWriter: Sendable {
 
     private struct Pending {
         var text: String?
+        /// The newest text `submit` was given: buffered, being written or written. Kept after the write.
+        var latest: String?
         var serial = 0
         var debounce: Task<Void, Never>?
         var idle: Task<Void, Never>?
@@ -85,6 +90,13 @@ final class RevisionWriter: Sendable {
         var failed = false
         var retired = false
         var onSaveFailed: (@Sendable (Bool) -> Void)?
+        var onWritten: (@Sendable () -> Void)?
+        /// The write that runs now (taken from the buffer by a flush) and its number. Writes run one after the
+        /// other, and a flush that finds nothing buffered waits for this one: a flush that returns means the text
+        /// typed before it is written (or, after a failure, back in the buffer), so the registry forgets a writer
+        /// only once its text is in the store.
+        var writing: (id: Int, task: Task<Outcome, any Error>)?
+        var writes = 0
     }
 
     private let core: Core
@@ -134,6 +146,20 @@ final class RevisionWriter: Sendable {
     /// `true` while typed text waits for the next write.
     var hasPendingText: Bool { pending.withLock { $0.text != nil } }
 
+    /// The newest text typed into this writer, whether it still waits, is being written or was written; `nil`
+    /// before the first `submit`. A view made again for a document whose writer outlived it (a failed write that
+    /// lingers in the registry, a write still running) shows this instead of a head read from the store, which can
+    /// be older: the next keystroke would otherwise replace the unsaved text. Only typing sets it, so it is the
+    /// document's text only where nothing else moves the head (My notes); Restore, Apply and a reconciliation do not
+    /// change it.
+    var latestText: String? { pending.withLock { $0.latest } }
+
+    /// The text typed into this writer that is not in the store yet: buffered (also after a failed write put it
+    /// back) or taken by a write that is still running; `nil` when everything typed is written. Unlike
+    /// `latestText` it goes stale only while a write is pending, so a layer editor (whose head Restore, Apply and a
+    /// reconciliation can move after typing) starts from it, else from the head it reads in the same turn.
+    var unsettledText: String? { pending.withLock { $0.text ?? ($0.writing != nil ? $0.latest : nil) } }
+
     /// Stops a document whose recording was detached before it had a row: it can never seed (its snapshot belongs
     /// to a recording that is gone), so a later flush throws instead of writing against the wrong note.
     func retire() { pending.withLock { $0.retired = true } }
@@ -144,6 +170,9 @@ final class RevisionWriter: Sendable {
         let tasks = pending.withLock { state -> [Task<Void, Never>?] in
             let all = [state.debounce, state.idle, state.maxWait, state.retry]
             state.text = nil
+            state.latest = nil
+            // A write still running that fails does not put its text back (`write`).
+            state.serial += 1
             state.debounce = nil
             state.idle = nil
             state.maxWait = nil
@@ -167,6 +196,7 @@ final class RevisionWriter: Sendable {
         let old = pending.withLock { state -> Task<Void, Never>? in
             let old = state.debounce
             state.text = text
+            state.latest = text
             state.serial += 1
             state.debounce = timer
             // The max-wait timer runs from the first unsaved keystroke and is not restarted by later ones.
@@ -183,35 +213,42 @@ final class RevisionWriter: Sendable {
     }
 
     /// Writes what is buffered. `closingSession` ends the edit session afterwards (a comment, Revise, Apply,
-    /// Restore, a reconciliation). A write that fails keeps the text for a retry.
+    /// Restore, a reconciliation). A write that fails keeps the text for a retry. With nothing buffered it waits for
+    /// a write that is still running (a timer's, a retry's) and, when that one failed, writes its text itself.
     @discardableResult
     func flush(closingSession: Bool = false) async throws -> Outcome {
-        let taken = pending.withLock { state -> (text: String, serial: Int)? in
+        enum Step {
+            case idle
+            case wait(Task<Outcome, any Error>)
+            case write(Task<Outcome, any Error>)
+        }
+        let step = pending.withLock { state -> Step in
             state.debounce?.cancel()
             state.debounce = nil
             state.maxWait?.cancel()
             state.maxWait = nil
-            guard let text = state.text else { return nil }
+            guard let text = state.text else { return state.writing.map { .wait($0.task) } ?? .idle }
             state.text = nil
-            return (text, state.serial)
+            state.writes += 1
+            let id = state.writes
+            let previous = state.writing?.task
+            let task = Task { [serial = state.serial] in
+                try await self.write(text, serial: serial, id: id, after: previous)
+            }
+            state.writing = (id, task)
+            return .write(task)
         }
         var outcome = Outcome.nothing
-        if let taken {
-            do {
-                // A retired writer (its recording was detached before it had a row) cannot seed; the text is kept
-                // and the failure reported, never dropped.
-                if pending.withLock({ $0.retired }), await core.docID == nil {
-                    throw NotesError.guardRejected(rule: "detached")
-                }
-                outcome = try await core.writeHuman(taken.text, serial: taken.serial)
-                observer.wrote(outcome)
-                reportSave(failed: false)
-            } catch {
-                pending.withLock { if $0.text == nil { $0.text = taken.text } }
-                reportSave(failed: true)
-                startRetry()
-                throw error
-            }
+        switch step {
+        case .idle:
+            break
+        case .wait(let running):
+            observer.waitsForWrite()
+            _ = try? await running.value
+            // A failed write put its text back: this flush writes it (or throws) instead of calling it written.
+            return try await flush(closingSession: closingSession)
+        case .write(let task):
+            outcome = try await task.value
         }
         if closingSession {
             await core.closeSession()
@@ -220,6 +257,39 @@ final class RevisionWriter: Sendable {
             startIdleTimer()
         }
         return outcome
+    }
+
+    /// One write of a flush, after the one before it. The result is reported here, in the order of the writes, and
+    /// a failure puts the text back into the buffer before the next flush can look at it.
+    private func write(
+        _ text: String, serial: Int, id: Int, after previous: Task<Outcome, any Error>?
+    ) async throws -> Outcome {
+        if let previous {
+            observer.waitsForWrite()
+            _ = try? await previous.value
+        }
+        do {
+            // A retired writer (its recording was detached before it had a row) cannot seed; the text is kept
+            // and the failure reported, never dropped.
+            if pending.withLock({ $0.retired }), await core.docID == nil {
+                throw NotesError.guardRejected(rule: "detached")
+            }
+            let outcome = try await core.writeHuman(text, serial: serial)
+            pending.withLock { if $0.writing?.id == id { $0.writing = nil } }
+            observer.wrote(outcome)
+            reportSave(failed: false)
+            if let written = pending.withLock({ $0.text == nil ? $0.onWritten : nil }) { written() }
+            return outcome
+        } catch {
+            pending.withLock { state in
+                // Newer typing (buffered, or taken by the next write) replaces this text; it is never put back over it.
+                if state.text == nil, state.serial == serial { state.text = text }
+                if state.writing?.id == id { state.writing = nil }
+            }
+            reportSave(failed: true)
+            startRetry()
+            throw error
+        }
     }
 
     func closeSession() async {
@@ -246,6 +316,12 @@ final class RevisionWriter: Sendable {
     /// The UI's hook for the save state (the editing session); replaces an earlier one.
     func setSaveFailureHandler(_ handler: (@Sendable (Bool) -> Void)?) {
         pending.withLock { $0.onSaveFailed = handler }
+    }
+
+    /// The UI's hook for "everything typed is written" (My notes' saving line); replaces an earlier one. Called
+    /// after a write that left nothing buffered.
+    func setWrittenHandler(_ handler: (@Sendable () -> Void)?) {
+        pending.withLock { $0.onWritten = handler }
     }
 
     /// Retries a failed write on the injected clock with doubling delays; ends when a write succeeds, nothing is

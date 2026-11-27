@@ -54,6 +54,7 @@ import Testing
         let model = model(r)
         await model.refresh()
         await model.newNote()
+        let first = try #require(model.currentID)
         await model.newNote()
         let keys = model.rows.map(\.id.key)
         #expect(keys.count == 2 && Set(keys).count == 2)
@@ -62,7 +63,9 @@ import Testing
             let id = String(key.rawValue.dropFirst("notes:".count))
             #expect(UUID(uuidString: id) != nil && id == id.lowercased())
         }
-        #expect(model.tabs.tabs.count == 2)
+        // The full window shows the note created last.
+        let last = try #require(keys.first { $0 != first.key })
+        #expect(model.currentID == .live(last))
     }
 
     @Test func anExplorerSearchIsClearedSoTheNewRowShows() async throws {
@@ -83,7 +86,7 @@ import Testing
         await model.refresh()
         #expect(!model.canCreateNote)
         await model.newNote()
-        #expect(model.rows.isEmpty && model.tabs.tabs.isEmpty)
+        #expect(model.rows.isEmpty && !model.isFullWindow)
     }
 
     @Test func aStoreThatRefusesWritesSaysSoAndOpensNothing() async throws {
@@ -93,7 +96,7 @@ import Testing
         await model.refresh()
         await model.newNote()
         #expect(model.feedback == .createFailed)
-        #expect(model.rows.isEmpty && model.tabs.tabs.isEmpty)
+        #expect(model.rows.isEmpty && !model.isFullWindow)
     }
 
     @Test func theMenuItemIsNewNoteWithCommandNAndFollowsTheStore() async throws {
@@ -118,13 +121,13 @@ import Testing
         #expect(try #require(locked.workspaceSections.first?.menuItems.first).isEnabled() == false)
     }
 
-    @Test func aRouteToAManualKeyOpensItsTabAndTheReservedIDIsNotASource() async throws {
+    @Test func aRouteToAManualKeyOpensItAndTheReservedIDIsNotASource() async throws {
         let r = try ReconRig()
         let model = model(r)
         await model.refresh()
         await model.newNote()
         let key = try #require(model.rows.first?.id.key)
-        model.close(.live(key))
+        model.dropDocument(.live(key))
         #expect(model.handle(NoteRoute.route(for: key)))
         #expect(model.currentID == .live(key))
         await model.loadContent(.live(key))
@@ -144,7 +147,8 @@ import Testing
         #expect(model.title(of: try #require(model.row(for: id))) == "Untitled note")
         await model.setTitle(id, to: "  Plan\u{202E}\nfor\tFriday \u{200B}")
         #expect(model.title(of: try #require(model.row(for: id))) == "Plan for Friday")
-        #expect(model.tabs.tabs.first?.title == "Plan for Friday")
+        // The full window's header shows it too.
+        #expect(model.currentDocument?.summary.map { model.presentation.title($0) } == "Plan for Friday")
         // The index follows the title through the trigger.
         let hits = try r.store.search("friday")
         #expect(hits.map(\.key) == [id.key] && hits.first?.titleMatched == true)
@@ -152,16 +156,17 @@ import Testing
         #expect(model.title(of: try #require(model.row(for: id))) == "Untitled note")
     }
 
-    /// ⌘W or the tab's ×: `close` forgets the document before the title field's last commit runs, and the title
-    /// typed into the field is still written.
-    @Test func aTitleTypedBeforeTheTabClosesIsWritten() async throws {
+    /// ⌘W, "‹ All notes" and a click on another row: the document is forgotten before the title field's last commit
+    /// runs, and the title typed into the field is still written.
+    @Test func aTitleTypedBeforeTheNoteIsLeftIsWritten() async throws {
         let r = try ReconRig()
         let model = model(r)
         await model.refresh()
         await model.newNote()
         let id = try #require(model.currentID)
         let document = try #require(model.currentDocument)
-        model.close(id)
+        model.closeFullWindow()
+        model.select(row: .live(NoteKey(pluginID: "meetings", id: "elsewhere")))
         #expect(model.documents[id] == nil)
         await model.setTitle(of: document, to: "Typed before closing")
         #expect(model.row(for: id).map { model.title(of: $0) } == "Typed before closing")
@@ -237,7 +242,7 @@ import Testing
         ] {
             r.publish([r.rig.layer("text")], state: state)
             let id = NoteItemID.live(r.key)
-            model.close(id)
+            model.dropDocument(id)
             model.open(id)
             await model.loadContent(id)
             #expect(model.canEdit(try #require(model.documents[id])) == allowed, "\(state)")
@@ -245,7 +250,7 @@ import Testing
         // A layer that already has an overlay stays editable while the source is writing.
         try r.rig.seededDocument(r.rig.layer("text"))
         r.publish([r.rig.layer("text")], state: .writing(done: 1, of: 2))
-        model.close(.live(r.key))
+        model.dropDocument(.live(r.key))
         model.open(.live(r.key))
         await model.loadContent(.live(r.key))
         #expect(model.canEdit(try #require(model.documents[.live(r.key)])))

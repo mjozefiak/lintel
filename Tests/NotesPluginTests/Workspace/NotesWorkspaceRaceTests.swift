@@ -53,8 +53,8 @@ struct NotesWorkspaceRaceTests {
         #expect(document.selectedLayer?.markdown == "new")
     }
 
-    @Test("an answer for a tab that was closed meanwhile is dropped")
-    func closedTab() async throws {
+    @Test("an answer for a note that was left meanwhile is dropped")
+    func leftNote() async throws {
         let (model, source, _) = rig()
         let id = NoteItemID.live(key)
         model.open(id)
@@ -65,14 +65,16 @@ struct NotesWorkspaceRaceTests {
         gate.hold(next: 1)
         let read = Task { await model.loadContent(id) }
         await gate.held.wait(atLeast: 1)
-        model.close(id)
+        // Back to the list, then another row: the note's document goes.
+        model.closeFullWindow()
+        model.select(row: .live(NoteKey(pluginID: "meetings", id: "elsewhere")))
         gate.release()
         await read.value
         #expect(document.phase == .loading)
         #expect(model.documents[id] == nil)
     }
 
-    @Test("a source that does not answer within the budget leaves its tab unavailable")
+    @Test("a source that does not answer within the budget leaves its note unavailable")
     func contentBudget() async throws {
         let (model, source, clock) = rig()
         let id = NoteItemID.live(key)
@@ -85,8 +87,8 @@ struct NotesWorkspaceRaceTests {
         #expect(model.documents[id]?.phase == .unavailable)
     }
 
-    @Test("a refresh reads every open tab on its own: a hanging note does not hold up the others")
-    func tabsAreIndependent() async throws {
+    @Test("a refresh reads every note on screen on its own: a hanging note does not hold up the others")
+    func documentsAreIndependent() async throws {
         let hanging = ScriptedNoteSource("meetings", items: [Fixtures.summary("meetings", "a", secondsAgo: 1)])
         let answering = ScriptedNoteSource("dictation", items: [Fixtures.summary("dictation", "b", secondsAgo: 2)])
         hanging.contentBehavior = .hangs
@@ -99,8 +101,12 @@ struct NotesWorkspaceRaceTests {
                 pasteboard: RecordingPasteboard(), saver: ScriptedSaver(), now: { Fixtures.epoch }, clock: clock))
         let slow = NoteItemID.live(key)
         let fast = NoteItemID.live(answeringKey)
+        // The slow note's agent run goes on after the user went to another note: both documents stay on screen.
         model.open(slow)
+        let running = try #require(model.documents[slow])
+        #expect(running.lock.move(to: .flushing))
         model.open(fast)
+        #expect(model.documents[slow] === running)
 
         // Two listings and two content reads each set a deadline.
         let base = clock.sleepCalls

@@ -71,6 +71,24 @@ import Testing
         #expect(offences.isEmpty, "Verdigris outside the selection: \(offences)")
     }
 
+    /// Phase 3b retired the tabs: one note at a time in the full window, the list behind "‹ All notes". Neither the
+    /// tab bar, the path bar nor the tab set may come back in the plugin's sources.
+    @Test func theTabsAndThePathBarAreRetired() throws {
+        let folder = Self.root.appending(path: "Sources/NotesPlugin")
+        let enumerator = try #require(FileManager.default.enumerator(at: folder, includingPropertiesForKeys: nil))
+        var offences: [String] = []
+        for case let file as URL in enumerator where file.pathExtension == "swift" {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            for name in ["NoteTabBar", "NoteTabSet", "NotePathBar", "closeCurrentTab", "NoteTabReorder"]
+            where text.contains(name) {
+                offences.append("\(file.lastPathComponent): \(name)")
+            }
+        }
+        #expect(offences.isEmpty, "the tabs are retired: \(offences)")
+        let fullWindow = folder.appending(path: "UI/FullWindow/NoteFullWindowBar.swift")
+        #expect(FileManager.default.fileExists(atPath: fullWindow.path(percentEncoded: false)))
+    }
+
     @Test func thePatternCatchesRawColours() {
         for bad in [".foregroundStyle(.red)", "Color.black", "Color(red: 1, green: 0, blue: 0)", "NSColor.white"] {
             #expect(bad.range(of: Self.pattern, options: .regularExpression) != nil, "\(bad)")

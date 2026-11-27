@@ -15,7 +15,14 @@ struct NoteEditingDocument: View {
         self.model = model
         self.document = document
         self.session = session
-        _buffer = State(initialValue: document.selectedLayer?.markdown ?? "")
+        _buffer = State(initialValue: Self.initialBuffer(document: document, session: session))
+    }
+
+    /// The text the editor starts from: the session's (the writer's unsaved text, else the head read with the
+    /// writer), then the layer as the note was read. After a failed save the note was read with an older text, and
+    /// the next keystroke would write that text over what was typed.
+    static func initialBuffer(document: NoteDocumentModel, session: NoteEditingSession) -> String {
+        session.startText ?? document.selectedLayer?.markdown ?? ""
     }
 
     var body: some View {

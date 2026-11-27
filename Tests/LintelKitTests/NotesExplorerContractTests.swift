@@ -352,6 +352,21 @@ struct ScriptedTrashSource: NoteSourceTrash {
         #expect(activated.withLock { $0 })
     }
 
+    @Test func aSectionKeepsTheShellSidebarUnlessItAsksToHideIt() {
+        let plain = WorkspaceSection(id: "s", title: "S", symbolName: "s.circle", order: 0) {
+            AnyView(EmptyView())
+        }
+        #expect(!plain.hidesSidebar())
+
+        let hidden = Mutex(true)
+        let section = WorkspaceSection(
+            id: "notes", title: "Notes", symbolName: "note.text", order: 1, makeView: { AnyView(EmptyView()) },
+            hidesSidebar: { hidden.withLock { $0 } })
+        #expect(section.hidesSidebar())
+        hidden.withLock { $0 = false }
+        #expect(!section.hidesSidebar())
+    }
+
     @Test func theSidebarContextTellsTheBlockWhetherItsSectionIsSelected() {
         let seen = Mutex<[Bool]>([])
         let sidebar = WorkspaceSidebar { context in

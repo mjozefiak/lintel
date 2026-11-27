@@ -32,9 +32,10 @@ extension NotesWorkspaceModel {
                 NotesPaneLayout.centreReserve(textScale: textScale)
             )
         case .inspector:
-            // A floating inspector lies over the document and only has to leave the explorer and a sliver.
+            // A floating inspector lies over the document and only has to leave the explorer and a sliver. The full
+            // window has no explorer beside the document.
             return (
-                desiredPaneWidth(.explorer),
+                isFullWindow ? 0 : desiredPaneWidth(.explorer),
                 inspectorFits ? NotesPaneLayout.centreReserve(textScale: textScale) : 160
             )
         }

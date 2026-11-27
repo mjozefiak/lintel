@@ -6,7 +6,7 @@ import Testing
 @testable import NotesPlugin
 
 /// Spec step 6.2: the workspace around the revise run: the lock strip, "Ask agent", the report strips, the editor
-/// lock and the tab that closes under a run. The service is the real one over a scripted lease; no window.
+/// lock and the full window that is left while a run goes on (phase 3b: the run is never cancelled by it). The service is the real one over a scripted lease; no window.
 @MainActor
 @Suite(.finishesRigs, .timeLimit(.minutes(2))) struct ReviseWorkspaceTests {
     private let notes = ReviseFixtures.note
@@ -39,6 +39,10 @@ import Testing
             NoteEditingSession.make(
                 content: content, layerID: layerID, store: store, registry: r.registry, model: document, readOnly: false
             )
+        }
+        environment.makeMineSession = { content in
+            NoteEditingSession.makeMine(
+                content: content, store: store, registry: r.registry, readOnly: false, clock: r.rig.clock)
         }
         let model = NotesWorkspaceModel(environment: environment)
         let item = NoteItemID.live(r.key)
@@ -164,16 +168,53 @@ import Testing
         await task.value
     }
 
-    @Test func closingTheTabCancelsItsRun() async throws {
-        let handle = ScriptedReviseHandle([.hang])
+    @Test func goingBackToTheListLetsTheRunFinishAndApply() async throws {
+        let gate = ReviseGate()
+        let handle = ScriptedReviseHandle([.after(gate, answer)])
+        let s = try await setup(steps: [.handle(handle)])
+        await comment(s, "next sprint")
+        let document = try #require(s.model.documents[s.item])
+        let task = Task { await s.model.revise() }
+        await handle.generating.wait()
+        // "‹ All notes" while the agent writes: the run is NOT cancelled and the note keeps its document.
+        s.model.closeFullWindow()
+        #expect(!s.model.isFullWindow)
+        #expect(s.service.isRunActive)
+        #expect(handle.releases == 0)
+        #expect(s.model.documents[s.item] === document)
+        // Opening it again shows the lock strip of the same run.
+        s.model.open(s.item)
+        #expect(s.model.strips.contains { $0.id == "revise.writing" })
+        s.model.closeFullWindow()
+        gate.open()
+        await task.value
+        #expect(!s.service.isRunActive)
+        let head = try #require(try s.r.store.liveDocument(key: s.r.key, layer: "notes"))
+        let body = try #require(try s.r.store.headRevision(of: head.id)).body
+        #expect(body.contains("(owner: Marek)."))
+    }
+
+    @Test func choosingAnotherNoteWhileTheAgentWritesKeepsTheRunAndDropsTheDocumentAfterwards() async throws {
+        let gate = ReviseGate()
+        let handle = ScriptedReviseHandle([.after(gate, answer)])
         let s = try await setup(steps: [.handle(handle)])
         await comment(s, "next sprint")
         let task = Task { await s.model.revise() }
         await handle.generating.wait()
-        s.model.close(s.item)
+        s.model.closeFullWindow()
+        let other = NoteItemID.live(NoteKey(pluginID: "meetings", id: "other"))
+        s.model.select(row: other)
+        // The note whose run goes on keeps its document (dropping it would hide the run's end).
+        #expect(s.model.documents[s.item] != nil)
+        #expect(s.service.isRunActive)
+        #expect(s.r.registry.openLiveKeys == [s.r.key])
+        gate.open()
         await task.value
-        #expect(!s.service.isRunActive)
+        #expect(s.model.documents[s.item] == nil)
         #expect(handle.releases == 1)
+        // The run's end dropped the document and let its writers go (re-review m4).
+        await s.model.awaitRelease(s.item)
+        #expect(s.r.registry.openLiveKeys.isEmpty)
     }
 
     // MARK: Ask agent
@@ -200,6 +241,43 @@ import Testing
         #expect(document.openCommentCount == 0)
         #expect(document.markdown?.contains("by Friday.") == true)
         #expect(!s.model.isAskQueued(document, thread: threads[1]))
+    }
+
+    // MARK: My notes
+
+    /// Spec step 3.5: Ask agent revises the Notes; My notes, written and on screen, is the user's and stays as it was.
+    @Test func askAgentOnTheNotesLeavesMyNotesWrittenAndOnScreenAsTheyWere() async throws {
+        let handle = ScriptedReviseHandle([.answer(answer)])
+        let s = try await setup(steps: [.handle(handle)])
+        await comment(s, "next sprint")
+        let document = try #require(s.model.documents[s.item])
+        let thread = try #require(document.commentThreads.first)
+        s.model.showMyNotes(document)
+        let pad = try #require(document.myNotes)
+        func type(_ text: String) {
+            pad.edit(NoteEditorEdit(text: text, range: 0..<text.utf16.count, changeInLength: text.utf16.count))
+        }
+        type("Ask Marek about pricing.")
+        await pad.flush()
+        let mine = try #require(try s.r.store.liveDocument(key: s.r.key, layer: NotesStore.mineLayer))
+        let before = try #require(try s.r.store.headRevision(of: mine.id))
+        type("Ask Marek about pricing.\nOn screen, not written yet.")
+        #expect(s.model.canAskAgent(document))
+        await s.model.askAgent(thread)
+        // The run revised the Notes...
+        #expect(document.markdown?.contains("(owner: Marek).") == true)
+        #expect(document.openCommentCount == 0)
+        // ...and My notes' head, its revisions and the text on screen are untouched.
+        let after = try #require(try s.r.store.headRevision(of: mine.id))
+        #expect(after.id == before.id)
+        #expect(after.body == "Ask Marek about pricing.")
+        #expect(after.author == "human")
+        #expect(try s.r.store.revisions(of: mine.id).allSatisfy { $0.author == "human" })
+        #expect(document.myNotes === pad)
+        #expect(pad.text == "Ask Marek about pricing.\nOn screen, not written yet.")
+        await pad.flush()
+        #expect(
+            try s.r.store.headRevision(of: mine.id)?.body == "Ask Marek about pricing.\nOn screen, not written yet.")
     }
 
     // MARK: Reports

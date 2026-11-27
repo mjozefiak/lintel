@@ -2,8 +2,9 @@ import LintelKit
 import LintelUI
 import SwiftUI
 
-/// The Notes section of the main window (prototype `shell-notes-*`, `.win.nt`): the explorer on the left, the
-/// tab bar, path bar and document in the centre, the status bar under both. The shell owns the title bar.
+/// The Notes section of the main window (notes explorer spec): the list and the preview, or one note in the full
+/// window with its bar ("‹ All notes"), the document and the inspector (phase 3b), and the status bar under both. The
+/// shell owns the title bar and leaves its sidebar out while a note fills the window.
 struct NotesSectionView: View {
     let model: NotesWorkspaceModel
 
@@ -25,46 +26,19 @@ struct NotesSectionView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(model.explorerStrips) { strip in NoteStripView(strip: strip, model: model) }
-            HStack(spacing: 0) {
-                NoteListView(model: model, width: model.paneWidth(.explorer, textScale: textSize.scale))
-                    .transaction(value: model.paneWidth(.explorer, textScale: textSize.scale)) { $0.animation = nil }
-                NotesPaneDivider(model: model, pane: .explorer)
-                if model.tabs.tabs.isEmpty {
-                    NotePreviewView(model: model)
-                } else {
-                    VStack(spacing: 0) {
-                        NoteTabBar(model: model)
-                        NotePathBar(model: model)
-                        NoteCenter(model: model)
-                            .hiddenContent(model.hidesContent)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(LintelBrand.windowBackground)
-                    // Next to the document when there is room; over its right edge when the section is narrow (the
-                    // path bar's button asked for it), so Comments and History stay reachable at the largest text size.
-                    .overlay(alignment: .trailing) {
-                        if let document = inspectorDocument, !model.inspectorFits {
-                            NoteInspector(
-                                model: model, document: document,
-                                width: model.paneWidth(.inspector, textScale: textSize.scale)
-                            )
-                            .hiddenContent(model.hidesContent)
-                            .shadow(color: LintelBrand.ink.opacity(0.2), radius: 14, x: -4)
-                            .notesFade(.inspector)
+            if model.isFullWindow {
+                fullWindow
+            } else {
+                ForEach(model.explorerStrips) { strip in NoteStripView(strip: strip, model: model) }
+                HStack(spacing: 0) {
+                    NoteListView(model: model, width: model.paneWidth(.explorer, textScale: textSize.scale))
+                        .transaction(value: model.paneWidth(.explorer, textScale: textSize.scale)) {
+                            $0.animation = nil
                         }
-                    }
-                    if let document = inspectorDocument, model.inspectorFits {
-                        NoteInspector(
-                            model: model, document: document,
-                            width: model.paneWidth(.inspector, textScale: textSize.scale)
-                        )
-                        .hiddenContent(model.hidesContent)
-                        .notesFade(.inspector)
-                    }
+                    NotesPaneDivider(model: model, pane: .explorer)
+                    NotePreviewView(model: model)
                 }
             }
-            .notesAnimation(.inspector, value: inspectorDocument != nil)
             NotesStatusBar(model: model)
         }
         .background(LintelBrand.windowBackground)
@@ -76,8 +50,12 @@ struct NotesSectionView: View {
         } action: { width in
             model.updateInspectorFit(sectionWidth: width, textScale: textSize.scale)
         }
-        // The text size changes what the centre column needs, so the same width may now be too narrow.
+        // The text size changes what the centre column needs, so the same width may now be too narrow; the full
+        // window has no list beside the document.
         .onChange(of: textSize.scale) {
+            model.updateInspectorFit(sectionWidth: model.sectionWidth, textScale: textSize.scale)
+        }
+        .onChange(of: model.isFullWindow) {
             model.updateInspectorFit(sectionWidth: model.sectionWidth, textScale: textSize.scale)
         }
         .environment(model.preferences)
@@ -93,12 +71,52 @@ struct NotesSectionView: View {
             Task { await model.confirmDelete(request) }
         }
     }
+
+    /// One note fills the section: its bar, the document and, beside it or over its edge, the inspector.
+    private var fullWindow: some View {
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                NoteFullWindowBar(model: model)
+                NoteCenter(model: model)
+                    .hiddenContent(model.hidesContent)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(LintelBrand.windowBackground)
+            // Next to the document when there is room; over its right edge when the section is narrow (the bar's
+            // button asked for it), so Comments and History stay reachable at the largest text size.
+            .overlay(alignment: .trailing) {
+                if let document = inspectorDocument, !model.inspectorFits {
+                    NoteInspector(
+                        model: model, document: document,
+                        width: model.paneWidth(.inspector, textScale: textSize.scale)
+                    )
+                    .hiddenContent(model.hidesContent)
+                    .shadow(color: LintelBrand.ink.opacity(0.2), radius: 14, x: -4)
+                    .notesFade(.inspector)
+                }
+            }
+            if let document = inspectorDocument, model.inspectorFits {
+                NoteInspector(
+                    model: model, document: document,
+                    width: model.paneWidth(.inspector, textScale: textSize.scale)
+                )
+                .hiddenContent(model.hidesContent)
+                .notesFade(.inspector)
+            }
+        }
+        .notesAnimation(.inspector, value: inspectorDocument != nil)
+        // Esc goes back to the list unless the focus is in text (`handleEscape`). A key monitor decides it, because
+        // `onExitCommand` fires only when a text view passes Esc up (which left the note under the user's typing)
+        // and never while nothing has the focus.
+        .background(
+            EscapeKeyMonitor { textHasFocus in model.handleEscape(textHasFocus: textHasFocus) }
+        )
+    }
 }
 
-/// What is under the path bar: the open note's document, or what the section has to say when no tab is open.
+/// The document of the note in the full window, or what the section has to say while it cannot be shown.
 struct NoteCenter: View {
     let model: NotesWorkspaceModel
-    @Environment(\.lintelTextSize) private var textSize
 
     var body: some View {
         centre.notesAnimation(.tab, value: model.currentID)
@@ -111,23 +129,8 @@ struct NoteCenter: View {
                 .notesFade(.tab)
         } else {
             switch model.screen {
-            case .list:
-                VStack(spacing: 6 * textSize.scale) {
-                    Image(systemName: "note.text")
-                        .font(textSize.font(.largeTitle))
-                        .foregroundStyle(LintelBrand.secondaryText)
-                        .accessibilityHidden(true)
-                    Text("No note open", comment: "Notes: centre column when no tab is open")
-                        .font(textSize.font(.title3, weight: .semibold))
-                        .foregroundStyle(LintelBrand.ink)
-                    Text("Choose a note in the list.", comment: "Notes: hint under the title when no tab is open")
-                        .font(textSize.font(.callout))
-                        .foregroundStyle(LintelBrand.secondaryText)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityElement(children: .combine)
-            case let screen:
-                NoteScreenView(model: model, screen: screen)
+            case .list: Color.clear
+            case let screen: NoteScreenView(model: model, screen: screen)
             }
         }
     }
@@ -146,7 +149,7 @@ extension NoteStateLevel {
 }
 
 extension NoteKind {
-    /// The tab's and the document's icon (prototype: people for a meeting, a microphone for a dictation).
+    /// The document's icon (prototype: people for a meeting, a microphone for a dictation).
     var symbolName: String {
         switch self {
         case .meeting: "person.2"

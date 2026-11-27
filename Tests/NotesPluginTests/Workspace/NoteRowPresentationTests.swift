@@ -4,55 +4,6 @@ import Testing
 
 @testable import NotesPlugin
 
-private func tab(_ id: String, title: String = "T", busy: Bool = false) -> NoteTab {
-    NoteTab(id: .live(Fixtures.key("meetings", id)), kind: .meeting, title: title, isBusy: busy)
-}
-
-@Suite("Notes tabs")
-struct NoteTabSetTests {
-    @Test("a note has one tab: opening it again selects it and refreshes its title")
-    func oneTabPerNote() {
-        var tabs = NoteTabSet()
-        let first = tabs.open(tab("a"))
-        let second = tabs.open(tab("b"))
-        let again = tabs.open(tab("a", title: "Renamed"))
-        #expect(first && second && !again)
-        #expect(tabs.tabs.map(\.title) == ["Renamed", "T"])
-        #expect(tabs.current == .live(Fixtures.key("meetings", "a")))
-    }
-
-    @Test("a detached overlay and the live note of the same key are different tabs")
-    func detachedIsAnotherTab() {
-        var tabs = NoteTabSet()
-        let key = Fixtures.key("meetings", "a")
-        tabs.open(NoteTab(id: .live(key), kind: .meeting, title: "Live"))
-        tabs.open(NoteTab(id: .detached(key, startedAtMs: 5), kind: .meeting, title: "Old"))
-        #expect(tabs.tabs.count == 2)
-    }
-
-    @Test("closing the current tab shows the right neighbour, else the left; closing another keeps the current")
-    func closing() {
-        var tabs = NoteTabSet()
-        for id in ["a", "b", "c"] { tabs.open(tab(id)) }
-        tabs.select(.live(Fixtures.key("meetings", "b")))
-        tabs.close(.live(Fixtures.key("meetings", "a")))
-        #expect(tabs.current == .live(Fixtures.key("meetings", "b")))
-        tabs.close(.live(Fixtures.key("meetings", "b")))
-        #expect(tabs.current == .live(Fixtures.key("meetings", "c")))
-        tabs.close(.live(Fixtures.key("meetings", "c")))
-        #expect(tabs.current == nil)
-        #expect(tabs.tabs.isEmpty)
-    }
-
-    @Test("selecting an unknown tab changes nothing")
-    func unknownSelect() {
-        var tabs = NoteTabSet()
-        tabs.open(tab("a"))
-        tabs.select(.live(Fixtures.key("meetings", "zzz")))
-        #expect(tabs.current == .live(Fixtures.key("meetings", "a")))
-    }
-}
-
 @Suite("Notes explorer row text")
 struct NoteRowPresentationTests {
     private let presentation: NoteRowPresentation = {

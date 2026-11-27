@@ -95,6 +95,9 @@ extension NotesWorkspaceModel {
         if let session = document.session {
             await session.flush(closingSession: true)
             document.leaveEditing()
+            // The note left the screen during the flush: a writer is taken only for a note that is shown, so the
+            // registry never holds one that no leave will release.
+            guard documents[id] === document else { return }
         }
         document.setCompare(nil)
         switch await environment.applyProposal(id, layer, revisionID, head ?? snapshot.headID) {
@@ -163,6 +166,9 @@ extension NotesWorkspaceModel {
         if let session = document.session {
             await session.flush(closingSession: true)
             document.leaveEditing()
+            // The note left the screen during the flush: a writer is taken only for a note that is shown, so the
+            // registry never holds one that no leave will release.
+            guard documents[id] === document else { return }
         }
         document.setCompare(nil)
         switch await environment.restoreRevision(id, layer, revisionID) {
