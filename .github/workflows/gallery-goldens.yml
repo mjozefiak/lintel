@@ -37,6 +37,8 @@ jobs:
       # The golden PNGs are Git LFS objects (owner decision 2026-11-27). The recording overwrites every picture of both
       # languages, but it starts from the checked-in manifest and the other language's pictures, which the sheet check
       # and the artifact must hold as real PNGs, not as pointers. The cache keeps the download to the new pictures.
+      # Restore and save are separate (the save runs right after `git lfs pull`, so it survives a later failure or a
+      # cancellation); `restore-keys` makes the cache grow, so old keys need an occasional prune.
       - name: Golden images (Git LFS) key
         id: lfs
         timeout-minutes: 1
@@ -44,7 +46,8 @@ jobs:
           echo "key=$(git lfs ls-files -l | cut -d' ' -f1 | sort | shasum -a 256 | cut -c1-40)" >> "$GITHUB_OUTPUT"
 
       - name: Restore the golden images (Git LFS)
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: lfs-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         timeout-minutes: 10
         with:
           path: .git/lfs/objects
@@ -54,6 +57,14 @@ jobs:
       - name: Fetch the golden images (Git LFS)
         timeout-minutes: 5
         run: git lfs pull
+
+      - name: Save the golden images (Git LFS)
+        if: steps.lfs-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        timeout-minutes: 10
+        with:
+          path: .git/lfs/objects
+          key: lfs-${{ runner.os }}-${{ steps.lfs.outputs.key }}
 
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         timeout-minutes: 5
