@@ -40,6 +40,10 @@ import Testing
                 content: content, layerID: layerID, store: store, registry: r.registry, model: document, readOnly: false
             )
         }
+        environment.makeMineSession = { content in
+            NoteEditingSession.makeMine(
+                content: content, store: store, registry: r.registry, readOnly: false, clock: r.rig.clock)
+        }
         let model = NotesWorkspaceModel(environment: environment)
         let item = NoteItemID.live(r.key)
         model.open(item)
@@ -233,6 +237,43 @@ import Testing
         #expect(document.openCommentCount == 0)
         #expect(document.markdown?.contains("by Friday.") == true)
         #expect(!s.model.isAskQueued(document, thread: threads[1]))
+    }
+
+    // MARK: My notes
+
+    /// Spec step 3.5: Ask agent revises the Notes; My notes, written and on screen, is the user's and stays as it was.
+    @Test func askAgentOnTheNotesLeavesMyNotesWrittenAndOnScreenAsTheyWere() async throws {
+        let handle = ScriptedReviseHandle([.answer(answer)])
+        let s = try await setup(steps: [.handle(handle)])
+        await comment(s, "next sprint")
+        let document = try #require(s.model.documents[s.item])
+        let thread = try #require(document.commentThreads.first)
+        s.model.showMyNotes(document)
+        let pad = try #require(document.myNotes)
+        func type(_ text: String) {
+            pad.edit(NoteEditorEdit(text: text, range: 0..<text.utf16.count, changeInLength: text.utf16.count))
+        }
+        type("Ask Marek about pricing.")
+        await pad.flush()
+        let mine = try #require(try s.r.store.liveDocument(key: s.r.key, layer: NotesStore.mineLayer))
+        let before = try #require(try s.r.store.headRevision(of: mine.id))
+        type("Ask Marek about pricing.\nOn screen, not written yet.")
+        #expect(s.model.canAskAgent(document))
+        await s.model.askAgent(thread)
+        // The run revised the Notes...
+        #expect(document.markdown?.contains("(owner: Marek).") == true)
+        #expect(document.openCommentCount == 0)
+        // ...and My notes' head, its revisions and the text on screen are untouched.
+        let after = try #require(try s.r.store.headRevision(of: mine.id))
+        #expect(after.id == before.id)
+        #expect(after.body == "Ask Marek about pricing.")
+        #expect(after.author == "human")
+        #expect(try s.r.store.revisions(of: mine.id).allSatisfy { $0.author == "human" })
+        #expect(document.myNotes === pad)
+        #expect(pad.text == "Ask Marek about pricing.\nOn screen, not written yet.")
+        await pad.flush()
+        #expect(
+            try s.r.store.headRevision(of: mine.id)?.body == "Ask Marek about pricing.\nOn screen, not written yet.")
     }
 
     // MARK: Reports
