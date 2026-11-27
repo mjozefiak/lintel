@@ -23,9 +23,17 @@ import Testing
         ("Spotkanie jest yyy we wtorek.", "Spotkanie jest we wtorek."),
         ("Spotkanie jest yyy, we wtorek.", "Spotkanie jest we wtorek."),
         ("The meeting is um on Tuesday.", "The meeting is on Tuesday."),
-        // A filler with a comma on both sides: the two commas are one pair, so neither stays.
-        ("Spotkanie jest, yyy, we wtorek.", "Spotkanie jest we wtorek."),
-        ("The meeting is, um, on Tuesday.", "The meeting is on Tuesday."),
+        // A filler with a comma on both sides: the filler's own comma goes with it and the one before it stays, so
+        // one of the pair is left.
+        ("Spotkanie jest, yyy, we wtorek.", "Spotkanie jest, we wtorek."),
+        ("The meeting is, um, on Tuesday.", "The meeting is, on Tuesday."),
+        ("Yes, um, I think so.", "Yes, I think so."),
+        ("jabłka, yyy, gruszki", "jabłka, gruszki"),
+        // Two fillers between commas: both fillers and their own commas go, the one before them stays.
+        ("Tak, yyy, eee, nie.", "Tak, nie."),
+        // A chunk can end on the filler, since the chunks are joined with a space: the comma before it stays for the
+        // next chunk ("…jest, yyy," + "we wtorek." reads as "…jest, we wtorek.").
+        ("Spotkanie jest, yyy,", "Spotkanie jest,"),
         // At the end of a sentence: the comma before it makes way for the full stop.
         ("Spotkanie jest we wtorek, yyy.", "Spotkanie jest we wtorek."),
         ("Spotkanie jest we wtorek yyy.", "Spotkanie jest we wtorek."),
@@ -118,7 +126,7 @@ import Testing
         let before = try await cleaner.format(chunk: "Zjadłem, yyy, obiad.", previousContext: nil)
         terms.value = ["yyy"]
         let after = try await cleaner.format(chunk: "Zjadłem, yyy, obiad.", previousContext: nil)
-        #expect(before.text == "Zjadłem obiad.")
+        #expect(before.text == "Zjadłem, obiad.")
         #expect(after.text == "Zjadłem, yyy, obiad.")
     }
 }

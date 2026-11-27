@@ -1,0 +1,22 @@
+# id: pl03-one-on-one
+# lang: pl
+# date: 2026-11-17
+# self: Ewa
+# title: Spotkanie 1:1
+[00:02] Ewa: Cześć Michał, jak minął tydzień?
+[00:06] Michał: Intensywnie. Konferencja w Gdańsku była bardzo dobra, sporo notatek przywiozłem.
+[00:14] Ewa: Super. Ja też coś notowałam z tych prelekcji o płatnościach.
+[00:21] Michał: Właśnie, możesz mi wysłać te swoje notatki z konferencji? Chcę je dołączyć do raportu.
+[00:28] Ewa: Jasne, wyślę ci je dziś wieczorem.
+[00:33] Michał: Dzięki. A co z modułem płatności? Kod jest coraz trudniejszy do utrzymania.
+[00:41] Ewa: Wiem. Założę ticket na refaktor modułu płatności, żebyśmy o tym nie zapomnieli. Terminu na razie nie ustalam.
+[00:52] Michał: Okej. Kto by to robił?
+[00:56] Ewa: Zobaczymy przy planowaniu, na razie bez przypisania.
+[01:02] Michał: Jasne.
+[01:06] Ewa: Gdyby Darek był w biurze, to bym go zaprosiła na przegląd architektury jeszcze w tym tygodniu.
+[01:15] Michał: Darek jest na urlopie do stycznia, więc to odpada.
+[01:20] Ewa: No tak, faktycznie. To przegląd zrobimy po jego powrocie, zobaczymy w styczniu.
+[01:28] Michał: A jeszcze jedno: kiedyś warto by było uporządkować dokumentację API.
+[01:35] Ewa: Kiedyś na pewno, teraz nie mamy na to głowy.
+[01:40] Michał: Rozumiem. To wszystko z mojej strony.
+[01:44] Ewa: Dzięki, do zobaczenia.

@@ -3,10 +3,11 @@
  "language": "en",
  "durationSec": 240,
  "fake": {
-  "number": "7400",
+  "number": "610",
+  "numberSpelled": "six hundred ten",
   "weekday": "Tuesday",
-  "name": "Kwantoris",
-  "person": "Zenon",
+  "name": "Arcturus",
+  "person": "Helena",
   "generic": "Speaker 1",
   "due": "Tuesday"
  },

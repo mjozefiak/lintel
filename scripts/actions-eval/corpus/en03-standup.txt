@@ -1,0 +1,16 @@
+# id: en03-standup
+# lang: en
+# date: 2026-11-19
+# self: Alex
+# title: Engineering standup
+[00:02] Alex: Okay, standup. Ben, go ahead.
+[00:05] Ben: The sync worker is leaking memory again. It grows about two hundred megabytes an hour until it gets killed.
+[00:14] Alex: Ugh. I'll open a ticket for the memory leak in the sync worker. No date yet, we need to profile it first.
+[00:23] Ben: Also, Alex, can you file one for the flaky login test and give it to Chloe? It failed four times this week.
+[00:31] Alex: Sure, I'll file it for Chloe.
+[00:34] Chloe: Fine by me. Do we want a ticket to upgrade Postgres to version seventeen?
+[00:40] Alex: Not now, let's wait for the next quarter.
+[00:44] Ben: We should really write more docs at some point.
+[00:48] Alex: Yeah, someday.
+[00:51] Chloe: I'll ping the infra team about the staging disk myself.
+[00:56] Alex: Thanks. That's it.

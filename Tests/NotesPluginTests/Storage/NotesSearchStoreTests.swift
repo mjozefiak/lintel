@@ -16,18 +16,37 @@ import Testing
                         WHERE r.state = 'applied'
         """
 
+    /// The view as migration `v2-explorer` recreates it: the same folding, letter by letter, and documents in
+    /// Recently deleted left out. Never edit either.
+    static let frozenV2ViewSQL = """
+        CREATE VIEW note_fts_source AS
+                        SELECT d.id AS id, replace(replace(replace(replace(replace(replace(COALESCE(d.title_override, ''), 'ł', 'l'), 'Ł', 'L'), 'đ', 'd'), 'Đ', 'D'), 'ø', 'o'), 'Ø', 'O') AS title, replace(replace(replace(replace(replace(replace(r.body_markdown, 'ł', 'l'), 'Ł', 'L'), 'đ', 'd'), 'Đ', 'D'), 'ø', 'o'), 'Ø', 'O') AS body
+                        FROM note_doc d JOIN note_revision r ON r.id = d.head_revision_id
+                        WHERE r.state = 'applied' AND d.deleted_at IS NULL
+        """
+
+    /// Whitespace is layout only; every letter of the folding is compared.
+    private static func squeezed(_ text: String?) -> String? {
+        text?.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    private static func viewSQL(_ db: Database) throws -> String? {
+        try String.fetchOne(db, sql: "SELECT sql FROM sqlite_master WHERE name = 'note_fts_source'")
+    }
+
     @Test func theViewSQLIsFrozen() throws {
         let harness = try NotesHarness()
         defer { withExtendedLifetime(harness) {} }
         let store = try harness.openStore()
-        let sql = try store.read { db in
-            try String.fetchOne(db, sql: "SELECT sql FROM sqlite_master WHERE name = 'note_fts_source'")
-        }
-        // Whitespace is layout only; every letter of the folding is compared.
-        func squeezed(_ text: String?) -> String? {
-            text?.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        }
-        #expect(squeezed(sql) == squeezed(Self.frozenViewSQL))
+        let sql = try store.read { db in try Self.viewSQL(db) }
+        #expect(Self.squeezed(sql) == Self.squeezed(Self.frozenV2ViewSQL))
+    }
+
+    @Test func theViewOfV1NotesIsFrozenToo() throws {
+        let queue = try DatabaseQueue()
+        try NotesStore.migrator.migrate(queue, upTo: "v1-notes")
+        let sql = try queue.read { db in try Self.viewSQL(db) }
+        #expect(Self.squeezed(sql) == Self.squeezed(Self.frozenViewSQL))
     }
 
     @Test func theFrozenSQLFoldsExactlyThePairsAndNothingElse() throws {

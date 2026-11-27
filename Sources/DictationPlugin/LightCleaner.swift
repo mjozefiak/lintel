@@ -8,9 +8,10 @@ import Foundation
 ///   trailing `,` `.` `?` or `!`. "yyy…" or "(eee)" is left alone.
 /// - It edits only the spans around a removed token: the rest of the text is returned byte for byte, so a text without
 ///   fillers comes back identical (the whitespace is never normalised).
-/// - The comma that belonged to the filler goes with it; when the word before it already ends with a comma the two are
-///   one pair ("is, um, on" → "is on"), a comma before a filler that ends the sentence is replaced by the sentence's
-///   full stop, and the next word gets a capital letter when the (capitalised) filler started a sentence.
+/// - The comma that belonged to the filler goes with it, and a comma before the filler stays, so a filler with a comma
+///   on both sides loses one of the pair and no more ("is, um, on" → "is, on", "jabłka, yyy, gruszki" →
+///   "jabłka, gruszki"); a comma before a filler that ends the sentence is replaced by the sentence's full stop, and
+///   the next word gets a capital letter when the (capitalised) filler started a sentence.
 /// - A capitalised filler is removed only at the start of a sentence (the start of the text or after `.?!`): the engine
 ///   capitalises what starts a sentence, so a capital in the middle is a name or an acronym ("UM", "ERM", "Eee") and
 ///   stays.
@@ -73,13 +74,8 @@ struct LightCleaner: TextFormatter {
             if filler.startsWithCapital {
                 capitalizeNext = true
             }
-            // "is, um, on" → "is on": the filler's own comma and the one before it are one pair, so neither stays.
-            if filler.trailing == ",", var previous = output.last, previous.text.count > 1,
-                previous.text.hasSuffix(",")
-            {
-                previous.text.removeLast()
-                output[output.count - 1] = previous
-            }
+            // "is, um, on" → "is, on": the filler's own comma goes with it and the one before it stays, so a comma on
+            // both sides leaves one.
             if let mark = filler.trailing, ".?!".contains(mark) {
                 // The filler ended its sentence: the next word starts a new one.
                 capitalizeNext = true

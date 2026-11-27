@@ -56,14 +56,26 @@ struct LocalLLMFormatter: TextFormatter {
 
     private let transport: any HTTPTransport
     private let target: @Sendable () -> Target?
+    private let level: DictationSettings.CleanupLevel
+    private let vocabulary: @Sendable () -> [String]
+    private let checksTerms: Bool
     private let logger: Logger
 
+    /// - Parameters:
+    ///   - level: the cleanup level whose prompt and guard limits this formatter uses (`.full` or `.standard`).
+    ///   - vocabulary: the vocabulary's terms and variants, which the guard's term check keeps in the text.
+    ///   - checksTerms: whether the guard runs the term check; the shipped switch unless a test turns it on.
     init(
         transport: any HTTPTransport, target: @escaping @Sendable () -> Target?,
+        level: DictationSettings.CleanupLevel = .standard, vocabulary: @escaping @Sendable () -> [String] = { [] },
+        checksTerms: Bool = FormatterGuard.checksTerms,
         logger: Logger = Logger(subsystem: "com.lintelapp", category: "dictation")
     ) {
         self.transport = transport
         self.target = target
+        self.level = level
+        self.vocabulary = vocabulary
+        self.checksTerms = checksTerms
         self.logger = logger
     }
 
@@ -76,7 +88,8 @@ struct LocalLLMFormatter: TextFormatter {
         let words = FormatterGuard.words(in: chunk)
         let request: URLRequest
         do {
-            request = try Self.request(for: target, chunk: chunk, context: previousContext, words: words)
+            request = try Self.request(
+                for: target, chunk: chunk, context: previousContext, words: words, level: level)
         } catch {
             return raw.falling(.badResponse)
         }
@@ -96,7 +109,9 @@ struct LocalLLMFormatter: TextFormatter {
         try Task.checkCancellation()
 
         guard let content = Self.content(of: data) else { return raw.falling(.badResponse) }
-        switch FormatterGuard.check(input: chunk, output: content) {
+        switch FormatterGuard.check(
+            input: chunk, output: content, level: level, vocabulary: vocabulary(), checksTerms: checksTerms)
+        {
         case .accepted(let text):
             return FormatResult(text: text, outcome: .formatted)
         case .rejected(let reason):
@@ -127,7 +142,10 @@ struct LocalLLMFormatter: TextFormatter {
         [.cannotConnectToHost, .networkConnectionLost, .notConnectedToInternet].contains(error.code)
     }
 
-    static func request(for target: Target, chunk: String, context: String?, words: Int) throws -> URLRequest {
+    static func request(
+        for target: Target, chunk: String, context: String?, words: Int,
+        level: DictationSettings.CleanupLevel = .standard
+    ) throws -> URLRequest {
         struct Body: Encodable {
             struct Message: Encodable {
                 let role: String
@@ -151,7 +169,7 @@ struct LocalLLMFormatter: TextFormatter {
         }
         let body = Body(
             model: target.model,
-            messages: CleanupPrompt.messages(transcript: chunk, context: context).map {
+            messages: CleanupPrompt.messages(transcript: chunk, context: context, level: level).map {
                 .init(role: $0.role, content: $0.content)
             },
             maxTokens: words * 4 + 64)

@@ -1,0 +1,21 @@
+# id: pl01-sprint
+# lang: pl
+# date: 2026-11-18
+# self: Marta
+# title: Planowanie sprintu
+[00:04] Marta: Dobra, zaczynamy. Mamy dziś planowanie sprintu, potem szybko przejdziemy przez błędy z zeszłego tygodnia.
+[00:15] Tomek: Zanim zaczniemy, ten błąd z eksportem CSV dalej wraca. Klienci z polskimi znakami dostają krzaki w pliku.
+[00:27] Ola: Tak, widziałam to wczoraj. To jest kodowanie, eksport zapisuje w Windows-1250 zamiast UTF-8.
+[00:38] Tomek: Marta, możesz założyć na to ticket? I najlepiej dać go Oli, bo ona już w tym siedzi.
+[00:46] Marta: Jasne, założę ticket na eksport CSV z polskimi znakami i przypiszę Oli. Termin do piątku, bo w poniedziałek wychodzi wydanie.
+[00:58] Ola: Do piątku dam radę.
+[01:05] Tomek: Druga sprawa: myślałem, czy nie założyć ticketu na migrację frontu do nowego frameworka. Stary już nam ciąży.
+[01:16] Marta: Nie, nie w tym kwartale. Mamy za mało ludzi, wrócimy do tego w styczniu.
+[01:24] Tomek: Okej, rozumiem.
+[01:30] Ola: A klient z Wrocławia pytał o status poprawek. Ja wyślę mu maila z podsumowaniem po spotkaniu.
+[01:41] Marta: Super, dzięki. To ja w takim razie nie piszę do niego osobno.
+[01:50] Tomek: Co z retro? Ostatnie przepadło przez wdrożenie.
+[01:57] Marta: Zrobię nam retro w przyszły wtorek o czternastej, wyślę zaproszenie wam obojgu. Godzina wystarczy.
+[02:08] Ola: Pasuje mi.
+[02:12] Tomek: Mi też. To tyle z mojej strony.
+[02:18] Marta: Dobra, to dziękuję, kończymy.

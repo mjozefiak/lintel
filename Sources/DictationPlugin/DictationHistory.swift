@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import LintelCore
 import LintelKit
 import LintelPersistence
 import Observation
@@ -36,6 +37,10 @@ final class DictationHistory {
     static let legacyService = "app.pounce.dictation"  // LEGACY-POUNCE
     static let retentionInterval: Duration = .seconds(60 * 60)
     static let vacuumInterval: TimeInterval = 24 * 60 * 60
+    /// How long after the job starts the first purge of Recently deleted runs. Not on the immediate pass: Notes'
+    /// trash sweep runs at activation and has to mark the overlays of trashed entries first, so a Mac that was off
+    /// for 40 days purges soon after the next launch but not before that sweep.
+    static let firstTrashPurgeDelay: Duration = .seconds(10 * 60)
 
     private(set) var status = Status.closed
     private(set) var entryCount = 0
@@ -182,6 +187,10 @@ final class DictationHistory {
         changed()
     }
 
+    /// Tells the panel's list and the Notes source that the history changed. The note source calls it after a trash,
+    /// a restore and the like, which change what the history shows without going through this class.
+    nonisolated func announceChange() { changed() }
+
     func delete(_ ids: [Int64]) throws {
         try store?.delete(ids)
         refreshCount()
@@ -200,13 +209,19 @@ final class DictationHistory {
         (now().addingTimeInterval(-Double(settings.retentionDays) * 86_400), settings.maximumEntries)
     }
 
-    /// One pass now: expired and surplus entries go, and a `VACUUM` runs at most once a day.
+    /// One pass now: expired and surplus entries go (an entry in Recently deleted does not count toward the
+    /// maximum, and one older than the retention goes at once), and a `VACUUM` runs at most once a day. With
+    /// `purgesTrash` the entries deleted more than 30 days ago go for good too; only the periodic job asks for it,
+    /// after its first delay (a change of the setting never purges Recently deleted).
     @discardableResult
-    func applyRetention() -> Int {
+    func applyRetention(purgesTrash: Bool = false) -> Int {
         guard let store else { return 0 }
         let (cutoff, maximum) = policy
-        let deleted = (try? store.applyRetention(cutoff: cutoff, maximumCount: maximum)) ?? 0
+        var deleted = (try? store.applyRetention(cutoff: cutoff, maximumCount: maximum)) ?? 0
         let current = now()
+        if purgesTrash {
+            deleted += (try? store.purgeTrashed(olderThan: current.addingTimeInterval(-TrashStamp.retention))) ?? 0
+        }
         if deleted > 0, lastVacuum.map({ current.timeIntervalSince($0) >= Self.vacuumInterval }) ?? true {
             lastVacuum = current
             try? store.vacuum()
@@ -224,15 +239,20 @@ final class DictationHistory {
         retentionTask?.cancel()
         let clock = clock
         retentionTask = Task { [weak self] in
+            var purgesTrash = false
+            var delay = Self.firstTrashPurgeDelay
             while !Task.isCancelled {
                 guard let self else { return }
-                applyRetention()
+                applyRetention(purgesTrash: purgesTrash)
                 opener.purgeOldArchives(now: now())
                 do {
-                    try await clock.sleep(for: Self.retentionInterval)
+                    try await clock.sleep(for: delay)
                 } catch {
                     return
                 }
+                // The pass after the first sleep is the first that purges Recently deleted; later ones are hourly.
+                purgesTrash = true
+                delay = Self.retentionInterval
             }
         }
     }

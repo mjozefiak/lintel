@@ -541,7 +541,7 @@ struct SessionRig {
             now: nowFn, sleep: sleepFn,
             beforeReady: beforeReady, sourceBundleID: sourceBundleID,
             keepAudio: { keepAudio }, recordCounters: recordCounters, retriesMicrophone: retriesMicrophone,
-            inputDiagnostics: { "name=Test input, uid=test, sampleRate=48000, channels=1" },
+            inputDiagnostics: { "name=#test-name, uid=#test-uid, sampleRate=48000, channels=1" },
             defaultInputChanges: defaultInputChanges)
     }
 

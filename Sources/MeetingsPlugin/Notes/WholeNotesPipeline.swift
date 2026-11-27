@@ -46,11 +46,12 @@ struct WholeNotesPipeline: Sendable {
     ) async throws -> NotesResult {
         let language = NotesLanguage.dominant(in: utterances.map(\.text).joined(separator: " "))
         func result(
-            _ status: NotesResult.Status, markdown: String? = nil, dropped: Int = 0, parts: Int = 0
+            _ status: NotesResult.Status, markdown: String? = nil, dropped: Int = 0, parts: Int = 0,
+            cutFromOther: Int = 0
         ) -> NotesResult {
             NotesResult(
-                status: status, markdown: markdown, droppedCount: dropped, failedChunks: [], chunkCount: parts,
-                verifiedPointCount: 0, reduceFailed: false, rejectedIDs: 0,
+                status: status, markdown: markdown, droppedCount: dropped, cutFromOtherCount: cutFromOther,
+                failedChunks: [], chunkCount: parts, verifiedPointCount: 0, reduceFailed: false, rejectedIDs: 0,
                 language: language, promptVersion: WholeNotesPrompt.version)
         }
         guard !utterances.isEmpty else { return result(.ok) }
@@ -60,7 +61,9 @@ struct WholeNotesPipeline: Sendable {
         let lengthMs = durationMs ?? ((utterances.map(\.startMs).max() ?? 0) + 60_000)
         let maxTopics = NotesLayout.maxTopics(durationMs: lengthMs)
         let budget = generator.profile.inputBudgetTokens
-        let parts = Self.parts(of: utterances, budget: budget, partTokens: configuration.partTokens)
+        let parts = Self.parts(
+            of: utterances, budget: budget,
+            partTokens: Self.partTokens(configured: configuration.partTokens, budget: budget))
         if parts.count > configuration.maxParts { throw NotesFailure.transcriptTooLong }
 
         try Task.checkCancellation()
@@ -104,7 +107,10 @@ struct WholeNotesPipeline: Sendable {
             let markdown = NotesDraftComposer.markdown(
                 draft: checked.draft, participants: NotesPipeline.participants(of: utterances), labels: labels,
                 durationMs: lengthMs)
-            return result(.ok, markdown: markdown, dropped: checked.report.dropped, parts: parts.count)
+            let cutFromOther = NotesDraftComposer.cutFromOther(of: checked.draft, durationMs: lengthMs)
+            return result(
+                .ok, markdown: markdown, dropped: checked.report.dropped, parts: parts.count,
+                cutFromOther: cutFromOther)
         } catch {
             await generator.release()
             throw error
@@ -143,6 +149,12 @@ struct WholeNotesPipeline: Sendable {
     }
 
     // MARK: Parts
+
+    /// The size of one part: the configured one, never above the generator's input budget (a model with a 24k
+    /// budget cannot take a 40k part, and the parts decide whether the meeting is too long at all).
+    static func partTokens(configured: Int, budget: Int) -> Int {
+        max(1, min(configured, budget))
+    }
 
     /// The transcript in one part when it fits `budget`; else parts of at most `partTokens`, cut between utterances
     /// at the longest pause near the limit, without overlap.

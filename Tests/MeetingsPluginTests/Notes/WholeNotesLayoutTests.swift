@@ -129,6 +129,34 @@ import Testing
 
     // MARK: Pipeline
 
+    /// A long meeting whose answer is mostly one-point topics: they all join "Other", which holds six of them. The
+    /// points it cannot take are counted in the result instead of vanishing (issue #304).
+    @Test func thePointsAFullOtherCannotTakeAreCountedInTheResult() async throws {
+        let answer =
+            (1...8).flatMap { ["TOPIC: Punkt \($0) o budżecie", "POINT | Punkt numer \($0) o budżecie."] }
+            + ["TOPIC: Harmonogram", "POINT | Harmonogram projektu omówiono.", "POINT | Punkt 9 o harmonogramie."]
+        let result = try await WholeNotesPipeline(
+            generator: ScriptedGenerator.answering(answer.joined(separator: "\n"))
+        )
+        .run(utterances: Self.utterances, durationMs: 60 * 60_000)
+        #expect(result.status == .ok)
+        #expect(result.cutFromOtherCount == 2)
+        let markdown = try #require(result.markdown)
+        let sections = markdown.components(separatedBy: "\n### ")
+        let other = try #require(sections.first { $0.hasPrefix("Inne") })
+        #expect(other.split(separator: "\n").filter { $0.hasPrefix("- ") }.count == NotesLayout.maxPointsPerTopic)
+        #expect(markdown.hasPrefix("### Harmonogram") || markdown.contains("\n### Harmonogram"))
+        // An answer whose one-point topics fit "Other" counts nothing.
+        let fitting =
+            (1...3).flatMap { ["TOPIC: Punkt \($0) o budżecie", "POINT | Punkt numer \($0) o budżecie."] }
+            + ["TOPIC: Harmonogram", "POINT | Harmonogram projektu omówiono.", "POINT | Punkt 9 o harmonogramie."]
+        let fits = try await WholeNotesPipeline(
+            generator: ScriptedGenerator.answering(fitting.joined(separator: "\n"))
+        )
+        .run(utterances: Self.utterances, durationMs: 60 * 60_000)
+        #expect(fits.cutFromOtherCount == 0)
+    }
+
     @Test func aMeetingOfThirtyEightMinutesAsksForSixTopicsAndWritesTheLayout() async throws {
         let answer = """
             TITLE: Budżet

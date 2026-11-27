@@ -10,6 +10,10 @@ section (pre-releases use `x.y.z-beta.N`).
 
 - Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
 
+- Dictation: a **Full** level of Tidy up my text (email layout, paragraphs for a long dictation, smoother style) is built and tested but not offered yet; it appears in the popup when it passes its quality checks.
+
+- Dictation: a check that a name or a vocabulary word survives the cleanup is built and tested but off; in the measurement it added more fallback than its limit, so nothing changes yet.
+
 ### Changed
 
 - Meeting notes now follow a topic layout: topics, decisions made and next steps. Notes written by a provider (Claude) start with a short intro; notes written by the model on this Mac, since notes prompt 7, have no intro, so the model never adds a sentence of its own about the meeting. They also show more of the points it checked (up to six per topic instead of ten in all). Notes written earlier stay as they are.
@@ -19,7 +23,11 @@ section (pre-releases use `x.y.z-beta.N`).
 
 ### Fixed
 
+- Settings → Features no longer says "All set" while a feature that is on still needs something: the banner names those features, the same ones that have a dot in the sidebar.
+- Settings → Features → Result order lists only the features that are on, so a new install does not show a list for a launcher that is off.
+- The feature switches in Settings → Features respond to VoiceOver's activate action and to Switch Control, like the other switches.
 - A meeting that was waiting for the notes model is no longer forgotten when Lintel restarts: it still says that its notes need the model, and it gets its notes when the model is downloaded.
+- A meeting that waits for the notes model no longer loses its notes when the model is downloaded while Lintel is saving that wait: they are written as soon as the download finishes.
 
 ## [0.1.0-beta.1] - 2026-11-22
 

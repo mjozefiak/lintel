@@ -49,7 +49,8 @@ enum DefaultInputObserver {
         }
     }
 
-    /// The default input as a log line, for the microphone's diagnostics.
+    /// The default input as a log line, for the microphone's diagnostics: safe to write public, because
+    /// `InputDeviceInfo.logDescription` hashes the device's name and UID (issue #269).
     static func diagnostics() -> String {
         MicrophoneCapture.defaultInputInfo()?.logDescription ?? "none"
     }

@@ -2,6 +2,7 @@ import Foundation
 import LintelKit
 import LintelTestSupport
 import Testing
+import os
 
 @testable import DictationPlugin
 @testable import LintelSpeech
@@ -10,9 +11,13 @@ import Testing
 /// each level picks and the popup's two keys. Every sentence here is invented.
 @MainActor
 @Suite struct CleanupLevelSettingsTests {
-    private func settings(_ values: [String: SettingValue] = [:]) -> (DictationSettings, MemorySettingsStore) {
+    private func settings(
+        _ values: [String: SettingValue] = [:], offersFull: Bool = false
+    ) -> (DictationSettings, MemorySettingsStore) {
         let store = MemorySettingsStore(values)
-        return (DictationSettings(PluginSettings(pluginID: "dictation", store: store)), store)
+        return (
+            DictationSettings(PluginSettings(pluginID: "dictation", store: store), offersFull: offersFull), store
+        )
     }
 
     @Test func aMissingOrUnknownLevelReadsAsStandard() {
@@ -36,18 +41,47 @@ import Testing
         #expect(store.value(forKey: "plugins.dictation.cleanupLevel") == nil)
     }
 
-    @Test func lightNeedsNoModelAndAStoredFullRunsAsStandard() {
+    @Test func lightNeedsNoModelAndAStoredFullRunsAsStandardWhileFullIsNotOffered() {
         let (light, _) = settings([
             "plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("light"),
         ])
         #expect(light.effectiveLevel == .light)
         #expect(!light.usesModel)
-        // A newer build wrote `full`; this one has no Full yet.
+        // A newer build wrote `full`; while Full is not offered this one runs it as Standard.
         let (full, _) = settings([
             "plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("full"),
         ])
         #expect(full.cleanupLevel == .full)
         #expect(full.effectiveLevel == .standard)
+    }
+
+    @Test func aStoredFullRunsAsFullWhileItIsOffered() {
+        let (full, _) = settings(
+            ["plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("full")],
+            offersFull: true)
+        #expect(full.effectiveLevel == .full)
+        #expect(full.usesModel)
+        // Off wins over any stored level.
+        let (off, _) = settings(["plugins.dictation.cleanupLevel": .string("full")], offersFull: true)
+        #expect(off.effectiveLevel == nil)
+    }
+
+    @Test func fullIsNotOfferedUntilItsTargetsPass() {
+        // The first measurement (2026-11-26) missed the self-correction target, so the shipped flag is off.
+        #expect(!DictationSettings.fullIsOffered)
+        #expect(!DictationSettings(PluginSettings(pluginID: "dictation", store: MemorySettingsStore())).offersFull)
+    }
+
+    @Test func aDebugBuildCanOfferFullForQA() {
+        #if DEBUG
+        let store = MemorySettingsStore([
+            "plugins.dictation.qaOfferFull": .bool(true), "plugins.dictation.mode": .string("cleanup"),
+            "plugins.dictation.cleanupLevel": .string("full"),
+        ])
+        let qa = DictationSettings(PluginSettings(pluginID: "dictation", store: store))
+        #expect(qa.offersFull)
+        #expect(qa.effectiveLevel == .full)
+        #endif
     }
 
     @Test func aBuildWithoutLevelsReadsOnlyTheModeKey() {
@@ -61,8 +95,10 @@ import Testing
 
     // MARK: The popup
 
-    private func model(_ store: MemorySettingsStore) -> (FormattingSettingsModel, DictationSettings) {
-        let settings = DictationSettings(PluginSettings(pluginID: "dictation", store: store))
+    private func model(
+        _ store: MemorySettingsStore, offersFull: Bool = false
+    ) -> (FormattingSettingsModel, DictationSettings) {
+        let settings = DictationSettings(PluginSettings(pluginID: "dictation", store: store), offersFull: offersFull)
         return (
             FormattingSettingsModel(settings: settings, transport: ScriptedTransport(.failure(.cannotConnectToHost))),
             settings
@@ -80,6 +116,29 @@ import Testing
             "plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("full"),
         ])
         #expect(model(full).0.choice == .standard)
+        #expect(model(full, offersFull: true).0.choice == .full)
+    }
+
+    @Test func fullIsInThePopupOnlyWhileItIsOffered() {
+        #expect(model(MemorySettingsStore()).0.choices == [.off, .light, .standard])
+        #expect(model(MemorySettingsStore(), offersFull: true).0.choices == [.off, .light, .standard, .full])
+    }
+
+    @Test func choosingFullWritesBothKeysAndNeedsAModel() async {
+        let transport = ScriptedTransport(.failure(.cannotConnectToHost))
+        let store = MemorySettingsStore()
+        let settings = DictationSettings(PluginSettings(pluginID: "dictation", store: store), offersFull: true)
+        let model = FormattingSettingsModel(settings: settings, transport: transport)
+        model.choice = .full
+        #expect(settings.mode == .cleanup)
+        #expect(settings.cleanupLevel == .full)
+        #expect(settings.effectiveLevel == .full)
+        #expect(model.usesModel)
+        await pollUntil("a server request after switching to Full") { !transport.requests.isEmpty }
+        // Turning it off keeps Full for the next time.
+        model.choice = .off
+        #expect(settings.mode == .raw)
+        #expect(settings.cleanupLevel == .full)
     }
 
     @Test func thePopupWritesBothKeysAndOffKeepsTheLevel() {
@@ -163,7 +222,8 @@ import Testing
     private func pick(_ values: [String: SettingValue]) async -> (
         formatter: (any TextFormatter)?, transport: ScriptedTransport, runtime: ScriptedRuntime
     ) {
-        let settings = DictationSettings(PluginSettings(pluginID: "dictation", store: MemorySettingsStore(values)))
+        let settings = DictationSettings(
+            PluginSettings(pluginID: "dictation", store: MemorySettingsStore(values)), offersFull: true)
         let transport = ScriptedTransport(.content("Zadzwonię jutro."))
         let runtime = ScriptedRuntime()
         await runtime.script(answer: "Zadzwonię jutro.")
@@ -212,6 +272,36 @@ import Testing
         }
     }
 
+    @Test func fullSendsItsOwnPromptAndStandardKeepsTheOldOne() async throws {
+        let chunk = "zadzwonię jutro do klienta w sprawie umowy"
+        for (level, expected) in [("full", CleanupPrompt.fullSystem), ("standard", CleanupPrompt.system)] {
+            var values: [String: SettingValue] = [
+                "plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string(level),
+                "plugins.dictation.llmSource": .string("builtIn"),
+                "plugins.dictation.llmEndpoint": .string("http://127.0.0.1:11434"),
+                "plugins.dictation.llmModel": .string("qwen"),
+            ]
+            // The built-in model: the messages the runtime received.
+            var picked = await pick(values)
+            var formatter = try #require(picked.formatter)
+            await formatter.prepare()
+            _ = try await formatter.format(chunk: chunk, previousContext: nil)
+            let sent = try #require(await picked.runtime.requests.first)
+            #expect(sent.first?.content == expected)
+            // The user's server: the system message of the request body.
+            values["plugins.dictation.llmSource"] = .string("server")
+            picked = await pick(values)
+            formatter = try #require(picked.formatter)
+            _ = try await formatter.format(chunk: chunk, previousContext: nil)
+            let request = try #require(picked.transport.requests.first)
+            let data = try #require(request.httpBody)
+            let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let messages = try #require(body["messages"] as? [[String: String]])
+            #expect(messages.first?["content"] == expected)
+            #expect(messages.count == CleanupPrompt.examples(for: level == "full" ? .full : .standard).count * 2 + 2)
+        }
+    }
+
     @Test func aLightSessionMakesNoCallToTheModelOrTheServer() async throws {
         let picked = await pick([
             "plugins.dictation.mode": .string("cleanup"), "plugins.dictation.cleanupLevel": .string("light"),
@@ -231,6 +321,42 @@ import Testing
         #expect(picked.transport.requests.isEmpty)
         #expect(await picked.runtime.loads == 0)
         #expect(await picked.runtime.requests.isEmpty)
+    }
+
+    /// The term check (spec Phase 3) is wired into the formatter the plugin builds: a vocabulary word the model drops
+    /// sends the chunk back raw, and only while the check is on. Guards the `vocabulary:` passing through
+    /// `DictationPlugin.formatter(...)`, which a later formatter rewrite could drop without any other test failing.
+    @Test func theTermCheckSeesTheVocabularyThroughTheFormatter() async throws {
+        let chunk = "musisz wpisać kubectl apply i wysłać mi log z serwera"
+        let answer = "Musisz wpisać apply i wysłać mi log z serwera."
+        let settings = DictationSettings(
+            PluginSettings(
+                pluginID: "dictation",
+                store: MemorySettingsStore([
+                    "plugins.dictation.mode": .string("cleanup"),
+                    "plugins.dictation.llmSource": .string("server"),
+                    "plugins.dictation.llmEndpoint": .string("http://127.0.0.1:11434"),
+                    "plugins.dictation.llmModel": .string("qwen"),
+                ])), offersFull: true)
+        let runtime = ScriptedRuntime()
+        await runtime.script(answer: answer)
+        let warm = KeepWarmRuntime(
+            runtime: runtime, modelURL: URL(fileURLWithPath: "/models/test.gguf"), keepWarm: { .seconds(60) })
+        let words: @Sendable () -> [String] = { ["kubectl"] }
+        let logger = Logger(subsystem: "com.lintelapp.tests", category: "dictation")
+        for checksTerms in [false, true] {
+            let transport = ScriptedTransport(.content(answer))
+            let formatter = try #require(
+                DictationPlugin.formatter(
+                    settings: settings, transport: transport, builtIn: warm, logger: logger,
+                    protectedWords: words, checksTerms: checksTerms))
+            let result = try await formatter.format(chunk: chunk, previousContext: nil)
+            if checksTerms {
+                #expect(result == .init(text: chunk, outcome: .fellBack(.rejected(.lostTerm))))
+            } else {
+                #expect(result == .init(text: answer, outcome: .formatted))
+            }
+        }
     }
 
     @Test func theVocabularyWordsAreProtectedWhileTheVocabularyIsOn() throws {

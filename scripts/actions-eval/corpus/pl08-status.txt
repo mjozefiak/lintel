@@ -1,0 +1,22 @@
+# id: pl08-status
+# lang: pl
+# date: 2026-11-25
+# self: Łukasz
+# title: Status projektu Orion
+[00:02] Łukasz: Witam, status Oriona. Agata, zaczniesz od kosztów?
+[00:07] Agata: Tak. Koszty chmury za październik wyszły osiemnaście tysięcy czterysta złotych, to o dwadzieścia procent więcej niż we wrześniu.
+[00:19] Łukasz: Sporo. Skąd ten wzrost?
+[00:23] Agata: Głównie środowisko testowe, chodziło całe noce. Łukasz, wyślesz zarządowi raport z kosztów chmury? Oni o to pytali.
+[00:33] Łukasz: Tak, wyślę zarządowi raport w piątek.
+[00:38] Wiktor: Druga sprawa: certyfikat SSL na serwerze staging wygasa na początku grudnia.
+[00:45] Łukasz: Dobra, zakładam ticket na odnowienie certyfikatu SSL na stagingu, przypisuję Wiktorowi, termin trzydziesty listopada.
+[00:56] Wiktor: Przyjąłem.
+[01:00] Dorota: Ja umówię spotkanie z działem prawnym w sprawie nowej umowy hostingu.
+[01:07] Łukasz: Dzięki, Dorota.
+[01:10] Wiktor: Fajnie by było kiedyś uporządkować naszą wiki, połowa stron jest nieaktualna.
+[01:17] Łukasz: Fajnie by było, zgadzam się. Może kiedyś.
+[01:21] Agata: A spotkanie z zespołem mobilnym? Mieli pokazać postęp.
+[01:26] Łukasz: Umówię spotkanie z zespołem mobilnym w czwartek, a nie, przepraszam, w piątek o trzynastej. W czwartek mam audyt.
+[01:37] Agata: Piątek trzynasta, okej.
+[01:40] Dorota: Ja mogę zrobić notatkę z tego spotkania.
+[01:44] Łukasz: Dzięki. To na dziś wszystko.
