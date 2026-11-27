@@ -585,6 +585,66 @@
       "sha256" : "d6a59479c7a06f0cade011fd705baf5dde2f35cee04a8c03e92b2883815a907a",
       "width" : 840
     },
+    "onboarding.permission-helper\/allowed@dark-m-en.png" : {
+      "height" : 168,
+      "sha256" : "610e8baed81c4a9d6193b1f8d337517f96b4dde0e571106ebb320cf0095707b4",
+      "width" : 680
+    },
+    "onboarding.permission-helper\/allowed@light-m-en.png" : {
+      "height" : 168,
+      "sha256" : "21eb07f1c1ffec75fbbeb3fbf623546bdfb80c1682e6b4d8d9ff92b993761633",
+      "width" : 680
+    },
+    "onboarding.permission-helper\/allowed@light-xl-pl.png" : {
+      "height" : 176,
+      "sha256" : "7ced22dd0345d7d3a61997f7249acbe17af3e578e93e138bc39a110bfa3b6764",
+      "width" : 680
+    },
+    "onboarding.permission-helper\/beside-lintel@dark-m-en.png" : {
+      "height" : 380,
+      "sha256" : "358c68ea6d066bcff359090b95dc57e42606f0905d0bc0bbc3e83143747b9d28",
+      "width" : 1160
+    },
+    "onboarding.permission-helper\/beside-lintel@light-m-en.png" : {
+      "height" : 380,
+      "sha256" : "75ca8574b6f9aa1819325edd462bd1b8b8af099b3b20b5ff965122238ffd94b9",
+      "width" : 1160
+    },
+    "onboarding.permission-helper\/beside-lintel@light-xl-pl.png" : {
+      "height" : 380,
+      "sha256" : "8f965887fc83624fbd37178040a8e37dca57048ad2d65f5dae2b6404b1006bf8",
+      "width" : 1160
+    },
+    "onboarding.permission-helper\/drag-tile@dark-m-en.png" : {
+      "height" : 308,
+      "sha256" : "a6cb79c8d17eff8116ea77eeb0235f9c5ecb3ddd1af727429eed8ec9172069dd",
+      "width" : 680
+    },
+    "onboarding.permission-helper\/drag-tile@light-m-en.png" : {
+      "height" : 308,
+      "sha256" : "b09992d33e1ddaa3f25ddc878fe715efe6bdac8c8f504241a3135b312cf50582",
+      "width" : 680
+    },
+    "onboarding.permission-helper\/drag-tile@light-xl-pl.png" : {
+      "height" : 316,
+      "sha256" : "e61b1a41900ea4a68de5244d9409f5a1ef1861070c23c1e768867724a94ea75c",
+      "width" : 680
+    },
+    "onboarding.permission-helper\/turn-on-switch@dark-m-en.png" : {
+      "height" : 236,
+      "sha256" : "413ecf64f8dbe270c7d41d0c0276ff5895227444611cf82cb318686cffc1b9ba",
+      "width" : 680
+    },
+    "onboarding.permission-helper\/turn-on-switch@light-m-en.png" : {
+      "height" : 236,
+      "sha256" : "d5a46f8c59dff13448ef4bf5177c68f944f7224dfb1eb7e8db1386060b7e2417",
+      "width" : 680
+    },
+    "onboarding.permission-helper\/turn-on-switch@light-xl-pl.png" : {
+      "height" : 294,
+      "sha256" : "a07efd56a0a40ffffaa6a63e1a211e9051140dfc3791ec847c584efba90ca106",
+      "width" : 680
+    },
     "ui.ring\/error@dark-m-en.png" : {
       "height" : 372,
       "sha256" : "0091777e3541f4c9d2bbc18f4531d68f25ec62f08351765650a001ae615632f0",
