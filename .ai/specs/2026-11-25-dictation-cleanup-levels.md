@@ -59,7 +59,7 @@ Invariants at **every** level (from the owner's proposal):
 
 - **Two keys, one each:** `plugins.dictation.cleanupLevel` (level) and `plugins.dictation.llmSource` (source). Changing one never changes the other. Off and Light never use a source, so choosing a source has no effect on them and the Light help line says "Runs on this Mac." / „Działa na tym Macu.”.
 - **The provider gate per level** (`ProviderLevels.offered`, a compile-time constant set from the measurement in Phase 4, expected `[.full]`). When the source is the provider and the level is not offered, the level runs on the **local fallback**: the built-in model when it is installed, otherwise the user's server when one is set, otherwise raw. The row says so in words (UI below), so nothing is silent.
-- **Latency limit from key release** (provider only): Standard 2 s, Full 6 s (Resolved assumptions A10, A11). At key release the session waits for the chunks still out at the provider until the limit. Every chunk not back by then is pasted **raw** and its provider request is cancelled, and the HUD shows one short line, only then: "Claude too slow, pasted as spoken" / „Claude za wolny, wklejono bez porządkowania” (new `FallbackReason.tooSlow`). Chunks that finished during the recording keep their tidied text, which is today's per-chunk `partial` rule. The existing per-chunk timeout (5 s + 0.2 s/word) still applies during the recording. The built-in model and the user's server keep today's timeouts and get no new limit.
+- **Latency limit from key release** (provider only): Standard 4 s (2 s before the Phase 4 measurement; owner decision 2026-11-26, confirmed on the Phase 4 PR), Full 6 s (Resolved assumptions A10, A11). At key release the session waits for the chunks still out at the provider until the limit. Every chunk not back by then is pasted **raw** and its provider request is cancelled, and the HUD shows one short line, only then: "Claude too slow, pasted as spoken" / „Claude za wolny, wklejono bez porządkowania” (new `FallbackReason.tooSlow`). Chunks that finished during the recording keep their tidied text, which is today's per-chunk `partial` rule. The existing per-chunk timeout (5 s + 0.2 s/word) still applies during the recording. The built-in model and the user's server keep today's timeouts and get no new limit.
 
 ## 📝 Source: external AI provider (differences from the providers spec)
 
@@ -225,7 +225,7 @@ Every level is measured with `scripts/dictation-eval/` (from `feat/dictation-cle
 - The eval tool gets `--source provider` and runs each chunk through `ProviderRunner` with the real Claude Code CLI. It is off by default and turned on by `LINTEL_DICTATION_EVAL_PROVIDER=claude-code` and `LINTEL_DICTATION_EVAL_PROVIDER_MODEL`.
 - It replays the chunking of a real session: chunks complete at the times the speech segments would, and it records **latency from key release** = the time from the last segment to the last chunk back, cold start included.
 - It reports p50 and p90 per level, plus the quality metrics of that level.
-- A level is **offered** for the provider when its p90 is at or under the limit (Standard 2 s, Full 6 s) **and** it meets that level's quality targets.
+- A level is **offered** for the provider when its p90 is at or under the limit (Standard 2 s, proposed 4 s after the Phase 4 measurement; Full 6 s) **and** it meets that level's quality targets; the owner decides when a level misses one (Phase 4 result).
 - The result is set in `ProviderLevels.offered` and recorded in `docs/perf.md`.
 - Input:
   - FLEURS PL/EN (public text) by default.
@@ -279,6 +279,18 @@ Outside the phases: the owner's decision on A3 (model assist for Light), taken f
 2. Measure Standard and Full on FLEURS PL/EN (and on the corpus if A14 is approved): p50 and p90 from release, the level's quality targets, the provider's failures. Table in `docs/perf.md` and the PR body.
 3. Propose `ProviderLevels.offered`. The owner confirms it on the PR.
 
+   **Result (2026-11-26, Claude Code 2.1.332, sonnet, Standard v2 and Full v1; FLEURS PL/EN 60 + 60 and the owner's corpus
+   of 40, sent with the owner's consent, A14; tables in `docs/perf.md`):** 320 requests, 0 provider failures. Latency from
+   release p50/p90 over all 160 dictations: Standard 2.31/3.30 s (corpus 2.77/3.85 s), Full 2.57/3.27 s (corpus
+   2.64/4.27 s, one two-chunk dictation 6.29 s). Standard fails the 2 s limit (132 of 160 over it) and meets D2's quality
+   targets (corpus self-corrections 85.7 %, forbidden words left 4.2 %, FLEURS WER within raw + 0.3 pt). Full passes the 6 s
+   gate and fixes the built-in Full's self-correction miss (85.7 %), with 0 invented layout, 0 lost numbers and the fewest
+   lost content words (6 items, 11 stems), but against the provider's Standard it misses terms hit (69.3 % against
+   73.2 %), `chat` and `code` WER (+1.5 and +30.7 pt, four and two items) and one short item with a line break.
+   **Owner decision (2026-11-26): `ProviderLevels.offered = [.standard, .full]`, with the provider's Standard limit at
+   4 s (its p90 is 3.3 s over all sets and 3.85 s on the corpus; 4 of 160 dictations over 4 s) and Full's at 6 s.** The
+   owner confirms it on the Phase 4 PR; Phase 5 writes the constant. If the Full prompt changes, Full is measured again.
+
 ### Phase 5 — provider source
 
 1. `LintelProviders`: `ProviderFeatureID.dictationCleanup`; `ProviderGate` lanes (`background` by default, `interactive`). Tests:
@@ -315,11 +327,11 @@ Outside the phases: the owner's decision on A3 (model assist for Light), taken f
 | A7 | Per-app levels or a quick switch in the HUD/menu bar? | Not now (Later) | needs app-category context (`FocusContextReader`) and new UI | — |
 | A8 | Polish labels | "Wyłączone / Lekkie / Standardowe / Pełne", row "Porządkuj mój tekst" (#253's label) | neuter agrees with "porządkowanie"; same row label as #253 | — |
 | A9 | One spec or split per level? | One spec, five PRs. The levels and the source share one setting and one control | each phase ships a working subset | — |
-| A10 | Provider latency limit from key release at Standard | **2 s** (the owner's proposed default); past it the late chunks are pasted raw | Standard is for everyday short messages; built-in p90 today is ≈ 1 s | ⚠ NEEDS HUMAN CONFIRMATION |
+| A10 | Provider latency limit from key release at Standard | **4 s** (owner decision 2026-11-26 after the Phase 4 measurement; it was 2 s); past it the late chunks are pasted raw | a CLI request costs about 2 s before the model writes, so 2 s fails almost every dictation; the provider's p90 is 3.3 s (corpus 3.85 s) | ⚠ confirm on the Phase 4 PR |
 | A11 | The same limit at Full | **6 s** | Full is for emails, where a wait is acceptable. It stays under the providers spec's 8 s p95 gate for chunks | ⚠ NEEDS HUMAN CONFIRMATION |
-| A12 | Which levels the provider serves | Only the levels that pass the Phase 4 gate (`ProviderLevels.offered`); **expected Full only**. Other levels use the local fallback, and the UI says so | follows the owner's "consider the provider by default only for Full" with data instead of a guess | — |
+| A12 | Which levels the provider serves | `ProviderLevels.offered = [.standard, .full]` (owner decision 2026-11-26 after Phase 4; the spec expected Full only). Light never uses a model | the Phase 4 measurement: Standard on the provider meets its quality targets and its p90 is 3.3 s; Full passes 6 s and misses three of its corpus targets against the provider's Standard, listed for the owner on the PR | ⚠ confirm on the Phase 4 PR |
 | A13 | Does dictation inherit the meetings provider choice? | No: its own `plugins.dictation.provider` and its own consent-by-choice | the providers spec, point 9, leaves this to the feature; separate consent is the safer reading of "the choice is the consent" | — |
-| A14 | May the owner's voice corpus go to Anthropic during the Phase 4 measurement? | Not by default; FLEURS only, until the owner says yes on the PR | the corpus is the owner's private speech, and the benchmark data never enters the repo | ⚠ NEEDS HUMAN CONFIRMATION |
+| A14 | May the owner's voice corpus go to Anthropic during the Phase 4 measurement? | **Yes, for the Phase 4 measurement** (owner, 2026-11-26): the text of the 40 utterances, through the provider only, never logged, numbers only in the repo | the corpus is the owner's private speech, and the benchmark data never enters the repo | — |
 | A15 | Dictation's place in `ProviderGate` | A separate `interactive` lane (two processes at most); notes are never cancelled | simplest; avoids minutes of waiting behind a whole-transcript notes run | — |
 | A16 | What does Full include? | **Owner decision 2026-11-26, wider than the first proposal:** Standard + the layout of a message (a spoken greeting and sign-off on their own lines) + paragraphs for a longer dictation with several thoughts (not only a mail) + a smoothed style (agreement, a run-on sentence in two, a doubled word or phrase removed). No new content, no cut of content, numbers, names, vocabulary terms and details untouched, the guard on every level. A short message, chat, code or query stays one line. The name "Full / Pełne" stays | the owner wants a readable text from a long dictation, not an email template; the guard and the eval checks keep "no invented words, no lost words" measurable | — |
 | A17 | Is Full offered after the Phase 2 measurement? | **No, not yet (2026-11-26).** `DictationSettings.fullIsOffered = false`; the plain range was tightened to 0.7–1.15 from the data | every Full target held except self-corrections ≥ Standard (57 % against 71 %, one item of seven) and, slightly, "no content word lost beyond Standard" (13 items / 26 stems against 12 / 23) and "an item under 25 words stays one line" (1 against 0); the targets are the owner's to change, so the PR stays open with the table | ⚠ NEEDS HUMAN CONFIRMATION |

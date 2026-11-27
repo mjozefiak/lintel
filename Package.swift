@@ -217,6 +217,9 @@ let package = Package(
             name: "DictationPluginTests",
             dependencies: [
                 "DictationPlugin", "LintelSpeech", "LintelKit", "LintelCore", "LintelPersistence", "LintelTestSupport",
+                // The provider measurement of the cleanup levels (spec 2026-11-25, Phase 4) runs chunks through
+                // `ProviderRunner`; tests only, `DictationPlugin` itself does not depend on it.
+                "LintelProviders",
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "GRDB", package: "GRDBCipher"),
             ],

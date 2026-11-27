@@ -195,6 +195,74 @@ and filled in then; nothing here is estimated.
 | Resident memory with the built-in 4B model loaded / after keep-warm unload | ≈ 3.3 GB / back to the baseline | – | Manual (Activity Monitor) |
 | Time of one chunk request | printed by `LINTEL_LLM_URL=… swift test --filter CleanupFixtureTests/realServer` | – | Manual |
 
+### Cleanup levels on the external provider (spec `2026-11-25-dictation-cleanup-levels`, Phase 4)
+
+Measured on 2026-11-26 with `scripts/dictation-eval/run.sh --source provider` (one run of each row, never in CI):
+Claude Code 2.1.332, `--model sonnet` (the CLI reported `claude-sonnet-5-5`), the isolation flags of ADR 0011, a
+subscription login, Apple M4 Max (128 GB), macOS 27.0.1. Prompts: Standard v2, Full v1 (`CleanupPrompt.version(for:)`,
+the head of PR #337). Input, from the stored raw transcripts, with each item's recording length for the replay
+(`--audio`, no estimate): FLEURS PL and EN, 60 items each, and the owner's corpus, 40 items, sent with the owner's consent
+for this measurement (spec A14, 2026-11-26; the text went to Anthropic, nothing of it is in this repository or a log).
+Latency is from the key release to the last chunk back, with the CLI's process start in every request; the speech
+engine's time for the last segment is not included. Every FLEURS item and 38 corpus items are one chunk, so their number
+is one request that starts at the release; two corpus items (`long`) are two chunks, the first sent while the speaker
+still talks. Percentiles are nearest-rank (`provider_summary.py`). 320 requests, 0 provider failures.
+
+| Level | Set | p50 | p90 | max | Over 2 s | Over 4 s | Over 6 s | Guard fallbacks |
+|---|---|---|---|---|---|---|---|---|
+| Standard | FLEURS PL | 2.31 s | 3.25 s | 3.93 s | 56 of 60 | 0 | 0 | 1 (`tooLong`) |
+| Standard | FLEURS EN | 2.19 s | 3.23 s | 3.35 s | 45 of 60 | 0 | 0 | 1 (`newNumber`) |
+| Standard | corpus | 2.77 s | 3.85 s | 5.76 s | 31 of 40 | 4 | 0 | 0 |
+| Standard | all 160 | 2.31 s | 3.30 s | 5.76 s | 132 | 4 | 0 | 2 |
+| Full | FLEURS PL | 2.37 s | 3.19 s | 4.68 s | 60 of 60 | 1 | 0 | 0 |
+| Full | FLEURS EN | 2.52 s | 3.12 s | 4.31 s | 51 of 60 | 2 | 0 | 1 (`newNumber`) |
+| Full | corpus | 2.64 s | 4.27 s | 6.29 s | 31 of 40 | 5 | 1 | 1 (`tooShort`) |
+| Full | all 160 | 2.57 s | 3.27 s | 6.29 s | 142 | 8 | 1 | 2 |
+
+Quality. FLEURS WER (raw / built-in / provider): Standard PL 6.5 / 6.9 / 6.7 %, EN 6.3 / 6.1 / 6.1 %; Full PL
+6.5 / 7.2 / 6.4 %, EN 6.3 / 6.7 / 6.2 %. On FLEURS, Full had 0 invented greetings or sign-offs, 0 lost numbers, 0 short
+items with a line break, and lost content words in PL 4 items (7 stems) against Standard's 5 (10), EN 0 against 1.
+
+The owner's corpus (`score_dictation.py`, `check_full.py`; built-in = Qwen3 4B, Phase 2):
+
+| Metric | Raw | Built-in Standard | Built-in Full | Provider Standard | Provider Full |
+|---|---|---|---|---|---|
+| WER | 30.3 % | 22.8 % | 22.0 % | 22.8 % | 24.2 % |
+| Terms hit | 68.5 % | 71.7 % | 71.7 % | 73.2 % | 69.3 % |
+| Self-corrections OK | 0 % | 71.4 % | 57.1 % | 85.7 % | 85.7 % |
+| Forbidden words left | 62.5 % | 16.7 % | 16.7 % | 4.2 % | 4.2 % |
+| WER `chat` / `code` / `keep-not-correction` | 19.6 / 72.7 / 18.8 % | 16.3 / 72.7 / 18.8 % | 16.3 / 72.7 / 18.8 % | 17.8 / 42.0 / 18.8 % | 19.3 / 72.7 / 18.8 % |
+| WER `list` / `mail` / `long` | 38.9 / 17.1 / 27.3 % | 28.7 / 14.2 / 17.4 % | 26.9 / 13.5 / 15.9 % | 19.4 / 13.8 / 25.3 % | 19.4 / 15.5 / 25.3 % |
+| Invented greeting or sign-off (items) | | 0 | 0 | 0 | 0 |
+| Lost number, not self-correction (items) | | 0 | 0 | 0 | 0 |
+| Lost content word, not self-correction (items, stems) | | 12, 23 | 13, 26 | 8, 15 | 6, 11 |
+| Item under 25 words with a line break | | 0 | 1 | 0 | 1 (`pl-mail-01`) |
+| Mail greeting alone on the first line | | 0 of 4 | 4 of 4 | 0 of 4 | 4 of 4 |
+| `mail` + `long` with ≥ 2 paragraphs (proxy) | | 0 of 8 | 8 of 8 | 0 of 8 | 7 of 8 |
+
+Reading:
+
+- **Standard on the provider meets D2's quality targets** (FLEURS WER ≤ raw + 0.3 pt; self-corrections 85.7 % ≥ 60 %;
+  forbidden words left 4.2 % ≤ 15 %) and is better than the built-in model on self-corrections, forbidden words, terms and
+  lost content words. It **fails the spec's 2 s limit** (132 of 160 dictations over it; a CLI request costs about 2 s
+  before the model writes anything, so no prompt change brings it under 2 s on this path). With the owner's proposed
+  provider limit of **4 s** it passes on every set: p90 3.25, 3.23 and 3.85 s, 3.30 s over all 160; 4 of the 40 corpus
+  dictations (none of FLEURS) would have been pasted raw at 4 s.
+- **Full on the provider passes its 6 s latency gate** (p90 3.27 s over all 160, corpus 4.27 s; one two-chunk corpus
+  dictation took 6.29 s, because its last chunk is sent at the release) and fixes the built-in Full's main miss:
+  self-corrections 85.7 % (built-in Full 57.1 %), with fewer lost content words than any other source. Against its
+  targets measured with the provider's own Standard as the baseline it **misses three**: terms hit 69.3 % against
+  73.2 % (≥ Standard), `chat` WER +1.5 pt and `code` WER +30.7 pt (≤ Standard + 1 pt; `code` is two items, and Full
+  equals raw and the built-in models there, while the provider's Standard wrote them better), and one short item with a
+  line break (`pl-mail-01`, the same item as the built-in Full). The other Full targets hold.
+- **Owner decision (2026-11-26, Phase 4): the provider serves both levels, `ProviderLevels.offered = [.standard, .full]`,
+  with a provider latency limit of 4 s at Standard (instead of 2 s, A10) and 6 s at Full (A11).** It is confirmed on the
+  Phase 4 PR; Phase 5 writes the constant. Full's three misses above are recorded for that confirmation; the Full prompt
+  is v1 (if a later round changes it, Full is measured again).
+- Limits: one run, one model (sonnet), one network, the account's load at the time unknown; two multi-chunk dictations
+  only, so the queue in the gate behind an earlier chunk is mostly covered by the offline tests; `code` and `chat` are
+  two and four items.
+
 ### Context (ADR 0010, epic DICT)
 
 Budgets of ADR 0010. Nothing is measured yet: the code does not exist. DICT-2.7 measures the first two rows,

@@ -51,6 +51,46 @@ The test (`DictationEvalTests.cleansRawTranscripts`) is off by default and turne
 `LINTEL_DICTATION_EVAL_INPUT`; `run.sh` sets that and `…_OUT`, `…_MODEL`, `…_APP`. To compare two versions of the
 prompt, check out each commit and run the same input.
 
+## External provider (`--source provider`, spec Phase 4)
+
+Measures the external AI provider as a cleanup source before the app has one. Each chunk goes through `ProviderRunner`
+(the isolation check of the argv, the authorization before the start, the FIFO gate) to the real Claude Code CLI, with
+the level's `CleanupPrompt` and the same `FormatterGuard`. **The text is sent to Anthropic**, so the tool is off unless
+both variables are set. Give it public text (FLEURS); the owner's corpus is sent only with the owner's explicit consent
+(spec A14: given for the Phase 4 measurement on 2026-11-26).
+
+```sh
+LINTEL_DICTATION_EVAL_PROVIDER=claude-code LINTEL_DICTATION_EVAL_PROVIDER_MODEL=sonnet \
+  scripts/dictation-eval/run.sh --source provider --level standard|full \
+  --input <raw fleurs-pl>.jsonl --out <result>.jsonl --audio <folder with <id>.wav>
+
+python3 -I scripts/dictation-eval/provider_summary.py <result>.jsonl... --markdown   # latency, failures
+scripts/dictation-eval/score.sh --fleurs=pl <result>.jsonl --markdown               # WER, as for the local source
+python3 -I scripts/dictation-eval/check_full.py --raw <raw>.jsonl --out <full result>.jsonl --std <standard result>.jsonl
+```
+
+- **Replay of a session.** The raw transcripts carry no pauses, so the words are spread evenly over the recording
+  (`--audio`: `<id>.wav`, `.flac` or `.m4a`; without it 150 words a minute). A chunk the segmenter closes while the user
+  speaks (more than 60 words) is handed over when its last word was said, the rest at the release, as
+  `DictationSession` does with `Segmenter.flush`. The requests run concurrently, as the session's tasks do, and queue in
+  the provider's gate. The eval starts at the first hand-over, so it never waits through the speech before it.
+- **Latency from the key release** (`release_ms`, also written as `latency_ms`): from the end of the last segment to
+  the last chunk back. Every request starts a new CLI process, so the process start (the "cold start") is in every
+  number. The speech engine's time for the last segment is not: it is the same for every source.
+- **Provider failures apart.** `provider_failures` holds closed codes (`failed.rateLimited`, `timedOut`, ...) and the
+  chunk stays raw; `rejections` are the guard's, as for the local source. One request may take 60 s in the eval: the
+  tail is measured, not cut. `provider_summary.py` applies the release limits of the spec (Standard 4 s since the Phase 4 measurement, A10; Full 6 s)
+  afterwards and prints p50, p90 (nearest rank), the dictations over the limit and the latency gate (p90 at or under the
+  limit). A level is offered for the provider only when the gate passes **and** the level's quality targets hold.
+- After 5 dictations in a row whose every chunk failed at the provider the run stops (no login, a limit).
+- Output adds `release_ms`, `audio_ms`, `audio_estimated`, `chunk_ms` (each request from its hand-over, queue
+  included), `provider_failures`, `source`, `level`, `prompt_version`, `provider_model` and `exact_model`. The app label
+  is `lintel-provider-<model>-<level>-v<prompt version>`.
+- The messages are flattened for a command-line provider with Meetings' `cli1` rule: the level's system prompt goes to
+  argv (our text only), the examples and the transcript to stdin. Phase 5 decides the format of `ProviderFormatter`.
+- Offline tests (`DictationProviderEvalTests`) run the same code over a fake `ProviderSystem` on a test clock; the CLI
+  never starts in them.
+
 ## What is not the same as in the app
 
 The app cleans chunks while the user speaks, split by the speech segments and pauses; the raw transcripts here
