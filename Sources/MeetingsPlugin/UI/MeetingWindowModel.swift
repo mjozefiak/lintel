@@ -95,6 +95,15 @@ final class MeetingWindowModel {
     var pendingTitle: String?
     var isConfirmingDelete = false
     private(set) var isDeleted = false
+    /// The speaker whose name is being edited in place, with the text typed so far (`MeetingWindowModel+Speakers`).
+    var speakerEdit: SpeakerEdit?
+    /// The question "Marek is already in this meeting. Merge?" after a name another speaker has.
+    private(set) var mergeOffer: MergeOffer?
+    /// The name evidence of the meeting, read with the document (the time of a suggestion, the origin of a name).
+    private(set) var nameEvidence: [MeetingsStore.StoredNameEvidence] = []
+    /// A segment the transcript should scroll to (the time of a suggestion was clicked); the counter makes a
+    /// second click on the same time scroll again.
+    private(set) var scrollRequest: ScrollRequest?
 
     let meetingID: Int64
 
@@ -161,14 +170,20 @@ final class MeetingWindowModel {
         let generation = loadGeneration
         let store = store
         let id = meetingID
-        let result = await Task.detached { () -> Result<MeetingDocument?, any Error> in
-            Result { try store.loadDocument(id: id) }
+        let result = await Task.detached {
+            () -> Result<(MeetingDocument, [MeetingsStore.StoredNameEvidence])?, any Error> in
+            Result {
+                guard let document = try store.loadDocument(id: id) else { return nil }
+                return (document, try store.nameEvidence(meetingID: id))
+            }
         }.value
         guard generation == loadGeneration, !isDeleted else { return }
         switch result {
         case .success(let loaded?):
-            document = loaded
+            document = loaded.0
+            nameEvidence = loaded.1
             phase = .loaded
+            dropStaleSpeakerState()
         case .success(nil):
             document = nil
             phase = .missing
@@ -301,7 +316,7 @@ final class MeetingWindowModel {
 
     /// Runs an edit off the main actor. Edits may overlap (a rename while another is still writing); each
     /// one counts itself in, and the last to finish reloads, so the screen shows the result of all of them.
-    private func mutate(_ change: @escaping @Sendable (MeetingsStore) throws -> Void) async {
+    func mutate(_ change: @escaping @Sendable (MeetingsStore) throws -> Void) async {
         let store = store
         pendingMutations += 1
         let succeeded = await Task.detached { (try? change(store)) != nil }.value
@@ -312,6 +327,14 @@ final class MeetingWindowModel {
             feedback = nil
         }
         if pendingMutations == 0 { await load() }
+    }
+
+    /// Sets the merge question (`MeetingWindowModel+Speakers`, the only writer).
+    func setMergeOffer(_ offer: MergeOffer?) { mergeOffer = offer }
+
+    /// Asks the transcript to scroll to a segment.
+    func requestScroll(to segmentID: Int64) {
+        scrollRequest = ScrollRequest(segmentID: segmentID, serial: (scrollRequest?.serial ?? 0) + 1)
     }
 
     // MARK: Export

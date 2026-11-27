@@ -29,17 +29,27 @@ extension MeetingsStore {
 
     /// Replaces the meeting's speakers with the plan's in one transaction and sets `speaker_id` of its
     /// segments, `speaker_mode` and `diarization_model_id`. Running it again (a second finalization) starts
-    /// from a clean slate: the old speakers go and their segments are re-linked.
+    /// from a clean slate: the old speakers go and their segments are re-linked, except for what the user decided
+    /// about names (speaker names spec, Edge Cases, "Ponowna finalizacja"): a name the user gave or confirmed and the
+    /// names the user rejected move to the new speaker that took most of the old one's segments
+    /// (`carryNames`).
     func applySpeakerPlan(_ plan: SpeakerPlan, meetingID: Int64, diarizationModelID: String?) throws {
         try write { db in
+            let previous = try Self.namesToCarry(meetingID: meetingID, in: db)
             try db.execute(sql: "DELETE FROM meeting_speaker WHERE meeting_id = ?", arguments: [meetingID])
             try db.execute(
                 sql: "UPDATE meeting_segment SET speaker_id = NULL WHERE meeting_id = ?", arguments: [meetingID])
             var ids: [Int64] = []
             for speaker in plan.speakers {
                 try db.execute(
-                    sql: "INSERT INTO meeting_speaker (meeting_id, label, is_self, source_channel) VALUES (?, ?, ?, ?)",
-                    arguments: [meetingID, speaker.label, speaker.isSelf, speaker.channel.rawValue])
+                    sql: """
+                        INSERT INTO meeting_speaker (meeting_id, label, is_self, source_channel, name_source)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                    arguments: [
+                        meetingID, speaker.label, speaker.isSelf, speaker.channel.rawValue,
+                        (speaker.isSelf ? NameSource.me : NameSource.default).rawValue,
+                    ])
                 ids.append(db.lastInsertedRowID)
             }
             for (segmentID, index) in plan.assignments where ids.indices.contains(index) {
@@ -47,6 +57,7 @@ extension MeetingsStore {
                     sql: "UPDATE meeting_segment SET speaker_id = ? WHERE id = ? AND meeting_id = ?",
                     arguments: [ids[index], segmentID, meetingID])
             }
+            try Self.carryNames(previous, to: ids, assignments: plan.assignments, in: db)
             try db.execute(
                 sql: "UPDATE meeting SET speaker_mode = ?, diarization_model_id = ? WHERE id = ?",
                 arguments: [plan.mode.rawValue, diarizationModelID, meetingID])
@@ -81,9 +92,10 @@ extension MeetingsStore {
         }
     }
 
-    /// "To ja": makes this speaker the one `is_self` speaker of its meeting. A speaker still named by the
-    /// default ("Mówca N") becomes "Ja"; one the user renamed keeps its name. The speaker who was "Ja" before
-    /// loses the flag and, if still labelled "Ja", gets the lowest free "Mówca N". Notes that exist (or are being
+    /// "To ja": makes this speaker the one `is_self` speaker of its meeting (`name_source = self`, `confirmed`, the
+    /// suggestion cleared). A speaker still named by the default ("Mówca N") becomes "Ja"; one the user renamed
+    /// keeps its name. The speaker who was "Ja" before loses the flag and, if still labelled "Ja", gets the lowest
+    /// free "Mówca N" (`name_source = default`); one with another label keeps it as the user's (`user`). Notes that exist (or are being
     /// written) become `stale`, like after a rename. Returns false when the speaker does not exist **or when the meeting is in
     /// `channels` mode**: there the speakers are tracks ("Ja" / "Inni", or one neutral "Mówca 1"), not people,
     /// and moving the flag would break the track-to-label rule the banner promises. Renaming still works.
@@ -114,17 +126,33 @@ extension MeetingsStore {
                     let renamed = SpeakerLabels.numbered(number)
                     taken.insert(renamed)
                     try db.execute(
-                        sql: "UPDATE meeting_speaker SET is_self = 0, label = ? WHERE id = ?",
+                        sql: """
+                            UPDATE meeting_speaker
+                            SET is_self = 0, label = ?, name_source = 'default', name_status = 'confirmed',
+                                suggested_name = NULL
+                            WHERE id = ?
+                            """,
                         arguments: [renamed, oldID])
                 } else {
-                    try db.execute(sql: "UPDATE meeting_speaker SET is_self = 0 WHERE id = ?", arguments: [oldID])
+                    // The label is one the user gave (it is not the default "Ja"), so it stays theirs.
+                    try db.execute(
+                        sql: """
+                            UPDATE meeting_speaker
+                            SET is_self = 0, name_source = 'user', name_status = 'confirmed', suggested_name = NULL
+                            WHERE id = ?
+                            """,
+                        arguments: [oldID])
                 }
             }
             let isDefault =
                 label.hasPrefix(SpeakerLabels.numberedPrefix)
                 && Int(label.dropFirst(SpeakerLabels.numberedPrefix.count)) != nil
             try db.execute(
-                sql: "UPDATE meeting_speaker SET is_self = 1, label = ? WHERE id = ?",
+                sql: """
+                    UPDATE meeting_speaker
+                    SET is_self = 1, label = ?, name_source = 'self', name_status = 'confirmed', suggested_name = NULL
+                    WHERE id = ?
+                    """,
                 arguments: [isDefault ? SpeakerLabels.me : label, speakerID])
             try db.execute(
                 sql: """

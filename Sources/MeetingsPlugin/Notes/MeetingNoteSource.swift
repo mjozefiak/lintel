@@ -469,4 +469,26 @@ extension MeetingNoteSource: NoteSourceEditing {
         try await Task.detached { try MeetingEdits.markSelf(speaker, of: id, in: store) }.value
         changed()
     }
+
+    func confirmSpeakerName(_ key: NoteKey, speakerID: String, name: String) async throws {
+        let (store, id) = try meeting(key)
+        let speaker = try self.speakerID(speakerID)
+        try await Task.detached { try MeetingEdits.confirmName(name, speaker: speaker, of: id, in: store) }.value
+        changed()
+    }
+
+    func rejectSpeakerName(_ key: NoteKey, speakerID: String, name: String) async throws {
+        let (store, id) = try meeting(key)
+        let speaker = try self.speakerID(speakerID)
+        try await Task.detached { try MeetingEdits.rejectName(name, speaker: speaker, of: id, in: store) }.value
+        changed()
+    }
+
+    func mergeSpeakers(_ key: NoteKey, speakerID: String, into targetSpeakerID: String) async throws {
+        let (store, id) = try meeting(key)
+        let speaker = try self.speakerID(speakerID)
+        let target = try self.speakerID(targetSpeakerID)
+        try await Task.detached { try MeetingEdits.mergeSpeaker(speaker, into: target, of: id, in: store) }.value
+        changed()
+    }
 }

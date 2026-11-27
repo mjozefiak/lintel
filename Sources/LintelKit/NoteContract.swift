@@ -229,15 +229,38 @@ public struct NoteBlockProvenance: Sendable, Equatable {
     }
 }
 
+/// How sure the owner is of a speaker's shown `name` (speaker names, spec `2026-11-25-meeting-speaker-names`). A
+/// closed set: adding a case is a breaking change of this contract (`BACKWARD_COMPATIBILITY.md` §1).
+public enum NoteSpeakerNameStatus: String, Sendable, Equatable, CaseIterable {
+    /// The name is final: the user gave or confirmed it, it is the user's own, or it is the default label nobody
+    /// named. The default for every speaker of a source that does not know names.
+    case confirmed
+    /// An automatic name the owner is sure of (the person introduced themselves, the meeting window named them).
+    /// It is used in the transcript and the notes without a click; the user can still change it.
+    case applied
+    /// `name` is still the default label ("Speaker 2"); `suggestion` waits for the user's yes or no and is never
+    /// used in the notes.
+    case suggested
+}
+
 public struct NoteSpeaker: Sendable, Equatable {
     public var id: String
     public var name: String
     public var isSelf: Bool
+    /// Added with speaker names; `.confirmed` for a source that does not know them.
+    public var nameStatus: NoteSpeakerNameStatus
+    /// The name waiting for the user's confirmation ("Marek?"); set only with `nameStatus == .suggested`.
+    public var suggestion: String?
 
-    public init(id: String, name: String, isSelf: Bool = false) {
+    public init(
+        id: String, name: String, isSelf: Bool = false, nameStatus: NoteSpeakerNameStatus = .confirmed,
+        suggestion: String? = nil
+    ) {
         self.id = id
         self.name = name
         self.isSelf = isSelf
+        self.nameStatus = nameStatus
+        self.suggestion = suggestion
     }
 }
 
@@ -379,12 +402,44 @@ public protocol NoteSource: Sendable {
     func makeChanges() -> AsyncStream<Void>
 }
 
+/// Why an edit of `NoteSourceEditing` was not made. Added with speaker names; any other error stays the source's own.
+public enum NoteEditingError: Error, Sendable, Equatable {
+    /// The source does not offer this edit (the default of every edit added after the first three).
+    case unsupported
+}
+
 /// Optional capability, found with `as?`: the edits that must stay in the owner.
 public protocol NoteSourceEditing: NoteSource {
     func renameTitle(_ key: NoteKey, to: String) async throws
     func renameSpeaker(_ key: NoteKey, speakerID: String, to: String) async throws
     /// Marks the speaker as the user; the owner sets its notes `stale`.
     func markSelf(_ key: NoteKey, speakerID: String) async throws
+    /// "Yes" on a suggestion: `name` (the suggestion the screen showed) becomes the speaker's name, the user's own,
+    /// and the owner sets its notes `stale`. Throws when the speaker no longer suggests `name` (the screen was
+    /// older than the note). Default: `NoteEditingError.unsupported`.
+    func confirmSpeakerName(_ key: NoteKey, speakerID: String, name: String) async throws
+    /// "No" on a suggestion: the owner remembers that this speaker is not `name` and never suggests it again; the
+    /// shown name stays. Throws when the speaker no longer suggests `name`. Default:
+    /// `NoteEditingError.unsupported`.
+    func rejectSpeakerName(_ key: NoteKey, speakerID: String, name: String) async throws
+    /// Two speakers are one person: everything `speakerID` said moves to `targetSpeakerID`, `speakerID` goes away
+    /// and the owner sets the notes `stale`. Refused while the note is being recorded or processed. Default:
+    /// `NoteEditingError.unsupported`.
+    func mergeSpeakers(_ key: NoteKey, speakerID: String, into targetSpeakerID: String) async throws
+}
+
+extension NoteSourceEditing {
+    public func confirmSpeakerName(_ key: NoteKey, speakerID: String, name: String) async throws {
+        throw NoteEditingError.unsupported
+    }
+
+    public func rejectSpeakerName(_ key: NoteKey, speakerID: String, name: String) async throws {
+        throw NoteEditingError.unsupported
+    }
+
+    public func mergeSpeakers(_ key: NoteKey, speakerID: String, into targetSpeakerID: String) async throws {
+        throw NoteEditingError.unsupported
+    }
 }
 
 // MARK: - Recently deleted (notes explorer, phase 1.1)

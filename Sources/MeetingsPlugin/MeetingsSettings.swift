@@ -41,6 +41,7 @@ struct MeetingsSettings: Sendable {
         static let keepAudio = "keepAudio"
         static let keptAudioDays = "keptAudioDays"
         static let selfName = "selfName"
+        static let namesFromConversation = "namesFromConversation"
     }
 
     static let defaultSpeechModel = "parakeet-ultra"
@@ -99,6 +100,17 @@ struct MeetingsSettings: Sendable {
     static let defaultNotesEnabled = true
 
     var notesEnabled: Bool { settings.bool(Key.notesEnabled, default: Self.defaultNotesEnabled) }
+
+    /// Names said in the conversation become speaker names (spec `2026-11-25-meeting-speaker-names`, owner decision
+    /// Q5): on by default. It works only together with `notesEnabled` (the pass uses the notes' own writer, and
+    /// without notes no model is loaded just for names), so it never widens what the notes switch allows to leave
+    /// the Mac. Settings → Meetings → Speaker names → "From the conversation" (step 1.6), inactive while notes
+    /// are off.
+    static let defaultNamesFromConversation = true
+
+    var namesFromConversation: Bool {
+        settings.bool(Key.namesFromConversation, default: Self.defaultNamesFromConversation)
+    }
 
     /// The built-in notes model; the default one (the smallest) when none is chosen, the stored id left the
     /// catalog or the model no longer fits this Mac's memory.
@@ -282,6 +294,7 @@ struct MeetingsSettings: Sendable {
     func setDiarization(_ value: Bool) { settings.set(value, for: Key.diarization) }
     func setConsentReminder(_ value: Bool) { settings.set(value, for: Key.consentReminder) }
     func setNotesEnabled(_ value: Bool) { settings.set(value, for: Key.notesEnabled) }
+    func setNamesFromConversation(_ value: Bool) { settings.set(value, for: Key.namesFromConversation) }
     func setBuiltInLLMModel(_ model: LLMModel) { settings.set(model.id, for: Key.builtInLLMModel) }
     /// The choice in Settings → Meetings → "Notes are written by": two keys that go together, so a half-written
     /// choice never reads as one. Choosing is the consent (owner decision, 2026-11-20); nothing else is stored.

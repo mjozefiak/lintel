@@ -69,14 +69,21 @@ struct MeetingWindowView: View {
                     symbol: "text.bubble",
                     text: Text("There is no transcript for this meeting.", comment: "Meeting window: no segments"))
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
-                        speakersSection
-                        ForEach(model.document?.segments ?? []) { segment in
-                            SegmentRow(segment: segment, model: model, contrast: contrast)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
+                            speakersSection
+                            ForEach(model.document?.segments ?? []) { segment in
+                                SegmentRow(segment: segment, model: model, contrast: contrast)
+                                    .id(Self.segmentAnchor(segment.id))
+                            }
                         }
+                        .padding(.vertical, 8)
                     }
-                    .padding(.vertical, 8)
+                    .onChange(of: model.scrollRequest) { _, request in
+                        guard let request else { return }
+                        withAnimation { proxy.scrollTo(Self.segmentAnchor(request.segmentID), anchor: .center) }
+                    }
                 }
                 .accessibilityLabel(Text("Transcript", comment: "Accessibility label of the transcript list"))
             }
@@ -154,22 +161,31 @@ struct MeetingWindowView: View {
     @ViewBuilder
     private var speakersSection: some View {
         if !model.speakers.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Speakers", comment: "Meeting window: heading of the speaker list")
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(Array(model.speakers.enumerated()), id: \.element.id) { index, speaker in
-                    SpeakerRow(speaker: speaker, index: index, model: model)
-                }
-                Text(
-                    "Renaming a speaker changes the name in the transcript at once. Notes already written change after you regenerate them.",
-                    comment: "Meeting window: hint under the speaker list"
-                )
-                .font(.callout).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal, 16).padding(.bottom, 12)
+            MeetingSpeakersList(state: model.speakerList, actions: speakerActions)
+                .padding(.horizontal, 16).padding(.bottom, 12)
         }
+    }
+
+    /// The scroll anchor of a segment; a string, so it never collides with a speaker row's id.
+    static func segmentAnchor(_ id: Int64) -> String { "segment-\(id)" }
+
+    private var speakerActions: MeetingSpeakersList.Actions { Self.speakerActions(for: model) }
+
+    /// What the list's buttons and name field do to the model. Each save names its speaker, so a field's late
+    /// focus loss saves only its own name (review m1 of rv6).
+    static func speakerActions(for model: MeetingWindowModel) -> MeetingSpeakersList.Actions {
+        MeetingSpeakersList.Actions(
+            beginEditing: { id in Task { await model.beginEditing(id) } },
+            updateDraft: { model.updateDraft($0) },
+            commitEdit: { id in Task { await model.commitEdit(of: id) } },
+            cancelEdit: { model.cancelEdit() },
+            confirm: { id in Task { await model.confirmSuggestion(id) } },
+            reject: { id in Task { await model.rejectSuggestion(id) } },
+            showEvidence: { model.showEvidence(of: $0) },
+            markSelf: { id in Task { await model.markSelf(id) } },
+            merge: { Task { await model.mergeSpeakers() } },
+            keepSeparate: { Task { await model.keepSeparate() } },
+            cancelMerge: { model.cancelMerge() })
     }
 
     // MARK: Footer
@@ -257,61 +273,6 @@ enum SpeakerPalette {
     static func color(_ index: Int?) -> Color {
         guard let index else { return .secondary }
         return colors[index % colors.count]
-    }
-}
-
-private struct SpeakerRow: View {
-    let speaker: MeetingDocument.Speaker
-    let index: Int
-    @Bindable var model: MeetingWindowModel
-    @State private var draft = ""
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Capsule().fill(SpeakerPalette.color(index)).frame(width: 4, height: 20)
-                .accessibilityHidden(true)
-            TextField(text: $draft) {
-                Text("Speaker name", comment: "Meeting window: label of a speaker name field")
-            }
-            .textFieldStyle(.roundedBorder)
-            .focused($focused)
-            .onSubmit { commit() }
-            .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
-            .accessibilityLabel(Text("Speaker name", comment: "Meeting window: label of a speaker name field"))
-            .accessibilityValue(Text(speaker.label))
-            .accessibilityHint(Text("Rename this speaker, then press Return", comment: "Hint of a speaker name field"))
-            if speaker.isSelf {
-                Label {
-                    Text("You", comment: "Meeting window: marks the speaker who is the user")
-                } icon: {
-                    Image(systemName: "person.crop.circle.fill")
-                }
-                .font(.callout).foregroundStyle(.secondary)
-            } else if model.canMarkSelf(speaker) {
-                Button {
-                    Task { await model.markSelf(speaker.id) }
-                } label: {
-                    Text("This is me", comment: "Meeting window button: mark this speaker as the user")
-                }
-                .accessibilityLabel(
-                    Text("This is me, \(speaker.label)", comment: "Accessibility label of This is me; the speaker"))
-            }
-        }
-        .onAppear { draft = speaker.label }
-        // The row is lazy and can scroll away with a half-typed name: save it then.
-        .onDisappear { commit() }
-        .onChange(of: speaker.label) { _, label in if !focused { draft = label } }
-    }
-
-    private func commit() {
-        let value = draft
-        if MeetingWindowModel.visible(value).isEmpty {
-            draft = speaker.label
-            return
-        }
-        if value == speaker.label { return }
-        Task { await model.renameSpeaker(speaker.id, to: value) }
     }
 }
 

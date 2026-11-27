@@ -39,8 +39,6 @@ struct MeetingsPaneContent: View {
     @Environment(\.lintelTextSize) private var textSize
     @State private var confirmation: PrivacyConfirmation?
     @State private var newApp = ""
-    @State private var selfNameDraft = ""
-    @FocusState private var selfNameFocused: Bool
 
     private enum PrivacyConfirmation: Identifiable {
         case clearLibrary
@@ -64,6 +62,7 @@ struct MeetingsPaneContent: View {
             Section {
                 recordingRows
             }
+            SpeakerNamesSection(model: model)
         } advanced: {
             advanced
         } data: {
@@ -137,9 +136,11 @@ struct MeetingsPaneContent: View {
                     comment: "Settings → Meetings: help under Write notes after each meeting"))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("Write notes after each meeting", comment: "Meetings settings toggle of automatic notes"))
     }
 
-    /// Speech model, language, "Your name" and retention: their own card under the notes section (mockup v2).
+    /// Speech model, language and retention: their own card under the notes section (mockup v2).
     @ViewBuilder private var recordingRows: some View {
         LabeledContent {
             Picker(selection: Binding(get: { model.speechPackageID }, set: { model.selectSpeechModel($0) })) {
@@ -180,7 +181,6 @@ struct MeetingsPaneContent: View {
                         comment: "Settings → Dictation: help under the language of the Whisper model"))
             }
         }
-        selfNameRow
         MenuPicker(selection: Binding(get: { model.retentionDays }, set: { model.selectRetention($0) })) {
             ForEach(model.retentionChoices(), id: \.self) { days in
                 Text(MeetingsSettingsPane.retentionTitle(days)).font(textSize.font(.body)).tag(days)
@@ -188,63 +188,6 @@ struct MeetingsPaneContent: View {
         } label: {
             Text("Keep meetings for", comment: "Meetings settings label of the retention choice")
                 .font(textSize.font(.body))
-        }
-    }
-
-    /// "Your name": a field that saves on Return or when it loses focus, and a button that fills it from the
-    /// macOS account only when clicked.
-    @ViewBuilder private var selfNameRow: some View {
-        LabeledContent {
-            TextField(
-                text: $selfNameDraft,
-                prompt: Text("Your name", comment: "Meetings settings: placeholder of the owner's name field")
-            ) {
-                Text("Your name", comment: "Meetings settings: label of the owner's name field")
-            }
-            .labelsHidden()
-            .font(textSize.font(.body))
-            .multilineTextAlignment(.trailing)
-            .frame(maxWidth: 200)
-            .focused($selfNameFocused)
-            .onSubmit { commitSelfName() }
-            .onChange(of: selfNameFocused) { _, focused in
-                if !focused { commitSelfName() }
-            }
-            .onAppear { selfNameDraft = model.selfName }
-        } label: {
-            label(
-                Text("Your name", comment: "Meetings settings: label of the owner's name field"),
-                help: Text(
-                    "Used in notes so tasks get an owner.",
-                    comment: "Settings → Meetings: help under the Your name field"))
-            if let error = model.selfNameError {
-                Text(Self.selfNameMessage(error))
-                    .font(textSize.font(.callout))
-                    .foregroundStyle(LintelBrand.statusError)
-            }
-            if let suggestion = model.suggestedSelfName {
-                Button {
-                    selfNameDraft = suggestion
-                    commitSelfName()
-                } label: {
-                    Text("Use: \(suggestion)", comment: "Meetings settings: button that fills Your name; the name")
-                        .font(textSize.font(.callout))
-                }
-                .buttonStyle(.link)
-            }
-        }
-    }
-
-    private func commitSelfName() {
-        if model.saveSelfName(selfNameDraft) { selfNameDraft = model.selfName }
-    }
-
-    static func selfNameMessage(_ error: MeetingsSettings.SelfNameError) -> LocalizedStringKey {
-        switch error {
-        case .generic:
-            "Use a real name, not a word like “I” or “Speaker 1”."
-        case .tooLong:
-            "The name is too long (60 characters at most)."
         }
     }
 
@@ -302,6 +245,8 @@ struct MeetingsPaneContent: View {
                     "Can lower other apps’ volume.", comment: "Settings → Meetings: help under Reduce echo"))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("Reduce echo from speakers", comment: "Settings → Meetings switch of voice processing"))
         Toggle(isOn: $model.suggestMeetings) {
             Text(
                 LocalizedStringResource(
@@ -311,6 +256,11 @@ struct MeetingsPaneContent: View {
             .font(textSize.font(.body))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text(
+                LocalizedStringResource(
+                    "Suggest recording (settings)", defaultValue: "Suggest recording when a meeting starts",
+                    comment: "Meetings settings toggle of suggestions")))
         if model.suggestMeetings {
             suggestionRows
         }
@@ -426,6 +376,8 @@ struct MeetingsPaneContent: View {
                 .font(textSize.font(.body))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("Remind me to say I am recording", comment: "Settings → Meetings switch of the consent reminder"))
         LabeledContent {
             Button(role: .destructive) {
                 // The number of copies Notes keeps is read first, so the sheet can say it.
@@ -470,6 +422,8 @@ struct MeetingsPaneContent: View {
                     comment: "Settings → Meetings: help under Keep recordings (days)"))
         }
         .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("Keep recordings", comment: "Settings → Meetings switch that keeps the encrypted audio"))
         if model.keepAudio || model.keptAudioCount > 0 {
             LabeledContent {
                 Button(role: .destructive) {
@@ -616,5 +570,127 @@ extension MeetingsConfirmations {
     /// copies" checkbox (owner decision L1-39).
     static func clearLibraryInMainWindow(keptCopies: Int) -> DestructiveConfirmation {
         keptCopies > 0 ? clearLibrary.with(option: .keptNotesCopies(count: keptCopies)) : clearLibrary
+    }
+}
+
+/// What the "Speaker names" group reads and changes: `MeetingsSettingsModel` in the app, a small fake in the gallery.
+@MainActor protocol SpeakerNamesSettings: AnyObject, Observable {
+    var selfName: String { get }
+    var selfNameError: MeetingsSettings.SelfNameError? { get }
+    var suggestedSelfName: String? { get }
+    /// Saves the typed name; false when it was refused (`selfNameError` says why).
+    func saveSelfName(_ text: String) -> Bool
+    var namesFromConversation: Bool { get set }
+    /// Whether the notes are on: names from the conversation need them.
+    var notesEnabledForNames: Bool { get }
+}
+
+/// Settings → Meetings, "Speaker names" (spec `2026-11-25-meeting-speaker-names`, UI/UX): "Your name" and the
+/// switch "From the conversation", which is off-limits (with one line saying why) while the notes are off.
+struct SpeakerNamesSection<Model: SpeakerNamesSettings>: View {
+    @Bindable var model: Model
+
+    @Environment(\.lintelTextSize) private var textSize
+    @State private var selfNameDraft = ""
+    @FocusState private var selfNameFocused: Bool
+
+    var body: some View {
+        Section {
+            selfNameRow
+            fromConversationRow
+        } header: {
+            Text(
+                "Speaker names",
+                comment: "Settings → Meetings section title: the owner's name and where names come from"
+            )
+            .settingsSectionHeader()
+        }
+    }
+
+    /// "Your name": a field that saves on Return or when it loses focus, and a button that fills it from the
+    /// macOS account only when clicked.
+    @ViewBuilder private var selfNameRow: some View {
+        LabeledContent {
+            TextField(
+                text: $selfNameDraft,
+                prompt: Text("Your name", comment: "Meetings settings: placeholder of the owner's name field")
+            ) {
+                Text("Your name", comment: "Meetings settings: label of the owner's name field")
+            }
+            .labelsHidden()
+            .font(textSize.font(.body))
+            .multilineTextAlignment(.trailing)
+            .frame(maxWidth: 200)
+            .focused($selfNameFocused)
+            .onSubmit { commitSelfName() }
+            .onChange(of: selfNameFocused) { _, focused in
+                if !focused { commitSelfName() }
+            }
+            .onAppear { selfNameDraft = model.selfName }
+        } label: {
+            label(
+                Text("Your name", comment: "Meetings settings: label of the owner's name field"),
+                help: Text(
+                    "Used in notes so tasks get an owner.",
+                    comment: "Settings → Meetings: help under the Your name field"))
+            if let error = model.selfNameError {
+                Text(Self.selfNameMessage(error))
+                    .font(textSize.font(.callout))
+                    .foregroundStyle(LintelBrand.statusError)
+            }
+            if let suggestion = model.suggestedSelfName {
+                Button {
+                    selfNameDraft = suggestion
+                    commitSelfName()
+                } label: {
+                    Text("Use: \(suggestion)", comment: "Meetings settings: button that fills Your name; the name")
+                        .font(textSize.font(.callout))
+                }
+                .buttonStyle(.link)
+            }
+        }
+    }
+
+    /// "From the conversation": on by default; inactive with one line while the notes are off.
+    @ViewBuilder private var fromConversationRow: some View {
+        Toggle(
+            isOn: Binding(get: { model.namesFromConversation }, set: { model.namesFromConversation = $0 })
+        ) {
+            label(
+                Text("From the conversation", comment: "Settings → Meetings switch: names said in the meeting"),
+                help: model.notesEnabledForNames
+                    ? Text(
+                        "A name someone says in the meeting goes into the transcript and notes.",
+                        comment: "Settings → Meetings: help under From the conversation")
+                    : Text(
+                        "Works when notes are on.",
+                        comment: "Settings → Meetings: why From the conversation is inactive"))
+        }
+        .toggleStyle(.switch)
+        .accessibilityLabel(
+            Text("From the conversation", comment: "Settings → Meetings switch: names said in the meeting")
+        )
+        .disabled(!model.notesEnabledForNames)
+    }
+
+    private func commitSelfName() {
+        if model.saveSelfName(selfNameDraft) { selfNameDraft = model.selfName }
+    }
+
+    static func selfNameMessage(_ error: MeetingsSettings.SelfNameError) -> LocalizedStringKey {
+        switch error {
+        case .generic:
+            "Use a real name, not a word like “I” or “Speaker 1”."
+        case .tooLong:
+            "The name is too long (60 characters at most)."
+        }
+    }
+
+    /// A row label with its one-line help under it, as the prototype's `R(label, help, control)`.
+    private func label(_ title: Text, help: Text) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            title.font(textSize.font(.body))
+            help.font(textSize.font(.callout)).foregroundStyle(LintelBrand.secondaryText)
+        }
     }
 }

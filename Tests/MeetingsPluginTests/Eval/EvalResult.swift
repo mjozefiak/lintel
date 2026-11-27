@@ -86,6 +86,9 @@ struct EvalResult: Codable, Equatable, Sendable {
     /// Additive and optional (spec 2026-11-25-meeting-speaker-names, step 0.1): the name each speaker label ended
     /// with, for `scripts/meeting-eval/score.py` (`speakerNames`). Absent until the app names speakers (F1).
     var speakerNames: [SpeakerName]?
+    /// Additive and optional (step 1.5): the counts of the speaker names step (`NotesTraceSpeakerNames`: the pass
+    /// status, its time, excerpts, answers, refusals, applied and suggested per source). Numbers only.
+    var speakerNamesPass: NotesTraceSpeakerNames?
 
     /// One speaker label and the real name shown for it. `label` is the segment `speaker` label ("Ja", "Inni",
     /// "Mówca N"), which is how the scorer joins names to words. `source`: default, self, user, platform, calendar,
@@ -98,7 +101,7 @@ struct EvalResult: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schema, recording, audioSeconds, config, asr, diarization, notes, capture, speakerNames
+        case schema, recording, audioSeconds, config, asr, diarization, notes, capture, speakerNames, speakerNamesPass
     }
 
     init(
@@ -124,6 +127,7 @@ struct EvalResult: Codable, Equatable, Sendable {
         notes = try container.decodeIfPresent(Notes.self, forKey: .notes)
         capture = try container.decodeIfPresent(CaptureCounters.self, forKey: .capture)
         speakerNames = try container.decodeIfPresent([SpeakerName].self, forKey: .speakerNames)
+        speakerNamesPass = try container.decodeIfPresent(NotesTraceSpeakerNames.self, forKey: .speakerNamesPass)
     }
 
     /// The optional sections are always written, as `null` when absent (the scorer reads the keys directly).
@@ -146,6 +150,7 @@ struct EvalResult: Codable, Equatable, Sendable {
         }
         try container.encodeIfPresent(capture, forKey: .capture)
         try container.encodeIfPresent(speakerNames, forKey: .speakerNames)
+        try container.encodeIfPresent(speakerNamesPass, forKey: .speakerNamesPass)
     }
 }
 
@@ -202,6 +207,12 @@ enum EvalResultWriter {
             ? "\(report.recording).notes-whole.json"
             : "\(report.recording).g\(report.generation).notes-whole.json"
         return try writeAtomically(try encoded(report), named: file, to: directory)
+    }
+
+    /// Writes `<directory>/<recording>.names.json` the same way (names and the model's answers: out folder only).
+    @discardableResult
+    static func write(_ dump: SpeakerNamesEval.Dump, to directory: URL) throws -> URL {
+        try writeAtomically(try encoded(dump), named: "\(dump.recording).names.json", to: directory)
     }
 
     /// Writes `<directory>/<recording>.notes-rejections.json` the same way.

@@ -5,7 +5,9 @@
 #        run.sh --transcript <result.json> --out <dir> --name <n> [notes options]   (replay: no audio, no ASR, no diarization)
 # Notes options: --notes-model <gguf> (quote track), or --notes-pipeline whole [--provider-model <alias>]
 #   [--llama-url http://127.0.0.1:<port> [--llama-budget <tokens>]] [--generations <n>] (provider track, see README);
-#   --dump-rejections writes the files that hold notes text (out folder only). The provider track runs the Claude
+#   --dump-rejections writes the files that hold notes text (out folder only).
+# Speaker names (quote track): --names runs the names step of the notes job first, --known-names <entry.json|list.json>
+#   gives it a participant list (a simulated calendar, never sent to the model), --skip-notes stops after the names. The provider track runs the Claude
 #   Code CLI with the CLAUDE_CONFIG_DIR of the environment: `env -u CLAUDE_CONFIG_DIR run.sh ...` is the default account.
 # Exit codes: 0 ok, 2 usage/input error, 3 dirty Sources/Package.swift refused, 4 test failure, 5 build failure.
 # Uses `swift build -c release -Xswiftc -enable-testing` (`swift test -c release` fails to link
@@ -18,9 +20,12 @@ die() { printf 'run.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
 
 audio="" out="" name="" engine="" language="" speech="" notes="" diar="" names="" allow_dirty=0
 transcript="" pipeline="" provider="" llama="" budget="" generations="" dump=""
+names_on="" known="" skip_notes=""
 while [[ $# -gt 0 ]]; do
   if [[ "$1" == "--allow-dirty" ]]; then allow_dirty=1; shift; continue; fi
   if [[ "$1" == "--dump-rejections" ]]; then dump=1; shift; continue; fi
+  if [[ "$1" == "--names" ]]; then names_on=1; shift; continue; fi
+  if [[ "$1" == "--skip-notes" ]]; then skip_notes=1; shift; continue; fi
   [[ $# -ge 2 ]] || die "missing value for $1"
   case "$1" in
     --audio) audio="$2" ;;
@@ -38,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     --llama-url) llama="$2" ;;
     --llama-budget) budget="$2" ;;
     --generations) generations="$2" ;;
+    --known-names) known="$2" ;;
     *) die "unknown argument: $1" ;;
   esac
   shift 2
@@ -64,6 +70,10 @@ case "$pipeline" in "" | map | whole) ;; *) die "bad --notes-pipeline: $pipeline
 [[ -z "$notes" || -f "$notes" ]] || die "notes model not found: $notes"
 [[ -z "$diar" || -d "$diar" ]] || die "diarization folder not found: $diar"
 [[ -z "$names" || -f "$names" ]] || die "speaker names file not found: $names"
+[[ -z "$names_on$known$skip_notes" || ( -n "$notes" && "$pipeline" != "whole" ) ]] \
+  || die "--names, --known-names and --skip-notes need the quote track (--notes-model)"
+[[ -z "$known$skip_notes" || -n "$names_on" ]] || die "--known-names and --skip-notes need --names"
+[[ -z "$known" || -f "$known" ]] || die "known names file not found: $known"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
@@ -76,6 +86,7 @@ out="$(abs "$out")"
 [[ -z "$notes" ]] || notes="$(cd "$(dirname "$notes")" && pwd)/$(basename "$notes")"
 [[ -z "$diar" ]] || diar="$(abs "$diar")"
 [[ -z "$names" ]] || names="$(cd "$(dirname "$names")" && pwd)/$(basename "$names")"
+[[ -z "$known" ]] || known="$(cd "$(dirname "$known")" && pwd)/$(basename "$known")"
 
 version="$(git rev-parse --short HEAD)"
 if [[ -n "$(git status --porcelain -- Sources Package.swift Package.resolved)" ]]; then
@@ -132,12 +143,15 @@ env ${audio:+LINTEL_MEETING_EVAL_AUDIO="$audio"} \
   ${notes:+LINTEL_MEETING_EVAL_NOTES_MODEL="$notes"} \
   ${diar:+LINTEL_MEETING_EVAL_DIARIZATION_FOLDER="$diar"} \
   ${names:+LINTEL_MEETING_EVAL_SPEAKER_NAMES="$names"} \
+  ${names_on:+LINTEL_MEETING_EVAL_NAMES=1} \
+  ${known:+LINTEL_MEETING_EVAL_KNOWN_NAMES="$known"} \
+  ${skip_notes:+LINTEL_MEETING_EVAL_SKIP_NOTES=1} \
   DYLD_FRAMEWORK_PATH="$platform/Library/Frameworks" \
   DYLD_LIBRARY_PATH="$platform/usr/lib" \
   "$helper" --test-bundle-path "$binary" --testing-library swift-testing \
   --filter 'EvalTests/evaluatesARealRecording' >"$log" 2>&1 || rc=$?
 
-grep -E 'MeetingEval|Eval:|✘|Test run with|Suite ' "$log" | cut -c1-200 >&2 || true
+grep -E 'MEETING-EVAL|MeetingEval|Eval:|✘|Test run with|Suite ' "$log" | cut -c1-200 >&2 || true
 if [[ $rc -ne 0 ]]; then
   printf 'run.sh: last lines: %s\n' "$(tail -n 5 "$log" | cut -c1-200 | tr '\n' '|')" >&2
   die "MeetingEvalTests failed (exit $rc); full log kept: $log" 4

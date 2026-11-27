@@ -23,6 +23,9 @@ final class MeetingWindowController: NSObject, NSWindowDelegate, MeetingWindowPr
 
     func isOpen(_ meetingID: Int64) -> Bool { windows[meetingID]?.isVisible ?? false }
 
+    /// The open window of a meeting, if any.
+    func window(for meetingID: Int64) -> NSWindow? { windows[meetingID] }
+
     func show(meetingID: Int64) {
         if let existing = windows[meetingID] {
             bringForward(existing)
@@ -50,6 +53,8 @@ final class MeetingWindowController: NSObject, NSWindowDelegate, MeetingWindowPr
 
     /// The window title follows the meeting title (also after a rename).
     private func keepTitle(of window: NSWindow, in model: MeetingWindowModel) {
+        // A model that has already loaded (a QA fixture) gives its title at once.
+        window.title = model.title
         withObservationTracking {
             _ = model.title
         } onChange: { [weak self, weak window, weak model] in

@@ -148,84 +148,25 @@ struct NotesGuard: Sendable {
         var hasItems: Bool { !(decisions.isEmpty && tasks.isEmpty && questions.isEmpty) }
     }
 
-    private let utterances: [NotesUtterance]
-    private let words: [String]
-    private let capitalised: [Bool]
-    private let startsSentence: [Bool]
-    private let charStart: [Int]
-    private let charEnd: [Int]
-    private let wordUtterance: [Int]
-    private let wordSentence: [Int]
-    private let sentenceRanges: [Range<Int>]
-    private let sentenceTerminators: [Character?]
-    private let utteranceRanges: [Range<Int>]
-    private let speakerNames: [String]
+    /// The transcript, tokenised once for every quote the guard checks (shared with `NameEvidenceGuard`).
+    private let index: TranscriptQuoteIndex
     private let nameCandidates: Vocabulary
     /// The dominant language of the whole transcript.
     let language: NotesLanguage
 
     init(utterances: [NotesUtterance]) {
-        self.utterances = utterances
-        var words: [String] = []
-        var capitalised: [Bool] = []
-        var starts: [Bool] = []
-        var charStart: [Int] = []
-        var charEnd: [Int] = []
-        var owner: [Int] = []
-        var sentenceOf: [Int] = []
-        var ranges: [Range<Int>] = []
-        var terminators: [Character?] = []
-        var utteranceRanges = Array(repeating: 0..<0, count: utterances.count)
-        var current = -1
-        var open = false
-        var previousSpeaker: String?
-        for (index, utterance) in utterances.enumerated() {
-            let tokens = NotesText.tokens(utterance.text)
-            guard !tokens.isEmpty else { continue }
-            let first = words.count
-            for (position, token) in tokens.enumerated() {
-                let continues = position == 0 && open && previousSpeaker == utterance.speaker && current >= 0
-                if position > 0, let end = token.sentenceEnd { terminators[current] = end }
-                if (position == 0 && !continues) || (position > 0 && token.sentenceEnd != nil) {
-                    current += 1
-                    ranges.append(words.count..<words.count)
-                    terminators.append(nil)
-                }
-                words.append(token.word)
-                capitalised.append(token.capitalised)
-                starts.append(token.startsSentence)
-                charStart.append(token.start)
-                charEnd.append(token.end)
-                owner.append(index)
-                sentenceOf.append(current)
-                ranges[current] = ranges[current].lowerBound..<words.count
-            }
-            utteranceRanges[index] = first..<words.count
-            let last = utterance.text.trimmingCharacters(in: .whitespacesAndNewlines).last
-            let terminated = last.map { ".!?\u{2026}".contains($0) } ?? false
-            if terminated { terminators[current] = last }
-            open = !terminated
-            previousSpeaker = utterance.speaker
-        }
-        self.words = words
-        self.capitalised = capitalised
-        startsSentence = starts
-        self.charStart = charStart
-        self.charEnd = charEnd
-        wordUtterance = owner
-        wordSentence = sentenceOf
-        sentenceRanges = ranges
-        sentenceTerminators = terminators
-        self.utteranceRanges = utteranceRanges
-        speakerNames = Array(Set(utterances.map(\.speaker))).sorted()
+        let index = TranscriptQuoteIndex(
+            utterances.map { QuoteSegment(speaker: $0.speaker, startMs: $0.startMs, text: $0.text) })
+        self.index = index
         language = NotesLanguage.dominant(in: utterances.map(\.text).joined(separator: " "))
 
         var names: [String] = []
-        for speaker in speakerNames where !Self.isGenericLabel(speaker) {
+        for speaker in index.speakerNames where !Self.isGenericLabel(speaker) {
             names.append(contentsOf: NotesText.words(speaker).filter { $0.count >= 3 })
         }
-        for index in words.indices where capitalised[index] && !starts[index] && words[index].count >= 3 {
-            names.append(words[index])
+        for word in index.words.indices
+        where index.capitalised[word] && !index.startsSentence[word] && index.words[word].count >= 3 {
+            names.append(index.words[word])
         }
         nameCandidates = Vocabulary(words: names, numbers: [])
     }
@@ -301,24 +242,13 @@ struct NotesGuard: Sendable {
     /// checked against.
     func verificationRequest(for point: NotesPoint, claim: String) -> NotesVerificationRequest {
         var context: [NotesVerificationRequest.Line] = []
-        if let center = point.utterance, utterances.indices.contains(center) {
+        if let center = point.utterance, index.segments.indices.contains(center) {
             let low = max(0, center - Self.verificationContextUtterances)
-            let high = min(utterances.count - 1, center + Self.verificationContextUtterances)
-            context = utterances[low...high].map { .init(speaker: $0.speaker, text: $0.text) }
+            let high = min(index.segments.count - 1, center + Self.verificationContextUtterances)
+            context = index.segments[low...high].map { .init(speaker: $0.speaker, text: $0.text) }
         }
         return NotesVerificationRequest(kind: point.kind, text: claim, quote: point.quote, context: context)
     }
-
-    private struct Match {
-        var range: Range<Int>
-        var wholeUtterance: Bool
-        /// How many leading quote words the range matches: all of them, or fewer when a literal quote ran on
-        /// past a sentence end and only its first sentence was matched.
-        var quoteCount: Int
-    }
-
-    /// The fewest quote words a match needs unless it is a whole utterance (`quoteTooShort`).
-    static let minimumQuoteWords = 3
 
     private struct Outcome {
         var point: NotesPoint
@@ -333,13 +263,13 @@ struct NotesGuard: Sendable {
         point.quote = Self.plain(point.quote)
         guard !point.text.isEmpty else { return .failure(Refusal(.emptyText)) }
 
-        let allQuoteWords = NotesText.words(strippingLinePrefix(point.quote))
-        guard !allQuoteWords.isEmpty, let match = find(allQuoteWords, near: point.timeMs) else {
-            return .failure(Refusal(.quoteNotInTranscript, detail: missKind(of: allQuoteWords)))
+        let allQuoteWords = index.quoteWords(from: point.quote)
+        guard !allQuoteWords.isEmpty, let match = index.find(allQuoteWords, near: point.timeMs) else {
+            return .failure(Refusal(.quoteNotInTranscript, detail: missDetail(of: allQuoteWords)))
         }
         // Only the matched part of the quote counts from here on (all of it, unless it was cut at a sentence end).
         let quoteWords = Array(allQuoteWords.prefix(match.quoteCount))
-        guard quoteWords.count >= Self.minimumQuoteWords || match.wholeUtterance else {
+        guard quoteWords.count >= TranscriptQuoteIndex.minimumQuoteWords || match.wholeUtterance else {
             return .failure(Refusal(.quoteTooShort))
         }
         let claimsDecision = point.kind == .decision || point.kind == .task
@@ -351,19 +281,18 @@ struct NotesGuard: Sendable {
             return .failure(Refusal(.languageChanged))
         }
 
-        let covered = Set(match.range.map { wordUtterance[$0] }).sorted()
-        let excerpt = self.excerpt(of: match.range)
+        let covered = Set(match.range.map { index.wordSegment[$0] }).sorted()
         var outcome = Outcome(point: point)
-        outcome.point.timeMs = utterances[covered[0]].startMs
-        outcome.point.speaker = utterances[covered[0]].speaker
+        outcome.point.timeMs = index.segments[covered[0]].startMs
+        outcome.point.speaker = index.segments[covered[0]].speaker
         outcome.point.utterance = covered[0]
-        outcome.point.sentence = wordSentence[match.range.lowerBound]
+        outcome.point.sentence = index.wordSentence[match.range.lowerBound]
         // What is shown as the quote is the transcript's own text.
-        outcome.point.quote = excerpt
+        outcome.point.quote = Self.plain(index.excerpt(of: match.range))
 
         // A sentence that is a question is no decision, task or finding. It stays as an open question only when
         // the model wrote it as one.
-        if outcome.point.kind != .question, isQuestion(sentence: wordSentence[match.range.lowerBound]) {
+        if outcome.point.kind != .question, isQuestion(sentence: index.wordSentence[match.range.lowerBound]) {
             guard outcome.point.text.hasSuffix("?") else { return .failure(Refusal(.questionNotAFinding)) }
             outcome.point.kind = .question
             outcome.downgraded = true
@@ -384,10 +313,10 @@ struct NotesGuard: Sendable {
         case .decision: break
         }
         let vocabulary = Vocabulary(
-            words: covered.flatMap { Array(words[utteranceRanges[$0]]) }
-                + covered.flatMap { NotesText.words(utterances[$0].speaker) },
+            words: covered.flatMap { Array(index.words[index.segmentRanges[$0]]) }
+                + covered.flatMap { NotesText.words(index.segments[$0].speaker) },
             numbers: covered.flatMap {
-                NotesText.numberUnits(utterances[$0].text) + NotesText.linkUnits(utterances[$0].text)
+                NotesText.numberUnits(index.segments[$0].text) + NotesText.linkUnits(index.segments[$0].text)
             })
         if let rule = Self.faithfulnessRefusal(outcome.point.text, vocabulary: vocabulary, strictStart: false) {
             return .failure(Refusal(.unsupportedDetail, detail: DropDetail(rawValue: rule.rawValue)))
@@ -399,15 +328,17 @@ struct NotesGuard: Sendable {
         }
         // A summary point is a fact of the discussion in other words; when most of those words are not the
         // quote's, the sense may have been turned around without anything the checks above see.
-        if outcome.point.kind == .summary, Self.driftsFromQuote(outcome.point.text, quote: Array(words[match.range])) {
+        if outcome.point.kind == .summary,
+            Self.driftsFromQuote(outcome.point.text, quote: Array(index.words[match.range]))
+        {
             return .failure(Refusal(.driftedFromQuote))
         }
 
         if outcome.point.kind == .task {
             outcome.point.person = checkedPerson(
-                point.person, match: match, speaker: utterances[covered[0]].speaker)
+                point.person, match: match, speaker: index.segments[covered[0]].speaker)
             if outcome.point.person == nil, Self.isEmptyPerson(point.person), covered.count == 1,
-                let owner = ownerFromSpeaker(match.range, speaker: utterances[covered[0]].speaker)
+                let owner = ownerFromSpeaker(match.range, speaker: index.segments[covered[0]].speaker)
             {
                 outcome.point.person = owner
                 outcome.ownerFromSpeaker = true
@@ -418,26 +349,6 @@ struct NotesGuard: Sendable {
             outcome.point.due = nil
         }
         return .success(outcome)
-    }
-
-    /// The original text of the matched words (and the sentence end after them when they end the sentence).
-    private func excerpt(of range: Range<Int>) -> String {
-        var pieces: [String] = []
-        let covered = Set(range.map { wordUtterance[$0] }).sorted()
-        for index in covered {
-            let inside = range.filter { wordUtterance[$0] == index }
-            guard let first = inside.first, let last = inside.last else { continue }
-            let characters = Array(utterances[index].text)
-            pieces.append(String(characters[charStart[first]..<min(charEnd[last], characters.count)]))
-        }
-        var text = pieces.joined(separator: " ")
-        let sentence = wordSentence[range.upperBound - 1]
-        if sentenceRanges[sentence].upperBound == range.upperBound, let end = sentenceTerminators[sentence],
-            !text.hasSuffix(String(end))
-        {
-            text.append(end)
-        }
-        return Self.plain(text)
     }
 
     private static let interrogativeOpeners: Set<String> = [
@@ -452,152 +363,20 @@ struct NotesGuard: Sendable {
     /// The sentence ends with a question mark and is either opened by a question word or has no confirming tag
     /// ("..., ok?") at its end: a question, not a statement.
     private func isQuestion(sentence: Int) -> Bool {
-        guard sentenceTerminators[sentence] == "?" else { return false }
-        let range = sentenceRanges[sentence]
-        if Self.interrogativeOpeners.contains(words[range.lowerBound]) { return true }
-        return !words[range].suffix(3).contains { Self.tagCues.contains($0) }
+        guard index.sentenceTerminators[sentence] == "?" else { return false }
+        let range = index.sentenceRanges[sentence]
+        if Self.interrogativeOpeners.contains(index.words[range.lowerBound]) { return true }
+        return !index.words[range].suffix(3).contains { Self.tagCues.contains($0) }
     }
 
-    /// The quote without a leading `[mm:ss]` and `Speaker:` the model may have copied along.
-    private func strippingLinePrefix(_ quote: String) -> String {
-        var text = quote.trimmingCharacters(in: .whitespaces)
-        if let match = text.prefixMatch(of: /\[?\d{1,3}:\d{2}(:\d{2})?\]?[ ]*/) {
-            text = String(text[match.range.upperBound...])
+    /// The measurement detail of a quote the index could not place (`DropDetail` keeps its own raw values).
+    private func missDetail(of quote: [String]) -> DropDetail {
+        switch index.missKind(of: quote) {
+        case .speakerChange: .quoteSpeakerChange
+        case .changedWord: .quoteChangedWord
+        case .omittedWords: .quoteOmittedWords
+        case .absent: .quoteAbsent
         }
-        for name in speakerNames where text.hasPrefix(name + ":") {
-            text = String(text.dropFirst(name.count + 1))
-            break
-        }
-        return text
-    }
-
-    /// How many transcript words, in all, a quote may skip between its first and last word (`dha czy chciał`
-    /// for the quote `dha chciał`).
-    static let maxSkippedTranscriptWords = 2
-
-    /// The first place in the transcript where all quote words follow each other (by `wordsMatch`): a literal
-    /// match within one speaker's words (cut at the first sentence end it crosses), one with gaps within one
-    /// sentence; with several, the one closest in time to `near`. An exact match (no gaps) wins over one that
-    /// skips up to `maxSkippedTranscriptWords` filler words; the first and the last quote word never have a gap
-    /// at the edge, and a skipped word is never a negation, a number, a word with a digit or a capitalised name
-    /// the quote does not contain.
-    private func find(_ quote: [String], near time: Int) -> Match? {
-        guard !quote.isEmpty, words.count >= quote.count else { return nil }
-        if let exact = find(quote, near: time, skips: 0) { return exact }
-        guard quote.count >= 2, Self.maxSkippedTranscriptWords > 0 else { return nil }
-        return find(quote, near: time, skips: Self.maxSkippedTranscriptWords)
-    }
-
-    private func find(_ quote: [String], near time: Int, skips: Int) -> Match? {
-        var best: Match?
-        var bestDistance = Int.max
-        for start in 0...(words.count - quote.count) where NotesText.wordsMatch(words[start], quote[0]) {
-            guard var end = matchEnd(quote, index: 1, after: start, skips: skips, literal: skips == 0) else { continue }
-            var quoteCount = quote.count
-            if skips > 0 {
-                // A match with gaps stays in one sentence.
-                guard wordSentence[start] == wordSentence[end - 1] else { continue }
-            } else if wordSentence[start] != wordSentence[end - 1] {
-                // A literal quote that runs on past a sentence end (within one speaker's words, see `matchEnd`)
-                // is matched on its first sentence only; the rest of the quote is ignored. Too short a start
-                // is no match.
-                end = sentenceRanges[wordSentence[start]].upperBound
-                quoteCount = end - start
-                guard quoteCount >= Self.minimumQuoteWords else { continue }
-            }
-            let range = start..<end
-            let distance = abs(utterances[wordUtterance[start]].startMs - time)
-            if distance < bestDistance {
-                bestDistance = distance
-                // A match with gaps or a cut one is never a whole utterance: it must not get round `quoteTooShort`.
-                best = Match(
-                    range: range,
-                    wholeUtterance: quoteCount == quote.count && range.count == quote.count && isWhole(range),
-                    quoteCount: quoteCount)
-            }
-        }
-        return best
-    }
-
-    /// The end (exclusive) of the transcript words matching `quote[index...]` after the word at `position`,
-    /// skipping at most `skips` words in all, or nil. A `literal` match may run over a sentence end but stays with
-    /// one speaker (`find` cuts it at the first sentence end); any other stays within one sentence.
-    private func matchEnd(_ quote: [String], index: Int, after position: Int, skips: Int, literal: Bool) -> Int? {
-        if index == quote.count { return position + 1 }
-        for gap in 0...skips {
-            let next = position + 1 + gap
-            guard next < words.count else { return nil }
-            if literal {
-                guard speaker(of: next) == speaker(of: position) else { return nil }
-            } else {
-                guard wordSentence[next] == wordSentence[position] else { return nil }
-            }
-            if gap > 0, !canSkip(position + gap, quote: quote) { return nil }
-            if NotesText.wordsMatch(words[next], quote[index]),
-                let end = matchEnd(quote, index: index + 1, after: next, skips: skips - gap, literal: literal)
-            {
-                return end
-            }
-        }
-        return nil
-    }
-
-    /// The kind of miss behind a quote that `find` did not place (measurement only; it runs for refused points).
-    /// Checked in this order: the quote's words in sequence across a change of speaker; one word that differs
-    /// in a stretch of the transcript of the quote's length; the words in order within one speaker's words with
-    /// more than `maxSkippedTranscriptWords` words in between; otherwise absent.
-    private func missKind(of quote: [String]) -> DropDetail {
-        guard quote.count >= 2, words.count >= quote.count else { return .quoteAbsent }
-        for start in 0...(words.count - quote.count) where NotesText.wordsMatch(words[start], quote[0]) {
-            var index = 1
-            while index < quote.count, NotesText.wordsMatch(words[start + index], quote[index]) { index += 1 }
-            if index == quote.count, speaker(of: start) != speaker(of: start + quote.count - 1) {
-                return .quoteSpeakerChange
-            }
-        }
-        if quote.count >= 3 {
-            for start in 0...(words.count - quote.count) {
-                let window = words[start..<(start + quote.count)]
-                let mismatches = zip(window, quote).filter { !NotesText.wordsMatch($0, $1) }.count
-                if mismatches == 1, wordSentence[start] == wordSentence[start + quote.count - 1] {
-                    return .quoteChangedWord
-                }
-            }
-        }
-        let reach = quote.count + 12
-        for start in words.indices where NotesText.wordsMatch(words[start], quote[0]) {
-            var position = start
-            var matched = 1
-            let limit = min(words.count, start + reach)
-            var next = start + 1
-            while matched < quote.count, next < limit, speaker(of: next) == speaker(of: start) {
-                if NotesText.wordsMatch(words[next], quote[matched]) {
-                    matched += 1
-                    position = next
-                }
-                next += 1
-            }
-            if matched == quote.count, position - start + 1 > quote.count { return .quoteOmittedWords }
-        }
-        return .quoteAbsent
-    }
-
-    /// The speaker's label (consecutive utterances of one speaker are one speaker).
-    private func speaker(of word: Int) -> String { utterances[wordUtterance[word]].speaker }
-
-    /// Whether the transcript word at `index` may be left out of a quote.
-    private func canSkip(_ index: Int, quote: [String]) -> Bool {
-        let word = words[index]
-        if Self.negations.contains(word) || NotesText.isNumberWord(word) { return false }
-        if word.contains(where: \.isNumber) { return false }
-        if capitalised[index], !quote.contains(where: { NotesText.wordsMatch($0, word) }) { return false }
-        return true
-    }
-
-    private func isWhole(_ range: Range<Int>) -> Bool {
-        let utterance = wordUtterance[range.lowerBound]
-        guard wordUtterance[range.upperBound - 1] == utterance else { return false }
-        return utteranceRanges[utterance] == range
     }
 
     // MARK: Person and date of a task
@@ -638,7 +417,7 @@ struct NotesGuard: Sendable {
     /// singular marker, no plural one) and the speaker's label is a real name.
     private func ownerFromSpeaker(_ range: Range<Int>, speaker: String) -> String? {
         guard !Self.isGenericLabel(speaker) else { return nil }
-        let quote = Array(words[range])
+        let quote = Array(index.words[range])
         let singular = quote.contains { Self.firstPersonWords.contains($0) && !Self.pluralWords.contains($0) }
         var pairSingular = false
         var plural = quote.contains { Self.pluralWords.contains($0) }
@@ -655,7 +434,7 @@ struct NotesGuard: Sendable {
     }
 
     private func hasFirstPersonMarker(_ range: Range<Int>) -> Bool {
-        let quote = Array(words[range])
+        let quote = Array(index.words[range])
         if quote.contains(where: { Self.firstPersonWords.contains($0) }) { return true }
         for index in quote.indices.dropLast() {
             if Self.firstPersonPairs.contains(where: { $0.0 == quote[index] && $0.1 == quote[index + 1] }) {
@@ -667,17 +446,20 @@ struct NotesGuard: Sendable {
 
     /// The person is a name that stands in the quote (capitalised in the transcript, not a function word). The
     /// speaker's label is accepted only when the quote is in the first person and the label is a real name.
-    private func checkedPerson(_ person: String?, match: Match, speaker: String) -> String? {
+    private func checkedPerson(_ person: String?, match: TranscriptQuoteIndex.Match, speaker: String) -> String? {
         guard let person = person.map(Self.plain), !person.isEmpty, !Self.isGenericLabel(person) else { return nil }
-        let candidates = match.range.filter { index in
-            capitalised[index] && words[index].count >= 3 && !Self.personStoplist.contains(words[index])
-                && (!startsSentence[index] || nameCandidates.containsName(words[index]))
+        let candidates = match.range.filter { word in
+            index.capitalised[word] && index.words[word].count >= 3
+                && !Self.personStoplist.contains(index.words[word])
+                && (!index.startsSentence[word] || nameCandidates.containsName(index.words[word]))
         }
         var kept: [String] = []
         for part in person.split(whereSeparator: \.isWhitespace) {
             let word = NotesText.words(String(part)).joined()
             guard word.count >= 3, !Self.personStoplist.contains(word) else { continue }
-            if candidates.contains(where: { NotesText.namesMatch(words[$0], word) }) { kept.append(String(part)) }
+            if candidates.contains(where: { NotesText.namesMatch(index.words[$0], word) }) {
+                kept.append(String(part))
+            }
         }
         if !kept.isEmpty { return kept.joined(separator: " ") }
 
@@ -814,7 +596,7 @@ struct NotesGuard: Sendable {
     /// The length of the meeting the limits use: `durationMs`, or the last utterance plus one minute (as
     /// `NotesFactGuard`) when it is missing or shorter than the transcript (a recording whose length was not saved).
     func meetingLength(_ durationMs: Int?) -> Int {
-        let lastUtterance = utterances.map(\.startMs).max() ?? 0
+        let lastUtterance = index.segments.map(\.startMs).max() ?? 0
         guard let durationMs, durationMs > lastUtterance else { return lastUtterance + 60_000 }
         return durationMs
     }
@@ -1052,13 +834,8 @@ struct NotesGuard: Sendable {
     }
 
     private static func hasNegation(_ words: [String]) -> Bool {
-        words.contains { negations.contains($0) }
+        words.contains { TranscriptQuoteIndex.negations.contains($0) }
     }
-
-    private static let negations: Set<String> = [
-        "nie", "nigdy", "nikt", "nic", "zaden", "zadna", "zadne", "not", "no", "never", "nobody", "nothing", "none",
-        "cannot", "without",
-    ]
 
     /// What a topic name is checked against: the vocabulary of the verified material and whether it has a negation.
     private struct TextMaterial {
@@ -1075,13 +852,13 @@ struct NotesGuard: Sendable {
                 numbers.append(contentsOf: NotesText.numberUnits(field) + NotesText.linkUnits(field))
             }
         }
-        for speaker in speakerNames {
+        for speaker in index.speakerNames {
             corpus.append(contentsOf: NotesText.words(speaker))
             numbers.append(contentsOf: NotesText.numberUnits(speaker))
         }
         return TextMaterial(
             vocabulary: Vocabulary(words: corpus, numbers: numbers),
-            hasNegation: corpus.contains(where: { Self.negations.contains($0) }))
+            hasNegation: corpus.contains(where: { TranscriptQuoteIndex.negations.contains($0) }))
     }
 
     /// The checks of a topic name, besides its length: it is in the language of the transcript, has a negation only
@@ -1092,7 +869,9 @@ struct NotesGuard: Sendable {
     private func textRefusal(_ text: String, material: TextMaterial, strictStart: Bool = true) -> TextRefusal? {
         let textLanguage = NotesLanguage.dominant(in: text)
         if language != .unknown, textLanguage != .unknown, textLanguage != language { return .languageChanged }
-        if NotesText.words(text).contains(where: { Self.negations.contains($0) }), !material.hasNegation {
+        if NotesText.words(text).contains(where: { TranscriptQuoteIndex.negations.contains($0) }),
+            !material.hasNegation
+        {
             return .negation
         }
         return Self.faithfulnessRefusal(text, vocabulary: material.vocabulary, strictStart: strictStart)

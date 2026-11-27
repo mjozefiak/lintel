@@ -55,7 +55,10 @@ import Testing
         try migrator.migrate(queue)
         #expect(
             try queue.read { try migrator.appliedIdentifiers($0) }
-                == ["v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash"])
+                == [
+                    "v1-meetings", "v2-consent", "v3-notes-provider", "v4-notes-awaiting-model", "v4-trash",
+                    "v5-speaker-names",
+                ])
 
         let store = MeetingsStore(database: queue)
         // Every value survived and every row is live.
@@ -79,11 +82,12 @@ import Testing
         #expect(try store.trashedCount() == 0)
     }
 
-    @Test func theMigrationIsRegisteredAfterEveryEarlierOne() {
+    @Test func theMigrationIsRegisteredAfterEveryEarlierOne() throws {
         let names = MeetingsStore.migrator.migrations
-        #expect(names.last == "v4-trash")
-        #expect(
-            names.firstIndex(of: "v4-notes-awaiting-model") == names.index(before: names.index(before: names.endIndex)))
+        let trash = try #require(names.firstIndex(of: "v4-trash"))
+        #expect(names.firstIndex(of: "v4-notes-awaiting-model") == names.index(before: trash))
+        // `v5-speaker-names` comes right after it.
+        #expect(names[names.index(after: trash)...].first == "v5-speaker-names")
     }
 
     /// The rollback note: an older build, whose migrator has never heard of `v4-trash`, opens the migrated database

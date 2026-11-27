@@ -30,6 +30,7 @@ public final class MeetingsPlugin: LintelPlugin {
     let settings: MeetingsSettings
     #if DEBUG
     private var qaHUD: MeetingHUDQA?
+    private var qaSpeakers: MeetingSpeakersQA?
     #endif
     let library: MeetingsLibrary
     /// True while a session records or processes; the session owner (step 1.10) calls `begin()` / `end()`.
@@ -192,6 +193,17 @@ public final class MeetingsPlugin: LintelPlugin {
         }
         #endif
         await library.openInBackground()
+        #if DEBUG
+        // `--qa-setting plugins.meetings.qaSpeakerNames=<state>`: a fixture meeting's window (docs/qa.md).
+        if let name = context.settings.string(MeetingSpeakersQA.settingName) {
+            let speakers = MeetingSpeakersQA()
+            if await speakers.show(named: name, library: library, pasteboard: context.pasteboard) {
+                qaSpeakers = speakers
+            } else {
+                context.logger.error("Unknown qaSpeakerNames state or no library")
+            }
+        }
+        #endif
         await notes.start()
         let detector = makeDetector()
         let workspace = context.workspace
@@ -238,6 +250,10 @@ public final class MeetingsPlugin: LintelPlugin {
         // The streams end when this method returns (the `defer` runs last), after the library is closed or
         // handed to a lingering session; a read that starts before that may still answer, a later one throws.
         defer { noteChanges.finishAll() }
+        #if DEBUG
+        qaSpeakers?.close()
+        qaSpeakers = nil
+        #endif
         // The window's recording ends with the plugin: `.idle` and finished streams, and a `start()` still
         // waiting for the HUD is answered. The `defer` runs last, so `shutDown()` below (which hides the HUD and
         // so answers a `start()` of an attempt that never registered) always comes first.

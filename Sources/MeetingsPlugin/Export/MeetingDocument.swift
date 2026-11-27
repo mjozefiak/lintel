@@ -9,6 +9,28 @@ struct MeetingDocument: Sendable, Equatable {
         var label: String
         var isSelf: Bool
         var channel: AudioChannel
+        /// Where the shown name came from and how sure the store is of it (`v5-speaker-names`); `nil` for a value
+        /// this build does not know. Only the window and the Notes source read them; the export never does.
+        var nameSource: NameSource? = .default
+        var nameStatus: SpeakerNameStatus? = .confirmed
+        /// The name waiting for the user's yes or no ("Marek?"); never part of the transcript or the notes.
+        var suggestedName: String? = nil
+
+        /// The suggestion to show: only while the row really waits for one, and only with visible text.
+        var pendingSuggestion: String? {
+            guard nameStatus == .suggested, let name = suggestedName.map(MeetingEdits.visible), !name.isEmpty
+            else { return nil }
+            return name
+        }
+
+        /// An automatic name the store is sure of (`applied`), shown without a mark.
+        var isAppliedName: Bool {
+            guard nameStatus == .applied else { return false }
+            switch nameSource {
+            case .platform, .calendar, .transcript: return true
+            case .user, .me, .default, nil: return false
+            }
+        }
     }
 
     struct Segment: Sendable, Equatable, Identifiable {
@@ -63,58 +85,67 @@ extension MeetingsStore {
     /// deleted unless `includingTrashed` (only the Notes source asks: a note in Recently deleted still has its
     /// content).
     func loadDocument(id: Int64, includingTrashed: Bool = false) throws -> MeetingDocument? {
-        try loadDocument(where: "id = ?", argument: id, includingTrashed: includingTrashed)
+        try read { db in try Self.loadDocument(id: id, includingTrashed: includingTrashed, in: db) }
     }
 
     /// The same by the meeting's public `uuid` (the Notes workspace's key `meetings:<uuid>`).
     func loadDocument(uuid: String, includingTrashed: Bool = false) throws -> MeetingDocument? {
-        try loadDocument(where: "uuid = ?", argument: uuid, includingTrashed: includingTrashed)
+        try read { db in
+            try Self.loadDocument(where: "uuid = ?", argument: uuid, includingTrashed: includingTrashed, in: db)
+        }
     }
 
-    private func loadDocument(where condition: String, argument: any DatabaseValueConvertible, includingTrashed: Bool)
-        throws -> MeetingDocument?
-    {
-        try read { db in
-            guard
-                let row = try Row.fetchOne(
-                    db,
-                    sql: "SELECT * FROM meeting WHERE \(condition)\(includingTrashed ? "" : " AND deleted_at IS NULL")",
-                    arguments: [argument])
-            else {
-                return nil
-            }
-            let id: Int64 = row["id"]
-            let speakers = try Row.fetchAll(
-                db, sql: "SELECT * FROM meeting_speaker WHERE meeting_id = ? ORDER BY id", arguments: [id]
-            ).map { row in
-                MeetingDocument.Speaker(
-                    id: row["id"], label: row["label"], isSelf: (row["is_self"] as Int) != 0,
-                    channel: AudioChannel(rawValue: row["source_channel"]) ?? .mic)
-            }
-            let segments = try Row.fetchAll(
-                db, sql: "SELECT * FROM meeting_segment WHERE meeting_id = ? ORDER BY start_ms, id", arguments: [id]
-            ).map { row in
-                MeetingDocument.Segment(
-                    id: row["id"], channel: AudioChannel(rawValue: row["channel"]) ?? .mic,
-                    startMs: row["start_ms"], endMs: row["end_ms"], speakerID: row["speaker_id"],
-                    text: row["text"])
-            }
-            return MeetingDocument(
-                id: id, uuid: row["uuid"], startedAt: Date(timeIntervalSince1970: row["started_at"]),
-                durationMs: row["duration_ms"], title: row["title"],
-                status: MeetingStatus(rawValue: row["status"]) ?? .failed,
-                speakerMode: SpeakerMode(rawValue: row["speaker_mode"]) ?? .none,
-                audioState: AudioState(rawValue: row["audio_state"]) ?? .deleted,
-                notesMarkdown: row["notes_markdown"],
-                notesStatus: NotesStatus(rawValue: row["notes_status"]) ?? .none,
-                notesDroppedCount: row["notes_dropped_count"], speakers: speakers, segments: segments,
-                speechModelID: row["speech_model_id"],
-                consentTextCopiedAt: (row["consent_text_copied_at"] as Int64?).map {
-                    Date(timeIntervalSince1970: TimeInterval($0))
-                },
-                notesProvider: row["notes_provider"], notesProviderModel: row["notes_provider_model"],
-                deletedAt: (row["deleted_at"] as Double?).map(TrashStamp.date(column:)))
+    /// The meeting by id inside a caller's transaction (`resolveSpeakerNames` reads it together with the speakers,
+    /// their names and their evidence, so no other write can land between them).
+    static func loadDocument(id: Int64, includingTrashed: Bool, in db: Database) throws -> MeetingDocument? {
+        try loadDocument(where: "id = ?", argument: id, includingTrashed: includingTrashed, in: db)
+    }
+
+    private static func loadDocument(
+        where condition: String, argument: any DatabaseValueConvertible, includingTrashed: Bool, in db: Database
+    ) throws -> MeetingDocument? {
+        guard
+            let row = try Row.fetchOne(
+                db,
+                sql: "SELECT * FROM meeting WHERE \(condition)\(includingTrashed ? "" : " AND deleted_at IS NULL")",
+                arguments: [argument])
+        else {
+            return nil
         }
+        let id: Int64 = row["id"]
+        let speakers = try Row.fetchAll(
+            db, sql: "SELECT * FROM meeting_speaker WHERE meeting_id = ? ORDER BY id", arguments: [id]
+        ).map { row in
+            MeetingDocument.Speaker(
+                id: row["id"], label: row["label"], isSelf: (row["is_self"] as Int) != 0,
+                channel: AudioChannel(rawValue: row["source_channel"]) ?? .mic,
+                nameSource: (row["name_source"] as String?).flatMap(NameSource.init(rawValue:)),
+                nameStatus: (row["name_status"] as String?).flatMap(SpeakerNameStatus.init(rawValue:)),
+                suggestedName: row["suggested_name"])
+        }
+        let segments = try Row.fetchAll(
+            db, sql: "SELECT * FROM meeting_segment WHERE meeting_id = ? ORDER BY start_ms, id", arguments: [id]
+        ).map { row in
+            MeetingDocument.Segment(
+                id: row["id"], channel: AudioChannel(rawValue: row["channel"]) ?? .mic,
+                startMs: row["start_ms"], endMs: row["end_ms"], speakerID: row["speaker_id"],
+                text: row["text"])
+        }
+        return MeetingDocument(
+            id: id, uuid: row["uuid"], startedAt: Date(timeIntervalSince1970: row["started_at"]),
+            durationMs: row["duration_ms"], title: row["title"],
+            status: MeetingStatus(rawValue: row["status"]) ?? .failed,
+            speakerMode: SpeakerMode(rawValue: row["speaker_mode"]) ?? .none,
+            audioState: AudioState(rawValue: row["audio_state"]) ?? .deleted,
+            notesMarkdown: row["notes_markdown"],
+            notesStatus: NotesStatus(rawValue: row["notes_status"]) ?? .none,
+            notesDroppedCount: row["notes_dropped_count"], speakers: speakers, segments: segments,
+            speechModelID: row["speech_model_id"],
+            consentTextCopiedAt: (row["consent_text_copied_at"] as Int64?).map {
+                Date(timeIntervalSince1970: TimeInterval($0))
+            },
+            notesProvider: row["notes_provider"], notesProviderModel: row["notes_provider_model"],
+            deletedAt: (row["deleted_at"] as Double?).map(TrashStamp.date(column:)))
     }
 
     /// Sets the title of a meeting; a blank title (also one of invisible characters only) clears it (the

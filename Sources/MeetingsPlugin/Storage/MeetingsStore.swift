@@ -274,7 +274,66 @@ final class MeetingsStore: Sendable {
             try db.execute(
                 sql: "CREATE INDEX meeting_deleted ON meeting(deleted_at) WHERE deleted_at IS NOT NULL")
         }
+        // Speaker names (spec `2026-11-25-meeting-speaker-names`, Data Model): where each speaker's name came from
+        // (`NameSource`), how sure it is (`SpeakerNameStatus`), a waiting suggestion and the names the user refused
+        // for this cluster (a JSON array of strings), plus the evidence the names were resolved from. The evidence
+        // points at a segment and never copies its text. Existing rows only get the new columns; `label` and
+        // `is_self` stay. Additive only: an older build never names the columns or the table and loses nothing.
+        migrator.registerMigration("v5-speaker-names") { db in
+            try db.execute(
+                sql: """
+                    ALTER TABLE meeting_speaker ADD COLUMN name_source TEXT NOT NULL DEFAULT 'default';
+                    ALTER TABLE meeting_speaker ADD COLUMN name_status TEXT NOT NULL DEFAULT 'confirmed';
+                    ALTER TABLE meeting_speaker ADD COLUMN suggested_name TEXT;
+                    ALTER TABLE meeting_speaker ADD COLUMN rejected_names TEXT;
+                    CREATE TABLE meeting_name_evidence (
+                        id INTEGER PRIMARY KEY,
+                        meeting_id INTEGER NOT NULL REFERENCES meeting(id) ON DELETE CASCADE,
+                        speaker_id INTEGER REFERENCES meeting_speaker(id) ON DELETE SET NULL,
+                        source TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        kind TEXT,
+                        segment_id INTEGER REFERENCES meeting_segment(id) ON DELETE SET NULL,
+                        start_ms INTEGER,
+                        end_ms INTEGER,
+                        strength REAL NOT NULL
+                    );
+                    CREATE INDEX meeting_name_evidence_on_meeting_id ON meeting_name_evidence(meeting_id);
+                    """
+            )
+            // The backfill, in this order: the user's own speaker (`is_self = 1`) is `self`; every speaker of a
+            // `channels` meeting is a track, not a person, and is `default`; a generic label is `default`;
+            // anything else is a name the user typed and is `user`. The generic labels are FROZEN here, written
+            // out instead of read from `SpeakerLabels` or `NotesGuard.isGenericLabel` (a test compares them with
+            // `SpeakerLabels`; a new default label needs a NEW migration):
+            // - the labels the code writes: "Ja" (`SpeakerLabels.me`), "Inni" (`SpeakerLabels.others`) and
+            //   "Mówca N" (`SpeakerLabels.numbered`), the same in every language (the labels are data, not UI);
+            // - the spec's other generic forms "Rozmówca N" and "Speaker N";
+            // each exactly as written (case and spaces count), alone or followed by one space and digits only.
+            try db.execute(
+                sql: """
+                    UPDATE meeting_speaker SET name_source = CASE
+                        WHEN is_self = 1 THEN 'self'
+                        WHEN meeting_id IN (SELECT id FROM meeting WHERE speaker_mode = 'channels') THEN 'default'
+                        WHEN \(frozenGenericLabelSQL("label")) THEN 'default'
+                        ELSE 'user'
+                    END
+                    """)
+        }
         return migrator
+    }
+
+    /// The frozen test of migration `v5-speaker-names` for a generic speaker label: one of the words below, alone
+    /// or followed by one space and digits only. Never edit; a new default label needs a new migration.
+    static func frozenGenericLabelSQL(_ expression: String) -> String {
+        let words: [(word: String, digitsFrom: Int)] = [
+            ("Ja", 4), ("Inni", 6), ("Mówca", 7), ("Rozmówca", 10), ("Speaker", 9),
+        ]
+        let numbered = words.map { word, digitsFrom in
+            "(\(expression) GLOB '\(word) [0-9]*' AND substr(\(expression), \(digitsFrom)) NOT GLOB '*[^0-9]*')"
+        }
+        let plain = words.map { "'\($0.word)'" }.joined(separator: ", ")
+        return "(\(expression) IN (\(plain)) OR " + numbered.joined(separator: " OR ") + ")"
     }
 }
 
@@ -300,12 +359,20 @@ extension MeetingsStore {
         }
     }
 
+    /// Adds a speaker. The user's own speaker gets `name_source = self`, any other one `default` (the column's
+    /// default), like the backfill of `v5-speaker-names`.
     @discardableResult
     func insertSpeaker(meetingID: Int64, label: String, isSelf: Bool, channel: AudioChannel) throws -> Int64 {
         try write { db in
             try db.execute(
-                sql: "INSERT INTO meeting_speaker (meeting_id, label, is_self, source_channel) VALUES (?, ?, ?, ?)",
-                arguments: [meetingID, label, isSelf, channel.rawValue])
+                sql: """
+                    INSERT INTO meeting_speaker (meeting_id, label, is_self, source_channel, name_source)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    meetingID, label, isSelf, channel.rawValue,
+                    (isSelf ? NameSource.me : NameSource.default).rawValue,
+                ])
             return db.lastInsertedRowID
         }
     }
@@ -380,11 +447,18 @@ extension MeetingsStore {
         }
     }
 
-    /// Renames a speaker. The notes of the meeting become `stale` when there are notes or they are being written
-    /// for the first time (`running`, no text yet); the job then stores its text as `stale`.
+    /// Renames a speaker. The name is the user's from now on (`name_source = user`, `confirmed`, the suggestion
+    /// cleared; a resolution never overwrites it). The notes of the meeting become `stale` when there are notes or
+    /// they are being written for the first time (`running`, no text yet); the job then stores its text as `stale`.
     func renameSpeaker(_ id: Int64, label: String) throws {
         try write { db in
-            try db.execute(sql: "UPDATE meeting_speaker SET label = ? WHERE id = ?", arguments: [label, id])
+            try db.execute(
+                sql: """
+                    UPDATE meeting_speaker
+                    SET label = ?, name_source = 'user', name_status = 'confirmed', suggested_name = NULL
+                    WHERE id = ?
+                    """,
+                arguments: [label, id])
             try db.execute(
                 sql: """
                     UPDATE meeting SET notes_status = 'stale'

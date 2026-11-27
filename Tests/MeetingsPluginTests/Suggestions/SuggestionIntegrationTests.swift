@@ -339,7 +339,15 @@ import Testing
             "CGEvent.tapCreate", "makeShortcutRecorder",
         ]
         for (name, text) in try sourceFiles() where name != "MeetingsPlugin+Settings.swift" {
-            let source = code(text)
+            var source = code(text)
+            // The two local keys of the meeting window (speaker names, step 1.6): Return on a focused name
+            // suggestion confirms it, and Esc is the merge question's Cancel while that question is shown (QA of
+            // #352, m2). Both live only in the meeting window while it is key, never globally.
+            if name == "MeetingSpeakersList.swift" {
+                source = source.replacingOccurrences(of: ".onKeyPress(.return) {", with: "")
+                #expect(source.components(separatedBy: ".keyboardShortcut(.cancelAction)").count == 2)
+                source = source.replacingOccurrences(of: ".keyboardShortcut(.cancelAction)", with: "")
+            }
             for word in forbidden {
                 #expect(!source.contains(word), "\(name) mentions \(word)")
             }
