@@ -50,6 +50,27 @@ import Testing
         return try r.store.headRevision(of: document.id)
     }
 
+    private var elsewhere: NoteItemID { .live(NoteKey(pluginID: "meetings", id: "elsewhere")) }
+
+    /// The meeting chosen again after another note, with its My notes tab on screen: a new document and a new pad.
+    private func comeBack(_ r: ReconRig, _ model: NotesWorkspaceModel) async throws -> MyNotesPad {
+        let id = NoteItemID.live(r.key)
+        model.select(row: id)
+        await model.loadPreview(id)
+        model.selectPreviewTab(.mine)
+        return try #require(model.previewDocument?.myNotes)
+    }
+
+    private func setReadOnly(_ r: ReconRig, _ on: Bool) {
+        r.rig.harness.settingsStore.setValue(.bool(on), forKey: "plugins.notes.readOnly")
+    }
+
+    /// Fires the writer's retry of a failed write (2 s on the manual clock).
+    private func fireRetry(_ r: ReconRig) async {
+        await waitUntil { r.rig.clock.sleeperCount > 0 }
+        r.rig.clock.advance(by: .seconds(2))
+    }
+
     @Test func theEmptyPadCreatesNothingAndTheFirstCharacterWritesTheUsersText() async throws {
         let r = try ReconRig()
         let opens = Opens()
@@ -181,19 +202,139 @@ import Testing
         #expect(model.previewDocument?.myNotes === pad)
     }
 
-    @Test func aRevisionOfTheNotesNeverTouchesMyNotes() async throws {
+    // MARK: Coming back after a failed or running save (review M1)
+
+    @Test func afterAFailedSaveComingBackShowsTheUnsavedTextAndTheNextKeystrokeKeepsIt() async throws {
         let r = try ReconRig()
         let model = model(r)
         let pad = try await showMine(r, model)
-        type(pad, "my own line")
+        try r.store.close()
+        type(pad, "unsaved words")
         await pad.flush()
-        let before = try #require(try mine(r))
-        // The notes layer gets a new agent revision (what a revise run writes); My notes keeps its head.
-        let notes = try r.rig.seededDocument(r.rig.layer("Ship it.", id: "notes", version: "n1"))
-        let writer = r.rig.writer(.existing(docID: notes.id))
-        let head = try #require(try r.store.headRevision(of: notes.id))
-        _ = try await writer.appendApplied(author: .agent, body: "Ship it on Friday.", expectingHead: head.id)
-        let after = try #require(try mine(r))
-        #expect(after.id == before.id && after.body == "my own line" && after.author == "human")
+        #expect(pad.saveFailed)
+        // Another note: the close's flush fails again and the writer lingers with the text.
+        model.select(row: elsewhere)
+        await model.awaitMyNotesRelease(r.key)
+        let again = try await comeBack(r, model)
+        #expect(again !== pad)
+        let writer = try #require(again.session?.writer)
+        #expect(writer === pad.session?.writer)
+        #expect(writer.hasPendingText)
+        // The pad shows the text the writer still holds, says it is not saved, and typing extends it.
+        #expect(again.text == "unsaved words")
+        #expect(again.saveFailed)
+        #expect(again.isSaving)
+        type(again, "unsaved words, and more")
+        #expect(writer.latestText == "unsaved words, and more")
+    }
+
+    @Test func whenTheRetryLandsAfterComingBackThePadKeepsTheTextItWrote() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        let pad = try await showMine(r, model)
+        type(pad, "first")
+        await pad.flush()
+        #expect(try mine(r)?.body == "first")
+        type(pad, "first, then unsaved")
+        setReadOnly(r, true)
+        await pad.flush()
+        #expect(pad.saveFailed)
+        model.select(row: elsewhere)
+        await model.awaitMyNotesRelease(r.key)
+        setReadOnly(r, false)
+        // The heads are read before the retry: the store still says "first".
+        let again = try await comeBack(r, model)
+        #expect(again.text == "first, then unsaved")
+        await fireRetry(r)
+        await waitUntil { !again.isSaving && !again.saveFailed }
+        #expect(try mine(r)?.body == "first, then unsaved")
+        type(again, "first, then unsaved, then typed")
+        await again.flush()
+        #expect(try mine(r)?.body == "first, then unsaved, then typed")
+    }
+
+    @Test func whenTheRetryLandsBeforeComingBackThePadShowsTheWrittenText() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        let pad = try await showMine(r, model)
+        type(pad, "written while away")
+        setReadOnly(r, true)
+        await pad.flush()
+        model.select(row: elsewhere)
+        await model.awaitMyNotesRelease(r.key)
+        setReadOnly(r, false)
+        await fireRetry(r)
+        await waitUntil { !pad.saveFailed }
+        #expect(try mine(r)?.body == "written while away")
+        let again = try await comeBack(r, model)
+        #expect(again.text == "written while away")
+        #expect(!again.saveFailed && !again.isSaving)
+        type(again, "written while away!")
+        await again.flush()
+        #expect(try mine(r)?.body == "written while away!")
+    }
+
+    @Test func comingBackWhileTheCloseStillWritesShowsTheTypedText() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        let pad = try await showMine(r, model)
+        type(pad, "quick")
+        // Back at once, while the close's write may still run: the read waits for it, and the pad shows the text.
+        model.select(row: elsewhere)
+        let again = try await comeBack(r, model)
+        #expect(again.text == "quick")
+        type(again, "quick!")
+        await again.flush()
+        #expect(try mine(r)?.body == "quick!")
+    }
+
+    // MARK: Read-only and Try Now (review m2)
+
+    @Test func notesReadOnlyBlocksThePadThroughItsSession() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        setReadOnly(r, true)
+        let pad = try await showMine(r, model)
+        let session = try #require(pad.session)
+        #expect(session.block == .readOnly)
+        #expect(pad.readOnlyReason == .readOnly)
+        type(pad, "x")
+        #expect(pad.text.isEmpty)
+        await pad.flush()
+        #expect(try mine(r) == nil)
+    }
+
+    @Test func notesReadOnlyTurnedOnWhileThePadIsOpenStopsTypingAndOffLetsItAgain() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        let pad = try await showMine(r, model)
+        #expect(pad.isEditable)
+        setReadOnly(r, true)
+        #expect(pad.readOnlyReason == .readOnly)
+        type(pad, "ignored")
+        #expect(pad.text.isEmpty)
+        setReadOnly(r, false)
+        #expect(pad.isEditable)
+        type(pad, "allowed again")
+        await pad.flush()
+        #expect(try mine(r)?.body == "allowed again")
+    }
+
+    @Test func tryNowAfterAFailureWritesTheTextAndTheStripGoes() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        let pad = try await showMine(r, model)
+        type(pad, "kept for Try Now")
+        setReadOnly(r, true)
+        await pad.flush()
+        await waitUntil { pad.saveFailed }
+        #expect(pad.isSaving)
+        setReadOnly(r, false)
+        let document = try #require(model.previewDocument)
+        await model.retryMyNotes(document)
+        await waitUntil { !pad.saveFailed }
+        #expect(!pad.isSaving)
+        #expect(pad.text == "kept for Try Now")
+        #expect(try mine(r)?.body == "kept for Try Now")
     }
 }

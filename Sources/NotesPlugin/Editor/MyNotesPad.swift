@@ -35,6 +35,8 @@ final class MyNotesPad {
         self.text = text
         self.session = session
         fixedReason = readOnlyReason
+        // A writer that outlived an earlier pad (a failed write lingers in the registry) still holds the text.
+        isSaving = session?.writer.hasPendingText ?? false
         session?.writer.setWrittenHandler { [weak self] in
             Task { @MainActor in self?.writtenAll() }
         }

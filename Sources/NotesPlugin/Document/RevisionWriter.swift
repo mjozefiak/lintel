@@ -77,6 +77,8 @@ final class RevisionWriter: Sendable {
 
     private struct Pending {
         var text: String?
+        /// The newest text `submit` was given: buffered, being written or written. Kept after the write.
+        var latest: String?
         var serial = 0
         var debounce: Task<Void, Never>?
         var idle: Task<Void, Never>?
@@ -135,6 +137,14 @@ final class RevisionWriter: Sendable {
     /// `true` while typed text waits for the next write.
     var hasPendingText: Bool { pending.withLock { $0.text != nil } }
 
+    /// The newest text typed into this writer, whether it still waits, is being written or was written; `nil`
+    /// before the first `submit`. A view made again for a document whose writer outlived it (a failed write that
+    /// lingers in the registry, a write still running) shows this instead of a head read from the store, which can
+    /// be older: the next keystroke would otherwise replace the unsaved text. Only typing sets it, so it is the
+    /// document's text only where nothing else moves the head (My notes); Restore, Apply and a reconciliation do not
+    /// change it.
+    var latestText: String? { pending.withLock { $0.latest } }
+
     /// Stops a document whose recording was detached before it had a row: it can never seed (its snapshot belongs
     /// to a recording that is gone), so a later flush throws instead of writing against the wrong note.
     func retire() { pending.withLock { $0.retired = true } }
@@ -145,6 +155,7 @@ final class RevisionWriter: Sendable {
         let tasks = pending.withLock { state -> [Task<Void, Never>?] in
             let all = [state.debounce, state.idle, state.maxWait, state.retry]
             state.text = nil
+            state.latest = nil
             state.debounce = nil
             state.idle = nil
             state.maxWait = nil
@@ -168,6 +179,7 @@ final class RevisionWriter: Sendable {
         let old = pending.withLock { state -> Task<Void, Never>? in
             let old = state.debounce
             state.text = text
+            state.latest = text
             state.serial += 1
             state.debounce = timer
             // The max-wait timer runs from the first unsaved keystroke and is not restarted by later ones.

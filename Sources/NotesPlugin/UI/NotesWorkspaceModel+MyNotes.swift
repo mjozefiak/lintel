@@ -11,14 +11,18 @@ extension NotesWorkspaceModel {
         guard document.myNotes == nil, document.phase == .loaded, Self.isMeeting(document), !document.isManual,
             let content = document.content
         else { return }
-        let text = document.mineMarkdown ?? ""
+        let stored = document.mineMarkdown ?? ""
         switch document.id {
         case .detached:
-            document.myNotes = MyNotesPad(text: text, session: nil, readOnlyReason: .recordingRemoved)
+            document.myNotes = MyNotesPad(text: stored, session: nil, readOnlyReason: .recordingRemoved)
         case .live:
             let session = environment.makeMineSession(content)
             let reason: MyNotesPad.ReadOnlyReason? =
                 session == nil ? (environment.notesReadOnly ? .readOnly : .unavailable) : nil
+            // Only the user writes `mine`, and only through the registry's one writer, so a writer that outlived
+            // the last pad (its write failed and lingers, or a retry landed after the heads were read) knows the
+            // newest text; the stored head can be older, and the next keystroke would replace the unsaved text.
+            let text = session?.writer.latestText ?? stored
             document.myNotes = MyNotesPad(text: text, session: session, readOnlyReason: reason)
         }
     }
@@ -36,14 +40,29 @@ extension NotesWorkspaceModel {
     }
 
     /// The note left the screen: what is typed is written and the writer is let go.
+    /// The release is remembered until it ends, so a read of the same note waits for it (`awaitMyNotesRelease`):
+    /// heads read while its write still runs would be older than what was typed.
     func closeMyNotes(_ document: NoteDocumentModel) {
         guard let pad = document.myNotes, case .live(let key) = document.id else { return }
         document.myNotes = nil
         let release = environment.releaseWriter
-        Task {
+        let previous = myNotesReleases[key]
+        let token = UUID()
+        let task = Task {
+            await previous?.task.value
             await pad.flush(closingSession: true)
             await release(.live(key, layer: NotesStore.mineLayer))
         }
+        myNotesReleases[key] = (token, task)
+        Task {
+            await task.value
+            if myNotesReleases[key]?.token == token { myNotesReleases[key] = nil }
+        }
+    }
+
+    /// Waits until a note's My notes, closed when it left the screen, is written and its writer let go.
+    func awaitMyNotesRelease(_ key: NoteKey) async {
+        await myNotesReleases[key]?.task.value
     }
 
     /// The full window's "My notes" segment. The editor of a layer ends first (it writes what is typed).
