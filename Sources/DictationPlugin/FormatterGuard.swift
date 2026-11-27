@@ -19,6 +19,10 @@ enum FormatterGuard {
         case newNumber
         /// The output has letters of a script the transcript does not (a Cyrillic word in a Polish sentence).
         case foreignScript
+        /// Full only: the output opens with a greeting or ends with a sign-off the speaker did not say.
+        case inventedLayout
+        /// Full only: a number the transcript holds is gone from the output (a dropped sentence or detail).
+        case lostNumber
     }
 
     /// The output may hold 0.6 to 1.15 times the input's words when the speaker said something that may go
@@ -32,7 +36,22 @@ enum FormatterGuard {
     /// With nothing to remove the output keeps nearly all the words: dropping a detail is a loss.
     static let plainLengthRange = 0.85...1.15
 
+    /// Full's plain range (spec phase 2): wide enough for the style edits (a doubled phrase, a joining word at a
+    /// sentence split). It contains Standard's, so a chunk Standard accepts for its length is never rejected at Full.
+    /// The spec's 0.6 was tightened to 0.7 from the eval: the accepted plain chunks of the owner's corpus and FLEURS PL/EN
+    /// (Full prompt v1, 2026-11-26) never went below 0.77, so 0.6 only let a dropped sentence through; the number,
+    /// language and invention checks carry the rest of the fidelity.
+    static let fullPlainLengthRange = 0.7...1.15
+
+    /// Standard's check. Kept for every caller that has no level.
     static func check(input: String, output rawOutput: String) -> Verdict {
+        check(input: input, output: rawOutput, level: .standard)
+    }
+
+    /// - Parameter level: `.full` adds the invented greeting/sign-off check, the lost-number check and the wider plain
+    ///   length range; every other level is Standard's check unchanged. Light has no model and never calls this.
+    static func check(input: String, output rawOutput: String, level: DictationSettings.CleanupLevel) -> Verdict {
+        let isFull = level == .full
         let output = clean(rawOutput)
         guard !output.isEmpty else { return .rejected(.empty) }
 
@@ -44,6 +63,16 @@ enum FormatterGuard {
         if !SpokenNumbers.newNumbers(in: withoutListMarkers(output), comparedTo: input).isEmpty {
             return .rejected(.newNumber)
         }
+        let kind = Removals.kind(of: input)
+        if isFull {
+            if InventedLayout.adds(to: input, in: output) { return .rejected(.inventedLayout) }
+            // A self-correction withdraws a number on purpose, so only the other chunks must keep every number.
+            if kind != .correction,
+                !SpokenNumbers.lostNumbers(in: output, comparedTo: input).isEmpty
+            {
+                return .rejected(.lostNumber)
+            }
+        }
 
         // A spoken number counts as one word and a list marker as none: "dwadzieścia pięć tysięcy" becomes
         // "25 000" and "po pierwsze" becomes "1.".
@@ -52,10 +81,13 @@ enum FormatterGuard {
         // Converting numbers reshapes a sentence ("procent" becomes "%"), so a chunk with spoken numbers gets the
         // wide range too: the number check above is what protects its details.
         let range: ClosedRange<Double>
-        switch Removals.kind(of: input) {
+        switch kind {
         case .correction: range = correctionLengthRange
         case .minor: range = lengthRange
-        case .none: range = SpokenNumbers.containsNumberWord(input) ? lengthRange : plainLengthRange
+        case .none:
+            range =
+                SpokenNumbers.containsNumberWord(input)
+                ? lengthRange : (isFull ? fullPlainLengthRange : plainLengthRange)
         }
         // A very short chunk can lose a filler word and so fall under the ratio by itself.
         if inputWords >= 5 {
@@ -136,6 +168,46 @@ enum FormatterGuard {
         return answerOpenings.contains {
             lower.hasPrefix($0) && !spoken.contains($0.trimmingCharacters(in: .punctuationCharacters))
         }
+    }
+}
+
+/// Full's check against content the speaker did not say: a greeting at the top or a sign-off at the bottom of the
+/// output that the transcript does not hold. Layout of a greeting the speaker said is welcome; writing one is not
+/// (spec invariant 2). Words are compared without diacritics and case, so "Cześć" matches "cześć".
+enum InventedLayout {
+    private static let greetings: [[String]] = [
+        ["czesc"], ["witam"], ["witaj"], ["hej"], ["dzien", "dobry"], ["dobry", "wieczor"], ["szanowni"],
+        ["szanowny"], ["szanowna"], ["hello"], ["hi"], ["hey"], ["dear"], ["good", "morning"], ["good", "afternoon"],
+        ["good", "evening"],
+    ]
+    private static let signOffs: [[String]] = [
+        ["pozdrawiam"], ["z", "powazaniem"], ["z", "wyrazami", "szacunku"], ["dziekuje"], ["dzieki"],
+        ["do", "uslyszenia"],
+        ["best", "regards"], ["kind", "regards"], ["regards"], ["sincerely"], ["thanks"], ["thank", "you"],
+        ["cheers"], ["yours"], ["talk", "soon"], ["best"],
+    ]
+
+    /// Whether the output's first line holds a greeting, or one of its last two lines a sign-off, that the input lacks.
+    static func adds(to input: String, in output: String) -> Bool {
+        let spoken = tokens(input)
+        let lines = output.split(whereSeparator: \.isNewline).map { tokens(String($0)) }.filter { !$0.isEmpty }
+        guard let first = lines.first else { return false }
+        if greetings.contains(where: { contains(first, $0) && !contains(spoken, $0) }) { return true }
+        // A single line is the greeting's line only when it also has a body; a one-line text is judged as a first line.
+        return lines.suffix(2).contains { line in signOffs.contains { contains(line, $0) && !contains(spoken, $0) } }
+    }
+
+    private static func tokens(_ text: String) -> [String] {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+            .split { !$0.isLetter && !$0.isNumber }.map(String.init)
+    }
+
+    private static func contains(_ tokens: [String], _ phrase: [String]) -> Bool {
+        guard tokens.count >= phrase.count else { return false }
+        for start in 0...(tokens.count - phrase.count) where Array(tokens[start..<start + phrase.count]) == phrase {
+            return true
+        }
+        return false
     }
 }
 

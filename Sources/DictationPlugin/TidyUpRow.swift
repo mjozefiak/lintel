@@ -20,6 +20,8 @@ enum TidyUpText {
         case .off: Text("Off", comment: "Settings → Dictation, Tidy up my text: the text is pasted as spoken")
         case .light: Text("Light", comment: "Settings → Dictation, Tidy up my text: only filler words are removed")
         case .standard: Text("Standard", comment: "Settings → Dictation, Tidy up my text: corrections and lists")
+        case .full:
+            Text("Full", comment: "Settings → Dictation, Tidy up my text: layout, paragraphs and a smoother style")
         }
     }
 
@@ -37,7 +39,18 @@ enum TidyUpText {
             Text(
                 "Also keeps only your corrections and turns spoken lists into lists.",
                 comment: "Settings → Dictation: help under Tidy up my text at the Standard level")
+        case .full:
+            Text(
+                "Also lays out emails and long texts and smooths the style. Numbers and names stay.",
+                comment: "Settings → Dictation: help under Tidy up my text at the Full level")
         }
+    }
+
+    /// The line under Full's help while the built-in model is the smallest one (spec A6).
+    static var smallModelHint: Text {
+        Text(
+            "Works best with the Recommended assistant.",
+            comment: "Settings → Dictation: under Tidy up my text at Full, shown with the smallest built-in model")
     }
 
     /// The example line of a value; `nil` for Off, which changes nothing. Read from the language of the process.
@@ -61,13 +74,24 @@ enum TidyUpText {
                 after: String(
                     localized: "The meeting is on Wednesday.",
                     comment: "Settings → Dictation: the Standard example after tidying"))
+        case .full:
+            // "⏎" stands for a line break, so the example fits two lines; the pasted text has real ones.
+            return Example(
+                before: String(
+                    localized: "Hi Anna, the report is ready. We still need to talk about the budget. Thanks, Tom",
+                    comment: "Settings → Dictation: invented sentence as dictated, Full example"),
+                after: String(
+                    localized:
+                        "Hi Anna,⏎⏎The report is ready.⏎⏎We still need to talk about the budget.⏎⏎Thanks,⏎Tom",
+                    comment: "Settings → Dictation: the Full example after tidying; ⏎ marks a line break"))
         }
     }
 
     /// What VoiceOver reads for an example: one element, with the arrow said as "becomes".
     static func spokenExample(_ example: Example) -> String {
-        String(
-            localized: "Example: \(example.before) becomes \(example.after)",
+        let after = example.after.replacingOccurrences(of: "⏎⏎", with: " ").replacingOccurrences(of: "⏎", with: " ")
+        return String(
+            localized: "Example: \(example.before) becomes \(after)",
             comment: "Settings → Dictation: VoiceOver text of the example under Tidy up my text")
     }
 }
@@ -76,17 +100,24 @@ enum TidyUpText {
 /// Used by the Dictation pane and drawn alone by the gallery.
 struct TidyUpRow: View {
     @Binding var choice: FormattingSettingsModel.TidyChoice
+    /// The values the popup lists (Full only while it is offered).
+    var choices: [FormattingSettingsModel.TidyChoice] = FormattingSettingsModel.TidyChoice.allCases
+    /// Whether the line "Works best with the Recommended assistant." shows (Full on the smallest built-in model).
+    var showsSmallModelHint = false
     @Environment(\.lintelTextSize) private var textSize
 
     var body: some View {
         MenuPicker(selection: $choice, title: TidyUpText.title) {
-            ForEach(FormattingSettingsModel.TidyChoice.allCases, id: \.self) { value in
+            ForEach(choices, id: \.self) { value in
                 TidyUpText.name(value).font(textSize.font(.body)).tag(value)
             }
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 TidyUpText.title.font(textSize.font(.body))
                 TidyUpText.help(choice).font(textSize.font(.callout)).foregroundStyle(LintelBrand.secondaryText)
+                if showsSmallModelHint {
+                    TidyUpText.smallModelHint.font(textSize.font(.callout)).foregroundStyle(LintelBrand.secondaryText)
+                }
                 if let example = TidyUpText.example(choice) {
                     TidyUpExample(example: example).padding(.top, 2)
                 }
