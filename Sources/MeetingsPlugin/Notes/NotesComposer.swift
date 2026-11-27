@@ -80,6 +80,13 @@ enum NotesComposer {
     static func shownKeyPoints(
         of verdict: NotesGuard.ReduceVerdict, labels: Labels, durationMs: Int?
     ) -> [NotesGuard.ReduceVerdict.Topic] {
+        arrangement(of: verdict, labels: labels, durationMs: durationMs).topics
+    }
+
+    /// `shownKeyPoints` and the points a full "Other" left out (`NotesLayout.Arrangement.cutFromOther`).
+    static func arrangement(
+        of verdict: NotesGuard.ReduceVerdict, labels: Labels, durationMs: Int?
+    ) -> (topics: [NotesGuard.ReduceVerdict.Topic], cutFromOther: Int) {
         let short = unarranged(verdict, participants: [], labels: labels).isShortMeeting(durationMs: durationMs)
         return shown(verdict, labels: labels, short: short)
     }
@@ -99,19 +106,21 @@ enum NotesComposer {
 
     private static func shown(
         _ verdict: NotesGuard.ReduceVerdict, labels: Labels, short: Bool
-    ) -> [NotesGuard.ReduceVerdict.Topic] {
-        var topics = NotesLayout.arranged(
+    ) -> (topics: [NotesGuard.ReduceVerdict.Topic], cutFromOther: Int) {
+        let arranged = NotesLayout.arranged(
             named(verdict.topics, labels: labels).map { (name: $0.name, isOther: $0.isOther, points: $0.points) },
             short: short
         )
-        .map { NotesGuard.ReduceVerdict.Topic(name: $0.name, points: $0.points, isOther: $0.isOther) }
+        var topics = arranged.topics.map {
+            NotesGuard.ReduceVerdict.Topic(name: $0.name, points: $0.points, isOther: $0.isOther)
+        }
         // "Other" alone is not a topic layout (every named topic was refused or held one point): its points get
         // the code's heading, like the findings without a name.
         if topics.count == 1, topics[0].isOther {
             topics[0].name = labels.keyPoints
             topics[0].isOther = false
         }
-        return topics
+        return (topics, arranged.cutFromOther)
     }
 
     /// A topic without a name gets the code's heading, so a meeting that is not short has no list outside every
