@@ -39,6 +39,8 @@ extension MeetingsStore: SpeakerNameStore {}
 ///   back to the default label. A resolve without an answered pass (the switch off, no excerpt, no pass at all)
 ///   knows nothing new about the conversation: the names it gave earlier (`transcript`, applied or suggested) and
 ///   their evidence stay as they are (orchestrator decision 2026-11-26).
+/// - A reply cut by the token limit (`SpeakerNamePass.Outcome.truncated`) is an answer with a hole in it, not a
+///   denial: it may add names, and the names the conversation gave earlier stay with their evidence.
 ///
 /// Nothing here logs; `Report` holds counts and closed codes only (for `NotesTrace`).
 enum MeetingSpeakerNames {
@@ -127,7 +129,9 @@ enum MeetingSpeakerNames {
             // No answer says nothing about the transcript: the names the meeting had stay.
             guard report.pass.status != .failed, !Task.isCancelled else { return report }
             answered = report.pass.accepted
-            conversationAnswered = report.pass.status == .answered
+            // A reply cut by the token limit is missing the entries it never reached: it may add names, but it
+            // never takes back the ones the conversation gave earlier (review m2).
+            conversationAnswered = report.pass.status == .answered && !report.pass.truncated
         }
 
         // The meeting as it is now: the user may have renamed, confirmed, refused or merged speakers while the

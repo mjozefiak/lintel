@@ -69,6 +69,9 @@ struct SpeakerNamePass: Sendable {
         }
 
         var status: Status = .notAsked
+        /// The answer ended at the token limit: it is missing entries, not denying them, so a caller may read its
+        /// names as an addition, never as the whole truth about the conversation (`MeetingSpeakerNames.refresh`).
+        var truncated = false
         /// The time from the first request to its end, the open of the writer included; 0 when it was not asked.
         var elapsedMs = 0
         /// The evidence that passed the guard, `source = .transcript`.
@@ -158,6 +161,7 @@ struct SpeakerNamePass: Sendable {
         guard let answer, !Task.isCancelled else { return outcome }
         outcome.status = .answered
         // An answer cut by the token limit keeps its complete entries; the guard checks each one.
+        outcome.truncated = answer.stoppedByTokenLimit
         let proposals = SpeakerNameParser.proposals(from: answer.text, cut: answer.stoppedByTokenLimit)
         outcome.answers = proposals.count
         let checked = NameEvidenceGuard(segments: segments).check(proposals)

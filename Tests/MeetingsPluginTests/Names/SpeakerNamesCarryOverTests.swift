@@ -19,20 +19,34 @@ import Testing
         let segments: [Int64]
     }
 
-    /// Six segments: 0–1 the owner, 2–3 the first caller, 4–5 the second.
-    private func fixture() throws -> Fixture {
+    /// Six segments: 0–1 the owner, 2–3 the first caller, 4–5 the second. `texts` gives the transcript said in
+    /// them, by segment index; a segment it does not cover says nothing nameable.
+    private func fixture(texts: [String] = []) throws -> Fixture {
         let directory = try TemporaryDirectory()
         let store = try MeetingsStore.open(in: directory.url, keys: testKeys())
         let meeting = try store.insertMeeting(
             uuid: "m", startedAt: Date(timeIntervalSince1970: 1_000), speechModelID: "m", status: .ready)
         var segments: [Int64] = []
         for index in 0..<6 {
+            let text = texts.indices.contains(index) ? texts[index] : "Synthetic \(index)"
             segments.append(
                 try store.insertSegment(
                     meetingID: meeting, channel: index < 2 ? .mic : .system, startMs: index * 1000,
-                    endMs: index * 1000 + 900, text: "Synthetic \(index)"))
+                    endMs: index * 1000 + 900, text: text))
         }
         return Fixture(store: store, directory: directory, meeting: meeting, segments: segments)
+    }
+
+    /// One name refresh over the fixture's meeting, as the notes job runs it.
+    private func refresh(
+        _ f: Fixture, generator: ScriptedGenerator, knownNames: [String] = []
+    ) async throws -> MeetingSpeakerNames.Report {
+        let document = try #require(try f.store.loadDocument(id: f.meeting))
+        let report = await MeetingSpeakerNames.refresh(
+            store: f.store, document: document, selfName: "",
+            pass: SpeakerNamePass(generator: generator, knownNames: knownNames), conditions: .init(),
+            knownNames: knownNames)
+        return try #require(report)
     }
 
     private func plan(_ f: Fixture, swapped: Bool = false) -> SpeakerPlan {
@@ -149,6 +163,78 @@ import Testing
         #expect(try state(f, segment: 3).source == .user)
         #expect(try state(f, segment: 2).label == "Mówca 2")
         #expect(try state(f, segment: 2).source == .default)
+    }
+
+    /// A later pass whose reply the token limit cut can add a name and never takes one back (review m2): a reply
+    /// that stopped mid-entry is missing names, not denying them, so the names the conversation gave earlier stay
+    /// with their evidence. An answer that ends by itself and names nobody is a denial. Every name is fictional.
+    @Test func aCutReplyNeverTakesBackTheNamesFromTheConversation() async throws {
+        let f = try fixture(texts: [
+            "Zaczynamy spotkanie.", "Dziękuję wszystkim.", "Dzień dobry, nazywam się Marek.",
+            "Zaczynamy od budżetu.", "Cześć, jestem Bogdan.", "Omawiamy harmonogram projektu.",
+        ])
+        defer { withExtendedLifetime(f.directory) {} }
+        try f.store.applySpeakerPlan(plan(f), meetingID: f.meeting, diarizationModelID: nil)
+        let first = """
+            [{"speaker": "Mówca 1", "name": "Marek", "kind": "introduction", \
+            "quote": "nazywam się Marek", "confidence": "high"}]
+            """
+        #expect(try await refresh(f, generator: .answering(first)).written)
+        #expect(try state(f, segment: 2).label == "Marek")
+
+        // A looping model answers one complete entry and is cut inside the next one.
+        let cut = ScriptedGenerator { _, _ in
+            GenerationResult(
+                text: """
+                    [{"speaker": "Mówca 2", "name": "Bogdan", "kind": "introduction", \
+                    "quote": "jestem Bogdan", "confidence": "high"}, {"speaker": "Mówca 1", "name": "Ma
+                    """, stoppedByTokenLimit: true)
+        }
+        let truncated = try await refresh(f, generator: cut)
+        #expect(truncated.pass.truncated)
+        #expect(truncated.written)
+        // The complete entry still lands, and the name the earlier reply gave stays with its evidence.
+        #expect(try state(f, segment: 4).label == "Bogdan")
+        let kept = try state(f, segment: 2)
+        #expect(kept.label == "Marek")
+        #expect(kept.source == .transcript && kept.status == .applied)
+        #expect(try f.store.nameEvidence(meetingID: f.meeting).count == 2)
+
+        // An answer that ends by itself and names nobody is a denial: both go back to their default labels.
+        let complete = try await refresh(f, generator: .answering("[]"))
+        #expect(!complete.pass.truncated)
+        #expect(try state(f, segment: 2).label == "Mówca 1")
+        #expect(try state(f, segment: 4).label == "Mówca 2")
+        #expect(try f.store.nameEvidence(meetingID: f.meeting).isEmpty)
+    }
+
+    /// The known name list reaches the resolver through `Resolution` (review n1): a sure announcement is applied
+    /// only when the name stands on the list the platform or the calendar gave.
+    @Test func theKnownNamesDecideASureAnnouncement() async throws {
+        let f = try fixture(texts: [
+            "Zaczynamy spotkanie.", "Dziękuję, głos ma Marek.", "Tak, budżet jest gotowy.",
+            "Zaczynamy od harmonogramu.", "Omawiamy jeszcze szczegóły.", "Do zobaczenia.",
+        ])
+        defer { withExtendedLifetime(f.directory) {} }
+        try f.store.applySpeakerPlan(plan(f), meetingID: f.meeting, diarizationModelID: nil)
+        let answer = """
+            [{"speaker": "Mówca 2", "name": "Marek", "kind": "announced", "quote": "głos ma Marek", \
+            "confidence": "high"}]
+            """
+
+        // Without a list the name is only a suggestion.
+        #expect(try await refresh(f, generator: .answering(answer)).written)
+        let suggested = try state(f, segment: 2)
+        #expect(suggested.label == "Mówca 1")
+        #expect(suggested.suggestedName == "Marek")
+        #expect(suggested.source == .transcript && suggested.status == .suggested)
+
+        // With the name on the list the same answer applies it.
+        #expect(try await refresh(f, generator: .answering(answer), knownNames: ["Marek"]).written)
+        let applied = try state(f, segment: 2)
+        #expect(applied.label == "Marek")
+        #expect(applied.suggestedName == nil)
+        #expect(applied.source == .transcript && applied.status == .applied)
     }
 }
 
