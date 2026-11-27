@@ -151,11 +151,12 @@ struct QAOptions: Equatable {
     var galleryCompare: URL?
     var galleryRecord: URL?
 
-    /// A gallery mode that draws and quits: no plugin or window of the app is started for it.
     /// `--qa-pill-spike <log file>`: shows one HUD pill in a non-activating 580 × 56 pt panel (`QAPillSpike`, minimal
     /// HUD spec Phase 1, risks R2 and R3) and logs every hover change and press with a time to the file. Nothing of the
     /// app starts. With `--qa-appearance dark` the pill is dark.
     var pillSpikeLog: URL?
+
+    /// A gallery mode that draws and quits: no plugin or window of the app is started for it.
     var runsGalleryBatch: Bool { galleryExport != nil || galleryCompare != nil || galleryRecord != nil }
 
     /// The file plugin's DEBUG-only fake home and its roots, which QA mode always sets

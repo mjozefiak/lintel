@@ -236,11 +236,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var qaOptions: QAOptions?
     private var galleryWindow: GalleryWindowController?
 
-    /// `--qa-gallery` opens the window (and quits after `--qa-quit-after`, with `--qa-snapshot` writing its content);
-    /// `--qa-gallery-export|compare|record` draw, report and exit with a code.
     /// `--qa-pill-spike`: kept alive while the app runs.
     private var pillSpike: QAPillSpike?
 
+    /// `--qa-gallery` opens the window (and quits after `--qa-quit-after`, with `--qa-snapshot` writing its content);
+    /// `--qa-gallery-export|compare|record` draw, report and exit with a code.
     private func runGallery(_ options: QAOptions) {
         if options.runsGalleryBatch {
             Task {

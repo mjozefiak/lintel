@@ -56,6 +56,16 @@ import Testing
         #expect(Self.dictation.hasHoverContent && Self.meeting.hasHoverContent && Self.suggestion.hasHoverContent)
         #expect(!PillContent(glyph: .done, text: "Saved", accessibilityLabel: "Saved").hasHoverContent)
         #expect(PillContent(glyph: .working(dot: true), hoverText: "Saving", accessibilityLabel: "").hasHoverContent)
+        // A ✕ that shows only on hover is hover content by itself (without it the pill would never expand to show it);
+        // one that is always drawn is not.
+        let hoverClose = PillContent(
+            glyph: .done, text: "Saved", close: PillClose(id: "x", accessibilityName: "Close", visibility: .onHover),
+            accessibilityLabel: "Saved")
+        let alwaysClose = PillContent(
+            glyph: .done, text: "Saved", close: PillClose(id: "x", accessibilityName: "Close"),
+            accessibilityLabel: "Saved")
+        #expect(hoverClose.hasHoverContent)
+        #expect(!alwaysClose.hasHoverContent)
     }
 
     @Test func theVariantFollowsTheSpecsFamilyTable() {
@@ -202,7 +212,8 @@ struct LintelPillLayoutTests {
         }
         host.frame = NSRect(x: 0, y: 0, width: 300, height: 60)
         host.layoutSubtreeIfNeeded()
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
+        host.displayIfNeeded()
+        CATransaction.flush()
         host.layoutSubtreeIfNeeded()
         func find(_ view: NSView) -> [RingLayerView] {
             (view as? RingLayerView).map { [$0] } ?? view.subviews.flatMap(find)
@@ -222,5 +233,40 @@ struct LintelPillLayoutTests {
             let moving = try rings(PillContentTests.meeting, motion: .system)
             #expect(moving.allSatisfy { $0.look?.animates == true })
         }
+    }
+}
+
+/// The pill is ONE accessibility element: the label says everything and every button is an action of that element, so
+/// VoiceOver does not walk into the ring, the clock or the buttons (spec "Accessibility"). SwiftUI builds its
+/// accessibility tree only for a connected client, so a unit test cannot read it; this scans the view's source for
+/// the modifiers that make it so.
+@Suite struct PillAccessibilitySourceScanTests {
+    private func code() throws -> String {
+        let url = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "Sources/LintelUI/Components/LintelPill.swift")
+        let source = try String(contentsOf: url, encoding: .utf8)
+        return source.split(separator: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+    }
+
+    @Test func thePillIsOneElementThatIgnoresItsChildren() throws {
+        let code = try code()
+        #expect(code.components(separatedBy: ".accessibilityElement(").count == 2, "exactly one element modifier")
+        #expect(code.contains(".accessibilityElement(children: .ignore)"))
+        #expect(!code.contains("children: .contain") && !code.contains("children: .combine"))
+    }
+
+    @Test func itsLabelAndActionsAreSetOnThatElement() throws {
+        let code = try code()
+        let element = try #require(code.range(of: ".accessibilityElement(children: .ignore)"))
+        let after = code[element.upperBound...]
+        #expect(after.contains(".accessibilityLabel(Text(verbatim: content.accessibilityLabel))"))
+        #expect(after.contains(".accessibilityActions {"))
+        #expect(after.contains("ForEach(content.accessibilityActions)"))
+    }
+
+    @Test func theScanSeesAMutation() {
+        let mutated = "x.accessibilityElement(children: .contain)"
+        #expect(!mutated.contains(".accessibilityElement(children: .ignore)"))
     }
 }

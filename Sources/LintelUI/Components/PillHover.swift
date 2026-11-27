@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// When a pill expands (spec `2026-11-25-minimal-hud`, "Hover"): 300 ms after the pointer comes to rest on it, and
-/// 500 ms after the pointer leaves it collapses again. Keyboard focus on a button inside the pill counts as hover
+/// When a pill expands (spec `2026-11-25-minimal-hud`, "Hover"): 300 ms after the pointer enters it (movement inside
+/// the pill does not restart the timer), and 500 ms after the pointer leaves it collapses again. Keyboard focus on a button inside the pill counts as hover
 /// and expands at once. The time is injected (`sleep`), so tests drive it with a manual clock.
 @MainActor @Observable
 public final class PillHoverModel {
@@ -181,13 +181,21 @@ public final class PillHoverHost<Content: View>: NSHostingView<Content> {
     }
 
     private func track(_ event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        let frame = hover.pillFrame
-        hover.pointer(inside: frame.isEmpty ? bounds.contains(point) : frame.contains(Self.flipped(point, in: self)))
+        track(at: convert(event.locationInWindow, from: nil))
     }
 
-    /// The pill's frame is in SwiftUI's top-left coordinates; a view that is not flipped measures from the bottom.
-    private static func flipped(_ point: CGPoint, in view: NSView) -> CGPoint {
-        view.isFlipped ? point : CGPoint(x: point.x, y: view.bounds.height - point.y)
+    /// The pointer at `point` (this view's coordinates).
+    func track(at point: CGPoint) {
+        hover.pointer(
+            inside: Self.isOnPill(point, pillFrame: hover.pillFrame, bounds: bounds, isFlipped: isFlipped))
+    }
+
+    /// Whether a pointer at `point` (the view's coordinates) is on the pill. The pill's frame is in SwiftUI's top-left
+    /// coordinates; a view that is not flipped measures from the bottom. Before the pill has reported its frame the
+    /// whole view counts.
+    static func isOnPill(_ point: CGPoint, pillFrame: CGRect, bounds: CGRect, isFlipped: Bool) -> Bool {
+        guard !pillFrame.isEmpty else { return bounds.contains(point) }
+        let topLeft = isFlipped ? point : CGPoint(x: point.x, y: bounds.height - point.y)
+        return pillFrame.contains(topLeft)
     }
 }
