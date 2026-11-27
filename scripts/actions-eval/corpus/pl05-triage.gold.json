@@ -1,0 +1,13 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["jira"], "evidence": [2, 3, 4],
+     "fields": {"title": ["crash", "ios"], "assignee": ["Igor"], "due": ["2026-11-24"], "condition": false,
+                "must_mention": ["17.4"]}},
+    {"id": "a2", "type": ["jira"], "evidence": [5, 6],
+     "fields": {"title": ["timeout"], "assignee": ["Natalia", "Natalii"], "due": null, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "other_speaker", "evidence": [7]},
+    {"id": "t2", "kind": "rejected", "evidence": [9, 10]}
+  ]
+}

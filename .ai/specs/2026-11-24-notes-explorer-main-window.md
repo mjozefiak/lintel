@@ -398,7 +398,7 @@ Phases 4, 5 and 7 are independent of each other once Phase 3b is in (7 needs onl
 1. **2.1 Gallery scenes** for the ring's window states (five states × meeting/dictation marks); contact sheet approved by the owner.
 2. **2.2 `LintelRing`**: reuse #273's component if merged, else create it in `LintelUI/Components` with #273's API (live, working, static; dot) plus this spec's additive options (progress, error); Core Animation rotation, Reduce Motion static, accessibility labels per state. Snapshot tests via the gallery.
 3. **2.3 `MeetingsLiveRecorder`** mapping `MeetingHUDState` and the notice timers to `LiveRecordingStatus`; `MeetingsPlugin.liveRecorder`; shell wiring of `PluginContext.liveRecorder` (active plugins only, first wins, a second logged once). Tests with a fake `MeetingController` clock: recording → silence warning at the HUD thresholds → cleared; `.microphoneOnly`; processing progress; failure reasons.
-4. **2.4 HUDs**: none here. Moving the meeting and dictation HUDs to the ring is #273's Phases 2–3.
+4. **2.4 HUDs**: none here. Moving the HUDs to the ring is #273's: the dictation pill in its Phase 2 and the meeting pill in its Phase 4.
 
 ### Phase 3a: explorer layout
 
