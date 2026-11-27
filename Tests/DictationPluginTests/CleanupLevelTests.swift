@@ -2,6 +2,7 @@ import Foundation
 import LintelKit
 import LintelTestSupport
 import Testing
+import os
 
 @testable import DictationPlugin
 @testable import LintelSpeech
@@ -320,6 +321,42 @@ import Testing
         #expect(picked.transport.requests.isEmpty)
         #expect(await picked.runtime.loads == 0)
         #expect(await picked.runtime.requests.isEmpty)
+    }
+
+    /// The term check (spec Phase 3) is wired into the formatter the plugin builds: a vocabulary word the model drops
+    /// sends the chunk back raw, and only while the check is on. Guards the `vocabulary:` passing through
+    /// `DictationPlugin.formatter(...)`, which a later formatter rewrite could drop without any other test failing.
+    @Test func theTermCheckSeesTheVocabularyThroughTheFormatter() async throws {
+        let chunk = "musisz wpisać kubectl apply i wysłać mi log z serwera"
+        let answer = "Musisz wpisać apply i wysłać mi log z serwera."
+        let settings = DictationSettings(
+            PluginSettings(
+                pluginID: "dictation",
+                store: MemorySettingsStore([
+                    "plugins.dictation.mode": .string("cleanup"),
+                    "plugins.dictation.llmSource": .string("server"),
+                    "plugins.dictation.llmEndpoint": .string("http://127.0.0.1:11434"),
+                    "plugins.dictation.llmModel": .string("qwen"),
+                ])), offersFull: true)
+        let runtime = ScriptedRuntime()
+        await runtime.script(answer: answer)
+        let warm = KeepWarmRuntime(
+            runtime: runtime, modelURL: URL(fileURLWithPath: "/models/test.gguf"), keepWarm: { .seconds(60) })
+        let words: @Sendable () -> [String] = { ["kubectl"] }
+        let logger = Logger(subsystem: "com.lintelapp.tests", category: "dictation")
+        for checksTerms in [false, true] {
+            let transport = ScriptedTransport(.content(answer))
+            let formatter = try #require(
+                DictationPlugin.formatter(
+                    settings: settings, transport: transport, builtIn: warm, logger: logger,
+                    protectedWords: words, checksTerms: checksTerms))
+            let result = try await formatter.format(chunk: chunk, previousContext: nil)
+            if checksTerms {
+                #expect(result == .init(text: chunk, outcome: .fellBack(.rejected(.lostTerm))))
+            } else {
+                #expect(result == .init(text: answer, outcome: .formatted))
+            }
+        }
     }
 
     @Test func theVocabularyWordsAreProtectedWhileTheVocabularyIsOn() throws {
