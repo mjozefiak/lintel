@@ -95,6 +95,15 @@ final class NotesWorkspaceModel {
         var isReviseQueued: @MainActor (NoteItemID, Int64) -> Bool = { _, _ in false }
         /// Renames the title of a recorded note in its owner (`NoteSourceEditing`); `false` when it was not changed.
         var renameTitle: @MainActor (NoteKey, String) async -> Bool = { _, _ in false }
+        /// Yes and No on a speaker's name suggestion in the transcript (speaker names, step 1.6b): the note, the
+        /// speaker's id and the suggested name the screen showed, answered by the owner (`NoteSourceEditing`).
+        /// Any error (`NoteEditingError.unsupported` too) leaves the note as it was and shows the failure strip.
+        var confirmSpeakerName: @MainActor (NoteKey, String, String) async throws -> Void = { _, _, _ in
+            throw NoteEditingError.unsupported
+        }
+        var rejectSpeakerName: @MainActor (NoteKey, String, String) async throws -> Void = { _, _, _ in
+            throw NoteEditingError.unsupported
+        }
         /// The commands of the active plugins and the shell for the command palette (`PluginContext.availableCommands`).
         var availableCommands: @MainActor () -> [CommandInfo] = { [] }
     }
@@ -532,6 +541,7 @@ final class NotesWorkspaceModel {
                 proposals: NoteOverlayContent.proposals(heads: heads))
             document.setActions(source.actions(for: key))
             document.canRenameTitle = source is any NoteSourceEditing
+            wireSpeakerSuggestions(document, editable: source is any NoteSourceEditing)
             await refreshPanes(id)
             #if DEBUG
             if qaMixedAuthors { document.qaMixAuthors() }

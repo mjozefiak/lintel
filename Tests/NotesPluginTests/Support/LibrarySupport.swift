@@ -202,6 +202,15 @@ final class ScriptedNoteSource: NoteSource, Sendable {
         var onSubscribe: (@Sendable () -> Void)?
         var renameFails = false
         var renamed: [(NoteKey, String)] = []
+        var speakerAnswers: [SpeakerAnswer] = []
+    }
+
+    /// Yes or No on a speaker name suggestion, as the source received it.
+    struct SpeakerAnswer: Equatable, Sendable {
+        var key: NoteKey
+        var speakerID: String
+        var name: String
+        var confirm: Bool
     }
 
     private let listStarts = CountLatch()
@@ -334,6 +343,8 @@ final class ScriptedNoteSource: NoteSource, Sendable {
         set { state.withLock { $0.renameFails = newValue } }
     }
     var renamedTitles: [(NoteKey, String)] { state.withLock { $0.renamed } }
+    var speakerAnswers: [SpeakerAnswer] { state.withLock { $0.speakerAnswers } }
+    fileprivate func recordAnswer(_ answer: SpeakerAnswer) { state.withLock { $0.speakerAnswers.append(answer) } }
     /// How many times Notes asked the source to delete a note.
     var deleteCalls: Int { deletes.count }
     /// How many times `content(for:)` was called.
@@ -376,6 +387,12 @@ extension ScriptedNoteSource: NoteSourceEditing {
     }
     func renameSpeaker(_ key: NoteKey, speakerID: String, to name: String) async throws {}
     func markSelf(_ key: NoteKey, speakerID: String) async throws {}
+    func confirmSpeakerName(_ key: NoteKey, speakerID: String, name: String) async throws {
+        recordAnswer(SpeakerAnswer(key: key, speakerID: speakerID, name: name, confirm: true))
+    }
+    func rejectSpeakerName(_ key: NoteKey, speakerID: String, name: String) async throws {
+        recordAnswer(SpeakerAnswer(key: key, speakerID: speakerID, name: name, confirm: false))
+    }
 }
 
 /// The overlay store of a library test: both the read port and the detacher, so a detach is visible to the

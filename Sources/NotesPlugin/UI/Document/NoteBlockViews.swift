@@ -16,7 +16,13 @@ struct NoteBlockRow: View {
     var body: some View {
         Group {
             if isTranscript {
-                TranscriptLine(document: document, block: block)
+                VStack(alignment: .leading, spacing: 2 * textSize.scale) {
+                    TranscriptLine(document: document, block: block)
+                    // Once per speaker, under their first words: the transcript shows who was meant.
+                    if let suggestion = document.speakerSuggestion(at: block) {
+                        SpeakerSuggestionLine(document: document, suggestion: suggestion)
+                    }
+                }
             } else {
                 NoteBlockBody(document: document, block: block)
             }
@@ -192,11 +198,13 @@ struct TranscriptLine: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 12 * textSize.scale) {
             if let name = document.speakerName(of: block) {
+                // As wide as the longest name up to a limit; a longer name wraps instead of being cut (#362).
                 Text(verbatim: name)
                     .font(textSize.font(.callout, weight: .bold))
                     .foregroundStyle(LintelBrand.ink)
-                    .lineLimit(1)
-                    .frame(width: 5.5 * 12.5 * textSize.scale, alignment: .leading)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(width: document.speakerColumnWidth(textSize: textSize), alignment: .leading)
             }
             if let start = block.startMs {
                 Text(verbatim: NoteQuote.clock(milliseconds: start))
@@ -218,5 +226,54 @@ struct TranscriptLine: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isHighlighted ? .isSelected : [])
+    }
+}
+
+/// A speaker name suggestion under the speaker's first words in the transcript (speaker names, step 1.6b): the
+/// name with a question mark, Yes and No, nothing else (the meeting window's line without the time). Return on the
+/// focused line says Yes. The name is drawn verbatim, never as Markdown.
+struct SpeakerSuggestionLine: View {
+    let document: NoteDocumentModel
+    let suggestion: SpeakerNameSuggestion
+    @Environment(\.lintelTextSize) private var textSize
+
+    private var isAnswering: Bool { document.answeringSpeaker != nil }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("\(suggestion.name)?", comment: "Meeting window: a suggested speaker name; the name")
+                .font(textSize.font(.callout))
+                .foregroundStyle(LintelBrand.ink)
+            Button {
+                document.answer(suggestion, confirm: true)
+            } label: {
+                Text("Yes", comment: "Meeting window: confirms a suggested speaker name")
+            }
+            .buttonStyle(LintelPrimaryButtonStyle())
+            .accessibilityLabel(Text("Confirm", comment: "Meeting window: accessibility label of Yes on a suggestion"))
+            Button {
+                document.answer(suggestion, confirm: false)
+            } label: {
+                Text("No", comment: "Meeting window: rejects a suggested speaker name")
+            }
+            .buttonStyle(LintelSecondaryButtonStyle())
+            .accessibilityLabel(Text("Reject", comment: "Meeting window: accessibility label of No on a suggestion"))
+            Spacer(minLength: 0)
+        }
+        .disabled(isAnswering)
+        // Under the words, lined up with the time chip: the speaker's column plus the line's spacing.
+        .padding(.leading, document.speakerColumnWidth(textSize: textSize) + 12 * textSize.scale)
+        .padding(.vertical, 2)
+        .focusable()
+        .onKeyPress(.return) {
+            guard !isAnswering else { return .ignored }
+            document.answer(suggestion, confirm: true)
+            return .handled
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(
+            Text(
+                "Name suggestion: \(suggestion.name). Confirm or Reject",
+                comment: "Meeting window: VoiceOver label of a suggested speaker name; the name"))
     }
 }

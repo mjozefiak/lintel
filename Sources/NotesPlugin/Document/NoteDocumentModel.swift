@@ -30,7 +30,11 @@ final class NoteDocumentModel {
     private(set) var phase: Phase = .loading
     private(set) var content: NoteContent?
     private(set) var layerID: String?
-    private(set) var blocks: [NoteBlock] = []
+    private(set) var blocks: [NoteBlock] = [] {
+        didSet { firstBlockOfSpeaker = Self.firstBlocks(of: blocks) }
+    }
+    /// The index of each speaker's first block in `blocks`: a name suggestion is shown there, once per speaker.
+    private(set) var firstBlockOfSpeaker: [String: Int] = [:]
     /// The transcript block a quote chip jumped to; cleared by `clearHighlight()` or by switching layers.
     private(set) var highlightedBlock: Int?
     private(set) var scrollRequest: ScrollRequest?
@@ -38,6 +42,15 @@ final class NoteDocumentModel {
     private(set) var actions: [NoteSourceAction] = []
     /// The source can rename the note's title (`NoteSourceEditing`): the header's title is a field (step 4.6).
     var canRenameTitle = false
+    /// The source can answer a speaker name suggestion (`NoteSourceEditing`), read with the content.
+    var canEditSpeakers = false
+    /// Yes (`true`) or No on a speaker's name suggestion: the speaker's id and the name the screen showed. Set by
+    /// the workspace model; without it the transcript shows no suggestion.
+    @ObservationIgnored var answerSpeakerSuggestion:
+        (@MainActor (_ speakerID: String, _ name: String, _ confirm: Bool) -> Void)?
+    /// The speaker whose suggestion is being answered: its Yes and No wait, so a double click sends one answer.
+    var answeringSpeaker: String?
+    @ObservationIgnored var speakerColumnCache: SpeakerColumnCache?
     /// An action of the source threw: the strip says so until it is dismissed or tried again.
     var actionFailed = false
     private var serial = 0
