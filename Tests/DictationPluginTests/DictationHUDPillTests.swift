@@ -327,6 +327,8 @@ import Testing
         DictationHUDQA.configure(model, fixture: fixture, hover: false, reduceMotion: false)
         #expect(model.microphoneLineVisible)
         // The fixture's line has no timer: nothing sleeps, and no time makes it collapse.
+        #expect(!model.lineTimerEnabled)
+        for _ in 0..<20 { await Task.yield() }
         #expect(clock.sleepCalls == 0)
         clock.advance(by: .seconds(60))
         #expect(model.microphoneLineVisible)
