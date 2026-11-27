@@ -3241,6 +3241,24 @@
         }
       }
     },
+    "Allow" : {
+      "comment" : "HUD pill: button that opens a privacy pane",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zezwól"
+          }
+        }
+      }
+    },
     "Allow Accessibility" : {
       "comment" : "Window HUD: opens the Accessibility setting",
       "extractionState" : "manual",
@@ -3417,6 +3435,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zezwól na mikrofon i pobierz model mowy."
+          }
+        }
+      }
+    },
+    "Allow the microphone in the dialog" : {
+      "comment" : "HUD pill: dictation while the system's microphone prompt is on screen",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow the microphone in the dialog"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zezwól na mikrofon w oknie systemu"
           }
         }
       }
@@ -3741,24 +3777,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Inna kopia pozostaje w folderze Aplikacje; usunąć ją może administrator."
-          }
-        }
-      }
-    },
-    "Another speech model is in use" : {
-      "comment" : "Dictation HUD when a meeting uses a different speech model",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Another speech model is in use"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Inny model mowy jest w użyciu"
           }
         }
       }
@@ -4466,7 +4484,7 @@
       }
     },
     "Cancel dictation" : {
-      "comment" : "Accessibility label of the HUD's ✕",
+      "comment" : "HUD pill, VoiceOver: the name of the ✕ while dictating",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -5653,20 +5671,20 @@
         }
       }
     },
-    "Copied – allow Accessibility to paste" : {
-      "comment" : "Dictation HUD when the text was only copied because Accessibility is missing",
+    "Copied, paste with ⌘V" : {
+      "comment" : "HUD pill: the text was only copied, the user pastes it",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Copied – allow Accessibility to paste"
+            "value" : "Copied, paste with ⌘V"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Skopiowano – zezwól na Dostępność, aby wklejać"
+            "value" : "Skopiowano, wklej ⌘V"
           }
         }
       }
@@ -6841,6 +6859,60 @@
         }
       }
     },
+    "Dictation is back after the meeting" : {
+      "comment" : "HUD pill: a meeting uses a different speech model, so dictation cannot load its own",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation is back after the meeting"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie wróci po spotkaniu"
+          }
+        }
+      }
+    },
+    "Dictation, finishing" : {
+      "comment" : "HUD pill, VoiceOver: the text is being produced after the recording",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation, finishing"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie, kończenie"
+          }
+        }
+      }
+    },
+    "Dictation, recording, %@" : {
+      "comment" : "HUD pill, VoiceOver: dictation is recording, the placeholder is the running time",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictation, recording, %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie, nagrywanie, %@"
+          }
+        }
+      }
+    },
     "Dictations" : {
       "comment" : "Explorer: the switch and the label above the list of dictations",
       "extractionState" : "manual",
@@ -7166,7 +7238,7 @@
       }
     },
     "Download" : {
-      "comment" : "Models pane: downloads a model",
+      "comment" : "HUD pill: the missing-model pill's button; Models pane: downloads a model",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -7958,7 +8030,7 @@
       }
     },
     "Esc cancels" : {
-      "comment" : "Dictation HUD hint",
+      "comment" : "HUD pill, VoiceOver: how to cancel the dictation",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -8637,6 +8709,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Pierwszy podział"
+          }
+        }
+      }
+    },
+    "Fix" : {
+      "comment" : "HUD pill: button that opens the place that fixes it",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Napraw"
           }
         }
       }
@@ -11899,24 +11989,6 @@
         }
       }
     },
-    "Loading model…" : {
-      "comment" : "Dictation HUD while the speech model loads",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Loading model…"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ładowanie modelu…"
-          }
-        }
-      }
-    },
     "Loading notes" : {
       "comment" : "Accessibility label while the notes are read",
       "extractionState" : "manual",
@@ -13519,24 +13591,6 @@
         }
       }
     },
-    "No dictation to paste yet" : {
-      "comment" : "Dictation HUD when there is no earlier dictation to paste again",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No dictation to paste yet"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nie ma jeszcze dyktowania do wklejenia"
-          }
-        }
-      }
-    },
     "No dictations match “%@”." : {
       "comment" : "Explorer: a search in the dictations found nothing; the query",
       "extractionState" : "manual",
@@ -13699,6 +13753,24 @@
         }
       }
     },
+    "No microphone access" : {
+      "comment" : "HUD pill: microphone access is denied",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No microphone access"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brak dostępu do mikrofonu"
+          }
+        }
+      }
+    },
     "No microphone audio – check the microphone permission and input" : {
       "comment" : "Meeting HUD notice when the microphone delivers only digital silence for about 10 seconds",
       "extractionState" : "manual",
@@ -13718,7 +13790,7 @@
       }
     },
     "No microphone found" : {
-      "comment" : "Dictation HUD when there is no input device",
+      "comment" : "HUD pill: there is no input device",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -13893,6 +13965,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nie ustawiono skrótu"
+          }
+        }
+      }
+    },
+    "No speech model" : {
+      "comment" : "HUD pill: no speech model is installed",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No speech model"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brak modelu mowy"
           }
         }
       }
@@ -14924,7 +15014,7 @@
       }
     },
     "Nothing heard" : {
-      "comment" : "Dictation HUD when the recording had no speech",
+      "comment" : "HUD pill: the recording had no speech",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -14973,6 +15063,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nic nie opuszcza tego Maca."
+          }
+        }
+      }
+    },
+    "Nothing to paste yet" : {
+      "comment" : "HUD pill: \"paste the raw version\" with no earlier dictation",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nothing to paste yet"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie ma jeszcze nic do wklejenia"
           }
         }
       }
@@ -15986,7 +16094,7 @@
       }
     },
     "Pasted" : {
-      "comment" : "Dictation HUD after the text was pasted",
+      "comment" : "HUD pill, VoiceOver: the text was pasted",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -16003,38 +16111,20 @@
         }
       }
     },
-    "Pasted – not cleaned up" : {
-      "comment" : "Dictation HUD when formatting failed and the raw text was pasted",
+    "Pasted without cleanup" : {
+      "comment" : "HUD pill: formatting failed for the whole text and the raw text was pasted",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pasted – not cleaned up"
+            "value" : "Pasted without cleanup"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wklejono – bez porządkowania"
-          }
-        }
-      }
-    },
-    "Pasted – partly cleaned up" : {
-      "comment" : "Dictation HUD when formatting failed for some parts of the text",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pasted – partly cleaned up"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wklejono – częściowo uporządkowane"
+            "value" : "Wklejono bez poprawek"
           }
         }
       }
@@ -16665,24 +16755,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Surowe"
-          }
-        }
-      }
-    },
-    "Raw version: Dictation → Paste raw version" : {
-      "comment" : "Dictation HUD hint that the raw transcript can be pasted again",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Raw version: Dictation → Paste raw version"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Surowy tekst: Dyktowanie → Wklej surową wersję"
           }
         }
       }
@@ -20089,6 +20161,24 @@
         }
       }
     },
+    "Speech model isn't working" : {
+      "comment" : "HUD pill: the speech model's folder is gone or loading it failed",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speech model isn't working"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model mowy nie działa"
+          }
+        }
+      }
+    },
     "Speech model unavailable" : {
       "comment" : "Dictation HUD when the model folder is gone",
       "extractionState" : "manual",
@@ -20396,7 +20486,7 @@
       }
     },
     "Stops in %lld s" : {
-      "comment" : "Dictation HUD countdown before the recording limit",
+      "comment" : "HUD pill, VoiceOver: countdown before the recording limit",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -22861,24 +22951,6 @@
         }
       }
     },
-    "The speech model failed to load" : {
-      "comment" : "Dictation HUD when loading the model failed",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The speech model failed to load"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nie udało się załadować modelu mowy"
-          }
-        }
-      }
-    },
     "The speech model is used by %@." : {
       "comment" : "Models pane banner detail: one needed speech model; the argument lists the features",
       "extractionState" : "manual",
@@ -25161,6 +25233,42 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Używane, gdy wyświetlacz nie ma własnego układu dla obszaru roboczego."
+          }
+        }
+      }
+    },
+    "Using %@" : {
+      "comment" : "HUD pill: the chosen microphone is missing, the placeholder is the name of the input used",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Using %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofon: %@"
+          }
+        }
+      }
+    },
+    "Using the default mic" : {
+      "comment" : "HUD pill: the chosen microphone is missing and the system's input has no name",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Using the default mic"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Domyślny mikrofon"
           }
         }
       }
@@ -27704,7 +27812,7 @@
       }
     },
     "✕ cancels" : {
-      "comment" : "Dictation HUD hint when Escape could not be claimed",
+      "comment" : "HUD pill, VoiceOver: how to cancel when Escape could not be claimed",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

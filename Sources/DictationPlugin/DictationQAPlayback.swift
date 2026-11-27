@@ -4,6 +4,7 @@ import AppKit
 import Foundation
 import LintelKit
 import LintelSpeech
+import LintelUI
 import SwiftUI
 import Synchronization
 
@@ -64,6 +65,12 @@ struct DictationQAAuthorizer: MicrophoneAuthorizer {
     private var isGranted: Bool { playback.url != nil || isQARun }
     func status() -> MicrophoneAccess { isGranted ? .granted : base.status() }
     func requestAccess() async -> Bool { isGranted ? true : await base.requestAccess() }
+}
+
+extension HUDState {
+    /// What the result JSON's `hud` field says the HUD showed: its VoiceOver text, or `"none"` for the one state
+    /// that shows nothing at all (OD-4, a partial cleanup), so a missing pill is never an empty string in the file.
+    var qaHUDText: String { pill() == nil ? "none" : accessibilityLabel() }
 }
 
 /// Forwards to the real HUD and remembers the last state, and the dictation the history was handed.
@@ -198,11 +205,12 @@ extension DictationPlugin: PluginQACommands {
             let promptVersion: Int
         }
         let result = Result(
-            file: wav.lastPathComponent, raw: raw, text: text, hud: state.title, promptVersion: promptVersion)
+            file: wav.lastPathComponent, raw: raw, text: text, hud: state.qaHUDText,
+            promptVersion: promptVersion)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         if let data = try? encoder.encode(result) { try? data.write(to: URL(filePath: "\(prefix).json")) }
-        return "ok: \(state.title); \(written.count) screenshots"
+        return "ok: \(state.accessibilityLabel()); \(written.count) screenshots"
     }
 }
 
@@ -217,10 +225,7 @@ struct DictationQACard {
     let promptVersion: Int
 
     func writePNG(to url: URL, appearance name: NSAppearance.Name) -> Bool {
-        let model = HUDModel()
-        model.reducesMotion = true
-        model.state = state
-        let view = Card(file: file, raw: raw, text: text, promptVersion: promptVersion, hud: model)
+        let view = Card(file: file, raw: raw, text: text, promptVersion: promptVersion, hud: state.pill())
         let host = NSHostingView(rootView: view)
         let size = NSSize(width: 520, height: 520)
         host.frame = NSRect(origin: .zero, size: size)
@@ -239,7 +244,7 @@ struct DictationQACard {
         let raw: String
         let text: String
         let promptVersion: Int
-        let hud: HUDModel
+        let hud: PillContent?
 
         var body: some View {
             VStack(alignment: .leading, spacing: 12) {
@@ -248,10 +253,13 @@ struct DictationQACard {
                     Spacer()
                     Text("cleanup prompt v\(promptVersion)").font(.caption).foregroundStyle(.secondary)
                 }
-                // The HUD's glass is not drawn by `cacheDisplay`: a solid pill stands behind the real view.
-                DictationHUDView(model: hud)
-                    .background(Capsule().fill(Color(nsColor: .controlBackgroundColor)).frame(width: 248, height: 40))
-                    .frame(maxWidth: .infinity)
+                // The HUD's glass is not drawn by `cacheDisplay`: a solid capsule stands behind the real pill.
+                if let hud {
+                    LintelPill(hud)
+                        .environment(\.lintelRingMotion, .reduced)
+                        .background(Capsule().fill(Color(nsColor: .controlBackgroundColor)))
+                        .frame(maxWidth: .infinity)
+                }
                 block("Heard (speech model, before cleanup)", raw)
                 block("Pasted (after cleanup)", text)
             }

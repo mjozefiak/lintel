@@ -219,8 +219,6 @@ final class DictationSettingsModel {
     }
 
     func openAccessibilitySettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            openURL(url)
-        }
+        if let url = DictationLinks.accessibility { openURL(url) }
     }
 }

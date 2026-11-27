@@ -235,10 +235,12 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
             return
         }
         let state = HUDState.recording(recording)
-        #expect(state.notice == "“USB MICROPHONE” unavailable – using “MacBook Pro Microphone”")
-        #expect(state.announcement == state.notice)
-        #expect(state.accessibilityLabel.contains("USB MICROPHONE"))
-        #expect(!(state.notice ?? "").contains("AppleUSBAudioEngine"))
+        // The pill shows the input that is used; VoiceOver and the announcement also name the missing device.
+        let message = "“USB MICROPHONE” unavailable – using “MacBook Pro Microphone”"
+        #expect(state.pill()?.text == "Using MacBook Pro Microphone")
+        #expect(state.announcement == message)
+        #expect(state.accessibilityLabel().contains("USB MICROPHONE"))
+        #expect(!state.accessibilityLabel().contains("AppleUSBAudioEngine"))
         #expect(state.offersCancel)
         controller.cancel()
     }
@@ -249,7 +251,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         let controller = rig.controller()
         controller.menu()
         await recording(rig)
-        #expect(rig.hud.states.allSatisfy { $0.notice == nil })
+        #expect(rig.hud.states.allSatisfy { $0.pill()?.text == nil })
         controller.cancel()
     }
 
@@ -265,7 +267,8 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
             return
         }
         #expect(!recording.escapeCancels)
-        #expect(HUDState.recording(recording).detail == "✕ cancels")
+        #expect(HUDState.recording(recording).accessibilityLabel().contains("✕ cancels"))
+        #expect(HUDState.recording(recording).pill()?.close?.visibility == .always)
         controller.cancel()
     }
 
@@ -290,7 +293,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(rig.hud.milestones == ["problem:modelMissing"])
         #expect(rig.audioStarted == 0)
         #expect(!controller.isBusy)
-        #expect(HUDState.problem(.modelMissing).offersSettings)
+        #expect(HUDState.problem(.modelMissing).pill()?.action?.id == HUDPillAction.openModels)
     }
 
     @Test func aDeniedMicrophoneShowsAMessageAndNeverRecords() async throws {
@@ -569,7 +572,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
 }
 
 @Suite struct HUDStateTests {
-    @Test func everyStateHasATitleASymbolAndTheRightButtons() {
+    @Test func everyStateHasAPillAndTheRightButtons() {
         let states: [HUDState] = [
             .allowMicrophone, .recording(.init()), .recording(.init(loadingModel: true)), .finishing, .pasted,
             .copied(.noAccessibility), .copied(.secureEventInput), .problem(.modelMissing),
@@ -579,13 +582,17 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
             .pastedUnformatted(all: true), .pastedUnformatted(all: false),
         ]
         for state in states {
-            #expect(!state.title.isEmpty)
-            #expect(!state.symbolName.isEmpty)
-            #expect(!state.accessibilityLabel.isEmpty)
+            // A partial cleanup shows nothing (OD-4); every other state is a pill with its words.
+            if state == .pastedUnformatted(all: false) {
+                #expect(state.pill() == nil)
+                continue
+            }
+            #expect(state.pill() != nil)
+            #expect(!state.accessibilityLabel().isEmpty)
         }
         #expect(HUDState.recording(.init()).offersCancel)
         #expect(!HUDState.finishing.offersCancel)
-        #expect(HUDState.pasted.hidesAfter == .milliseconds(800))
+        #expect(HUDState.pasted.hidesAfter == .milliseconds(600))
         #expect(HUDState.recording(.init()).hidesAfter == nil)
     }
 
@@ -595,12 +602,13 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(HUDState.recording(.init(loadingModel: true)).announcement == nil)
         #expect(HUDState.recording(.init(secondsLeft: 30)).announcement == nil)
         #expect(HUDState.finishing.announcement != nil)
-        #expect(HUDState.pasted.announcement == HUDState.pasted.title)
+        #expect(HUDState.pasted.announcement == HUDState.pasted.accessibilityLabel())
     }
 
-    @Test func theCountdownReplacesTheCancelHint() {
-        #expect(HUDState.recording(.init(secondsLeft: 30)).detail?.contains("30") == true)
-        #expect(HUDState.recording(.init()).detail == "Esc cancels")
+    @Test func theCountdownIsInTheLabelAndTheCancelHintFollowsEscape() {
+        #expect(HUDState.recording(.init(secondsLeft: 30)).accessibilityLabel().contains("30"))
+        #expect(
+            HUDState.recording(.init()).accessibilityLabel(elapsed: 12) == "Dictation, recording, 0:12. Esc cancels.")
     }
 
     @Test func theSameAnnouncementIsNotSpokenAgainWhileTheLevelMoves() {
@@ -616,8 +624,8 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
     }
 
     @Test func theTimerFormatsMinutesAndSeconds() {
-        #expect(DictationHUDView.format(0) == "0:00")
-        #expect(DictationHUDView.format(65.9) == "1:05")
-        #expect(DictationHUDView.format(-3) == "0:00")
+        #expect(HUDState.clock(0) == "0:00")
+        #expect(HUDState.clock(Int(65.9)) == "1:05")
+        #expect(HUDState.clock(-3) == "0:00")
     }
 }

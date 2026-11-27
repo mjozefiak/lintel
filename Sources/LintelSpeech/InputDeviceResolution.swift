@@ -43,6 +43,23 @@ extension InputFallback {
     }
 }
 
+extension InputFallback {
+    /// The line the HUD pills show (spec `2026-11-25-minimal-hud`, "Microphone line (OD-11)"): the name of the input
+    /// that is used, never the missing device's (that one is in `message`, which the pill's VoiceOver label and
+    /// announcement keep). The pill shortens a long name in the middle. A name that is not known gives "Using the
+    /// default mic".
+    public var pillLine: String {
+        guard let using = usingName else {
+            return String(
+                localized: "Using the default mic",
+                comment: "HUD pill: the chosen microphone is missing and the system's input has no name")
+        }
+        return String(
+            localized: "Using \(using)",
+            comment: "HUD pill: the chosen microphone is missing, the placeholder is the name of the input used")
+    }
+}
+
 /// An input that can tell the session it did not get the device the user chose.
 public protocol InputFallbackReporting: AudioInput {
     /// Set while the last `start` used the default input because the chosen device was not available.

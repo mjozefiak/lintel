@@ -60,6 +60,16 @@ public final class PillHoverModel {
         set(expanded: false)
     }
 
+    #if DEBUG
+    /// QA fixtures and the gallery: the settled hover (or its absence) at once, as if the pointer had rested, without
+    /// waiting for a timer. A release build has no such way in.
+    public func settle(expanded: Bool) {
+        pending?.cancel()
+        pending = nil
+        set(expanded: expanded)
+    }
+    #endif
+
     private func reschedule() {
         pending?.cancel()
         pending = nil
@@ -151,6 +161,20 @@ public final class PillHoverHost<Content: View>: NSHostingView<Content> {
     @MainActor @preconcurrency required init?(coder: NSCoder) {
         nil
     }
+
+    #if DEBUG
+    /// QA (`--qa-snapshot`): `cacheDisplay` does not draw the glass, so a snapshot of a QA panel gets an opaque backdrop
+    /// cut to this shape (the pill), like `SnapshotBackdropHostingView`; the panel still tracks the real pointer, so
+    /// the hover can be checked on the running app. `nil` (the default) draws nothing extra.
+    public var backdropShape: ((NSRect) -> NSBezierPath)?
+
+    public override func cacheDisplay(in rect: NSRect, to bitmap: NSBitmapImageRep) {
+        super.cacheDisplay(in: rect, to: bitmap)
+        guard let backdropShape else { return }
+        SnapshotBackdropHostingView<Content>.paintBackdrop(
+            in: bitmap, viewBounds: bounds, path: backdropShape(bounds), color: LintelBrand.windowBackgroundColor)
+    }
+    #endif
 
     /// The options of the tracking area (a test checks them).
     public static var trackingOptions: NSTrackingArea.Options {

@@ -6,6 +6,14 @@ import LintelUI
 import SwiftUI
 import os
 
+/// The System Settings deep link the HUD and the Settings pane both open. It lives here, once, so the two cannot
+/// drift apart.
+enum DictationLinks {
+    /// The Accessibility pane: the grant a paste keystroke needs (the HUD's "Allow" on a copied text).
+    static let accessibility = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+}
+
 /// Voice dictation (spec: Dyktowanie głosowe): records under a global shortcut, transcribes with a speech
 /// model that runs inside Lintel, and pastes the text into the app in front. Audio never leaves the Mac
 /// and is never written to disk.
@@ -165,7 +173,12 @@ public final class DictationPlugin: LintelPlugin {
         // A missing or broken speech model goes to the Models pane; the microphone problem goes to Settings.
         hud = DictationHUDPanel(
             onCancel: { relay.controller?.cancel() }, onOpenSettings: { openSettings() },
-            onOpenModels: { openModels(settings.speechModelID) })
+            onOpenModels: { openModels(settings.speechModelID) },
+            onOpenAccessibility: {
+                if let url = DictationLinks.accessibility {
+                    Task { try? await workspace.open(url) }
+                }
+            })
         self.relay = relay
         #if DEBUG
         qaRecorder = DictationQARecorder(wrapping: hud)
@@ -240,7 +253,11 @@ public final class DictationPlugin: LintelPlugin {
         // `--qa-hud dictation:<state>`: draws the HUD in that state, nothing else (docs/qa.md).
         if let name = context.settings.string(DictationHUDQA.settingName) {
             let hud = DictationHUDQA()
-            if hud.show(named: name) {
+            // `plugins.dictation.qaHUDHover`: the pill drawn in its hover state (docs/qa.md).
+            if hud.show(
+                named: name, hover: context.settings.bool(DictationHUDQA.hoverSettingName, default: false),
+                reduceMotion: context.settings.bool(DictationHUDQA.reduceMotionSettingName, default: false))
+            {
                 qaHUD = hud
             } else {
                 context.logger.error("Unknown --qa-hud dictation state")

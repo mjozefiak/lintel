@@ -11,24 +11,26 @@ import Testing
 @MainActor
 @Suite struct DictationModelRoutingTests {
     @Test func theModelProblemsOpenModelsAndTheMicrophoneOpensSettings() {
-        for problem in [HUDState.Problem.modelMissing, .modelUnavailable, .modelFailedToLoad] {
-            #expect(HUDState.problem(problem).opensModels)
-            #expect(HUDState.problem(problem).offersSettings)
-        }
-        #expect(!HUDState.problem(.microphoneDenied).opensModels)
-        #expect(HUDState.problem(.microphoneDenied).offersSettings)
-
         let model = HUDModel()
         var settings = 0
         var models = 0
         model.onOpenSettings = { settings += 1 }
         model.onOpenModels = { models += 1 }
-        model.state = .problem(.modelMissing)
-        model.openLink()
-        #expect(settings == 0 && models == 1)
-        model.state = .problem(.microphoneDenied)
-        model.openLink()
-        #expect(settings == 1 && models == 1)
+        // The pill's one button of each problem, pressed the way the pill reports it.
+        func press(_ state: HUDState) {
+            guard let action = state.pill()?.action else {
+                Issue.record("no button for \(state)")
+                return
+            }
+            model.perform(action.id)
+        }
+        for problem in [HUDState.Problem.modelMissing, .modelUnavailable, .modelFailedToLoad] {
+            let before = (settings, models)
+            press(.problem(problem))
+            #expect(settings == before.0 && models == before.1 + 1)
+        }
+        press(.problem(.microphoneDenied))
+        #expect(settings == 1 && models == 3)
     }
 
     /// Dictation's "in use" sources, each with the token that must be in `modelUsage`'s `isInUse`. Only the Models
