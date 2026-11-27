@@ -84,7 +84,7 @@ enum TidySourceText {
     }
 
     static var checkAgain: Text {
-        Text("Check Again", comment: "Button that re-reads the Full Disk Access state")
+        Text("Check Again", comment: "Settings → Dictation: reads the AI provider’s state again")
     }
 
     /// The note under a model that is slower and uses more of the plan's limit.

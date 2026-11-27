@@ -4538,7 +4538,7 @@
       }
     },
     "Check Again" : {
-      "comment" : "Button that re-reads the Full Disk Access state",
+      "comment" : "Button that reads a permission's or an AI provider’s state again (Full Disk Access, Permissions, Meetings, Dictation)",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
