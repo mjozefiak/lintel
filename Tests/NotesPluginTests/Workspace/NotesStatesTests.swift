@@ -112,7 +112,7 @@ struct NotesScreenTests {
         let strip = listed.model.strips.first
         #expect(strip?.id == "locked")
         #expect(strip?.tone == .error)
-        #expect(strip?.text == "Lintel can’t read the key to your notes. Nothing was deleted.")
+        #expect(strip?.text == "Your own notes and edits can’t be opened right now. Nothing was deleted.")
         #expect(strip?.actions.map(\.title) == ["Try again"])
         #expect(listed.model.statusLine?.text == "Key unavailable")
 
@@ -121,6 +121,40 @@ struct NotesScreenTests {
         await listed.model.perform("locked.retry")
         #expect(listed.model.strips.isEmpty)
         #expect(listed.model.statusLine == nil)
+    }
+
+    @Test("with no tab open the explorer shows the strips: locked rows with Try again, Hide content with its way back")
+    func explorerStrips() async {
+        let rig = StatesRig()
+        rig.store.failReads = true
+        await rig.model.refresh()
+        #expect(rig.model.explorerStrips.map(\.id) == ["locked"])
+        #expect(rig.model.explorerStrips.first?.actions.map(\.id) == ["locked.retry"])
+
+        rig.model.hidesContent = true
+        #expect(rig.model.explorerStrips.map(\.id) == ["hidden", "locked"])
+        #expect(rig.model.explorerStrips.first?.text == "Content hidden. Press ⌘⇧H to show it again.")
+        #expect(rig.model.explorerStrips.first?.actions.map(\.id) == ["hidden.show"])
+
+        // A tab is open: the path bar shows the same strips, so the explorer shows none.
+        rig.model.open(.live(StatesRig.key))
+        #expect(rig.model.explorerStrips.isEmpty)
+        #expect(rig.model.strips.map(\.id).starts(with: ["hidden", "locked"]))
+    }
+
+    @Test("Hide content leaves the sidebar's numbers and the status bar's count out")
+    func sidebarCounts() async {
+        let rig = StatesRig(items: 2)
+        await rig.model.refresh()
+        #expect(rig.model.sidebarCount(of: .all) == 2)
+        #expect(rig.model.sidebarCount(of: .meetings) == 2)
+        #expect(!rig.model.statusRight.isEmpty)
+        rig.model.hidesContent = true
+        #expect(NoteCollection.allCases.allSatisfy { rig.model.sidebarCount(of: $0) == nil })
+        #expect(rig.model.statusRight.isEmpty)
+        rig.model.hidesContent = false
+        #expect(rig.model.sidebarCount(of: .all) == 2)
+        #expect(!rig.model.statusRight.isEmpty)
     }
 
     @Test("a search with no answer says what was asked, and the list comes back with an empty field")

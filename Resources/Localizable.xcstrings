@@ -11575,24 +11575,6 @@
         }
       }
     },
-    "Lintel can’t read the key to your notes. Nothing was deleted." : {
-      "comment" : "Notes: strip when the key to notes.sqlite cannot be read",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel can’t read the key to your notes. Nothing was deleted."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lintel nie może odczytać klucza do notatek. Nic nie zostało usunięte."
-          }
-        }
-      }
-    },
     "Lintel can’t read the key. Nothing was deleted." : {
       "comment" : "Settings → Clipboard banner detail when the keychain denied access to the key",
       "extractionState" : "manual",
@@ -26389,6 +26371,24 @@
         }
       }
     },
+    "Your own notes and edits can’t be opened right now. Nothing was deleted." : {
+      "comment" : "Notes: strip when the key to notes.sqlite cannot be read",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your own notes and edits can’t be opened right now. Nothing was deleted."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Twoich notatek i zmian nie da się teraz otworzyć. Nic nie zostało usunięte."
+          }
+        }
+      }
+    },
     "yesterday %@" : {
       "comment" : "Row accessibility label: a time yesterday",
       "extractionState" : "manual",
@@ -28023,6 +28023,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Notatki są wyłączone dla tego spotkania."
+          }
+        }
+      }
+    },
+    "Notes are off for this meeting. For new meetings, turn on “Write notes after each meeting” in Settings → Meetings." : {
+      "comment" : "Preview: no notes were written and they cannot be written from here",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes are off for this meeting. For new meetings, turn on “Write notes after each meeting” in Settings → Meetings."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notatki są wyłączone dla tego spotkania. Dla nowych spotkań włącz „Pisz notatki po każdym spotkaniu” w Ustawieniach → Spotkania."
           }
         }
       }

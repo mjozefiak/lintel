@@ -29,6 +29,12 @@ extension NotesWorkspaceModel {
         await setCollection(next)
     }
 
+    /// A sidebar row's number: the collection's count, or none while content is hidden, because how many notes
+    /// there are is the user's too (QA of #348, minor 6).
+    func sidebarCount(of collection: NoteCollection) -> Int? {
+        hidesContent ? nil : explorer.counts.count(of: collection)
+    }
+
     // MARK: Writing the notes again
 
     /// Whether the preview's "Try Again" can write the notes: only the plugin that owns the recording can, and only

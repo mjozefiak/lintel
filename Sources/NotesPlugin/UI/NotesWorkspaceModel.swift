@@ -327,6 +327,16 @@ final class NotesWorkspaceModel {
         if let previous { dropPreview(previous) }
     }
 
+    /// Grows on every click on a row; the list takes the keyboard focus when it changes, so ↑ / ↓ and Return work
+    /// right after a click instead of going to the search field (QA of #348, M-B).
+    private(set) var listFocusRequests = 0
+
+    /// A click on a row: selects it and asks the list for the keyboard focus.
+    func click(row id: NoteItemID) {
+        select(row: id)
+        listFocusRequests += 1
+    }
+
     /// A click or an arrow key: the preview shows this note. It opens no tab.
     func select(row id: NoteItemID) {
         let previous = explorer.selection

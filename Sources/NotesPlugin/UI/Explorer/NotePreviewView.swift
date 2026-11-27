@@ -232,9 +232,15 @@ struct NotePreviewView: View {
                     localized: "Lintel is writing the notes.", comment: "Preview: the notes are being written"),
                 isWriting: true)
         case .notesOff(let canWrite):
+            // Without a recorder nothing here can write them; the sentence names the switch for new meetings.
+            // There is no route from Notes to the Meetings pane yet (an owner question on #348).
             var result = Problem(
-                message: String(
-                    localized: "Notes are off for this meeting.", comment: "Preview: no notes were written"),
+                message: canWrite
+                    ? String(localized: "Notes are off for this meeting.", comment: "Preview: no notes were written")
+                    : String(
+                        localized:
+                            "Notes are off for this meeting. For new meetings, turn on “Write notes after each meeting” in Settings → Meetings.",
+                        comment: "Preview: no notes were written and they cannot be written from here"),
                 failed: model.previewRetryFailed)
             if canWrite {
                 result.buttonTitle = String(

@@ -3,7 +3,7 @@ import LintelUI
 import SwiftUI
 
 /// The Notes section's block of the main window's sidebar (spec "Layout"): All notes, Meetings and Dictations with
-/// their counts. The shell draws the sidebar and calls this through `WorkspaceSection.sidebar`; a click selects the
+/// their counts (none while content is hidden). The shell draws the sidebar and calls this through `WorkspaceSection.sidebar`; a click selects the
 /// Notes section and the collection. The Folders header stays hidden until phase 6 and the Dictionary row (phase 7)
 /// is the Dictation section's own.
 struct NotesSidebarBlock: View {
@@ -20,7 +20,7 @@ struct NotesSidebarBlock: View {
             ForEach(Self.rows, id: \.collection) { row in
                 SidebarRow(
                     title: NoteListView.title(of: row.collection), symbolName: row.symbol,
-                    count: model.explorer.counts.count(of: row.collection),
+                    count: model.sidebarCount(of: row.collection),
                     isSelected: context.isSelected && model.explorer.collection == row.collection
                 ) {
                     context.activate()

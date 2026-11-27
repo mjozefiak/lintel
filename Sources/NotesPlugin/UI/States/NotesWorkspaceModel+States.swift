@@ -103,11 +103,13 @@ extension NotesWorkspaceModel {
         }
     }
 
-    /// The right part of the status bar: "27 notes · 1 writing", empty while loading or locked.
+    /// The right part of the status bar: "27 notes · 1 writing", empty while loading or locked, and while content is
+    /// hidden (how many notes there are is left out like the sidebar's numbers).
     var statusRight: String {
+        if hidesContent { return "" }
         switch screen {
-        case .loading, .locked: ""
-        default: statusSummary
+        case .loading, .locked: return ""
+        default: return statusSummary
         }
     }
 
@@ -158,7 +160,7 @@ extension NotesWorkspaceModel {
                 Strip(
                     id: "locked", tone: .error,
                     text: String(
-                        localized: "Lintel can’t read the key to your notes. Nothing was deleted.",
+                        localized: "Your own notes and edits can’t be opened right now. Nothing was deleted.",
                         comment: "Notes: strip when the key to notes.sqlite cannot be read"),
                     actions: [Strip.Action(id: "locked.retry", title: Self.tryAgain)]))
         }
@@ -216,6 +218,11 @@ extension NotesWorkspaceModel {
         }
         return result
     }
+
+    /// The strips the explorer shows across the list and the preview while no tab is open (QA of #348, minors 4
+    /// and 6): Hide content with the way back, notes that can't be opened with Try again, a failed delete or "Make
+    /// note". With a tab open the path bar shows the same strips, so the explorer shows none and nothing is twice.
+    var explorerStrips: [Strip] { tabs.tabs.isEmpty ? strips : [] }
 
     /// The owner's actions for the inspector's Actions list. The strips of an interrupted or a writing note already
     /// carry every one of them, so the inspector lists none then and no button appears twice.

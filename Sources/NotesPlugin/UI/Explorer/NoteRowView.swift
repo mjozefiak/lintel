@@ -7,12 +7,27 @@ import SwiftUI
 /// attention, the state in words beside its ring. Verdigris marks only the selection and live rings.
 struct NoteRowView: View {
     let model: NotesWorkspaceModel
-    let row: NoteRow
+    /// The row as the list passed it; the body reads the model's current copy (`current`).
+    let listed: NoteRow
     @Environment(\.lintelTextSize) private var textSize
+    /// Whether the list has the keyboard focus: the selected row then carries a ring, so a keyboard user sees where
+    /// ↑ / ↓ act.
+    @Environment(\.explorerListFocused) private var listFocused
 
-    private var isSelected: Bool { model.explorer.selection == row.id }
+    init(model: NotesWorkspaceModel, row: NoteRow) {
+        self.model = model
+        self.listed = row
+    }
+
+    /// The model's row of this id. A lazy list can keep a row view and redraw it (its selection changed) with the
+    /// value it was first given, so a search that kept the row lost its snippet (QA of #348, minor 3); reading the
+    /// model's rows ties the body to every new listing.
+    private var row: NoteRow { model.row(for: listed.id) ?? listed }
+
+    private var isSelected: Bool { model.explorer.selection == listed.id }
 
     var body: some View {
+        let row = row
         let text = ExplorerRowText(presentation: model.presentation)
         let state = text.state(row.badge)
         let snippet = model.snippetText(of: row)
@@ -26,10 +41,14 @@ struct NoteRowView: View {
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                 if let snippet {
-                    Text(HighlightedSnippet.make(snippet, query: model.searchQuery?.raw ?? ""))
-                        .font(textSize.font(.footnote))
-                        .foregroundStyle(LintelBrand.secondaryText)
-                        .lineLimit(2)
+                    let query = model.searchQuery?.raw ?? ""
+                    Text(
+                        HighlightedSnippet.make(
+                            NoteRowPresentation.focusedSnippet(snippet, query: query), query: query)
+                    )
+                    .font(textSize.font(.footnote))
+                    .foregroundStyle(LintelBrand.secondaryText)
+                    .lineLimit(2)
                 } else {
                     Text(verbatim: text.meta(row.summary))
                         .font(textSize.font(.footnote))
@@ -54,11 +73,15 @@ struct NoteRowView: View {
         .background(
             isSelected ? LintelBrand.windowSelectionTint : Color.clear, in: RoundedRectangle(cornerRadius: 8)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isSelected ? LintelBrand.accent : Color.clear, lineWidth: listFocused ? 2 : 0)
+        }
         .contentShape(Rectangle())
         .padding(.horizontal, 6 * textSize.scale)
         .padding(.vertical, 1)
         .onTapGesture(count: 2) { model.open(row.id) }
-        .onTapGesture { model.select(row: row.id) }
+        .onTapGesture { model.click(row: row.id) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             Text(
@@ -102,6 +125,11 @@ struct NoteRowView: View {
         case .error: LintelBrand.statusError
         }
     }
+}
+
+extension EnvironmentValues {
+    /// Set by `NoteListView` while its list has the keyboard focus.
+    @Entry var explorerListFocused = false
 }
 
 /// A search hit's snippet with the query's words marked (the selection tint, accent text, bold).

@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// One row of the main window's sidebar (prototype `.si`): a symbol, a title and, optionally, a count. Selection is the
-/// only place Verdigris appears; the count stays in the secondary colour. The row is one button for VoiceOver and
-/// reads "title, count". Shared by the shell's default row and the sections' own blocks (the notes collections).
+/// only place Verdigris appears; the count stays in the secondary colour. The row is one button for VoiceOver: it
+/// reads "title, count" and its press action runs the click. Shared by the shell's default row and the sections' own blocks (the notes collections).
 public struct SidebarRow: View {
     private let title: String
     private let symbolName: String
@@ -57,5 +57,8 @@ public struct SidebarRow: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: count.map { "\(title), \($0)" } ?? title))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        // The element above replaces the button's own, so it needs the press action itself: without it VoiceOver,
+        // Voice Control and Switch Control could not switch a collection or open Settings (QA of #348, M-A).
+        .accessibilityAction { action() }
     }
 }

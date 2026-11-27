@@ -9,6 +9,7 @@ import SwiftUI
 struct NoteListView: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
+    @FocusState private var listFocused: Bool
 
     /// Set by the section from `NotesWorkspaceModel.paneWidth` (a dragged width, else the default).
     let width: CGFloat
@@ -85,7 +86,11 @@ struct NoteListView: View {
                 }
             }
             .focusable()
+            .focused($listFocused)
+            // The system ring would frame the whole column; the selected row draws its own (`NoteRowView`).
             .focusEffectDisabled()
+            .environment(\.explorerListFocused, listFocused)
+            .onChange(of: model.listFocusRequests) { listFocused = true }
             .onKeyPress(.upArrow) { result(.up) }
             .onKeyPress(.downArrow) { result(.down) }
             .onKeyPress(.return) { result(.open) }

@@ -25,6 +25,7 @@ struct NotesSectionView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            ForEach(model.explorerStrips) { strip in NoteStripView(strip: strip, model: model) }
             HStack(spacing: 0) {
                 NoteListView(model: model, width: model.paneWidth(.explorer, textScale: textSize.scale))
                     .transaction(value: model.paneWidth(.explorer, textScale: textSize.scale)) { $0.animation = nil }
