@@ -23,13 +23,19 @@ struct DictationGalleryTests {
         return url.appending(path: "Tests/MeetingsPluginTests/Gallery/Goldens", directoryHint: .isDirectory)
     }()
 
-    @Test("ids are unique and well formed, every state has a summary, the six states exist")
+    @Test("ids are unique and well formed, every state has a summary, the states exist")
     func scenesAreValid() {
         let scenes = DictationPlugin.galleryScenes
         #expect(GalleryScene.validationProblems(scenes).isEmpty, "\(GalleryScene.validationProblems(scenes))")
-        #expect(scenes.map(\.id) == ["dictation.tidy-up"])
-        let ids = Set(scenes.flatMap { $0.states.map(\.id) })
-        #expect(ids == ["off", "light", "standard", "full", "full-small-model", "standard-dimmed"])
+        #expect(scenes.map(\.id) == ["dictation.tidy-up", "dictation.hud-pills"])
+        let tidyUp = Set(scenes.first { $0.id == "dictation.tidy-up" }?.states.map(\.id) ?? [])
+        #expect(tidyUp == ["off", "light", "standard", "full", "full-small-model", "standard-dimmed"])
+        // The HUD pills (minimal HUD, Phase 2): every state of the dictation HUD that has a pill, the three looks.
+        let pills = Set(scenes.first { $0.id == "dictation.hud-pills" }?.states.map(\.id) ?? [])
+        #expect(
+            pills.isSuperset(of: ["recording", "recording-hover", "recording-loading-model", "finishing", "pasted"]))
+        #expect(pills.isSuperset(of: ["reduced-motion-recording", "increased-contrast-recording"]))
+        #expect(pills.isSuperset(of: ["recording-microphone-fallback", "recording-microphone-fallback-collapsed"]))
     }
 
     @Test("every state draws real content in the CI appearances")
@@ -47,7 +53,7 @@ struct DictationGalleryTests {
 
     @Test("a state is made fresh each time, and the states differ from one another")
     func statesAreIndependent() async throws {
-        let states = try #require(DictationPlugin.galleryScenes.first).states
+        let states = try #require(DictationPlugin.galleryScenes.first { $0.id == "dictation.tidy-up" }).states
         var first: [String: String] = [:]
         for state in states {
             let bitmap = try await GalleryRenderer.render(state, Self.lightM)

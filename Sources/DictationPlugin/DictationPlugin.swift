@@ -165,7 +165,14 @@ public final class DictationPlugin: LintelPlugin {
         // A missing or broken speech model goes to the Models pane; the microphone problem goes to Settings.
         hud = DictationHUDPanel(
             onCancel: { relay.controller?.cancel() }, onOpenSettings: { openSettings() },
-            onOpenModels: { openModels(settings.speechModelID) })
+            onOpenModels: { openModels(settings.speechModelID) },
+            onOpenAccessibility: {
+                if let url = URL(
+                    string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+                {
+                    Task { try? await workspace.open(url) }
+                }
+            })
         self.relay = relay
         #if DEBUG
         qaRecorder = DictationQARecorder(wrapping: hud)
@@ -240,7 +247,11 @@ public final class DictationPlugin: LintelPlugin {
         // `--qa-hud dictation:<state>`: draws the HUD in that state, nothing else (docs/qa.md).
         if let name = context.settings.string(DictationHUDQA.settingName) {
             let hud = DictationHUDQA()
-            if hud.show(named: name) {
+            // `plugins.dictation.qaHUDHover`: the pill drawn in its hover state (docs/qa.md).
+            if hud.show(
+                named: name, hover: context.settings.bool(DictationHUDQA.hoverSettingName, default: false),
+                reduceMotion: context.settings.bool(DictationHUDQA.reduceMotionSettingName, default: false))
+            {
                 qaHUD = hud
             } else {
                 context.logger.error("Unknown --qa-hud dictation state")

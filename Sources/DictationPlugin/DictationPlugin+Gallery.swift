@@ -7,7 +7,7 @@ import SwiftUI
 /// scene draws the real `TidyUpRow` (the popup, the help line and the example of the chosen value) on the settings
 /// template, over a fixed choice. Nothing starts: no server probe, no model, no file. The sentences are invented.
 extension DictationPlugin: GalleryProviding {
-    public static var galleryScenes: [GalleryScene] { [TidyUpGallery.scene] }
+    public static var galleryScenes: [GalleryScene] { [TidyUpGallery.scene, HUDPillGallery.scene] }
 }
 
 /// The pane a state draws: only the row of "Tidy up my text", like in Settings → Dictation → Basics.

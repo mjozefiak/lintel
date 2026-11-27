@@ -20,8 +20,8 @@ public nonisolated struct PillContent: Equatable, Sendable {
     public var truncation: PillTruncation
     /// The one visible button after the line.
     public var action: PillAction?
-    /// Hover content (OD-2, OD-5, OD-9, OD-10): a short text, level meters and buttons shown only while the pointer
-    /// rests on the pill (or a button inside it has keyboard focus). Never the only place of anything: every one of
+    /// Hover content (OD-2, OD-5, OD-9, OD-10): a short text, level meters and buttons shown only once the pointer
+    /// has entered the pill (or a button inside it has keyboard focus). Never the only place of anything: every one of
     /// them is also an accessibility action or in the label.
     public var hoverText: String?
     public var hoverLevels: [PillLevel]

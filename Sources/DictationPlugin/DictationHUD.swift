@@ -1,4 +1,6 @@
 import AppKit
+import LintelSpeech
+import LintelUI
 import Observation
 import SwiftUI
 
@@ -25,26 +27,110 @@ struct AnnouncementGate {
     }
 }
 
-/// The state the HUD's view reads.
+/// The state the HUD's view reads: the dictation state, the pill's hover (spec `2026-11-25-minimal-hud`, "Hover") and
+/// the 3 s window of the replaced-microphone line (OD-11). The timers are the model's, not the controller's: the
+/// controller only reports states.
 @MainActor @Observable
 final class HUDModel {
+    /// How long the line "Using <microphone>" stays before only the amber dot is left (OD-11, dictation: 3 s).
+    static let microphoneLineDuration: Duration = .seconds(3)
+
     var state = HUDState.finishing
     /// When the recording began, for the running time.
     var recordingStartedAt: Date?
-    var reducesMotion = false
+    /// The 3 s line collapses by itself. QA fixtures switch it off: they set the collapsed state directly, so no
+    /// fixture changes while a snapshot is taken.
+    @ObservationIgnored var lineTimerEnabled = true
+    /// How the pill moves: the system's Reduce Motion (the panel reads it on every state) or, for QA, a fixed look.
+    var motion: LintelRingMotion = .system
+    /// The replaced-microphone line is shown (the first 3 s) or collapsed to the amber dot.
+    var microphoneLineVisible = true
+    #if DEBUG
+    /// QA only: a fixed running time, so a snapshot is the same every run.
+    var qaElapsed: Int?
+    #endif
+    @ObservationIgnored let hover: PillHoverModel
     @ObservationIgnored var onCancel: () -> Void = {}
     @ObservationIgnored var onOpenSettings: () -> Void = {}
     /// The model problems' button: `PluginContext.openModels` for the speech model.
     @ObservationIgnored var onOpenModels: () -> Void = {}
+    /// "Allow" on a copy that could not be pasted: the Accessibility privacy pane.
+    @ObservationIgnored var onOpenAccessibility: () -> Void = {}
 
-    /// The HUD's link: the Models pane for a model problem, else Settings.
-    func openLink() {
-        if state.opensModels { onOpenModels() } else { onOpenSettings() }
+    @ObservationIgnored private let sleep: @Sendable (Duration) async throws -> Void
+    @ObservationIgnored private var lineTask: Task<Void, Never>?
+    @ObservationIgnored private var lineFallback: InputFallback?
+
+    /// - Parameter sleep: the time of the hover (300 / 500 ms) and of the 3 s line; a test passes a manual clock's.
+    init(sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
+        self.sleep = sleep
+        hover = PillHoverModel(sleep: sleep)
+    }
+
+    /// Shows `new`. A change of state (not a level update inside one recording) collapses the hover, so a pill that
+    /// appears under the pointer does not expand until the pointer moves.
+    func apply(_ new: HUDState) {
+        if !(state.offersCancel && new.offersCancel) { hover.reset() }
+        state = new
+        followMicrophoneLine(of: new)
+    }
+
+    /// The panel went away: forget the hover and the line's timer.
+    func clear() {
+        hover.reset()
+        lineTask?.cancel()
+        lineTask = nil
+        lineFallback = nil
+        microphoneLineVisible = true
+    }
+
+    /// A button of the pill was pressed (or its accessibility action ran).
+    func perform(_ id: String) {
+        switch id {
+        case HUDPillAction.cancel: onCancel()
+        case HUDPillAction.openSettings: onOpenSettings()
+        case HUDPillAction.openModels: onOpenModels()
+        case HUDPillAction.allowAccessibility: onOpenAccessibility()
+        default: break
+        }
+    }
+
+    /// The line starts when a recording gets (or changes) its fallback, not on every level update.
+    private func followMicrophoneLine(of state: HUDState) {
+        var fallback: InputFallback?
+        if case .recording(let recording) = state { fallback = recording.fallback }
+        guard fallback != lineFallback else { return }
+        lineFallback = fallback
+        lineTask?.cancel()
+        lineTask = nil
+        microphoneLineVisible = true
+        guard fallback != nil else { return }
+        guard lineTimerEnabled else { return }
+        let sleep = self.sleep
+        lineTask = Task { [weak self] in
+            do { try await sleep(Self.microphoneLineDuration) } catch { return }
+            guard !Task.isCancelled else { return }
+            self?.microphoneLineVisible = false
+        }
     }
 }
 
-/// A small pill at the bottom of the screen with the mouse cursor. A non-activating panel: it never takes
-/// the focus from the app the user is dictating into, and it ignores the mouse apart from its buttons.
+/// Where the panel goes: the pill's bottom edge 48 pt above the visible frame's bottom edge (spec "The pill family":
+/// the distances are the pill's, not the panel's), so the 56 pt tall transparent panel sits (56 − pill height) / 2
+/// lower than its own bottom would.
+enum HUDPlacement {
+    static let bottomInset: CGFloat = 48
+
+    static func origin(visibleFrame: CGRect, panelSize: CGSize, pillHeight: CGFloat) -> CGPoint {
+        CGPoint(
+            x: visibleFrame.midX - panelSize.width / 2,
+            y: visibleFrame.minY + bottomInset - (panelSize.height - pillHeight) / 2)
+    }
+}
+
+/// A small pill at the bottom of the screen with the mouse cursor. A non-activating panel: it never takes the focus
+/// from the app the user is dictating into. The panel is a fixed transparent 580 × 56 pt frame with the pill centred in
+/// it; only the pill's pixels take the mouse (the hover and its buttons), the rest passes clicks through.
 @MainActor
 final class DictationHUDPanel: HUDPresenter {
     private let model = HUDModel()
@@ -55,24 +141,27 @@ final class DictationHUDPanel: HUDPresenter {
 
     init(
         onCancel: @escaping () -> Void, onOpenSettings: @escaping () -> Void,
-        onOpenModels: @escaping () -> Void = {},
+        onOpenModels: @escaping () -> Void = {}, onOpenAccessibility: @escaping () -> Void = {},
         reducesMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     ) {
         self.reducesMotion = reducesMotion
         model.onCancel = onCancel
         model.onOpenSettings = onOpenSettings
         model.onOpenModels = onOpenModels
+        model.onOpenAccessibility = onOpenAccessibility
     }
 
     func show(_ state: HUDState) {
         hideTask?.cancel()
         hideTask = nil
         let wasRecording = model.state.offersCancel
-        model.reducesMotion = reducesMotion()
+        model.motion = reducesMotion() ? .reduced : .system
         if state.offersCancel, !wasRecording || model.recordingStartedAt == nil {
             model.recordingStartedAt = Date()
         }
-        model.state = state
+        model.apply(state)
+        // A state with no pill (a partial cleanup, OD-4) shows nothing.
+        guard state.pill() != nil else { return hide() }
         let panel = panel ?? makePanel()
         self.panel = panel
         position(panel)
@@ -93,6 +182,7 @@ final class DictationHUDPanel: HUDPresenter {
         hideTask?.cancel()
         hideTask = nil
         model.recordingStartedAt = nil
+        model.clear()
         announcements.reset()
         panel?.orderOut(nil)
     }
@@ -109,7 +199,7 @@ final class DictationHUDPanel: HUDPresenter {
         panel.becomesKeyOnlyIfNeeded = true
         panel.isFloatingPanel = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        panel.contentView = NSHostingView(rootView: DictationHUDView(model: model))
+        panel.contentView = PillHoverHost(rootView: DictationHUDView(model: model), hover: model.hover)
         return panel
     }
 
@@ -118,8 +208,9 @@ final class DictationHUDPanel: HUDPresenter {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
         guard let frame = screen?.visibleFrame else { return }
-        let size = panel.frame.size
-        panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.minY + 48))
+        let origin = HUDPlacement.origin(
+            visibleFrame: frame, panelSize: panel.frame.size, pillHeight: PillMetrics.height(AppTextSize.current()))
+        panel.setFrameOrigin(origin)
     }
 
     private func announce(_ text: String, from panel: NSPanel) {
@@ -133,168 +224,32 @@ final class DictationHUDPanel: HUDPresenter {
 }
 
 struct DictationHUDView: View {
-    /// The size of the capsule, shared with the QA snapshot's backdrop (`DictationHUDQA`).
-    static let size = CGSize(width: 248, height: 40)
-    /// The panel is taller than the capsule: the capsule sits at its bottom (where it always was) and the
-    /// one-line notice about an unavailable microphone (shown only then) goes above it.
-    static let panelSize = CGSize(width: 360, height: 104)
-    /// The distance of the capsule from the panel's bottom edge.
-    static let bottomInset: CGFloat = 8
+    /// The panel: a fixed transparent frame larger than the widest hovered pill (`PillMetrics.panelSize`).
+    static let panelSize = PillMetrics.panelSize
 
     let model: HUDModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        let state = model.state
-        VStack(spacing: 6) {
-            Spacer(minLength: 0)
-            if let notice = state.notice {
-                Text(notice)
-                    .font(.footnote.weight(.medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                    .truncationMode(.middle)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: 344)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 14))
-                    .overlay {
-                        if contrast == .increased {
-                            RoundedRectangle(cornerRadius: 14).strokeBorder(.primary.opacity(0.6), lineWidth: 1)
-                        }
-                    }
-            }
-            capsule(for: state)
-        }
-        .padding(.bottom, Self.bottomInset)
-        .frame(width: Self.panelSize.width, height: Self.panelSize.height)
-        .animation(reduceMotion || model.reducesMotion ? nil : .smooth(duration: 0.2), value: state)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(state.accessibilityLabel)
-    }
-
-    private func capsule(for state: HUDState) -> some View {
-        HStack(spacing: 10) {
-            icon(for: state)
-                .frame(width: 20, height: 20)
-            Text(state.title)
-                .font(.callout.weight(.medium))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            if case .recording(let recording) = state {
-                Spacer(minLength: 4)
-                LevelBars(level: recording.level, animated: !(reduceMotion || model.reducesMotion))
-                if let started = model.recordingStartedAt {
-                    TimelineView(.periodic(from: started, by: 1)) { context in
-                        Text(Self.format(context.date.timeIntervalSince(started)))
-                            .font(.callout.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
+        LintelTextSizeScope(size: AppTextSize.current) {
+            if model.state.offersCancel, let started = model.recordingStartedAt {
+                // The running time is on hover and in the VoiceOver label, so the view redraws each second while
+                // recording and never otherwise.
+                TimelineView(.periodic(from: started, by: 1)) { context in
+                    pill(elapsed: Int(context.date.timeIntervalSince(started)))
                 }
             } else {
-                Spacer(minLength: 0)
+                pill(elapsed: 0)
             }
-            if state.offersSettings {
-                Button(state.detail ?? "") { model.openLink() }
-                    .buttonStyle(.link)
-                    // The brand's text-grade accent (4.5:1 on the glass) from the app's asset catalog; the system
-                    // accent when the catalog is missing (`swift run`, tests).
-                    .foregroundStyle(Color(nsColor: NSColor(named: "AccentText") ?? .controlAccentColor))
-                    .font(.system(size: 12, weight: .medium))
-            }
-            if state.offersCancel {
-                Button {
-                    model.onCancel()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    String(localized: "Cancel dictation", comment: "Accessibility label of the HUD's ✕"))
-            }
-        }
-        .padding(.leading, 14)
-        .padding(.trailing, 12)
-        .frame(width: Self.size.width, height: Self.size.height)
-        .glassEffect(.regular, in: .capsule)
-        .overlay {
-            if contrast == .increased { Capsule().strokeBorder(.primary.opacity(0.6), lineWidth: 1) }
         }
     }
 
-    @ViewBuilder
-    private func icon(for state: HUDState) -> some View {
-        switch state {
-        case .recording(let recording) where !recording.loadingModel:
-            Image(systemName: "record.circle.fill")
-                .symbolRenderingMode(.multicolor)
-                .foregroundStyle(.red)
-                .font(.title3)
-                .symbolEffect(.pulse, isActive: !(reduceMotion || model.reducesMotion))
-                .accessibilityHidden(true)
-        case .finishing, .recording:
-            BrandCaret(animated: !(reduceMotion || model.reducesMotion))
-                .accessibilityHidden(true)
-        case .pasted:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                .font(.title3).accessibilityHidden(true)
-        case .pastedUnformatted, .copied, .allowMicrophone:
-            Image(systemName: state.symbolName).foregroundStyle(.orange)
-                .font(.title3).accessibilityHidden(true)
-        case .problem:
-            Image(systemName: state.symbolName).foregroundStyle(.red)
-                .font(.title3).accessibilityHidden(true)
+    @ViewBuilder private func pill(elapsed: Int) -> some View {
+        #if DEBUG
+        let elapsed = model.qaElapsed ?? elapsed
+        #endif
+        if let content = model.state.pill(elapsed: elapsed, microphoneLineVisible: model.microphoneLineVisible) {
+            PillHoverRoot(content, hover: model.hover, onAction: { model.perform($0) })
+                .environment(\.lintelRingMotion, model.motion)
         }
-    }
-
-    static func format(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds))
-        return String(format: "%d:%02d", total / 60, total % 60)
-    }
-}
-
-/// The "working" indicator: the accent caret. It blinks, or stays solid when Reduce Motion is on.
-private struct BrandCaret: View {
-    let animated: Bool
-    @State private var lit = true
-
-    var body: some View {
-        Capsule()
-            .fill(Color.accentColor)
-            .frame(width: 3, height: 16)
-            .opacity(lit ? 1 : 0.25)
-            .task(id: animated) {
-                lit = true
-                guard animated else { return }
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(550))
-                    lit.toggle()
-                }
-            }
-    }
-}
-
-/// Bars that follow the microphone level, tallest in the middle; flat when Reduce Motion is on.
-private struct LevelBars: View {
-    let level: Float
-    let animated: Bool
-    private static let profile: [CGFloat] = [0.45, 0.7, 1, 0.7, 0.45]
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<Self.profile.count, id: \.self) { index in
-                let height = 4 + 14 * CGFloat(min(1, max(0, level))) * Self.profile[index]
-                Capsule()
-                    .fill(Color.accentColor)
-                    .frame(width: 3, height: height)
-            }
-        }
-        .frame(height: 18)
-        .animation(animated ? .easeOut(duration: 0.08) : nil, value: level)
-        .accessibilityHidden(true)
     }
 }

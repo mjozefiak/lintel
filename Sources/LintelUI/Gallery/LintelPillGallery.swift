@@ -95,7 +95,7 @@ import SwiftUI
             ) { dictation },
             state(
                 "live-wave-hover",
-                "Dictation, hovered (300 ms after the pointer rests): the time and the ✕ appear; the wave stays.",
+                "Dictation, hovered (300 ms after the pointer enters): the time and the ✕ appear; the wave stays.",
                 expanded: true
             ) { dictation },
             state(
