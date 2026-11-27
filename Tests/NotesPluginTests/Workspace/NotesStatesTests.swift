@@ -142,6 +142,27 @@ struct NotesScreenTests {
         #expect(rig.model.strips.map(\.id).starts(with: ["hidden", "locked"]))
     }
 
+    @Test("a tab's own strip does not follow the last tab into the explorer; the explorer's own failure does")
+    func explorerStripsOnlyTheirOwn() async {
+        let rig = StatesRig()
+        await rig.model.refresh()
+        rig.model.open(.live(StatesRig.key))
+        rig.model.show(.saveFailed)
+        #expect(rig.model.strips.map(\.id) == ["save"])
+        #expect(rig.model.explorerStrips.isEmpty)
+        // Its Try again and "Choose another place…" act on the open note: with the last tab closed they could do
+        // nothing, so the explorer does not show them.
+        rig.model.close(.live(StatesRig.key))
+        #expect(rig.model.tabs.tabs.isEmpty)
+        #expect(rig.model.explorerStrips.isEmpty)
+        rig.model.show(.restoreFailed)
+        #expect(rig.model.explorerStrips.isEmpty)
+        // A failed delete from the explorer is said there.
+        rig.model.show(.deleteFailed)
+        #expect(rig.model.explorerStrips.map(\.id) == ["feedback"])
+        #expect(rig.model.explorerStrips.first?.isDismissible == true)
+    }
+
     @Test("Hide content leaves the sidebar's numbers and the status bar's count out")
     func sidebarCounts() async {
         let rig = StatesRig(items: 2)
