@@ -9,38 +9,12 @@ struct NoteStripView: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
 
+    @Environment(\.notesCompact) private var compact
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Circle().fill(dot).frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
-                    .accessibilityHidden(true)
-                Text(verbatim: strip.text)
-                    .font(textSize.font(.callout))
-                    .foregroundStyle(LintelBrand.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                ForEach(strip.actions) { action in
-                    Button {
-                        Task { await model.perform(action.id) }
-                    } label: {
-                        Text(verbatim: action.title)
-                            .font(textSize.font(.callout, weight: .semibold))
-                            .foregroundStyle(LintelBrand.accentText)
-                            .lineLimit(1)
-                    }
-                    .buttonStyle(.plain)
-                }
-                if strip.isDismissible {
-                    Button {
-                        model.dismissStrip(strip.id)
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(textSize.font(.caption2, weight: .semibold))
-                            .foregroundStyle(LintelBrand.secondaryText)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text("Dismiss", comment: "Accessibility label of a strip's close button"))
-                }
+            Group {
+                if compact { stackedRow } else { row }
             }
             .padding(.horizontal, 16 * textSize.scale)
             .padding(.vertical, 4 * textSize.scale)
@@ -49,6 +23,70 @@ struct NoteStripView: View {
             LintelDivider()
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var sentence: some View {
+        Text(verbatim: strip.text)
+            .font(textSize.font(.callout))
+            .foregroundStyle(LintelBrand.ink)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var dotView: some View {
+        Circle().fill(dot).frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
+            .accessibilityHidden(true)
+    }
+
+    private func actionButton(_ action: NotesWorkspaceModel.Strip.Action) -> some View {
+        Button {
+            Task { await model.perform(action.id) }
+        } label: {
+            Text(verbatim: action.title)
+                .font(textSize.font(.callout, weight: .semibold))
+                .foregroundStyle(LintelBrand.accentText)
+                // The whole word, on one line when it fits; a title longer than the strip wraps, never cut.
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var dismissButton: some View {
+        Button {
+            model.dismissStrip(strip.id)
+        } label: {
+            Image(systemName: "xmark")
+                .font(textSize.font(.caption2, weight: .semibold))
+                .foregroundStyle(LintelBrand.secondaryText)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Dismiss", comment: "Accessibility label of a strip's close button"))
+    }
+
+    private var row: some View {
+        HStack(spacing: 10) {
+            dotView
+            sentence
+            Spacer(minLength: 0)
+            ForEach(strip.actions) { action in actionButton(action).lineLimit(1) }
+            if strip.isDismissible { dismissButton }
+        }
+    }
+
+    /// A narrow section (a window tiled to about 310 pt): the sentence has the width, the actions sit under it.
+    private var stackedRow: some View {
+        HStack(alignment: .top, spacing: 10) {
+            dotView.padding(.top, 6 * textSize.scale)
+            VStack(alignment: .leading, spacing: 4 * textSize.scale) {
+                sentence
+                if !strip.actions.isEmpty {
+                    WrappingRow(spacing: 14 * textSize.scale, lineSpacing: 2 * textSize.scale) {
+                        ForEach(strip.actions) { action in actionButton(action) }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if strip.isDismissible { dismissButton.padding(.top, 2 * textSize.scale) }
+        }
     }
 
     private var dot: Color {

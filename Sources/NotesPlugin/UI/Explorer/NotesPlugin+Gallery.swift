@@ -66,7 +66,7 @@ private final class GalleryRecorder: LiveRecorder, @unchecked Sendable {
     func retryNotes(_ key: NoteKey) async throws {}
 }
 
-@MainActor private func galleryModel(_ scenario: NotesExplorerGalleryCase) -> NotesWorkspaceModel {
+@MainActor func galleryModel(_ scenario: NotesExplorerGalleryCase) -> NotesWorkspaceModel {
     let sources: [any NoteSource]
     let overlays: any OverlayIndex & OverlayDetacher
     switch scenario.sources {

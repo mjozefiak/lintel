@@ -21,7 +21,14 @@ struct NotePreviewView: View {
             if let id = model.explorer.selection {
                 Group {
                     if let document = model.previewDocument {
-                        content(id: id, document: document)
+                        // A narrow section is short too: the whole preview scrolls (title, tabs and text together)
+                        // instead of being cut off at the window's edge.
+                        if compact {
+                            ScrollView { content(id: id, document: document) }
+                                .scrollBounceBehavior(.basedOnSize)
+                        } else {
+                            content(id: id, document: document)
+                        }
                     } else {
                         NoteSkeletonDocument()
                     }
@@ -171,24 +178,30 @@ struct NotePreviewView: View {
 
     // MARK: Body
 
-    private func blocks(_ document: NoteDocumentModel) -> some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(document.blocks) { block in
-                    NoteBlockRow(
-                        document: document, block: block,
-                        previous: block.index > 0 && block.index - 1 < document.blocks.count
-                            ? document.blocks[block.index - 1] : nil)
-                }
-                if document.blocks.isEmpty {
-                    Text("This note has no text yet.", comment: "Document: the shown layer has no text")
-                        .font(textSize.font(.callout))
-                        .foregroundStyle(LintelBrand.secondaryText)
-                        .padding(.leading, 5.4 * 12.5 * textSize.scale)
-                }
-            }
-            .padding(.vertical, 8 * textSize.scale)
+    @ViewBuilder private func blocks(_ document: NoteDocumentModel) -> some View {
+        if compact {
+            blockList(document)
+        } else {
+            ScrollView { blockList(document) }
         }
+    }
+
+    private func blockList(_ document: NoteDocumentModel) -> some View {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(document.blocks) { block in
+                NoteBlockRow(
+                    document: document, block: block,
+                    previous: block.index > 0 && block.index - 1 < document.blocks.count
+                        ? document.blocks[block.index - 1] : nil)
+            }
+            if document.blocks.isEmpty {
+                Text("This note has no text yet.", comment: "Document: the shown layer has no text")
+                    .font(textSize.font(.callout))
+                    .foregroundStyle(LintelBrand.secondaryText)
+                    .padding(.leading, 5.4 * 12.5 * textSize.scale)
+            }
+        }
+        .padding(.vertical, 8 * textSize.scale)
     }
 
     /// My notes is read-only in this phase: the line says so and what will be here.
@@ -316,7 +329,11 @@ struct WrappingRow: Layout {
         var lineHeight: CGFloat = 0
         var widest: CGFloat = 0
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            // A child wider than the row wraps its own words instead of reaching past the edge.
+            var size = subview.sizeThatFits(.unspecified)
+            if size.width > width, width.isFinite {
+                size = subview.sizeThatFits(ProposedViewSize(width: width, height: nil))
+            }
             if x > 0 && x + size.width > width {
                 y += lineHeight + lineSpacing
                 x = 0
@@ -339,7 +356,8 @@ struct WrappingRow: Layout {
         let result = lines(subviews, width: bounds.width)
         for (subview, frame) in zip(subviews, result.frames) {
             subview.place(
-                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: .unspecified)
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                proposal: ProposedViewSize(width: frame.width, height: frame.height))
         }
     }
 }

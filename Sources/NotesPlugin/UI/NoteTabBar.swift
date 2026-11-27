@@ -342,21 +342,36 @@ struct NotePathBar: View {
 struct NotesStatusBar: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
+    @Environment(\.notesCompact) private var compact
+
+    private var encryption: some View {
+        Label {
+            Text("Encrypted on this Mac", comment: "Notes status bar: where the notes are stored")
+        } icon: {
+            Image(systemName: "lock")
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             LintelDivider()
-            HStack(spacing: 14) {
-                if let line = model.statusLine { StatusLineView(line: line) }
-                if model.showsEncryptionNote {
-                    Label {
-                        Text("Encrypted on this Mac", comment: "Notes status bar: where the notes are stored")
-                    } icon: {
-                        Image(systemName: "lock")
+            Group {
+                if compact {
+                    // A narrow section: one part per line, so a part wraps between words and never into pieces.
+                    VStack(alignment: .leading, spacing: 2 * textSize.scale) {
+                        if let line = model.statusLine { StatusLineView(line: line) }
+                        if model.showsEncryptionNote { encryption }
+                        if !model.statusRight.isEmpty { Text(verbatim: model.statusRight) }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    HStack(spacing: 14) {
+                        if let line = model.statusLine { StatusLineView(line: line) }
+                        if model.showsEncryptionNote { encryption }
+                        Spacer(minLength: 0)
+                        Text(verbatim: model.statusRight)
                     }
                 }
-                Spacer(minLength: 0)
-                Text(verbatim: model.statusRight)
             }
             .font(textSize.font(.footnote))
             .foregroundStyle(LintelBrand.secondaryText)
@@ -376,30 +391,44 @@ struct StatusLineView: View {
     let line: NotesWorkspaceModel.StatusLine
     @Environment(\.lintelTextSize) private var textSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.notesCompact) private var compact
 
     var body: some View {
-        HStack(spacing: 6) {
-            switch line.kind {
-            case .busy:
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .foregroundStyle(LintelBrand.accentText)
-                    .accessibilityHidden(true)
-            default:
-                Circle().fill(color).frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
-                    .accessibilityHidden(true)
+        // The progress bar goes under the words in a narrow section, so the words keep the whole width.
+        let layout: AnyLayout =
+            compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3)) : AnyLayout(HStackLayout(spacing: 6))
+        layout {
+            HStack(spacing: 6) {
+                marker
+                Text(verbatim: line.text)
             }
-            Text(verbatim: line.text)
-            if case .busy(let progress?) = line.kind {
-                ZStack(alignment: .leading) {
-                    Capsule().fill(LintelBrand.hairline)
-                    GeometryReader { proxy in
-                        Capsule().fill(LintelBrand.accent).frame(width: proxy.size.width * progress)
-                    }
-                }
-                .frame(width: 8 * 12.5 * textSize.scale, height: 4)
-                .padding(.leading, 2)
+            progressBar
+        }
+    }
+
+    @ViewBuilder private var marker: some View {
+        switch line.kind {
+        case .busy:
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .foregroundStyle(LintelBrand.accentText)
                 .accessibilityHidden(true)
+        default:
+            Circle().fill(color).frame(width: 7 * textSize.scale, height: 7 * textSize.scale)
+                .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder private var progressBar: some View {
+        if case .busy(let progress?) = line.kind {
+            ZStack(alignment: .leading) {
+                Capsule().fill(LintelBrand.hairline)
+                GeometryReader { proxy in
+                    Capsule().fill(LintelBrand.accent).frame(width: proxy.size.width * progress)
+                }
             }
+            .frame(width: 8 * 12.5 * textSize.scale, height: 4)
+            .padding(.leading, compact ? 0 : 2)
+            .accessibilityHidden(true)
         }
     }
 

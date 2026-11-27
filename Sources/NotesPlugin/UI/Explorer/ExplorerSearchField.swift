@@ -7,14 +7,21 @@ struct ExplorerSearchField: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
     @FocusState private var focused: Bool
+    @Environment(\.notesCompact) private var compact
 
     private var prompt: Text {
+        // A narrow list has no room for "Szukaj w dyktowaniach" at the largest text size; the heading already says
+        // what is searched.
+        guard !compact else {
+            return Text("Search", comment: "Explorer: short placeholder of the search field in a narrow window")
+        }
         switch model.collection {
         case .dictations:
-            Text("Search dictations", comment: "Explorer: placeholder of the search field in the Dictations list")
+            return Text(
+                "Search dictations", comment: "Explorer: placeholder of the search field in the Dictations list")
         case .meetings:
-            Text("Search meetings", comment: "Explorer: placeholder of the search field in the Meetings list")
-        case .all: Text("Search notes", comment: "Explorer: placeholder of the search field")
+            return Text("Search meetings", comment: "Explorer: placeholder of the search field in the Meetings list")
+        case .all: return Text("Search notes", comment: "Explorer: placeholder of the search field")
         }
     }
 

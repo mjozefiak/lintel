@@ -27,7 +27,9 @@ struct NotesSectionView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(model.explorerStrips) { strip in NoteStripView(strip: strip, model: model) }
+            ForEach(model.explorerStrips) { strip in
+                NoteStripView(strip: strip, model: model).environment(\.notesCompact, compact)
+            }
             if compact && model.tabs.tabs.isEmpty {
                 NoteStackedExplorer(model: model)
             } else {
@@ -75,7 +77,7 @@ struct NotesSectionView: View {
                 }
                 .notesAnimation(.inspector, value: inspectorDocument != nil)
             }
-            NotesStatusBar(model: model)
+            NotesStatusBar(model: model).environment(\.notesCompact, compact)
         }
         .background(LintelBrand.windowBackground)
         .overlay {
@@ -106,22 +108,37 @@ struct NotesSectionView: View {
 }
 
 /// A section too narrow for two columns (a window tiled to about 310 pt): the list on top and, when a note is
-/// selected, its preview under it. Everything takes the width it has and wraps; nothing is cut off.
+/// selected, its preview under it. Everything takes the width it has and wraps; nothing is cut off. The list gets
+/// a share of the height, the preview scrolls in the rest, so a window that is short for the text size loses
+/// nothing: what does not fit scrolls.
 struct NoteStackedExplorer: View {
     let model: NotesWorkspaceModel
     @Environment(\.lintelTextSize) private var textSize
 
+    /// The list's height beside a preview: at most its natural 240 pt, about 45 % of a short window, never less than
+    /// the heading and search field plus a row.
+    static func listHeight(available: CGFloat, textScale: CGFloat) -> CGFloat {
+        min(available, min(240 * textScale, max(available * 0.45, 150 * textScale)))
+    }
+
     var body: some View {
         let hasPreview = model.explorer.selection != nil
-        VStack(spacing: 0) {
-            NoteListView(model: model, width: nil)
-                .frame(maxHeight: hasPreview ? 240 * textSize.scale : .infinity)
-            if hasPreview {
-                LintelDivider()
-                NotePreviewView(model: model, compact: true)
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                NoteListView(model: model, width: nil)
+                    .environment(\.notesCompact, true)
+                    .frame(
+                        height: hasPreview
+                            ? Self.listHeight(available: proxy.size.height, textScale: textSize.scale)
+                            : proxy.size.height
+                    )
+                if hasPreview {
+                    LintelDivider()
+                    NotePreviewView(model: model, compact: true)
+                }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
