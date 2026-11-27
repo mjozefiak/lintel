@@ -94,6 +94,8 @@ import Testing
         }
         #expect(
             conditional == [
+                // The LFS cache is saved only when the exact key was not restored (the pictures changed).
+                "      - name: Save the golden images (Git LFS)",
                 "      - name: Restore the Thread Sanitizer build cache", "      - name: Test under Thread Sanitizer",
                 // The design gallery: its step does not fail the job itself (so it never hides the steps after it);
                 // these two report a difference at the end.

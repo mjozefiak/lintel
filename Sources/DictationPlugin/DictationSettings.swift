@@ -65,11 +65,12 @@ struct DictationSettings: Sendable {
     static let defaultSpeechModel = "parakeet-ultra"
     static let defaultKeepWarmMinutes = 10
 
-    /// Whether Full is offered and runs. Spec phase 2: Full ships only when its measured targets pass; with this off a
-    /// stored `full` (a newer build wrote it) shows and runs as Standard and the popup has no Full. **Off since the first
-    /// measurement (2026-11-26):** Full met every target but one, self-corrections OK 57 % against Standard's 71 % on the
-    /// owner's corpus (4 of 7 items against 5 of 7), so it waits for the owner's decision. A DEBUG build turns it on for
-    /// QA with `plugins.dictation.qaOfferFull=true`.
+    /// Whether Full is offered and runs. Spec phase 2: Full ships only when every measured target passes; with this off
+    /// a stored `full` (a newer build wrote it) shows and runs as Standard and the popup has no Full. **Off after the
+    /// third round too (2026-11-26, Full prompt v3): v3 holds self-corrections above Standard's (6 of 7 items against
+    /// 5), no invented greeting, sign-off or lost number, chat WER equal to Standard's and fewer lost content words than
+    /// Standard on the owner's corpus (see the spec's Phase 2b result), but the owner has not decided to offer it. A
+    /// DEBUG build turns it on for QA with `plugins.dictation.qaOfferFull=true`.
     static let fullIsOffered = false
 
     private let settings: PluginSettings

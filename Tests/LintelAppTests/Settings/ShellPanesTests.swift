@@ -157,7 +157,7 @@ enum PaneTree {
         // A stored `false` does not turn it off, so the Features banner counts it as on.
         await host.setEnabled(false, for: AlwaysOnNotesPlugin.manifest.id)
         #expect(host.isEnabled(AlwaysOnNotesPlugin.manifest.id))
-        #expect(ShellPaneBanners.features(host: host).detail == "All features are on.")
+        #expect(ShellPaneBanners.features(host: host, reader: FakePermissionsReader()).detail == "All features are on.")
     }
 
     @Test func aFeatureRowSaysOnlyWhatTheSwitchDoesNot() {
@@ -249,7 +249,7 @@ enum PaneTree {
             host: host, reader: FakePermissionsReader(),
             shellBanners: [
                 "general": { ShellPaneBanners.general(shortcut: "⌘Space") },
-                "features": { ShellPaneBanners.features(host: host) },
+                "features": { ShellPaneBanners.features(host: host, reader: FakePermissionsReader()) },
             ])
         model.show("general")
         #expect(model.shownBanner?.detail == "Press ⌘Space to open Lintel.")
