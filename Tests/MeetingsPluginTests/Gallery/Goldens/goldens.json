@@ -752,7 +752,7 @@
     },
     "notes.preview\/my-notes@light-xl-pl.png" : {
       "height" : 1000,
-      "sha256" : "f3616a4abaa47f5cd9774c6237ea9aeceb1df76e44bcc54ff6a2983f850a8712",
+      "sha256" : "010b1db02cd1787b1d4533ef910aee11b1a4311d1739482c31d93030bdadc9c9",
       "width" : 1120
     },
     "notes.preview\/needs-model@dark-m-en.png" : {
@@ -1002,7 +1002,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45928248668",
+  "recordRun" : "45964110197",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
