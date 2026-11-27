@@ -23,6 +23,11 @@ enum FallbackReason: Equatable, Sendable {
     case modelUnavailable
     /// The built-in model did not finish in time.
     case timedOut
+    /// The external provider was not back in time: its request ran past the chunk's limit, or the limit after the key
+    /// release (spec `2026-11-25-dictation-cleanup-levels`, A10, A11).
+    case tooSlow
+    /// The external provider failed (signed out, limit, no network, unavailable).
+    case provider(ProviderProblem)
     case rejected(FormatterGuard.Reason)
 }
 

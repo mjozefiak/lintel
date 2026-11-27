@@ -130,20 +130,10 @@ struct DictationPaneContent: View {
     }
 
     @ViewBuilder private var cleanupRows: some View {
-        if formatting.offersBuiltIn {
-            MenuPicker(selection: $formatting.source) {
-                Text("Built-in (Lintel)", comment: "Dictation settings choice of the built-in formatting model")
-                    .font(textSize.font(.body))
-                    .tag(DictationSettings.LLMSource.builtIn)
-                Text("My server", comment: "Dictation settings choice of the user's formatting server")
-                    .font(textSize.font(.body))
-                    .tag(DictationSettings.LLMSource.server)
-            } label: {
-                Text("Run on", comment: "Dictation settings label of the formatting source")
-                    .font(textSize.font(.body))
-            }
-        }
-        if formatting.isBuiltIn {
+        TidySourceRows(formatting: formatting)
+        if formatting.isProvider {
+            // Claude has its own rows (the model, what is sent, the status), drawn by `TidySourceRows`.
+        } else if formatting.isBuiltIn {
             MenuPicker(
                 selection: Binding(
                     get: { formatting.builtInModel.id }, set: { formatting.chooseBuiltInModel($0) }),

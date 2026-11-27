@@ -20,6 +20,8 @@ import Testing
         "llmModel": "setLLMModel",
         "llmSource": "setLLMSource",
         "builtInLLMModel": "setBuiltInLLMModel",
+        "provider": "setProvider",
+        "providerModel": "setProvider",
         "historyEnabled": "setHistoryEnabled",
         "retentionDays": "setRetentionDays",
         "maximumEntries": "setMaximumEntries",
@@ -49,6 +51,7 @@ import Testing
             "main window",
             [
                 "Sources/DictationPlugin/DictationSettingsPane.swift",
+                "Sources/DictationPlugin/TidySourceRows.swift",
                 "Sources/DictationPlugin/Vocabulary/VocabularySection.swift",
                 // The speech model's folder is chosen in the Models pane through the usage's `chooseFolder`.
                 "Sources/DictationPlugin/DictationPlugin.swift",
@@ -64,8 +67,10 @@ import Testing
                 "cleanupLevel": "$formatting.choice",
                 "llmEndpoint": "formatting.chooseEndpoint(",
                 "llmModel": "formatting.chooseModel(",
-                "llmSource": "$formatting.source",
+                "llmSource": "formatting.source = .server",
                 "builtInLLMModel": "formatting.chooseBuiltInModel(",
+                "provider": "formatting.source = .provider",
+                "providerModel": "formatting.chooseProviderModel(",
                 "historyEnabled": "$history.isEnabled",
                 "retentionDays": "$history.retentionDays",
                 "maximumEntries": "$history.maximumEntries",

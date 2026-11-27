@@ -1,9 +1,11 @@
 import AppKit
 import Foundation
 import LintelKit
+import LintelProviders
 import LintelSpeech
 import LintelUI
 import SwiftUI
+import Synchronization
 import os
 
 /// Voice dictation (spec: Dyktowanie głosowe): records under a global shortcut, transcribes with a speech
@@ -56,8 +58,14 @@ public final class DictationPlugin: LintelPlugin {
     let qaPlayback = DictationQAPlayback()
     private(set) var qaRecorder: DictationQARecorder?
     #endif
-    private let formattingModel: FormattingSettingsModel
+    /// Internal for the tests (the pane's model of the tidy-up rows).
+    let formattingModel: FormattingSettingsModel
     private let transport: any HTTPTransport
+    /// The runner of the provider source, made on first use (`DictationProviders`).
+    let providerRunner: ProviderRunnerHolder
+    /// Whether the built-in formatting model is installed, as last read (`formatter(…)` is chosen synchronously when a
+    /// dictation starts, so the local fallback of a provider source needs the answer ready).
+    let builtInInstalled = BuiltInInstalledFlag()
     let history: DictationHistory
     /// The user's vocabulary (DICT-1.1); loaded on activation, so the settings pane never reads the disk.
     let vocabulary: VocabularyStore
@@ -156,8 +164,13 @@ public final class DictationPlugin: LintelPlugin {
         historyModel.deleteKeptCopies = { await deleteKeptNoteCopies(Self.manifest.id, false) }
         let transport = LoopbackTransport()
         self.transport = transport
+        let providerRunner = ProviderRunnerHolder(providers: .standard, cachesDirectory: context.cachesDirectory)
+        self.providerRunner = providerRunner
+        let installed = builtInInstalled
         formattingModel = FormattingSettingsModel(
-            settings: settings, transport: transport, llmModels: llmModels, runtime: builtInLLM)
+            settings: settings, transport: transport, llmModels: llmModels, runtime: builtInLLM,
+            providerStatus: Self.providerStatusReporter(providerRunner))
+        formattingModel.onBuiltInLocation = { installed.set($0.folder != nil) }
         let openSettings = context.openSettings
         let openModels = context.openModels
         // The HUD's buttons call back into the controller, which exists once the plugin is active.
@@ -188,32 +201,75 @@ public final class DictationPlugin: LintelPlugin {
     }
 
     /// The formatter for a new session, chosen by the level in force when the dictation starts: none when the cleanup is
-    /// off, `LightCleaner` for Light (no model, no server, no lease), else the user's server or the built-in model.
+    /// off, `LightCleaner` for Light (no model, no server, no lease, no provider), else the formatter of the EFFECTIVE
+    /// source (`DictationSettings.effectiveSource`): the user's server, the built-in model, or the external provider
+    /// (only for a level it serves; any other runs locally, and with nothing local the text is pasted as spoken).
     /// `protectedWords` are the vocabulary's terms and variants, which Light never removes or changes.
     nonisolated static func formatter(
         settings: DictationSettings, transport: any HTTPTransport, builtIn: KeepWarmRuntime, logger: Logger,
-        protectedWords: @escaping @Sendable () -> [String] = { [] }
+        protectedWords: @escaping @Sendable () -> [String] = { [] }, builtInInstalled: Bool = true,
+        providerRunner: ProviderRunnerHolder? = nil
     ) -> (any TextFormatter)? {
         guard let level = settings.effectiveLevel else { return nil }
-        switch level {
-        case .light:
-            return LightCleaner(protectedWords: protectedWords)
-        case .standard, .full:
-            switch settings.llmSource {
-            case .server:
-                return LocalLLMFormatter(
-                    transport: transport, target: { settings.llmTarget }, level: level, logger: logger)
-            case .builtIn:
-                return BuiltInFormatter(runtime: builtIn, level: level, logger: logger)
-            }
+        if level == .light { return LightCleaner(protectedWords: protectedWords) }
+        switch settings.effectiveSource(for: level, builtInInstalled: builtInInstalled) {
+        case .server:
+            return LocalLLMFormatter(transport: transport, target: { settings.llmTarget }, level: level, logger: logger)
+        case .builtIn:
+            return BuiltInFormatter(runtime: builtIn, level: level, logger: logger)
+        case .provider(let selection):
+            guard let providerRunner else { return nil }
+            // The authorization re-reads the settings before every process: the source must still be the provider, and
+            // it must be the one this session started with.
+            return ProviderFormatter(
+                runner: providerRunner.runner, selection: selection, level: level,
+                currentSelection: { settings.llmSource == .provider ? settings.providerSelection : nil },
+                logger: logger)
+        case .none:
+            return nil
         }
     }
 
-    /// The model the history records for a dictation: the built-in model's id or the server's model name at a level that
-    /// runs a model, and `nil` at Light or Off, where no model ran (the note's column stays empty, never a fake name).
-    nonisolated static func formatterModel(settings: DictationSettings) -> String? {
-        guard settings.usesModel else { return nil }
-        return settings.llmSource == .builtIn ? settings.builtInLLMModel.id : settings.llmModel
+    /// The status check of the Settings → Dictation row: the two content-free probes (`--version`, `auth status`) on
+    /// the `background` lane, the queue meeting notes and other probes wait in. A probe still running when a dictation
+    /// is released never delays its first chunk (the `interactive` lane is dictation's alone); the row only shows
+    /// "Checking…" for longer while a background run holds the slot.
+    nonisolated static let providerProbeLane: ProviderLane = .background
+
+    /// The row's check as `FormattingSettingsModel` asks it: the provider's two probes on `providerProbeLane`.
+    nonisolated static func providerStatusReporter(
+        _ runner: ProviderRunnerHolder
+    ) -> @Sendable (ProviderID) async -> ProviderStatusReport {
+        { await runner.runner.report(of: $0, lane: providerProbeLane) }
+    }
+
+    /// "Claude": what a HUD line calls the provider that is chosen (the descriptor's short name).
+    nonisolated static func providerName(settings: DictationSettings) -> String {
+        let chosen = settings.providerSelection?.provider
+        return (DictationSettings.knownProviders.first { $0.id == chosen } ?? DictationSettings.knownProviders.first)?
+            .shortName ?? "Claude"
+    }
+
+    /// How long after the key release the session waits for formatting that is still out: only the provider source has a
+    /// limit (`ProviderLevels.releaseDeadline`, owner decision 2026-11-26); the local sources keep their own timeouts.
+    nonisolated static func releaseDeadline(settings: DictationSettings, builtInInstalled: Bool) -> Duration? {
+        guard let level = settings.effectiveLevel,
+            case .provider = settings.effectiveSource(for: level, builtInInstalled: builtInInstalled)
+        else { return nil }
+        return ProviderLevels.releaseDeadline(for: level)
+    }
+
+    /// The model the history records for a dictation, by the source that ran: the built-in model's id, the server's model
+    /// name, or `cli:claude-code/sonnet` for the provider; `nil` at Light or Off, and where nothing ran, so the note's
+    /// column stays empty and never shows a fake name (a local fallback records the local model, not the provider).
+    nonisolated static func formatterModel(settings: DictationSettings, builtInInstalled: Bool = true) -> String? {
+        guard let level = settings.effectiveLevel else { return nil }
+        switch settings.effectiveSource(for: level, builtInInstalled: builtInInstalled) {
+        case .builtIn: return settings.builtInLLMModel.id
+        case .server: return settings.llmModel
+        case .provider(let selection): return selection.historyMark
+        case .none: return nil
+        }
     }
 
     /// The words Light keeps: the vocabulary's terms and spoken variants, empty while the vocabulary is switched off.
@@ -254,6 +310,8 @@ public final class DictationPlugin: LintelPlugin {
         let history = history
         let builtInLLM = builtInLLM
         let vocabulary = vocabulary
+        let builtInInstalled = builtInInstalled
+        let providerRunner = providerRunner
         #if DEBUG
         let qaPlayback = qaPlayback
         let qaRecorder = qaRecorder
@@ -285,7 +343,10 @@ public final class DictationPlugin: LintelPlugin {
                         engine: engine,
                         formatter: Self.formatter(
                             settings: settings, transport: transport, builtIn: builtInLLM, logger: context.logger,
-                            protectedWords: Self.protectedWords(settings: settings, vocabulary: vocabulary)),
+                            protectedWords: Self.protectedWords(settings: settings, vocabulary: vocabulary),
+                            builtInInstalled: builtInInstalled.value, providerRunner: providerRunner),
+                        releaseDeadline: Self.releaseDeadline(
+                            settings: settings, builtInInstalled: builtInInstalled.value),
                         replaceTerms: Self.termReplacement(settings: settings, vocabulary: vocabulary),
                         modelFolder: folder, lease: lease, modelID: settings.speechModelID,
                         keepWarm: { settings.keepWarm }, logger: context.logger, onEvent: onEvent)
@@ -306,7 +367,8 @@ public final class DictationPlugin: LintelPlugin {
                 frontmostBundleID: { context.workspace.frontmostApplication?.bundleIdentifier },
                 formatMode: { settings.effectiveLevel == nil ? .raw : .clean },
                 speechModelID: { settings.speechModelID },
-                formatterModel: { Self.formatterModel(settings: settings) }))
+                formatterModel: { Self.formatterModel(settings: settings, builtInInstalled: builtInInstalled.value) },
+                providerName: { Self.providerName(settings: settings) }))
         self.controller = controller
         relay.controller = controller
         history.open()
@@ -318,6 +380,8 @@ public final class DictationPlugin: LintelPlugin {
         // The banner's state is known before the shell first reads it; coming back from System Settings or from
         // a download elsewhere re-reads it.
         await settingsModel.refreshStatus()
+        // Where the built-in model is, for the local fallback of a provider source (no process, no download).
+        await formattingModel.refreshBuiltIn()
         let model = settingsModel
         activationObserver = AppActivationObserver(center: appActivationCenter) {
             Task { await model.refreshStatus() }
@@ -607,4 +671,14 @@ final class ControllerRelay {
     func pasteFromHistory(_ text: String) async {
         await controller?.pasteFromHistory(text)
     }
+}
+
+/// Whether the built-in formatting model is installed, as last read by the Settings model (the formatter is chosen
+/// synchronously when a dictation starts).
+final class BuiltInInstalledFlag: Sendable {
+    private let state = Mutex(false)
+    /// Starts as `false`: until `activate()` reads the model's place, a provider source whose level the provider does
+    /// not serve falls back to the user's server (or raw), never to a built-in formatter that may have no model.
+    var value: Bool { state.withLock { $0 } }
+    func set(_ installed: Bool) { state.withLock { $0 = installed } }
 }

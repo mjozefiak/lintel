@@ -15,6 +15,8 @@ public struct ProviderFeatureID: RawRepresentable, Hashable, Sendable {
     public init(rawValue: String) { self.rawValue = rawValue }
 
     public static let meetingsNotes = ProviderFeatureID(rawValue: "meetings.notes")
+    /// The tidying of a dictated chunk (spec `2026-11-25-dictation-cleanup-levels`, Phase 5).
+    public static let dictationCleanup = ProviderFeatureID(rawValue: "dictation.cleanup")
 }
 
 /// Why the consumer refused. A closed set: the reason is logged, so it never carries text.
@@ -96,19 +98,23 @@ public struct ProviderRequest: Sendable {
     public let model: String
     public let messages: [ChatMessage]
     public let timeout: Duration
+    /// The queue the request waits in; `background` unless the consumer is something the user waits for.
+    public let lane: ProviderLane
 
     public init(
         provider: ProviderID = .claudeCode,
         feature: ProviderFeatureID,
         model: String,
         messages: [ChatMessage],
-        timeout: Duration = .seconds(600)
+        timeout: Duration = .seconds(600),
+        lane: ProviderLane = .background
     ) {
         self.provider = provider
         self.feature = feature
         self.model = model
         self.messages = messages
         self.timeout = timeout
+        self.lane = lane
     }
 }
 

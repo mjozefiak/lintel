@@ -10,6 +10,8 @@ section (pre-releases use `x.y.z-beta.N`).
 
 - Dictation: **Tidy up my text** replaces the "Clean up text" switch in Settings → Dictation with a choice of Off, Light and Standard. Light only removes filler words such as "yyy", "eee", "um" and "uh" and never changes your words; it runs on this Mac without a model, as fast as pasting the raw text. Standard is the cleanup you had before (Cleanup prompt v2). If you had "Clean up text" on, you stay on Standard; if you had it off, you stay on Off.
 
+- Dictation: you can now choose **Claude** in Settings → Dictation → **Tidy up with**, next to This Mac and My server, for the Standard and Full levels. It uses your own Claude Code and appears in the menu only when Claude Code is installed and signed in. The text you dictate is sent to Anthropic through it; the sound stays on your Mac, and nothing else (no app name, window title, clipboard, selection or your vocabulary) is sent. If Claude takes longer than 4 seconds (Standard) or 6 seconds (Full) after you release the key, the text it has not tidied is pasted as you said it and a short line says so. Nothing is sent unless you choose Claude; your choice is separate from the one for meeting notes.
+
 - Dictation: a **Full** level of Tidy up my text (email layout, paragraphs for a long dictation, smoother style) is built and tested but not offered yet; it appears in the popup when it passes its quality checks.
 
 ### Changed

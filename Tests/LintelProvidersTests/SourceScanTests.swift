@@ -45,18 +45,17 @@ import Testing
         }
     }
 
-    @Test func onlyMeetingsPluginAndItsTestsDependOnIt() throws {
+    @Test func onlyTheTwoConsumingPluginsAndTheirTestsDependOnIt() throws {
         let manifest = try String(contentsOf: Self.root.appending(path: "Package.swift"), encoding: .utf8)
-        // Its own declaration, its test target, `MeetingsPlugin` (the notes provider, A5b), and the two test targets
-        // that build a plugin with a fake runner (`MeetingsPluginTests`, `LintelAppTests`).
+        // Its own declaration, its test target, `MeetingsPlugin` (the notes provider, A5b) and `DictationPlugin` (the
+        // cleanup provider, spec 2026-11-25-dictation-cleanup-levels Phase 5), and the test targets that build a plugin
+        // with a fake runner (`MeetingsPluginTests`, `DictationPluginTests`, `LintelAppTests`).
         let mentions = manifest.components(separatedBy: "\"LintelProviders\"").count - 1
-        #expect(mentions == 5)
-        let plugin = try targetText("MeetingsPlugin")
-        #expect(plugin.contains("\"LintelProviders\""))
-        for name in [
-            "LintelApp", "AppsPlugin", "FilesPlugin", "ClipboardPlugin", "DictationPlugin", "NotesPlugin",
-            "WindowsPlugin",
-        ] {
+        #expect(mentions == 7)
+        for name in ["MeetingsPlugin", "DictationPlugin"] {
+            #expect(try targetText(name).contains("\"LintelProviders\""), "\(name) is a consumer")
+        }
+        for name in ["LintelApp", "AppsPlugin", "FilesPlugin", "ClipboardPlugin", "NotesPlugin", "WindowsPlugin"] {
             #expect(!(try targetText(name)).contains("\"LintelProviders\""), "\(name) must not depend on it")
         }
     }

@@ -3,6 +3,8 @@ import LintelKit
 import Synchronization
 import os
 
+@testable import DictationPlugin
+
 /// Settings in memory (no `UserDefaults` suite left behind).
 final class MemorySettingsStore: SettingsStore {
     private let values = Mutex<[String: SettingValue]>([:])
@@ -109,6 +111,8 @@ struct DictationHarness {
     let context: PluginContext
 
     init(settings initial: [String: SettingValue] = [:], keychain: any KeychainClient = NoKeychain()) throws {
+        // Every plugin a test builds gets the quiet provider system: no process is looked for or started.
+        DictationProviders.standard = .quiet
         let directory = try TemporaryDirectory()
         let settings = MemorySettingsStore(initial)
         let pasteboard = pasteboard

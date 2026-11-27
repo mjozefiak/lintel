@@ -143,7 +143,7 @@ Pytania z review specu (2026-11-19) i z drugiego review (Q11). **Rozstrzygnięte
 | # | Pytanie | Odpowiedź | Stan |
 |---|---|---|---|
 | Q1 | Bramka wysyłki: zgoda per funkcja czy także flaga per spotkanie? | **Jedna zgoda przy wyborze dostawcy i modelu. Bez flagi per spotkanie.** *(2026-11-20: zgodą jest sam wybór dostawcy w ustawieniach, bez okna; zmiana modelu u tego samego dostawcy bez pytania.)* | **rozstrzygnięte przez właściciela** |
-| Q2 | Dyktowanie przez dostawcę w v1? | **Nie.** Dyktowanie jest poza v1; osobna faza po osobnej decyzji właściciela. Kontekst DICT nigdy. | **rozstrzygnięte przez właściciela** (wartość domyślna przyjęta) |
+| Q2 | Dyktowanie przez dostawcę w v1? | **Nie.** Dyktowanie jest poza v1; osobna faza po osobnej decyzji właściciela. Kontekst DICT nigdy. **2026-11-26: ta osobna decyzja zapadła; dyktowanie przez dostawcę jest w specu `2026-11-25-dictation-cleanup-levels` (faza 5: `ProviderFormatter`, własny wybór `plugins.dictation.provider`, limity od zwolnienia klawisza), poza zakresem tego specu.** | **rozstrzygnięte przez właściciela** (wartość domyślna przyjęta) |
 | Q3 | Dostawcy w v1? | **Tylko Claude Code CLI.** | **rozstrzygnięte przez właściciela** |
 | Q4 | CLI subskrypcji czy klucz API? | **CLI w v1, klucz API (BYOK) jako Faza 2 zaraz po v1.** | **rozstrzygnięte przez właściciela** |
 | Q5 | Imiona mówców (nadane ręcznie, `selfName`) w wysyłanym transkrypcie? | **Tak**, powiedziane wprost w informacji przy wyborze i w „Szczegółach” (do 2026-11-20: w oknie zgody). | **rozstrzygnięte przez właściciela** |

@@ -22,6 +22,7 @@ enum QuietMeetings {
             })
         #expect(
             MeetingsSystem.liveUses.isEmpty, "a test built the real \(MeetingsSystem.liveUses.sorted())")
+        QuietDictation.install()
     }
 }
 

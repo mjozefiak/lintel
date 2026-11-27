@@ -12,6 +12,9 @@ enum HUDState: Equatable, Sendable {
     case pasted
     /// Pasted, but some or all of the text is the raw transcript because formatting failed.
     case pastedUnformatted(all: Bool)
+    /// Pasted as spoken because the external provider did not tidy the text (too slow, signed out, limit, no network).
+    /// One line, shown only when this happens: the normal state of a dictation on the provider looks like any other.
+    case pastedAsSpoken(ProviderNotice)
     case copied(TextPaster.CopyReason)
     case problem(Problem)
 
@@ -26,6 +29,35 @@ enum HUDState: Equatable, Sendable {
         var escapeCancels = true
         /// The chosen microphone is unplugged and the system's input is used; the HUD says so.
         var fallback: InputFallback?
+    }
+
+    /// What went wrong at the provider and what to call it ("Claude", from the descriptor).
+    struct ProviderNotice: Equatable, Sendable {
+        enum Kind: Equatable, Sendable {
+            case tooSlow, notSignedIn, rateLimited, network, unavailable
+        }
+        var kind: Kind
+        var name: String
+
+        init(_ kind: Kind, name: String) {
+            self.kind = kind
+            self.name = name
+        }
+
+        /// The notice for a chunk's fallback reason; `nil` for a reason that is not the provider's.
+        init?(reason: FallbackReason, name: String) {
+            switch reason {
+            case .tooSlow: self.init(.tooSlow, name: name)
+            case .provider(let problem):
+                switch problem {
+                case .notSignedIn: self.init(.notSignedIn, name: name)
+                case .rateLimited: self.init(.rateLimited, name: name)
+                case .network: self.init(.network, name: name)
+                case .unavailable: self.init(.unavailable, name: name)
+                }
+            default: return nil
+            }
+        }
     }
 
     enum Problem: Equatable, Sendable {
@@ -63,6 +95,29 @@ extension HUDState {
                 : String(
                     localized: "Pasted – partly cleaned up",
                     comment: "Dictation HUD when formatting failed for some parts of the text")
+        case .pastedAsSpoken(let notice):
+            switch notice.kind {
+            case .tooSlow:
+                String(
+                    localized: "\(notice.name) too slow, pasted as spoken",
+                    comment: "Dictation HUD when the provider was not back in time and the raw text was pasted")
+            case .notSignedIn:
+                String(
+                    localized: "\(notice.name) is signed out, pasted as spoken",
+                    comment: "Dictation HUD when the provider is signed out and the raw text was pasted")
+            case .rateLimited:
+                String(
+                    localized: "\(notice.name) limit reached, pasted as spoken",
+                    comment: "Dictation HUD when the provider's usage limit is reached and the raw text was pasted")
+            case .network:
+                String(
+                    localized: "No network for \(notice.name), pasted as spoken",
+                    comment: "Dictation HUD when the provider cannot be reached and the raw text was pasted")
+            case .unavailable:
+                String(
+                    localized: "\(notice.name) unavailable, pasted as spoken",
+                    comment: "Dictation HUD when the provider cannot be used and the raw text was pasted")
+            }
         case .copied(.noAccessibility):
             String(
                 localized: "Copied – allow Accessibility to paste",
@@ -129,7 +184,7 @@ extension HUDState {
         case .recording: "mic.fill"
         case .finishing: "ellipsis"
         case .pasted: "checkmark"
-        case .pastedUnformatted: "exclamationmark.circle"
+        case .pastedUnformatted, .pastedAsSpoken: "exclamationmark.circle"
         case .copied: "doc.on.clipboard"
         case .problem(.nothingHeard): "waveform.slash"
         case .problem: "exclamationmark.triangle"
@@ -166,7 +221,7 @@ extension HUDState {
     var hidesAfter: Duration? {
         switch self {
         case .pasted: .milliseconds(800)
-        case .pastedUnformatted, .copied, .problem: .seconds(3)
+        case .pastedUnformatted, .pastedAsSpoken, .copied, .problem: .seconds(3)
         default: nil
         }
     }
@@ -181,7 +236,7 @@ extension HUDState {
             String(localized: "Recording started", comment: "VoiceOver announcement when dictation starts")
         case .finishing:
             String(localized: "Recording stopped", comment: "VoiceOver announcement when dictation stops")
-        case .pasted, .pastedUnformatted, .copied, .problem:
+        case .pasted, .pastedUnformatted, .pastedAsSpoken, .copied, .problem:
             title
         default:
             nil

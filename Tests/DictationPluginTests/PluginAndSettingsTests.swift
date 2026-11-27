@@ -25,6 +25,20 @@ import Testing
         #expect(harness.context.modelsDirectory.deletingLastPathComponent() == harness.directory.url)
     }
 
+    /// The built-in formatting model counts as installed only after `activate()` has read its place
+    /// (`BuiltInInstalledFlag` starts `false`): before that read, a provider source whose level the provider does not
+    /// serve falls back to the user's server (or raw), never to a built-in formatter that may have no model.
+    @Test func theBuiltInModelCountsAsInstalledOnlyAfterActivationReadsItsPlace() async throws {
+        let harness = try DictationHarness()
+        defer { harness.tearDown() }
+        let plugin = DictationPlugin(context: harness.context)
+        #expect(!plugin.builtInInstalled.value)
+        try await plugin.activate()
+        // The fixture has no built-in model: the read in `activate()` leaves the answer `false`.
+        #expect(!plugin.builtInInstalled.value)
+        await plugin.deactivate()
+    }
+
     @Test func theRecordCommandRunsFromTheMenuAndTakesKeyEventsFromTheShortcut() async throws {
         let harness = try DictationHarness()
         defer { harness.tearDown() }

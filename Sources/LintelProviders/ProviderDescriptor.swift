@@ -105,6 +105,9 @@ public struct ProviderDescriptor: Sendable {
             environmentAllowlist: environmentAllowlist, argumentBuilder: argumentBuilder)
     }
 
+    /// The name a sentence uses ("Claude too slow"): the company's product for Anthropic, else the display name.
+    public var shortName: String { recipient == "Anthropic" ? "Claude" : displayName }
+
     /// The model a consumer offers first: the first entry of `models`.
     public var defaultModelID: String { models.first?.id ?? "" }
 

@@ -23,6 +23,7 @@ import os
             case .finishing: "finishing"
             case .pasted: "pasted"
             case .pastedUnformatted(let all): "pastedUnformatted:\(all)"
+            case .pastedAsSpoken(let notice): "pastedAsSpoken:\(notice.kind)"
             case .copied: "copied"
             case .problem(let problem): "problem:\(problem)"
             case .allowMicrophone: "allow"
@@ -69,6 +70,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         var mode = FormatMode.raw
         var now = ContinuousClock.now
         var installed = true
+        var formatterModelName: String? = "qwen"
 
         init() throws {
             directory = try TemporaryDirectory()
@@ -120,7 +122,7 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
                     clock: paste.clock, now: { rig.now },
                     recordHistory: { rig.recorded.append($0) },
                     frontmostBundleID: { "com.example.target" },
-                    formatMode: { rig.mode }, speechModelID: { "fixture" }, formatterModel: { "qwen" }))
+                    formatMode: { rig.mode }, speechModelID: { "fixture" }, formatterModel: { rig.formatterModelName }))
         }
 
         func tearDown() { paste.pasteboard.release() }
@@ -417,6 +419,48 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(rig.hud.last == .pastedUnformatted(all: true))
     }
 
+    @Test func aProviderThatWasTooSlowIsAnnouncedInOneLineAndTheRawTextIsPasted() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.formatter = StubFormatter { chunk, _ in FormatResult(text: chunk, outcome: .fellBack(.tooSlow)) }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        controller.menu()
+        await settle(rig)
+
+        #expect(rig.paste.pasteboard.string() == "segment 1")
+        #expect(rig.hud.last == .pastedAsSpoken(.init(.tooSlow, name: "Claude")))
+        #expect(rig.hud.milestones.last == "pastedAsSpoken:tooSlow")
+    }
+
+    @Test func aSignedOutProviderIsAnnouncedWithItsOwnLine() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.formatter = StubFormatter { chunk, _ in
+            FormatResult(text: chunk, outcome: .fellBack(.provider(.notSignedIn)))
+        }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        controller.menu()
+        await settle(rig)
+        #expect(rig.hud.last == .pastedAsSpoken(.init(.notSignedIn, name: "Claude")))
+    }
+
+    @Test func aProviderThatTidiedEverythingShowsTheNormalPastedState() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.formatter = StubFormatter { chunk, _ in FormatResult(text: "Clean: \(chunk)", outcome: .formatted) }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        controller.menu()
+        await settle(rig)
+        // No provider line in the normal state: it looks like any other dictation.
+        #expect(rig.hud.milestones == ["recording", "finishing", "pasted"])
+    }
+
     @Test func pasteLastRawPastesTheTranscriptWithoutFormatting() async throws {
         let rig = try Rig()
         defer { rig.tearDown() }
@@ -519,6 +563,25 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(entry.formatterModel == "qwen")
     }
 
+    @Test func theHistoryNamesTheModelThatWasChosenWhenTheDictationStarted() async throws {
+        let rig = try Rig()
+        defer { rig.tearDown() }
+        rig.mode = .clean
+        rig.formatterModelName = "cli:claude-code/sonnet"
+        rig.formatter = StubFormatter { chunk, _ in FormatResult(text: "Clean \(chunk)", outcome: .formatted) }
+        let controller = rig.controller()
+        controller.menu()
+        await recording(rig)
+        // The source is switched while the dictation runs: this dictation still went to the provider.
+        rig.formatterModelName = "qwen"
+        controller.menu()
+        await settle(rig)
+
+        await waitUntil { !rig.recorded.isEmpty }
+        let entry = try #require(rig.recorded.first)
+        #expect(entry.formatterModel == "cli:claude-code/sonnet")
+    }
+
     @Test func aFailedFormattingIsRecordedAsFailedWithoutAFormattedText() async throws {
         let rig = try Rig()
         defer { rig.tearDown() }
@@ -577,6 +640,9 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
             .problem(.noMicrophone), .problem(.nothingHeard), .problem(.nothingToPaste),
             .problem(.speechModelBusy),
             .pastedUnformatted(all: true), .pastedUnformatted(all: false),
+            .pastedAsSpoken(.init(.tooSlow, name: "Claude")), .pastedAsSpoken(.init(.notSignedIn, name: "Claude")),
+            .pastedAsSpoken(.init(.rateLimited, name: "Claude")), .pastedAsSpoken(.init(.network, name: "Claude")),
+            .pastedAsSpoken(.init(.unavailable, name: "Claude")),
         ]
         for state in states {
             #expect(!state.title.isEmpty)
@@ -596,6 +662,39 @@ final class FakeAuthorizer: MicrophoneAuthorizer, @unchecked Sendable {
         #expect(HUDState.recording(.init(secondsLeft: 30)).announcement == nil)
         #expect(HUDState.finishing.announcement != nil)
         #expect(HUDState.pasted.announcement == HUDState.pasted.title)
+    }
+
+    @Test func aProviderNoticeIsOneLineNamesTheCompanyAndOffersNothing() {
+        let notices: [HUDState.ProviderNotice.Kind] = [.tooSlow, .notSignedIn, .rateLimited, .network, .unavailable]
+        var titles = Set<String>()
+        for kind in notices {
+            let state = HUDState.pastedAsSpoken(.init(kind, name: "Claude"))
+            #expect(state.title.contains("Claude"))
+            #expect(!state.title.contains("\n"))
+            #expect(state.announcement == state.title)
+            #expect(!state.offersCancel)
+            #expect(state.hidesAfter != nil)
+            titles.insert(state.title)
+        }
+        #expect(titles.count == notices.count)
+    }
+
+    @Test func theProviderLineGetsAWiderCapsuleThatStillFitsThePanel() {
+        let notice = HUDState.pastedAsSpoken(.init(.tooSlow, name: "Claude"))
+        #expect(DictationHUDView.capsuleWidth(for: notice) > DictationHUDView.size.width)
+        #expect(DictationHUDView.capsuleWidth(for: notice) <= DictationHUDView.panelSize.width - 16)
+        #expect(DictationHUDView.capsuleWidth(for: .pasted) == DictationHUDView.size.width)
+    }
+
+    @Test func onlyTheProvidersReasonsMakeANotice() {
+        let name = "Claude"
+        #expect(HUDState.ProviderNotice(reason: .tooSlow, name: name)?.kind == .tooSlow)
+        #expect(HUDState.ProviderNotice(reason: .provider(.notSignedIn), name: name)?.kind == .notSignedIn)
+        #expect(HUDState.ProviderNotice(reason: .provider(.rateLimited), name: name)?.kind == .rateLimited)
+        #expect(HUDState.ProviderNotice(reason: .provider(.network), name: name)?.kind == .network)
+        #expect(HUDState.ProviderNotice(reason: .provider(.unavailable), name: name)?.kind == .unavailable)
+        #expect(HUDState.ProviderNotice(reason: .rejected(.tooShort), name: name) == nil)
+        #expect(HUDState.ProviderNotice(reason: .unreachable, name: name) == nil)
     }
 
     @Test func theCountdownReplacesTheCancelHint() {
