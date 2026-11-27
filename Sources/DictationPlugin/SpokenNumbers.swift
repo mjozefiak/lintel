@@ -159,6 +159,49 @@ enum SpokenNumbers {
         }
     }
 
+    /// The numbers of `input` that `output` has lost, for Full, where a long chunk could drop a sentence and its numbers
+    /// and still pass the length range: a number written in digits that `output` holds neither whole nor in its groups,
+    /// and a run of number words none of whose readings (every part of it, "czternastej trzydzieści" gives 14, 30 and 44)
+    /// `output` holds in digits or in words. Read leniently on purpose: a time said in words and written "14:30" is kept,
+    /// and a run whose largest reading is 10 or less is not checked at all, because those words are mostly ordinals and
+    /// idioms ("po pierwsze", "trzecim piętrze", "jedno"), which a list or a rewrite turns into markers or other words.
+    /// A small number written in digits is still checked, and so is every spoken number above 10.
+    static func lostNumbers(in output: String, comparedTo input: String) -> [Int] {
+        let kept = allowed(in: output)
+        var lost = written(in: input).compactMap { number -> Int? in
+            kept.contains(number.joined) || number.groups.allSatisfy(kept.contains) ? nil : number.joined
+        }
+        for run in wordRuns(in: input) {
+            let readings = spokenNumbers(in: run.joined(separator: " "))
+            if let value = readings.max(), value > 10, readings.isDisjoint(with: kept) { lost.append(value) }
+        }
+        return lost
+    }
+
+    /// The runs of consecutive number words of a text, each as its words.
+    private static func wordRuns(in text: String) -> [[String]] {
+        var runs: [[String]] = []
+        var run: [String] = []
+        func flush() {
+            if !run.isEmpty { runs.append(run) }
+            run = []
+        }
+        let words = tokens(in: text)
+        for (index, token) in words.enumerated() {
+            if word(for: token) != nil {
+                run.append(token)
+            } else if joiners.contains(token), !run.isEmpty, index + 1 < words.count,
+                word(for: words[index + 1]) != nil
+            {
+                continue
+            } else {
+                flush()
+            }
+        }
+        flush()
+        return runs
+    }
+
     private static func tokens(in text: String) -> [String] {
         text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
     }

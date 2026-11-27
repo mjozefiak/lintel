@@ -80,6 +80,25 @@ import Testing
         #expect(other?.isOther == true && other?.points.count == NotesLayout.maxPointsPerTopic)
     }
 
+    /// A long meeting with many one-point topics fills "Other" past its bound: the points it cannot take are not
+    /// shown and the arrangement counts them, so a track never loses them silently (issue #304).
+    @Test func thePointsAFullOtherCannotTakeAreCounted() {
+        var layout = NotesLayout()
+        layout.topics = (1...8).map { topic("Temat \($0)", 1) } + [topic("Duży", 4)]
+        let arrangement = layout.arrangement(durationMs: 60 * 60_000)
+        #expect(arrangement.topics.last?.isOther == true)
+        #expect(arrangement.topics.last?.points.count == NotesLayout.maxPointsPerTopic)
+        #expect(arrangement.cutFromOther == 2)
+        #expect(arrangement.topics == layout.shownTopics(durationMs: 60 * 60_000))
+        // An "Other" that fits takes everything: nothing is counted.
+        layout.topics = (1...3).map { topic("Temat \($0)", 1) } + [topic("Duży", 4)]
+        #expect(layout.arrangement(durationMs: 60 * 60_000).cutFromOther == 0)
+        // A short meeting is one list without "Other": nothing is cut either.
+        var short = NotesLayout()
+        short.topics = (1...8).map { topic("Temat \($0)", 1) }
+        #expect(short.arrangement(durationMs: 5 * 60_000).cutFromOther == 0)
+    }
+
     // MARK: Order and sections
 
     @Test func theSectionsComeInTheDocumentedOrderAndTheIntroHasNoHeading() {
