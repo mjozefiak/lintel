@@ -1,0 +1,4 @@
+# The design gallery's golden PNGs are Git LFS objects (owner decision 2026-11-27, spec 2026-11-23-swiftui-design-gallery
+# Q5): they change whenever a scene's picture is recorded, which would put every version in the repository's history.
+# The pointers stay in git, the pictures in LFS. `goldens.json` (sizes and hashes) stays a plain file.
+Tests/**/Gallery/Goldens/**/*.png filter=lfs diff=lfs merge=lfs -text

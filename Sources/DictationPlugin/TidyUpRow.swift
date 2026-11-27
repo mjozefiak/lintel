@@ -100,8 +100,10 @@ enum TidyUpText {
 /// Used by the Dictation pane and drawn alone by the gallery.
 struct TidyUpRow: View {
     @Binding var choice: FormattingSettingsModel.TidyChoice
-    /// The values the popup lists (Full only while it is offered).
-    var choices: [FormattingSettingsModel.TidyChoice] = FormattingSettingsModel.TidyChoice.allCases
+    /// The values the popup lists. The default is the offered ones, so a caller that passes nothing never shows Full
+    /// while `DictationSettings.fullIsOffered` is off; the pane passes the model's own list and the gallery all of them.
+    var choices: [FormattingSettingsModel.TidyChoice] = FormattingSettingsModel.TidyChoice.listed(
+        offeringFull: DictationSettings.fullIsOffered)
     /// Whether the line "Works best with the Recommended assistant." shows (Full on the smallest built-in model).
     var showsSmallModelHint = false
     @Environment(\.lintelTextSize) private var textSize

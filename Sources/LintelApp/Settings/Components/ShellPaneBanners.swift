@@ -37,12 +37,17 @@ enum ShellPaneBanners {
 
     /// What the Features banner needs to know about one plugin.
     struct Feature: Equatable {
+        var name: String = ""
         let isEnabled: Bool
         let isFailed: Bool
+        /// The level of the plugin's own settings banner when it is `attention` or `error`: the level that gives the
+        /// plugin its dot in the sidebar (`StatusDerivation.attention`). `nil` for a feature that is off.
+        var attention: SettingsStatus.Level? = nil
     }
 
-    /// Features: "All set · All features are on.", "Some features are off.", or attention for a feature that
-    /// could not start. A feature that cannot be turned off counts as on (`PluginHost.isEnabled`).
+    /// Features: attention for a feature that could not start, or for enabled features whose own pane says they need
+    /// something (the same banners that give them a dot in the sidebar); else "All set · All features are on." or
+    /// "Some features are off." A feature that cannot be turned off counts as on (`PluginHost.isEnabled`).
     static func features(_ features: [Feature]) -> StatusDerivation.Banner {
         if features.contains(where: \.isFailed) {
             return StatusDerivation.Banner(
@@ -52,6 +57,17 @@ enum ShellPaneBanners {
                 detail: String(
                     localized: "Open its pane to try again. Nothing was deleted.",
                     comment: "Settings → Features banner detail: a plugin failed"),
+                actions: [])
+        }
+        let waiting = features.filter { $0.isEnabled && $0.attention != nil }
+        if !waiting.isEmpty {
+            let names = waiting.map(\.name).formatted(.list(type: .and))
+            return StatusDerivation.Banner(
+                level: waiting.contains { $0.attention == .error } ? .error : .attention,
+                title: StatusDerivation.levelName(.attention),
+                detail: String(
+                    localized: "Open \(names) in the sidebar to finish setting up.",
+                    comment: "Settings → Features banner detail: the features whose panes have something to do"),
                 actions: [])
         }
         let allOn = features.allSatisfy(\.isEnabled)
@@ -64,11 +80,20 @@ enum ShellPaneBanners {
             actions: [])
     }
 
-    static func features(host: PluginHost) -> StatusDerivation.Banner {
+    /// The banner of the Features pane. `reader` gives the permission states the sidebar dots use, so a feature
+    /// that has a dot there is named here.
+    static func features(host: PluginHost, reader: any PermissionsReader) -> StatusDerivation.Banner {
         features(
             host.entries.map {
+                let id = $0.manifest.id
                 let failed = if case .failed = $0.state { true } else { false }
-                return Feature(isEnabled: host.isEnabled($0.manifest.id), isFailed: failed)
+                let enabled = host.isEnabled(id)
+                return Feature(
+                    name: String(localized: $0.manifest.displayName), isEnabled: enabled, isFailed: failed,
+                    attention: enabled
+                        ? StatusDerivation.attention(
+                            SettingsHostModel.banner(for: id.rawValue, host: host, reader: reader))
+                        : nil)
             })
     }
 

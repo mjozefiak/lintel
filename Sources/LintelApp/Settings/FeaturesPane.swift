@@ -40,19 +40,37 @@ struct FeatureControls {
     }
 }
 
-/// The "Result order" list (issue #5): the plugins with result sections, in the user's order.
+/// The "Result order" list (issue #5): the plugins with result sections that are on, in the user's order. A plugin
+/// that is off has no section in the launcher, so it is not listed (#288); its place in the saved order is kept
+/// for when it is turned on again.
 struct SectionOrderControls {
     let host: PluginHost
     let settings: AppSettings
 
-    /// Plugins that contribute search sections, in the current order.
-    var ordered: [PluginHost.Entry] {
+    /// Every plugin that contributes search sections, on or off, in the current order.
+    private var all: [PluginHost.Entry] {
         SectionOrder.sorted(host.entries.filter { !$0.plugin.searchSources.isEmpty }, saved: settings.sectionOrder)
+    }
+
+    /// The listed plugins: those with result sections that are on, in the current order.
+    var ordered: [PluginHost.Entry] {
+        all.filter { host.isEnabled($0.manifest.id) }
+    }
+
+    /// Saves `visible` (the new order of the listed plugins) in `app.sectionOrder`: the plugins that are off keep
+    /// their places.
+    private func save(visible: [PluginID]) {
+        var remaining = visible[...]
+        let merged = all.map(\.manifest.id).map { id -> PluginID in
+            guard host.isEnabled(id), let next = remaining.popFirst() else { return id }
+            return next
+        }
+        settings.sectionOrder = merged.map(\.rawValue)
     }
 
     /// Moves a section up (−1) or down (+1) and saves the whole order in `app.sectionOrder`.
     func move(_ id: PluginID, by offset: Int) {
-        settings.sectionOrder = SectionOrder.moving(id, by: offset, in: ordered.map(\.manifest.id)).map(\.rawValue)
+        save(visible: SectionOrder.moving(id, by: offset, in: ordered.map(\.manifest.id)))
     }
 
     /// Drag and drop: puts `id` at `index` of the current order and saves the whole order.
@@ -61,7 +79,7 @@ struct SectionOrderControls {
         guard let from = ids.firstIndex(of: id) else { return }
         ids.remove(at: from)
         ids.insert(id, at: min(max(index, 0), ids.count))
-        settings.sectionOrder = ids.map(\.rawValue)
+        save(visible: ids)
     }
 
     func restoreDefault() {
@@ -195,43 +213,51 @@ struct FeatureSwitchRow: View {
         }
     }
 
-    var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                // Prototype `set-features`: the symbol sits in front of the name, in the name's colour.
-                HStack(spacing: 4) {
-                    Image(systemName: manifest.symbolName)
-                        .font(textSize.font(.callout))
-                        .accessibilityHidden(true)
-                    Text(manifest.displayName)
-                        .font(textSize.font(.body, weight: .semibold))
-                }
-                if let summary = manifest.summary {
-                    Text(summary)
-                        .font(textSize.font(.callout))
-                        .foregroundStyle(LintelBrand.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if let detail = Self.detail(for: state) {
-                    Text(verbatim: detail)
-                        .font(textSize.font(.callout))
-                        .foregroundStyle(LintelBrand.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+    /// The symbol and name, the manifest's summary and the state line: the switch's label (or, for a feature that
+    /// cannot be turned off, the row's text).
+    private var text: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // Prototype `set-features`: the symbol sits in front of the name, in the name's colour.
+            HStack(spacing: 4) {
+                Image(systemName: manifest.symbolName)
+                    .font(textSize.font(.callout))
+                    .accessibilityHidden(true)
+                Text(manifest.displayName)
+                    .font(textSize.font(.body, weight: .semibold))
             }
-            Spacer(minLength: 12)
-            switch FeatureAccessory(manifest) {
-            case .alwaysOn:
-                AlwaysOnChip()
-            case .toggle:
-                Toggle(isOn: Binding(get: { isEnabled }, set: { setEnabled($0) })) {
-                    Text(manifest.displayName)
-                }
-                .labelsHidden()
-                .toggleStyle(.switch)
+            if let summary = manifest.summary {
+                Text(summary)
+                    .font(textSize.font(.callout))
+                    .foregroundStyle(LintelBrand.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let detail = Self.detail(for: state) {
+                Text(verbatim: detail)
+                    .font(textSize.font(.callout))
+                    .foregroundStyle(LintelBrand.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .accessibilityElement(children: FeatureAccessory(manifest) == .alwaysOn ? .combine : .contain)
+    }
+
+    var body: some View {
+        switch FeatureAccessory(manifest) {
+        case .alwaysOn:
+            HStack(spacing: 10) {
+                text
+                Spacer(minLength: 12)
+                AlwaysOnChip()
+            }
+            .accessibilityElement(children: .combine)
+        case .toggle:
+            // The text is the switch's own label, not a sibling of a switch with a hidden label: with a hidden
+            // label SwiftUI exposes the switch as an `AXToggle` without the press action, so VoiceOver and Switch
+            // Control could not turn a feature on (#289). Like Settings → General.
+            Toggle(isOn: Binding(get: { isEnabled }, set: { setEnabled($0) })) {
+                text
+            }
+            .toggleStyle(.switch)
+        }
     }
 }
 
