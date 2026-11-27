@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Cleans raw dictation transcripts offline with the app's cleanup path and a real GGUF model, and writes a
 # JSONL the benchmark scorer reads (see README.md).
-# Usage: run.sh --input <raw.jsonl> --out <result.jsonl> --model <model.gguf> [--app <label>]
+# Usage: run.sh --input <raw.jsonl> --out <result.jsonl> [--level light|standard|full] [--model <model.gguf>]
+#        [--app <label>]
+# --level standard (default) and full need --model; light runs LightCleaner alone, no model.
 # Exit codes: 0 ok, 2 usage/input error, 4 test failure, 5 build failure.
 # Builds DictationPluginTests in release (`swift test -c release` fails to link other plugin tests) and runs
 # ONLY DictationEvalTests through the Swift Testing helper, so no other suite shares the process.
@@ -9,7 +11,7 @@ set -euo pipefail
 
 die() { printf 'run.sh: %s\n' "$1" >&2; exit "${2:-2}"; }
 
-input="" out="" model="" app=""
+input="" out="" model="" app="" level="standard"
 while [[ $# -gt 0 ]]; do
   [[ $# -ge 2 ]] || die "missing value for $1"
   case "$1" in
@@ -17,18 +19,25 @@ while [[ $# -gt 0 ]]; do
     --out) out="$2" ;;
     --model) model="$2" ;;
     --app) app="$2" ;;
+    --level) level="$2" ;;
     *) die "unknown argument: $1" ;;
   esac
   shift 2
 done
-[[ -n "$input" && -n "$out" && -n "$model" ]] || die "required: --input --out --model"
+case "$level" in
+  light) ;;
+  standard) [[ -n "$model" ]] || die "--level standard needs --model" ;;
+  full) [[ -n "$model" ]] || die "--level full needs --model" ;;
+  *) die "--level must be light, standard or full" ;;
+esac
+[[ -n "$input" && -n "$out" ]] || die "required: --input --out"
 [[ -f "$input" ]] || die "input not found: $input"
-[[ -f "$model" ]] || die "model not found: $model"
+[[ -z "$model" || -f "$model" ]] || die "model not found: $model"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
 input="$(cd "$(dirname "$input")" && pwd)/$(basename "$input")"
-model="$(cd "$(dirname "$model")" && pwd)/$(basename "$model")"
+[[ -z "$model" ]] || model="$(cd "$(dirname "$model")" && pwd)/$(basename "$model")"
 mkdir -p "$(dirname "$out")"
 out="$(cd "$(dirname "$out")" && pwd)/$(basename "$out")"
 
@@ -54,7 +63,8 @@ log="$out.run.log"
 rc=0
 env LINTEL_DICTATION_EVAL_INPUT="$input" \
   LINTEL_DICTATION_EVAL_OUT="$out" \
-  LINTEL_DICTATION_EVAL_MODEL="$model" \
+  LINTEL_DICTATION_EVAL_LEVEL="$level" \
+  ${model:+LINTEL_DICTATION_EVAL_MODEL="$model"} \
   ${app:+LINTEL_DICTATION_EVAL_APP="$app"} \
   DYLD_FRAMEWORK_PATH="$platform/Library/Frameworks" \
   DYLD_LIBRARY_PATH="$platform/usr/lib" \

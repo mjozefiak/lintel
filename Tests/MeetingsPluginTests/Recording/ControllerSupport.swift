@@ -317,7 +317,9 @@ final class ControllerRig {
     init(
         settings: [String: SettingValue] = [:], access: MicrophoneAccess = .granted,
         keychainError: KeychainError? = nil,
-        shutdownTimeout: Duration = .seconds(5), observer: (any MeetingRecordingObserver)? = nil
+        shutdownTimeout: Duration = .seconds(5), observer: (any MeetingRecordingObserver)? = nil,
+        hudObserver: @escaping @MainActor (MeetingHUDState?) -> Void = { _ in },
+        meetingRegistered: @escaping @MainActor (Int64) -> Void = { _ in }
     ) throws {
         harness = try MeetingsHarness(settings: settings)
         library = harness.library()
@@ -339,7 +341,8 @@ final class ControllerRig {
                 openModels: { [unowned self] id in self.modelsOpened.append(id) },
                 changed: { changes.update { $0 += 1 } }, pasteboard: pasteboard,
                 now: { [unowned self] in self.consentClock }, shutdownTimeout: shutdownTimeout,
-                stateChanged: { ChangeSignal.shared.fire() }, recordingObserver: observer))
+                stateChanged: { ChangeSignal.shared.fire() }, hudObserver: hudObserver,
+                meetingRegistered: meetingRegistered, recordingObserver: observer))
     }
 
     /// Starts and waits until the recording runs.

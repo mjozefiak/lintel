@@ -93,10 +93,11 @@ import Testing
         }
     }
 
-    @Test func theReducePromptAsksForAChoiceOfFindingsAndQuestions() {
-        #expect(NotesPrompt.reduceSystem.contains("FINDINGS"))
-        #expect(NotesPrompt.reduceSystem.contains("at most 10"))
-        #expect(NotesPrompt.reduceSystem.contains("QUESTIONS"))
+    @Test func theReducePromptAsksForAChoiceOfTopicsAndQuestions() {
+        let prompt = NotesPrompt.reduceSystem(maxTopics: 10)
+        #expect(prompt.contains("TOPIC"))
+        #expect(prompt.contains("Topics are a choice, not a list of everything"))
+        #expect(prompt.contains("QUESTIONS: ids, at most 5"))
     }
 }
 

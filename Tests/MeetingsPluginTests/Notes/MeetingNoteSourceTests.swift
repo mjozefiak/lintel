@@ -295,7 +295,7 @@ struct MeetingNoteLayerTests {
                 decisions: [NotesPoint(id: "p1", kind: .decision, timeMs: 83_000, quote: "q", text: "Ship it")],
                 tasks: [],
                 questions: [NotesPoint(id: "p2", kind: .question, timeMs: 3_725_000, quote: "q", text: "Who pays")],
-                summary: nil, summaryReplaced: false, rejectedIDs: 0),
+                rejectedIDs: 0),
             participants: [], labels: .english)
         #expect(!notes.contains("\\[") && !notes.contains("01\\:23"))
         let layer = try #require(MeetingNoteLayers.notesLayer(document(segments: [], notes: notes)))

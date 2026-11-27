@@ -1,13 +1,21 @@
 import Foundation
+import LintelCore
 import os
 
 /// Applies the retention policy at activation and every hour: meetings older than `plugins.meetings
 /// .retentionDays` (0 keeps everything) are deleted with their spool folders, expired spools of interrupted
-/// meetings go (`orphanAudioDays`), and a `VACUUM` runs at most once a day. Transcripts never reach a log.
+/// meetings go (`orphanAudioDays`), and a `VACUUM` runs at most once a day. Meetings in Recently deleted are
+/// deleted for good 30 days after they were deleted (spool and kept recording included; the first such purge runs
+/// `firstTrashPurgeDelay` after the start), while the age rules above keep deleting by age at once, trashed rows
+/// included. Transcripts never reach a log.
 @MainActor
 final class RetentionJob {
     static let interval: Duration = .seconds(60 * 60)
     static let vacuumInterval: TimeInterval = 24 * 60 * 60
+    /// How long after the job starts the first trash purge runs. Not on the immediate pass: Notes' trash sweep runs
+    /// at activation and has to mark the overlays of trashed meetings first, so a Mac that was off for 40 days
+    /// purges soon after the next launch but not before that sweep.
+    static let firstTrashPurgeDelay: Duration = .seconds(10 * 60)
 
     struct Policy: Equatable, Sendable {
         /// 0 means unlimited.
@@ -61,17 +69,24 @@ final class RetentionJob {
         stop()
         let clock = clock
         task = Task { [weak self] in
+            var purgesTrash = false
+            var delay = Self.firstTrashPurgeDelay
             while !Task.isCancelled {
                 guard let self else { return }
                 hourly()
-                if let store = store(), await self.run(store: store, policy: policy()) > 0 {
+                if let store = store(),
+                    await self.run(store: store, policy: policy(), purgesTrash: purgesTrash) > 0
+                {
                     changed()
                 }
                 do {
-                    try await clock.sleep(for: Self.interval)
+                    try await clock.sleep(for: delay)
                 } catch {
                     return
                 }
+                // The pass after the first sleep is the first that purges Recently deleted; later ones are hourly.
+                purgesTrash = true
+                delay = Self.interval
             }
         }
     }
@@ -81,9 +96,10 @@ final class RetentionJob {
         task = nil
     }
 
-    /// One pass in the background. Returns how many meetings were deleted.
+    /// One pass in the background. Returns how many meetings were deleted (by age and, when `purgesTrash`, from
+    /// Recently deleted after their 30 days).
     @discardableResult
-    func run(store: MeetingsStore, policy: Policy) async -> Int {
+    func run(store: MeetingsStore, policy: Policy, purgesTrash: Bool = true) async -> Int {
         let now = now()
         let vacuums = lastVacuum.map { now.timeIntervalSince($0) >= Self.vacuumInterval } ?? true
         let spool = spool
@@ -95,6 +111,14 @@ final class RetentionJob {
                 if let cutoff = policy.cutoff(now: now) {
                     uuids = try store.applyRetention(cutoff: cutoff, excluding: protected)
                     spool.removeSpools(forMeetings: uuids)
+                }
+                // Recently deleted: 30 days after the delete the meeting goes for good with its audio (a restore
+                // before that brings the audio back, so nothing of a trashed meeting was removed until now).
+                var purged: [String] = []
+                if purgesTrash {
+                    purged = try store.purgeTrashed(
+                        olderThan: now.addingTimeInterval(-TrashStamp.retention), excluding: protected)
+                    spool.removeSpools(forMeetings: purged)
                 }
                 // Only interrupted meetings age out; the sweep never sees a recording or processing one, nor one
                 // that is being finished.
@@ -108,17 +132,17 @@ final class RetentionJob {
                 spool.removeSpools(forMeetings: keptCandidates)
                 let keptGone = keptCandidates.filter { !spool.hasSpool(forMeeting: $0) }
                 try store.markAudioDeleted(uuids: keptGone)
-                if !uuids.isEmpty || !orphans.isEmpty || !keptGone.isEmpty {
+                if !uuids.isEmpty || !orphans.isEmpty || !keptGone.isEmpty || !purged.isEmpty {
                     logger.info(
-                        "Retention deleted \(uuids.count, privacy: .public) meetings and \(orphans.count + keptGone.count, privacy: .public) old spools"
+                        "Retention deleted \(uuids.count, privacy: .public) meetings, purged \(purged.count, privacy: .public) from Recently deleted and removed \(orphans.count + keptGone.count, privacy: .public) old spools"
                     )
                 }
                 var vacuumed = false
-                if vacuums, !uuids.isEmpty {
+                if vacuums, !uuids.isEmpty || !purged.isEmpty {
                     try store.vacuum()
                     vacuumed = true
                 }
-                return (uuids.count, vacuumed)
+                return (uuids.count + purged.count, vacuumed)
             } catch MeetingsStoreError.closed {
                 // The plugin deactivated while the pass ran: a quiet cancel.
                 return (0, false)

@@ -74,6 +74,10 @@ enum NotesNumberForms {
         return result
     }()
 
+    /// Polish fractions that a model writes as a decimal: "półtora" is "1,5", so the value is kept in tenths
+    /// (`15`), the form a decimal unit is compared in. "pół" alone is left out: it also means "half of something".
+    private static let fractions: [String: Int] = ["poltora": 15, "poltorej": 15]
+
     /// The Polish ordinal stems of the hours a clock time is said with ("o piątej"), by value.
     private static let hourStems: [(String, Int)] = [
         ("pierwsz", 1), ("drug", 2), ("trzec", 3), ("czwart", 4), ("piat", 5), ("szost", 6), ("siodm", 7),
@@ -106,6 +110,12 @@ enum NotesNumberForms {
                 flush()
                 values.insert(digits)
                 lastDigit = digits
+                continue
+            }
+            if let tenths = fractions[word] {
+                flush()
+                values.insert(tenths)
+                lastDigit = nil
                 continue
             }
             guard let (value, kind) = table[word] else {
@@ -159,16 +169,25 @@ enum NotesNumberForms {
     /// The endings of a feminine ordinal, the form a clock hour is said in ("o piątej", "na piątą", "trzecia").
     private static let hourEndings: Set<String> = ["a", "ej", "ia", "iej"]
 
-    /// The hours named by Polish ordinals ("piątej" → 5). A weekday with the same stem ("piątek", "czwartku") or
-    /// another ordinal ("drugi") names no hour.
+    /// The hours named by Polish ordinals ("piątej" → 5, "dwudziestej pierwszej" → 21). A weekday with the same
+    /// stem ("piątek", "czwartku") or another ordinal ("drugi") names no hour.
     static func spokenHours(_ words: [String]) -> Set<Int> {
-        var hours: Set<Int> = []
-        for word in words {
-            for (stem, value) in hourStems
-            where word.hasPrefix(stem) && hourEndings.contains(String(word.dropFirst(stem.count))) {
-                hours.insert(value)
-            }
+        let values = words.map(hourValue(of:))
+        var hours = Set(values.compactMap { $0 })
+        // A compound hour: the tens ordinal and the unit ordinal are two words ("dwudziestej pierwszej").
+        for index in values.indices.dropLast() {
+            guard values[index] == 20, let unit = values[index + 1], (1...9).contains(unit) else { continue }
+            hours.insert(20 + unit)
         }
         return hours
+    }
+
+    /// The hour one ordinal word names ("piątej" → 5), `nil` for any other word.
+    private static func hourValue(of word: String) -> Int? {
+        for (stem, value) in hourStems
+        where word.hasPrefix(stem) && hourEndings.contains(String(word.dropFirst(stem.count))) {
+            return value
+        }
+        return nil
     }
 }

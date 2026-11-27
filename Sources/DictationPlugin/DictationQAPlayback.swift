@@ -179,10 +179,11 @@ extension DictationPlugin: PluginQACommands {
         guard let state = recorder.lastState else { return "error: no HUD state" }
 
         let raw = controller.lastRawText ?? ""
+        let promptVersion = CleanupPrompt.version(for: settings.effectiveLevel ?? .standard)
         let text = recorder.entry?.bestText ?? ""
         let card = DictationQACard(
             file: wav.deletingPathExtension().lastPathComponent, raw: raw, text: text, state: state,
-            promptVersion: CleanupPrompt.version)
+            promptVersion: promptVersion)
         let prefix = parts[1]
         var written: [String] = []
         for (name, appearance) in [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)] {
@@ -197,7 +198,7 @@ extension DictationPlugin: PluginQACommands {
             let promptVersion: Int
         }
         let result = Result(
-            file: wav.lastPathComponent, raw: raw, text: text, hud: state.title, promptVersion: CleanupPrompt.version)
+            file: wav.lastPathComponent, raw: raw, text: text, hud: state.title, promptVersion: promptVersion)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         if let data = try? encoder.encode(result) { try? data.write(to: URL(filePath: "\(prefix).json")) }
@@ -221,7 +222,7 @@ struct DictationQACard {
         model.state = state
         let view = Card(file: file, raw: raw, text: text, promptVersion: promptVersion, hud: model)
         let host = NSHostingView(rootView: view)
-        let size = NSSize(width: 520, height: 330)
+        let size = NSSize(width: 520, height: 520)
         host.frame = NSRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: true)
         window.appearance = NSAppearance(named: name)
@@ -255,7 +256,7 @@ struct DictationQACard {
                 block("Pasted (after cleanup)", text)
             }
             .padding(16)
-            .frame(width: 520, height: 330, alignment: .topLeading)
+            .frame(width: 520, height: 520, alignment: .topLeading)
             .background(Color(nsColor: .windowBackgroundColor))
         }
 

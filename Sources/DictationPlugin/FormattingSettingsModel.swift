@@ -2,8 +2,8 @@ import Foundation
 import LintelSpeech
 import Observation
 
-/// What the "Formatting" section of the Dictation pane shows and does: the mode, the servers found on this Mac,
-/// the model to use, and a "Try it" button. Nothing here leaves the Mac: every address goes through
+/// What the "Formatting" section of the Dictation pane shows and does: how much to tidy, the servers found on this
+/// Mac, the model to use, and a "Try it" button. Nothing here leaves the Mac: every address goes through
 /// `LoopbackPolicy`.
 @MainActor @Observable
 final class FormattingSettingsModel {
@@ -13,13 +13,58 @@ final class FormattingSettingsModel {
         case result(original: String, text: String, cleaned: Bool)
     }
 
+    /// The values of the popup. A stored `full` is shown, and runs, as Standard while Full is not offered
+    /// (`DictationSettings.offersFull`).
+    enum TidyChoice: String, CaseIterable, Sendable {
+        case off, light, standard, full
+
+        init(_ settings: DictationSettings) {
+            switch settings.effectiveLevel {
+            case nil: self = .off
+            case .light: self = .light
+            case .standard: self = .standard
+            case .full: self = .full
+            }
+        }
+
+        /// The level a model runs at, `nil` for Off and Light, which run no model.
+        var modelLevel: DictationSettings.CleanupLevel? {
+            switch self {
+            case .off, .light: nil
+            case .standard: .standard
+            case .full: .full
+            }
+        }
+    }
+
+    /// The values the popup lists: Full only while it is offered.
+    var choices: [TidyChoice] {
+        TidyChoice.allCases.filter { $0 != .full || settings.offersFull }
+    }
+
     /// The text "Try it" cleans up.
     static let sample = "yyy no więc jutro mamy spotkanie o dziesiątej nie to znaczy o jedenastej w biurze"
 
-    var mode: DictationSettings.Mode {
+    /// "Tidy up my text": one popup over two keys. Off is `mode = raw` (the stored level stays, so turning it back on
+    /// returns to it); Light and Standard are `mode = cleanup` plus `cleanupLevel`.
+    var choice: TidyChoice {
         didSet {
-            settings.setMode(mode)
-            if mode == .cleanup { Task { await refresh() } }
+            guard choice != oldValue else { return }
+            switch choice {
+            case .off:
+                settings.setMode(.raw)
+            case .light:
+                settings.setCleanupLevel(.light)
+                settings.setMode(.cleanup)
+            case .standard:
+                settings.setCleanupLevel(.standard)
+                settings.setMode(.cleanup)
+            case .full:
+                settings.setCleanupLevel(.full)
+                settings.setMode(.cleanup)
+            }
+            tryState = .idle
+            if usesModel { Task { await refresh() } }
         }
     }
     private(set) var endpoints: [LLMEndpoint] = []
@@ -48,7 +93,7 @@ final class FormattingSettingsModel {
 
     @ObservationIgnored private let settings: DictationSettings
     @ObservationIgnored private let probe: EndpointProbe
-    @ObservationIgnored private let formatter: LocalLLMFormatter
+    @ObservationIgnored private let transport: any HTTPTransport
     @ObservationIgnored private let llmModels: ModelManager?
     @ObservationIgnored private let runtime: KeepWarmRuntime?
     @ObservationIgnored private var tryTask: Task<Void, Never>?
@@ -64,19 +109,30 @@ final class FormattingSettingsModel {
         self.llmModels = llmModels
         self.runtime = runtime
         probe = EndpointProbe(transport: transport)
-        formatter = LocalLLMFormatter(transport: transport, target: { settings.llmTarget })
+        self.transport = transport
         let offered = LLMModelCatalog.available(physicalMemory: physicalMemory)
         builtInModels = offered.isEmpty ? [LLMModelCatalog.defaultModel] : offered
         let chosen = settings.builtInLLMModel
         builtInModel = builtInModels.contains(chosen) ? chosen : (builtInModels.first ?? chosen)
         source = llmModels == nil ? .server : settings.llmSource
-        mode = settings.mode
+        choice = TidyChoice(settings)
         address = settings.llmEndpoint?.absoluteString ?? ""
         selectedEndpoint = settings.llmEndpoint
         selectedModel = settings.llmModel
     }
 
-    var isCleanupOn: Bool { mode == .cleanup }
+    /// Whether anything is tidied (Light, Standard or Full).
+    var isCleanupOn: Bool { choice != .off }
+
+    /// Whether a language model (the built-in one or a server) does the tidying: Standard and Full. Light needs none.
+    var usesModel: Bool { choice.modelLevel != nil }
+
+    /// Full on the smallest catalog model: it works, but the larger one does it better (spec A6), so the pane says so.
+    var showsSmallModelHint: Bool {
+        guard choice == .full, isBuiltIn else { return false }
+        let smallest = LLMModelCatalog.all.min { $0.residentBytes < $1.residentBytes }
+        return builtInModel == smallest
+    }
 
     /// The models of the selected server, from the last probe.
     var models: [String] {
@@ -93,7 +149,7 @@ final class FormattingSettingsModel {
 
     /// Looks for servers again (the pane calls it when it appears and when the mode is switched on).
     func refresh() async {
-        guard isCleanupOn else { return }
+        guard usesModel else { return }
         await refreshBuiltIn()
         guard !isBuiltIn else { return }
         isProbing = true
@@ -157,11 +213,13 @@ final class FormattingSettingsModel {
     func tryIt() {
         guard tryTask == nil, hasTarget else { return }
         tryState = .running
+        let level = choice.modelLevel ?? .standard
         let formatter: any TextFormatter
         if isBuiltIn, let runtime {
-            formatter = BuiltInFormatter(runtime: runtime)
+            formatter = BuiltInFormatter(runtime: runtime, level: level)
         } else {
-            formatter = self.formatter
+            let settings = settings
+            formatter = LocalLLMFormatter(transport: transport, target: { settings.llmTarget }, level: level)
         }
         tryTask = Task { [weak self] in
             let sample = Self.sample

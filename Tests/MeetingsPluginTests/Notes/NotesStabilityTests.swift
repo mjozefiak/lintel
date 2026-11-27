@@ -26,7 +26,6 @@ import Testing
         var questions = 0
         /// How many thirds of the meeting the topics come from (0...3).
         var thirds = 0
-        var hasSummary = false
         var requests = 0
     }
 
@@ -135,15 +134,15 @@ import Testing
             if NotesFake.isReduce(messages) {
                 let reminded = NotesFake.lastUser(messages).contains(NotesPrompt.formatReminder)
                 switch mode {
-                case .ok: return .done(NotesFake.reduceAnswer(messages, summary: "The areas are on track."))
+                case .ok: return .done(NotesFake.reduceAnswer(messages))
                 case .loops:
                     // Greedy decoding repeats its loop for the same prompt; a changed prompt breaks it.
-                    if reminded { return .done(NotesFake.reduceAnswer(messages, summary: "The areas are on track.")) }
-                    return .cutOff("SUMMARY: The areas are on track.\nDECISIONS: p1, p1, p1, p1, p1, p1, p1, p1, p1")
+                    if reminded { return .done(NotesFake.reduceAnswer(messages)) }
+                    return .cutOff("DECISIONS: p1, p1, p1, p1, p1, p1, p1, p1, p1")
                 case .noise: return .done("I cannot help with that.")
                 }
             }
-            return .done("SUMMARY: The areas are on track.")
+            return .done("NONE")
         }
     }
 
@@ -169,9 +168,9 @@ import Testing
         row.requests = filtered.llm.calls.count
         let markdown = result.markdown ?? ""
         row.decisions = bullets(of: "Decisions", in: markdown).count
-        row.tasks = bullets(of: "Action items", in: markdown).count
+        row.tasks = bullets(of: "Next steps", in: markdown).count
         row.questions = bullets(of: "Open questions", in: markdown).count
-        let topics = bullets(of: "Topics discussed", in: markdown)
+        let topics = topicBullets(in: markdown)
         row.topics = topics.count
         var thirds = Set<Int>()
         for topic in topics {
@@ -180,8 +179,22 @@ import Testing
             }
         }
         row.thirds = thirds.count
-        row.hasSummary = markdown.contains("## Summary")
         return row
+    }
+
+    /// The findings: the bullets outside the sections of decisions, next steps and open questions (under a topic
+    /// heading, or the list of a short meeting).
+    static func topicBullets(in markdown: String) -> [String] {
+        var section: String?
+        var result: [String] = []
+        for line in markdown.split(separator: "\n").map(String.init) {
+            if line.hasPrefix("#") {
+                section = line.drop { $0 == "#" || $0 == " " }.description
+            } else if line.hasPrefix("- "), !["Decisions", "Next steps", "Open questions"].contains(section ?? "") {
+                result.append(line)
+            }
+        }
+        return result
     }
 
     static func bullets(of heading: String, in markdown: String) -> [String] {
@@ -192,11 +205,11 @@ import Testing
 
     static func table(_ rows: [Row]) -> String {
         var out =
-            "run | reduce model | status | decisions | tasks | topics | topic thirds | questions | summary | requests\n"
-        out += "--- | --- | --- | --- | --- | --- | --- | --- | --- | ---\n"
+            "run | reduce model | status | decisions | tasks | topics | topic thirds | questions | requests\n"
+        out += "--- | --- | --- | --- | --- | --- | --- | --- | ---\n"
         for r in rows {
             out +=
-                "\(r.run) | \(r.mode.rawValue) | \(r.status) | \(r.decisions) | \(r.tasks) | \(r.topics) | \(r.thirds) | \(r.questions) | \(r.hasSummary ? 1 : 0) | \(r.requests)\n"
+                "\(r.run) | \(r.mode.rawValue) | \(r.status) | \(r.decisions) | \(r.tasks) | \(r.topics) | \(r.thirds) | \(r.questions) | \(r.requests)\n"
         }
         let partial = rows.filter { $0.status == "partial" }.count
         func range(_ key: KeyPath<Row, Int>) -> String {

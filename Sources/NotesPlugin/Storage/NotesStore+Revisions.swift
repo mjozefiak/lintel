@@ -306,27 +306,13 @@ extension NotesStore {
     }
 
     /// Like `detach`, and reports the rows it moved (with `alongside` in the same transaction), so the registry
-    /// can re-key the open documents.
+    /// can re-key the open documents. Rows that carry a Recently deleted mark are deleted, not moved
+    /// (`detachOrDeleteTrashed`).
     @discardableResult
     func detachReportingRows(
         _ key: NoteKey, alongside: (Database, [DetachedRow]) throws -> Void = { _, _ in }
     ) throws -> [DetachedRow] {
-        try writeMaintenance { db in
-            let moved = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT id, layer, source_started_at_ms FROM note_doc
-                    WHERE key = ? AND source_plugin_id != 'notes' AND source_state IS NOT 'detached' ORDER BY id
-                    """, arguments: [key.rawValue]
-            ).map { DetachedRow(docID: $0["id"], layer: $0["layer"], startedAtMs: $0["source_started_at_ms"]) }
-            try db.execute(
-                sql: """
-                    UPDATE note_doc SET source_state = 'detached'
-                    WHERE key = ? AND source_plugin_id != 'notes' AND source_state IS NOT 'detached'
-                    """, arguments: [key.rawValue])
-            try alongside(db, moved)
-            return moved
-        }
+        try detachOrDeleteTrashed(key, alongside: alongside).moved
     }
 
     /// Documents Export All may write: every head except a `detached` row without user writing and without an

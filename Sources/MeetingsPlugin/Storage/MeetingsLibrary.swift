@@ -293,11 +293,12 @@ final class MeetingsLibrary {
         meetingCount = (try? store.meetingCount()) ?? 0
     }
 
-    /// One retention pass now.
+    /// One retention pass now (by age; the 30-day purge of Recently deleted belongs to the periodic job, whose first
+    /// run waits for Notes' trash sweep).
     @discardableResult
     func applyRetention() async -> Int {
         guard let store else { return 0 }
-        let deleted = await retention.run(store: store, policy: policy)
+        let deleted = await retention.run(store: store, policy: policy, purgesTrash: false)
         if deleted > 0 {
             refreshCount()
             changed()

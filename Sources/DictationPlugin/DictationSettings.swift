@@ -15,6 +15,7 @@ struct DictationSettings: Sendable {
         static let keepWarmMinutes = "keepWarmMinutes"
         static let restoreClipboard = "restoreClipboard"
         static let mode = "mode"
+        static let cleanupLevel = "cleanupLevel"
         static let llmEndpoint = "llmEndpoint"
         static let llmModel = "llmModel"
         static let llmSource = "llmSource"
@@ -38,6 +39,21 @@ struct DictationSettings: Sendable {
         case cleanup
     }
 
+    /// How much the cleanup changes (spec `2026-11-25-dictation-cleanup-levels`). `mode` stays the on/off switch
+    /// (`raw` = Off); the level only matters while `mode` is `cleanup`.
+    enum CleanupLevel: String, Sendable, CaseIterable {
+        /// Filler words out, nothing else: `LightCleaner`, no language model.
+        case light
+        /// Today's cleanup by a language model (`CleanupPrompt`).
+        case standard
+        /// Standard plus email layout, paragraphs for a longer dictation and a smoothed style (spec phase 2, owner
+        /// decision 2026-11-26). Offered only while `DictationSettings.fullIsOffered` is on.
+        case full
+
+        /// Whether a language model does the work at this level.
+        var usesModel: Bool { self != .light }
+    }
+
     /// Where the cleanup model runs.
     enum LLMSource: String, Sendable, CaseIterable {
         /// The user's own server on this Mac (Ollama, LM Studio, llama-server).
@@ -49,10 +65,23 @@ struct DictationSettings: Sendable {
     static let defaultSpeechModel = "parakeet-ultra"
     static let defaultKeepWarmMinutes = 10
 
-    private let settings: PluginSettings
+    /// Whether Full is offered and runs. Spec phase 2: Full ships only when its measured targets pass; with this off a
+    /// stored `full` (a newer build wrote it) shows and runs as Standard and the popup has no Full. **Off since the first
+    /// measurement (2026-11-26):** Full met every target but one, self-corrections OK 57 % against Standard's 71 % on the
+    /// owner's corpus (4 of 7 items against 5 of 7), so it waits for the owner's decision. A DEBUG build turns it on for
+    /// QA with `plugins.dictation.qaOfferFull=true`.
+    static let fullIsOffered = false
 
-    init(_ settings: PluginSettings) {
+    private let settings: PluginSettings
+    let offersFull: Bool
+
+    init(_ settings: PluginSettings, offersFull: Bool = DictationSettings.fullIsOffered) {
         self.settings = settings
+        #if DEBUG
+        self.offersFull = offersFull || settings.bool("qaOfferFull", default: false)
+        #else
+        self.offersFull = offersFull
+        #endif
     }
 
     var speechModelID: String { settings.string(Key.speechModel) ?? Self.defaultSpeechModel }
@@ -82,6 +111,26 @@ struct DictationSettings: Sendable {
     var vocabularyEnabled: Bool { settings.bool(Key.vocabularyEnabled, default: true) }
 
     var mode: Mode { settings.string(Key.mode).flatMap(Mode.init(rawValue:)) ?? .raw }
+
+    /// The stored level; a missing or unknown value reads as `standard`, which is what `mode = cleanup` did before
+    /// levels existed. Nothing is migrated.
+    var cleanupLevel: CleanupLevel {
+        settings.string(Key.cleanupLevel).flatMap(CleanupLevel.init(rawValue:)) ?? .standard
+    }
+
+    /// The level that runs now: `nil` while the cleanup is off. A stored `full` runs as Standard while Full is not
+    /// offered.
+    var effectiveLevel: CleanupLevel? {
+        guard mode == .cleanup else { return nil }
+        switch cleanupLevel {
+        case .light: return .light
+        case .standard: return .standard
+        case .full: return offersFull ? .full : .standard
+        }
+    }
+
+    /// Whether the cleanup needs a language model (server or built-in) right now.
+    var usesModel: Bool { effectiveLevel?.usesModel ?? false }
 
     /// The formatting server's address, always a loopback one (the setter refuses anything else).
     var llmEndpoint: URL? {
@@ -120,6 +169,7 @@ struct DictationSettings: Sendable {
     func setMaximumEntries(_ count: Int) { settings.set(count, for: Key.maximumEntries) }
 
     func setMode(_ mode: Mode) { settings.set(mode.rawValue, for: Key.mode) }
+    func setCleanupLevel(_ level: CleanupLevel) { settings.set(level.rawValue, for: Key.cleanupLevel) }
     func setLLMModel(_ model: String?) {
         if let model, !model.isEmpty {
             settings.set(model, for: Key.llmModel)

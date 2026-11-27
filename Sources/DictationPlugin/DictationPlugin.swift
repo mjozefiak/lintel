@@ -147,7 +147,8 @@ public final class DictationPlugin: LintelPlugin {
         vocabularyModel = VocabularyPanelModel(
             store: vocabulary, settings: settings,
             revealInFinder: { url in workspace.revealInFinder([url]) })
-        noteSource = DictationNoteSource(history: history, hub: noteChanges)
+        noteSource = DictationNoteSource(
+            history: history, hub: noteChanges, retentionDays: { settings.retentionDays })
         historyModel = HistorySettingsModel(settings: settings, history: history)
         let keptNoteCopies = context.keptNoteCopies
         let deleteKeptNoteCopies = context.deleteKeptNoteCopies
@@ -186,17 +187,40 @@ public final class DictationPlugin: LintelPlugin {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    /// The formatter for a new session: none in raw mode, else the user's server or the built-in model.
-    private static func formatter(
-        settings: DictationSettings, transport: any HTTPTransport, builtIn: KeepWarmRuntime, logger: Logger
+    /// The formatter for a new session, chosen by the level in force when the dictation starts: none when the cleanup is
+    /// off, `LightCleaner` for Light (no model, no server, no lease), else the user's server or the built-in model.
+    /// `protectedWords` are the vocabulary's terms and variants, which Light never removes or changes.
+    nonisolated static func formatter(
+        settings: DictationSettings, transport: any HTTPTransport, builtIn: KeepWarmRuntime, logger: Logger,
+        protectedWords: @escaping @Sendable () -> [String] = { [] }
     ) -> (any TextFormatter)? {
-        guard settings.mode == .cleanup else { return nil }
-        switch settings.llmSource {
-        case .server:
-            return LocalLLMFormatter(transport: transport, target: { settings.llmTarget }, logger: logger)
-        case .builtIn:
-            return BuiltInFormatter(runtime: builtIn, logger: logger)
+        guard let level = settings.effectiveLevel else { return nil }
+        switch level {
+        case .light:
+            return LightCleaner(protectedWords: protectedWords)
+        case .standard, .full:
+            switch settings.llmSource {
+            case .server:
+                return LocalLLMFormatter(
+                    transport: transport, target: { settings.llmTarget }, level: level, logger: logger)
+            case .builtIn:
+                return BuiltInFormatter(runtime: builtIn, level: level, logger: logger)
+            }
         }
+    }
+
+    /// The model the history records for a dictation: the built-in model's id or the server's model name at a level that
+    /// runs a model, and `nil` at Light or Off, where no model ran (the note's column stays empty, never a fake name).
+    nonisolated static func formatterModel(settings: DictationSettings) -> String? {
+        guard settings.usesModel else { return nil }
+        return settings.llmSource == .builtIn ? settings.builtInLLMModel.id : settings.llmModel
+    }
+
+    /// The words Light keeps: the vocabulary's terms and spoken variants, empty while the vocabulary is switched off.
+    nonisolated static func protectedWords(
+        settings: DictationSettings, vocabulary: VocabularyStore
+    ) -> @Sendable () -> [String] {
+        { settings.vocabularyEnabled ? vocabulary.terms.flatMap { [$0.term] + $0.aliases } : [] }
     }
 
     /// The vocabulary step of a dictation (DICT-1.1): the user's terms replace what was said, or nothing
@@ -260,7 +284,8 @@ public final class DictationPlugin: LintelPlugin {
                         vad: LazyVAD(modelFolder: folder.appending(path: ModelCatalog.sileroVADPath)),
                         engine: engine,
                         formatter: Self.formatter(
-                            settings: settings, transport: transport, builtIn: builtInLLM, logger: context.logger),
+                            settings: settings, transport: transport, builtIn: builtInLLM, logger: context.logger,
+                            protectedWords: Self.protectedWords(settings: settings, vocabulary: vocabulary)),
                         replaceTerms: Self.termReplacement(settings: settings, vocabulary: vocabulary),
                         modelFolder: folder, lease: lease, modelID: settings.speechModelID,
                         keepWarm: { settings.keepWarm }, logger: context.logger, onEvent: onEvent)
@@ -279,9 +304,9 @@ public final class DictationPlugin: LintelPlugin {
                     history.record($0)
                 },
                 frontmostBundleID: { context.workspace.frontmostApplication?.bundleIdentifier },
-                formatMode: { settings.mode == .cleanup ? .clean : .raw },
+                formatMode: { settings.effectiveLevel == nil ? .raw : .clean },
                 speechModelID: { settings.speechModelID },
-                formatterModel: { settings.llmSource == .builtIn ? settings.builtInLLMModel.id : settings.llmModel }))
+                formatterModel: { Self.formatterModel(settings: settings) }))
         self.controller = controller
         relay.controller = controller
         history.open()
