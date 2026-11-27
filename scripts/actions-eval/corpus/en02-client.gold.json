@@ -1,0 +1,13 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["email"], "evidence": [4, 5],
+     "fields": {"title": ["quote"], "to": {"required": [["Marcus"]], "optional": []}, "due": ["2026-11-23"], "condition": false}},
+    {"id": "a2", "type": ["calendar"], "evidence": [7, 8],
+     "fields": {"title": ["kickoff"], "date": ["2026-12-01"], "time": "10:00",
+                "participants": {"required": [["Marcus"], ["Ivy"]], "optional": []}, "condition": true}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "other_speaker", "evidence": [9]},
+    {"id": "t2", "kind": "condition_failed", "evidence": [10, 11]}
+  ]
+}

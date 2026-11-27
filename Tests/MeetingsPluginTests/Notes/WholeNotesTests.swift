@@ -56,16 +56,26 @@ final class ScriptedGenerator: NotesGenerating, @unchecked Sendable {
             #expect(
                 !groups.contains(Temporal.group(of: NotesText.words(corpus.fake.weekday).joined()) ?? "?"),
                 "\(corpus.name): weekday")
-            // The `numberWords` fault spells the planted number out; it must not be said in words either.
-            #expect(corpus.fake.number == "7400", "\(corpus.name): the numberWords fault spells 7400")
+            // The `numberWords` fault spells the planted number out; it must be that number and not be said.
+            let number = try #require(Int(corpus.fake.number), "\(corpus.name): the planted number is not a number")
             #expect(
-                !NotesNumberForms.spokenValues(corpus.utterances.flatMap { NotesText.words($0.text) }).contains(7400),
-                "\(corpus.name): 7400 is said in words")
+                NotesNumberForms.spokenValues(NotesText.words(corpus.fake.numberSpelled)).contains(number),
+                "\(corpus.name): \(corpus.fake.numberSpelled) is not \(number)")
+            #expect(
+                !NotesNumberForms.spokenValues(corpus.utterances.flatMap { NotesText.words($0.text) }).contains(number),
+                "\(corpus.name): \(number) is said in words")
             for planted in [corpus.fake.number, corpus.fake.name, corpus.fake.person] {
                 #expect(
                     !said.contains(NotesText.words(planted).joined()), "\(corpus.name): \(planted) is in the transcript"
                 )
             }
+        }
+        // A case that plants the same value as another proves nothing about it: every case names its own.
+        for values in [
+            cases.map(\.fake.number), cases.map(\.fake.numberSpelled), cases.map(\.fake.name),
+            cases.map(\.fake.person),
+        ] {
+            #expect(Set(values).count == values.count, "planted values repeat: \(values)")
         }
         #expect(cases.contains { $0.extraFaults.contains { $0.class == "injection" } })
         #expect(cases.contains { $0.extraFaults.contains { $0.gap == true } })
@@ -257,6 +267,131 @@ final class ScriptedGenerator: NotesGenerating, @unchecked Sendable {
             NotesUtterance(startMs: 0, speaker: "Dan", text: "We got ten offers for the new office this week.")
         ])
         #expect(english.check(NotesDraftParser.parse("OPEN | We have 10 offers.").draft).draft.open.count == 1)
+    }
+
+    /// The minutes of a clock time are checked too: "22:45" says nothing about 45 when the meeting only said
+    /// "twenty two thousand". A time whose minutes were said, or the top of the hour, stands.
+    @Test func theMinutesOfAClockTimeAreChecked() {
+        let guardian = NotesFactGuard(utterances: [
+            NotesUtterance(
+                startMs: 0, speaker: "Marta",
+                text: "Nowy lokal kosztuje dwadzieścia dwa tysiące, o dziesiątej trzydzieści.")
+        ])
+        func kept(_ line: String) -> Bool {
+            guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        #expect(kept("Spotkanie jest o 10:30."))
+        #expect(kept("Spotkanie jest o 22:00."))
+        #expect(!kept("Spotkanie jest o 22:45."))
+        #expect(!kept("Spotkanie jest o 22:56."))
+    }
+
+    /// A compound Polish ordinal names one hour ("dwudziestej pierwszej" is 21), and a number and a date are
+    /// written by a model as digits: "półtora" as 1.5, "piętnastego marca" as 15.03. None of them may be removed.
+    @Test func fractionsDatesAndCompoundHoursStandWhenSaid() {
+        func kept(_ said: String, _ line: String) -> Bool {
+            let guardian = NotesFactGuard(utterances: [NotesUtterance(startMs: 0, speaker: "Marek", text: said)])
+            return guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        let hour = "Widzimy się o dwudziestej pierwszej w biurze."
+        #expect(kept(hour, "Spotkanie jest o 21:00."))
+        #expect(!kept(hour, "Spotkanie jest o 23:00."))
+        let date = "Termin to piętnastego marca."
+        #expect(kept(date, "Termin to 15.03."))
+        #expect(!kept(date, "Termin to 15.04."))
+        let fraction = "Mamy półtora dnia na przygotowanie."
+        #expect(kept(fraction, "Mamy 1.5 dnia."))
+        #expect(!kept(fraction, "Mamy 1.4 dnia."))
+    }
+
+    /// A decimal is backed by the decimal itself, never by its two halves said on their own: a meeting that said
+    /// "jeden" and "cztery" (and not "czternaście") says nothing about "1.4".
+    @Test func anInventedDecimalIsNotBackedByItsHalves() {
+        let guardian = NotesFactGuard(utterances: [
+            NotesUtterance(
+                startMs: 0, speaker: "Marek",
+                text: "Mamy jeden projekt i cztery osoby, a na wdrożenie dwa tygodnie i pięć dni.")
+        ])
+        func kept(_ line: String) -> Bool {
+            guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        #expect(!kept("Wzrost 1.4 procent."))
+        #expect(!kept("Wzrost 2.5 procent."))
+        #expect(!kept("Wzrost 2,5 procent."))
+        #expect(kept("Na wdrożenie mamy 2 tygodnie i 5 dni."))
+
+        let english = NotesFactGuard(utterances: [
+            NotesUtterance(startMs: 0, speaker: "Dan", text: "We have one project and four people for five days.")
+        ])
+        #expect(
+            english.check(NotesDraftParser.parse("OPEN | Growth was 4.1 percent.").draft).draft.open.isEmpty,
+            "one and four were said, 4.1 was not")
+    }
+
+    /// A time the meeting said as a phrase ("half past ten", "wpół do jedenastej", "kwadrans po trzeciej") is
+    /// backed by that phrase, by its hour and by its minutes: the digits a model writes for it are not removed.
+    @Test func aClockPhraseBacksTheTimeItNames() {
+        func kept(_ said: String, _ line: String) -> Bool {
+            let guardian = NotesFactGuard(utterances: [NotesUtterance(startMs: 0, speaker: "Marek", text: said)])
+            return guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        let polish = "Widzimy się wpół do jedenastej w biurze."
+        #expect(kept(polish, "Spotkanie jest o 10:30."))
+        #expect(!kept(polish, "Spotkanie jest o 11:30."))
+        #expect(!kept(polish, "Spotkanie jest o 10:45."))
+        let english = "Let us meet at half past ten in the office."
+        #expect(kept(english, "The meeting is at 10:30."))
+        #expect(!kept(english, "The meeting is at 10:45."))
+        let quarter = "Spotkanie jest za kwadrans trzecia."
+        #expect(kept(quarter, "Spotkanie jest o 2:45."))
+        #expect(!kept(quarter, "Spotkanie jest o 3:15."))
+        // A phrase with "to" names the minutes of the hour before it, and twelve when that hour is one.
+        let noon = "Spotkanie jest kwadrans do pierwszej."
+        #expect(kept(noon, "Spotkanie jest o 12:45."))
+        #expect(!kept(noon, "Spotkanie jest o 12:30."))
+    }
+
+    /// A quotation mark or a bracket before the first word does not make that word a name: a line that opens
+    /// with an ordinary word the meeting did not say as such still stands.
+    @Test func aLineOpeningWithAQuotationMarkIsNoName() {
+        let guardian = NotesFactGuard(utterances: [
+            NotesUtterance(startMs: 0, speaker: "Marek", text: "Ustalamy, że idziemy w prawo.")
+        ])
+        func kept(_ line: String) -> Bool {
+            guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        #expect(kept("„Zdecydowano” razem o projekcie."))
+        #expect(kept("(Zdecydowano) razem o projekcie."))
+        // A capital that follows a colon is still checked as a name, quotation mark or not.
+        #expect(!kept("Ustalenia: „Zenon” przygotuje raport."))
+    }
+
+    /// A capitalised word after a colon is a name, not a place in the sentence: an invented person written there
+    /// goes, a person who was in the meeting stays.
+    @Test func aNameAfterAColonIsChecked() {
+        let guardian = NotesFactGuard(utterances: [
+            NotesUtterance(startMs: 0, speaker: "Marek", text: "Marek przygotuje raport do piątku.")
+        ])
+        func kept(_ line: String) -> Bool {
+            guardian.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        #expect(kept("Ustalenia: Marek przygotuje raport do piątku."))
+        #expect(!kept("Ustalenia: Zenon przygotuje raport do piątku."))
+        // The first word of a line is capitalised for its place: it is left unchecked (a named limit of the guard).
+        #expect(kept("Zenon przygotuje raport do piątku."))
+    }
+
+    /// In an English meeting "ten" and "one" are numbers: a line may not use them unless they were said.
+    @Test func theEnglishTenAndOneAreNumbers() {
+        let plain = NotesFactGuard(utterances: [
+            NotesUtterance(startMs: 0, speaker: "Dan", text: "We had twenty offers and a short list for the office.")
+        ])
+        func kept(_ line: String) -> Bool {
+            plain.check(NotesDraftParser.parse("OPEN | \(line)").draft).draft.open.count == 1
+        }
+        #expect(!kept("We have ten offers."))
+        #expect(!kept("We have twenty one offers."))
+        #expect(kept("We have twenty offers."))
     }
 }
 
@@ -520,12 +655,12 @@ enum ExampleSeparation {
     }
 
     @Test func aLongerTranscriptIsPartsAndOneMerge() async throws {
-        let generator = ScriptedGenerator(budget: 1) { _, _ in
+        let generator = ScriptedGenerator(budget: 900) { _, _ in
             GenerationResult(text: Self.answer, stoppedByTokenLimit: false)
         }
         var configuration = WholeNotesPipeline.Configuration()
         configuration.partTokens = 600
-        let parts = WholeNotesPipeline.parts(of: Self.utterances, budget: 1, partTokens: 600)
+        let parts = WholeNotesPipeline.parts(of: Self.utterances, budget: 900, partTokens: 600)
         #expect(parts.count >= 3 && parts.count <= 8)
         #expect(parts.flatMap { $0 } == Self.utterances, "parts must cover the transcript without overlap")
         let result = try await WholeNotesPipeline(generator: generator, configuration: configuration)
@@ -537,8 +672,34 @@ enum ExampleSeparation {
         #expect(result.chunkCount == parts.count)
     }
 
+    /// A configured part bigger than the generator's input budget is cut down to that budget: with the bare
+    /// `partTokens` the whole transcript would fit in one part of 40k for a 24k model, which the model cannot take.
+    @Test func aPartIsNeverBiggerThanTheGeneratorBudget() async throws {
+        let long: [NotesUtterance] = (0..<700).map {
+            NotesUtterance(
+                startMs: $0 * 1_000, speaker: $0.isMultiple(of: 2) ? "Anna" : "Marek",
+                text: "Omawiamy punkt numer \($0) agendy i jego wpływ na harmonogram projektu w tym kwartale.")
+        }
+        #expect(WholeNotesPipeline.partTokens(configured: 40_000, budget: 24_000) == 24_000)
+        #expect(WholeNotesPipeline.partTokens(configured: 40_000, budget: 100_000) == 40_000)
+        let clamped = WholeNotesPipeline.parts(of: long, budget: 24_000, partTokens: 24_000)
+        let unclamped = WholeNotesPipeline.parts(of: long, budget: 24_000, partTokens: 40_000)
+        #expect(clamped.count > 1)
+        #expect(unclamped.count == 1, "the fixture must fit one unclamped part, or the clamp proves nothing")
+        let generator = ScriptedGenerator(budget: 24_000) { _, _ in
+            GenerationResult(text: Self.answer, stoppedByTokenLimit: false)
+        }
+        var configuration = WholeNotesPipeline.Configuration()
+        configuration.partTokens = 40_000
+        configuration.maxParts = clamped.count - 1
+        await #expect(throws: NotesFailure.transcriptTooLong) {
+            _ = try await WholeNotesPipeline(generator: generator, configuration: configuration).run(utterances: long)
+        }
+        #expect(generator.calls.isEmpty)
+    }
+
     @Test func moreThanEightPartsStartNothing() async throws {
-        let generator = ScriptedGenerator(budget: 1) { _, _ in
+        let generator = ScriptedGenerator(budget: 900) { _, _ in
             GenerationResult(text: Self.answer, stoppedByTokenLimit: false)
         }
         var configuration = WholeNotesPipeline.Configuration()
@@ -551,7 +712,7 @@ enum ExampleSeparation {
     }
 
     @Test func aFailedPartEndsTheJobFailedNeverPartial() async throws {
-        let generator = ScriptedGenerator(budget: 1) { call, _ in
+        let generator = ScriptedGenerator(budget: 900) { call, _ in
             GenerationResult(text: call == 2 || call == 3 ? "no lines here" : Self.answer, stoppedByTokenLimit: false)
         }
         var configuration = WholeNotesPipeline.Configuration()
@@ -570,7 +731,7 @@ enum ExampleSeparation {
 
     @Test func aCancellationBetweenPartsSendsNoFurtherPart() async throws {
         let handle = RunHandle()
-        let generator = ScriptedGenerator(budget: 1) { call, _ in
+        let generator = ScriptedGenerator(budget: 900) { call, _ in
             if call == 1 {
                 while handle.task.withLock({ $0 }) == nil { await Task.yield() }
                 handle.task.withLock { $0?.cancel() }
@@ -579,7 +740,7 @@ enum ExampleSeparation {
         }
         var configuration = WholeNotesPipeline.Configuration()
         configuration.partTokens = 600
-        #expect(WholeNotesPipeline.parts(of: Self.utterances, budget: 1, partTokens: 600).count >= 3)
+        #expect(WholeNotesPipeline.parts(of: Self.utterances, budget: 900, partTokens: 600).count >= 3)
         let pipeline = WholeNotesPipeline(generator: generator, configuration: configuration)
         let task = Task { try await pipeline.run(utterances: Self.utterances) }
         handle.task.withLock { $0 = task }
@@ -639,13 +800,17 @@ enum ExampleSeparation {
 
     /// Since A5b the provider's generator is the one that has the whole-transcript profile (spec step 1.7d said "until
     /// PR 5b"); no other generator in the app may take it, and it is not used by `NotesPipeline`'s built-in model.
+    /// The track itself is built only in the provider job of `NotesService`, never by the built-in one.
     @Test func onlyTheProviderGeneratorUsesThisTrack() throws {
         var owners: [String] = []
+        var builders: [String] = []
         for file in TestPaths.meetingsSourceFiles() {
             let text = try String(contentsOf: file, encoding: .utf8)
             if text.contains("strategy: .wholeTranscript") { owners.append(file.lastPathComponent) }
+            if text.contains("WholeNotesPipeline(") { builders.append(file.lastPathComponent) }
         }
         #expect(owners == ["ProviderNotesGenerator.swift"], "\(owners)")
+        #expect(builders == ["NotesService.swift"], "\(builders)")
         #expect(NotesLease.self is any NotesGenerating.Type)
     }
 
