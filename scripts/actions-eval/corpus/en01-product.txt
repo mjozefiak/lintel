@@ -1,0 +1,17 @@
+# id: en01-product
+# lang: en
+# date: 2026-11-18
+# self: Sam
+# title: Product sync
+[00:02] Sam: Morning everyone, let's keep this short.
+[00:06] Priya: Quick one first: the contrast in dark mode on the settings page is still failing the accessibility check.
+[00:15] Priya: Sam, could you file a ticket for that and give it to Leo? Ideally done by next Friday.
+[00:22] Sam: Sure, I'll file the dark mode contrast ticket for Leo, due next Friday.
+[00:28] Leo: Works for me.
+[00:31] Sam: Also, I'll email Grace at Northwind the beta build link tomorrow. She's our design partner for this release.
+[00:40] Leo: Should we book a team offsite in December?
+[00:44] Sam: Let's not, the travel budget is frozen until January.
+[00:49] Priya: Fair. I'll set up the user interviews for the onboarding flow myself.
+[00:55] Sam: Great, thanks Priya.
+[00:58] Leo: The crash rate dropped to zero point four percent after the last fix, by the way.
+[01:05] Sam: Nice. Okay, that's it, thanks all.

@@ -8,6 +8,9 @@ import Testing
 struct WholeNotesCase: Decodable {
     struct Fake: Decodable {
         var number: String
+        /// The same number in words, per case: a fault proving that spelled-out numbers are caught must not be
+        /// the same string in every case.
+        var numberSpelled: String
         var weekday: String
         var name: String
         var person: String
@@ -110,9 +113,9 @@ struct WholeNotesFault {
                 name: "numberWords", hard: true,
                 answer: answer + "\n"
                     + line(
-                        "DECISION | ~00:10 | Budżet wynosi siedem tysięcy czterysta złotych.",
-                        "DECISION | ~00:10 | The budget is seven thousand four hundred dollars."),
-                expect: .dropped, absent: [line("siedem tysięcy", "seven thousand")]),
+                        "DECISION | ~00:10 | Budżet wynosi \(fake.numberSpelled) złotych.",
+                        "DECISION | ~00:10 | The budget is \(fake.numberSpelled) dollars."),
+                expect: .dropped, absent: [fake.numberSpelled]),
             .init(
                 name: "weekday", hard: true,
                 answer: answer + "\n"

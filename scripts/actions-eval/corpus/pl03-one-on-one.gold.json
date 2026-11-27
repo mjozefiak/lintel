@@ -1,0 +1,13 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["email"], "evidence": [4, 5],
+     "fields": {"title": ["notat"], "to": {"required": [["Michał", "Michal"]], "optional": []},
+                "due": ["2026-11-17"], "condition": false}},
+    {"id": "a2", "type": ["jira"], "evidence": [7],
+     "fields": {"title": ["płatno", "refaktor"], "assignee": null, "due": null, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "condition_failed", "evidence": [11, 12, 13]},
+    {"id": "t2", "kind": "vague", "evidence": [14, 15]}
+  ]
+}

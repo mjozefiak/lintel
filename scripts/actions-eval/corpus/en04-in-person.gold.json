@@ -1,0 +1,13 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["calendar"], "evidence": [3],
+     "fields": {"title": ["design review"], "date": ["2026-11-30"], "time": "14:00",
+                "participants": {"required": [["Nora"], ["Tim"]], "optional": []}, "condition": false}},
+    {"id": "a2", "type": ["email"], "evidence": [5, 6],
+     "fields": {"title": ["budget"], "to": {"required": [["Omar", "finance"]], "optional": [["finance"]]}, "due": ["2026-11-26"], "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "other_speaker", "evidence": [7]},
+    {"id": "t2", "kind": "rejected", "evidence": [8, 9]}
+  ]
+}

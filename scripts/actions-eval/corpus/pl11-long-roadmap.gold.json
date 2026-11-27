@@ -1,0 +1,19 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["jira"], "evidence": [8, 32, 33],
+     "fields": {"title": ["eksport"], "assignee": ["Ula", "Uli"], "due": null, "condition": false, "must_mention": ["10000"]}},
+    {"id": "a2", "type": ["email"], "evidence": [11, 12, 39, 40],
+     "fields": {"title": ["roadmap"], "to": {"required": [["Beata", "Beacie", "Beaty"]], "optional": []},
+                "due": ["2026-11-24"], "condition": false}},
+    {"id": "a3", "type": ["calendar"], "evidence": [18, 19],
+     "fields": {"title": ["vortex"], "date": ["2026-11-25"], "time": "11:00",
+                "participants": {"required": [["Ania"]], "optional": [["Vortex", "Vortexem"]]}, "condition": false}},
+    {"id": "a4", "type": ["jira"], "evidence": [30],
+     "fields": {"title": ["raport"], "assignee": null, "due": null, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "withdrawn", "evidence": [14, 37, 38]},
+    {"id": "t2", "kind": "other_speaker", "evidence": [20]},
+    {"id": "t3", "kind": "hedge", "evidence": [22, 23]}
+  ]
+}

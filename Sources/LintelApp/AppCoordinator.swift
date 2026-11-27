@@ -41,7 +41,7 @@ final class AppCoordinator {
     private let settingsRelay: PluginSettingsRelay
     /// `PluginContext.resultsChanged` with the plugin's id, for the Settings banner.
     private let statusRelay = PluginStatusRelay()
-    /// `PluginContext.noteSources`, `noteSourcesChanged` and `openNote` (the Notes workspace).
+    /// `PluginContext.noteSources`, `noteSourcesChanged`, `openNote` and `liveRecorder` (the Notes workspace).
     private let noteSourcesRelay = NoteSourcesRelay()
     private let icons: IconCache
     /// Where app activations are posted (tests use their own centre).
@@ -98,7 +98,8 @@ final class AppCoordinator {
                     noteSourcesChanged: { noteRelay.changes() },
                     openNote: { key in noteRelay.openNote(WorkspaceRoute(kind: "openNote", id: key.rawValue)) },
                     keptNoteCopies: { owner in await noteRelay.keptCopies(owner) },
-                    deleteKeptNoteCopies: { owner, erased in await noteRelay.deleteKeptCopies(owner, erased) }
+                    deleteKeptNoteCopies: { owner, erased in await noteRelay.deleteKeptCopies(owner, erased) },
+                    liveRecorder: { noteRelay.liveRecorder() }
                 )
             },
             settings: environment.settings
@@ -119,13 +120,17 @@ final class AppCoordinator {
         statusRelay.handler = { [weak self] id in self?.settingsHost?.pluginResultsChanged(id) }
         let host = host
         let logger = logger
-        var reported = Set<String>()
+        // One reporter for both selections: a plugin that breaks the id rule is logged once per app run, however
+        // often the shell looks.
+        let once = OnceReported { logger.error("\($0, privacy: .public)") }
         noteRelay.sources = {
-            Self.activeNoteSources(
-                host, report: { if reported.insert($0).inserted { logger.error("\($0, privacy: .public)") } })
+            Self.activeNoteSources(host, report: { once.report($0) })
         }
         noteRelay.openNote = { [weak self] route in self?.openNote(route) ?? false }
         noteRelay.commands = { [weak self] in self?.paletteCommands() ?? [] }
+        noteRelay.liveRecorder = {
+            Self.activeLiveRecorder(host, report: { once.report($0) })
+        }
         noteRelay.keptCopies = { [weak self] owner in await self?.host.keptNoteCopies(ofOwner: owner) ?? 0 }
         noteRelay.deleteKeptCopies = { [weak self] owner, erased in
             await self?.host.deleteKeptNoteCopies(ofOwner: owner, ownerErased: erased) ?? true
@@ -169,6 +174,26 @@ final class AppCoordinator {
             }
         }
         return result
+    }
+
+    /// The first active plugin's live recorder (the Notes window's Record button); plugin order decides. A
+    /// recorder whose `pluginID` is not its plugin's id, and any recorder after the first, is dropped and
+    /// reported once (`NoteSourcesRelay.liveRecorder` reports each message once).
+    static func activeLiveRecorder(_ host: PluginHost, report: (String) -> Void = { _ in }) -> (any LiveRecorder)? {
+        var found: (any LiveRecorder)?
+        for entry in host.entries where entry.state.isActive {
+            guard let recorder = entry.plugin.liveRecorder else { continue }
+            guard recorder.pluginID == entry.manifest.id else {
+                report("live recorder dropped: id does not match its plugin \(entry.manifest.id.rawValue)")
+                continue
+            }
+            guard found == nil else {
+                report("live recorder dropped: a recorder of \(entry.manifest.id.rawValue) is taken already")
+                continue
+            }
+            found = recorder
+        }
+        return found
     }
 
     /// Tells Notes when a plugin was switched on or off, failed or recovered: its set of sources changed.
@@ -737,5 +762,21 @@ final class PluginSettingsRelay {
 
     @MainActor func openModels(_ pluginID: String, _ packageID: String?) {
         modelsHandler(pluginID, packageID)
+    }
+}
+
+/// Lets each distinct message through once. The shell shares one between the note sources' and the live recorder's
+/// selection, so a plugin that breaks the id rule is logged once per app run, however often the shell looks.
+final class OnceReported {
+    private var seen = Set<String>()
+    private let sink: (String) -> Void
+
+    init(_ sink: @escaping (String) -> Void) {
+        self.sink = sink
+    }
+
+    func report(_ message: String) {
+        guard seen.insert(message).inserted else { return }
+        sink(message)
     }
 }
