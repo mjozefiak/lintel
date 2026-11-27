@@ -1,4 +1,4 @@
-# Minimal HUD sketch (revision 1, 2026-11-25)
+# Minimal HUD sketch (revision 3, 2026-11-26)
 
 Before-and-after sketch for the owner's decision on the minimal HUD pills. Spec: `.ai/specs/2026-11-25-minimal-hud.md`. Brief: the owner's direction of 2026-11-25 (pills as minimal as Wispr Flow / Granola; problems only when they occur, one line).
 
@@ -40,3 +40,5 @@ The owner decided OD-1 to OD-13 (spec, "Owner decisions"). Only two states of th
 ## Revision 3 (2026-11-26): review of PR #273
 
 Text fixes only, no redraw and no new measurement: the Polish microphone-denied line now reads „Brak dostępu do mikrofonu” (as in the spec), the processing hover „Transkrybuję, zostały 3” (OD-9) and the suggestion button „Nagraj” (OD-10). `prototype.json` carries revision 3 and the current sha256 of `README.md` and `index.html`. The `evidence/` images are still from revision 1.
+
+The title names the current revision (3); revision 1 is the drawing of 2026-11-25, revisions 2 and 3 are the annotations above. After the owner's answers to Q4 (b) and Q5 (a) the sketch is not redrawn: the SwiftUI gallery (`ui.pill`, Phase 1) is the source of truth from here on.
