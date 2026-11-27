@@ -632,17 +632,17 @@
     },
     "notes.explorer\/search@dark-m-en.png" : {
       "height" : 1240,
-      "sha256" : "eae48f9b4d8d60896958b7e2ebe7eaa35657f251d9aa91697c17a399b12fd8eb",
+      "sha256" : "cd6c149e0e2aab8ef5d587c69592d93c02a369e59700d265bb2dabac3360a4c9",
       "width" : 640
     },
     "notes.explorer\/search@light-m-en.png" : {
       "height" : 1240,
-      "sha256" : "9b4633291f0e464c2cb347d7002062b73c382a18b5040dcb6c9724d7e97bd107",
+      "sha256" : "c76b53737e688a7ff348f1c34c106951a6e01b1a3ab45427fa3bfb0f29681004",
       "width" : 640
     },
     "notes.explorer\/search@light-xl-pl.png" : {
       "height" : 1240,
-      "sha256" : "c2c2bd7742a6da631fe111d0919c55d34fe7aac19356caade3d53508192f762e",
+      "sha256" : "98044ebd3389095bb95e28b20c35f816e13864717f0421da8ac187f2796ce4c7",
       "width" : 640
     },
     "notes.preview\/dictation@dark-m-en.png" : {
@@ -767,17 +767,17 @@
     },
     "notes.preview\/notes-off@dark-m-en.png" : {
       "height" : 1000,
-      "sha256" : "d1f798d2baeb818bc24414c5904232b3e4cef15a9e0c2c5557b0025b25937c4a",
+      "sha256" : "889a274565f09f829939ce0a94cadfab09e9dde0b10f54ad60ba1797bd6be872",
       "width" : 1120
     },
     "notes.preview\/notes-off@light-m-en.png" : {
       "height" : 1000,
-      "sha256" : "a5a60f348389f8cf29a2652ed5c58e6aa176a8fe25f0a2087c5f141ecd3e378b",
+      "sha256" : "e1888ebd9e5113ac148ce71959c3c6292a98736d9c0f9018bdb1773ed4500739",
       "width" : 1120
     },
     "notes.preview\/notes-off@light-xl-pl.png" : {
       "height" : 1000,
-      "sha256" : "e91fa135705ef971ed8fdc3a257a1ef638e5052de13cbb1bf6d5bbd8fbbb3878",
+      "sha256" : "1a1ed7c1df6d02ab3d71e04e501692c28658cb4f9ed8295ea3f7920e1f3ac111",
       "width" : 1120
     },
     "notes.preview\/own-note@dark-m-en.png" : {
@@ -997,7 +997,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45907544766",
+  "recordRun" : "45917262448",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
