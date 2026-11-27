@@ -28568,7 +28568,7 @@
       }
     },
     "Back to All Notes" : {
-      "comment" : "Notes menu: leaves the full window and shows the list",
+      "comment" : "Full window: the Notes menu item that goes back to the list",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

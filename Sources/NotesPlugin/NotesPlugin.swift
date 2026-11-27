@@ -132,7 +132,7 @@ public final class NotesPlugin: LintelPlugin {
                 // "‹ All notes" (⌘[) of the full window; Esc does the same in the window (phase 3b).
                 CommandInfo(
                     title: LocalizedStringResource(
-                        "Back to All Notes", comment: "Notes menu: leaves the full window and shows the list"),
+                        "Back to All Notes", comment: "Full window: the Notes menu item that goes back to the list"),
                     shortcut: NoteFullWindowBar.backShortcut,
                     isEnabled: { [self] in workspace.isFullWindow },
                     run: { [self] in workspace.closeFullWindow() }),
