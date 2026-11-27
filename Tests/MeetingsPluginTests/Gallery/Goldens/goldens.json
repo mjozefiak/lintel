@@ -735,19 +735,24 @@
       "sha256" : "35dbf5d1f4e1b51583f04abd8350c6ca103218ff717337e4a17a0de56c5dec8e",
       "width" : 1120
     },
-    "notes.preview\/my-notes@dark-m-en.png" : {
+    "notes.preview\/my-notes-failed@light-xl-pl.png" : {
       "height" : 1000,
-      "sha256" : "07af8f811c93f8148b87618d6eec6383f7cade8cb1e64cc382f8950a5a609e65",
+      "sha256" : "af664c72d927042ed4cc08a34c688e5a9bab289e775a54c46f5d1cd438b8f893",
+      "width" : 1120
+    },
+    "notes.preview\/my-notes-saving@dark-m-en.png" : {
+      "height" : 1000,
+      "sha256" : "bdf9656b44f3329aefe68884ea5cf5523016976ef8f01618d9cc938417be2379",
       "width" : 1120
     },
     "notes.preview\/my-notes@light-m-en.png" : {
       "height" : 1000,
-      "sha256" : "852750915207a4cd4f715f54b94ddf41d7ee902c7a1d1a6be94efaf353b8cf96",
+      "sha256" : "3cfca47e3755dbad3756058527f17ef7a99cc42b56d3c57e7cd31ba02a3a8e29",
       "width" : 1120
     },
     "notes.preview\/my-notes@light-xl-pl.png" : {
       "height" : 1000,
-      "sha256" : "d1376a69e638003ea4d43d89b9d161a2490c40bec51dfdca7ae71d29c5f18aef",
+      "sha256" : "f3616a4abaa47f5cd9774c6237ea9aeceb1df76e44bcc54ff6a2983f850a8712",
       "width" : 1120
     },
     "notes.preview\/needs-model@dark-m-en.png" : {
@@ -997,7 +1002,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45917262448",
+  "recordRun" : "45928248668",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
