@@ -90,8 +90,8 @@ public struct ProviderRunner: Sendable {
     }
 
     /// The status and the CLI's version number (`2.1.329`), for the Settings row. The two probes carry no content.
-    /// `lane` is the queue the two probes wait in: a consumer the user waits for (dictation's Settings row) asks on
-    /// `interactive`, so a long background run does not keep its check on "checking".
+    /// `lane` is the queue the two probes wait in; both consumers' rows ask on `background` (the default), so a probe
+    /// in progress never delays a dictation chunk (`interactive` is dictation's alone).
     public func report(of provider: ProviderID, lane: ProviderLane = .background) async -> ProviderStatusReport {
         guard let descriptor = descriptors.first(where: { $0.id == provider }) else {
             return ProviderStatusReport(status: .notInstalled, version: nil)

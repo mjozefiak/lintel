@@ -4,8 +4,8 @@ import Foundation
 /// for the other (spec `2026-11-25-dictation-cleanup-levels`, A15): a whole-transcript meeting-notes run can hold the
 /// `background` slot for minutes, and a dictation chunk must not wait behind it. Neither lane cancels the other.
 public enum ProviderLane: String, Sendable, Hashable, CaseIterable {
-    /// Work nobody waits for with a key held down: meeting notes, status probes of a background consumer. The default,
-    /// so a consumer written before lanes keeps its behaviour.
+    /// Work nobody waits for with a key held down: meeting notes, status probes of a Settings row. The default, so a
+    /// consumer written before lanes keeps its behaviour.
     case background
     /// Work the user waits for right after releasing a key: dictation.
     case interactive

@@ -169,7 +169,7 @@ public final class DictationPlugin: LintelPlugin {
         let installed = builtInInstalled
         formattingModel = FormattingSettingsModel(
             settings: settings, transport: transport, llmModels: llmModels, runtime: builtInLLM,
-            providerStatus: { await providerRunner.runner.report(of: $0, lane: .interactive) })
+            providerStatus: Self.providerStatusReporter(providerRunner))
         formattingModel.onBuiltInLocation = { installed.set($0.folder != nil) }
         let openSettings = context.openSettings
         let openModels = context.openModels
@@ -228,6 +228,19 @@ public final class DictationPlugin: LintelPlugin {
         case .none:
             return nil
         }
+    }
+
+    /// The status check of the Settings → Dictation row: the two content-free probes (`--version`, `auth status`) on
+    /// the `background` lane, the queue meeting notes and other probes wait in. A probe still running when a dictation
+    /// is released never delays its first chunk (the `interactive` lane is dictation's alone); the row only shows
+    /// "Checking…" for longer while a background run holds the slot.
+    nonisolated static let providerProbeLane: ProviderLane = .background
+
+    /// The row's check as `FormattingSettingsModel` asks it: the provider's two probes on `providerProbeLane`.
+    nonisolated static func providerStatusReporter(
+        _ runner: ProviderRunnerHolder
+    ) -> @Sendable (ProviderID) async -> ProviderStatusReport {
+        { await runner.runner.report(of: $0, lane: providerProbeLane) }
     }
 
     /// "Claude": what a HUD line calls the provider that is chosen (the descriptor's short name).

@@ -39,7 +39,9 @@ import Testing
         #expect(spec.arguments.contains("sonnet"))
     }
 
-    /// A whole-transcript meeting-notes run holds the provider for minutes; a dictation chunk must not wait for it.
+    /// A whole-transcript meeting-notes run holds the provider for minutes; a dictation chunk must not wait for it. The
+    /// other direction of `aStatusProbeInProgressNeverDelaysADictationChunk`: notes and the Settings row's probes both
+    /// wait on `background`, and `interactive` is dictation's alone.
     @Test func aDictationChunkDoesNotWaitForARunningMeetingNotesRun() async throws {
         let held = Latch()
         let release = Latch()
@@ -67,6 +69,65 @@ import Testing
         #expect(process.contentRuns == 2)
         release.open()
         _ = try await notes.value
+    }
+
+    /// A fake CLI for the Settings row's probes (`--version`, `auth status`): the first probe waits until the test lets
+    /// it go; a content run answers at once and says so on `contentStarted`.
+    private final class HeldProbeProcess: ProviderProcessRunning, @unchecked Sendable {
+        let probeEntered = Latch()
+        let releaseProbe = Latch()
+        let contentStarted = CountLatch()
+        private let probes = Mutex(0)
+
+        func runContent(_ spec: ProviderProcessSpec) async throws -> ProviderProcessOutput {
+            contentStarted.increment()
+            return FakeProviderProcess.output(answer: ProviderFormatterTests.tidy)
+        }
+
+        func runProbe(_ spec: ProviderProcessSpec) async throws -> ProviderProcessOutput {
+            let call = probes.withLock { value -> Int in
+                value += 1
+                return value
+            }
+            if call == 1 {
+                probeEntered.open()
+                await releaseProbe.wait()
+            }
+            return ProviderProcessOutput(
+                stdout: Data("2.1.329 (Claude Code)".utf8), stderr: Data(), exitCode: 0, ending: .exited)
+        }
+    }
+
+    /// The Settings row's probes wait on the `background` lane (`DictationPlugin.providerProbeLane`): a probe in
+    /// progress when a dictation is released never delays its first chunk, because the `interactive` lane is free.
+    /// With the probes back on `interactive` the chunk queues behind the held probe and never reaches its process.
+    @Test func aStatusProbeInProgressNeverDelaysADictationChunk() async throws {
+        let process = HeldProbeProcess()
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "provider-probe-lane-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let runner = ProviderRunner(
+            system: ProviderSystem(locator: QuietProviderLocator(), process: process),
+            descriptors: [ProviderDescriptor.claudeCode.with(isolationVerified: true)],
+            cachesDirectory: directory, gate: ProviderGate())
+        let holder = ProviderRunnerHolder(
+            providers: DictationProviders { _ in runner }, cachesDirectory: directory)
+        // What Settings → Dictation asks while its source row is shown.
+        let check = Task { await DictationPlugin.providerStatusReporter(holder)(.claudeCode) }
+        guard await process.probeEntered.wait(guard: .seconds(10), "the row's probe to be in its process") else {
+            return check.cancel()
+        }
+        let formatter = ProviderFormatter(
+            runner: holder.runner, selection: Self.selection, currentSelection: { Self.selection })
+        let chunk = Task { try await formatter.format(chunk: Self.chunk, previousContext: nil) }
+        #expect(
+            await process.contentStarted.wait(
+                atLeast: 1, guard: .seconds(10), "the dictation chunk to run while the probe is held"))
+        process.releaseProbe.open()
+        let result = try await chunk.value
+        #expect(result.outcome == .formatted)
+        #expect(await check.value.version == "2.1.329")
     }
 
     @Test func withoutTheUsersChoiceNothingStarts() async throws {
