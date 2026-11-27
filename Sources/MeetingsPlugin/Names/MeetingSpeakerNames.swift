@@ -40,7 +40,9 @@ extension MeetingsStore: SpeakerNameStore {}
 ///   knows nothing new about the conversation: the names it gave earlier (`transcript`, applied or suggested) and
 ///   their evidence stay as they are (orchestrator decision 2026-11-26).
 /// - A reply cut by the token limit (`SpeakerNamePass.Outcome.truncated`) is an answer with a hole in it, not a
-///   denial: it may add names, and the names the conversation gave earlier stay with their evidence.
+///   denial: it may add names, and the names the conversation gave earlier stay with their evidence. Those names
+///   are reserved in that run too: the resolver treats their speakers as protected, so a second speaker never
+///   gets the same name (the one-name-per-speaker rule; review m3).
 ///
 /// Nothing here logs; `Report` holds counts and closed codes only (for `NotesTrace`).
 enum MeetingSpeakerNames {
@@ -288,13 +290,23 @@ extension MeetingSpeakerNames {
             let snapshot = Snapshot(document: document, states: states)
             let evidence = snapshot.remapping(self.evidence, from: before)
             let byID = snapshot.statesByID
-            let clusters = document.speakers.map { MeetingSpeakerNames.cluster(for: $0, state: byID[$0.id]) }
             // Without an answer the conversation's own names are not this run's to change.
             let writable = Set(
                 document.speakers.filter { speaker in
                     guard let state = byID[speaker.id], MeetingSpeakerNames.isWritable(state) else { return false }
                     return conversationAnswered || state.source != .transcript
                 }.map(\.id))
+            let clusters = document.speakers.map { speaker -> SpeakerNameCluster in
+                var cluster = MeetingSpeakerNames.cluster(for: speaker, state: byID[speaker.id])
+                // A name a cut reply leaves frozen is not up for grabs either: the resolver sees that speaker as
+                // protected, so the name is reserved and no other speaker takes it in this run. Only the plan
+                // sees the `.confirmed` status; the speaker is not `writable`, so the store writes nothing for
+                // it (review m3).
+                if !speaker.isSelf, !writable.contains(speaker.id), byID[speaker.id]?.source == .transcript {
+                    cluster.status = .confirmed
+                }
+                return cluster
+            }
             let resolutions = SpeakerNameResolver.resolve(
                 SpeakerNameRequest(
                     mode: .diarized, clusters: clusters, selfName: selfName, evidence: evidence,

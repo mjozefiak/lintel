@@ -208,6 +208,57 @@ import Testing
         #expect(try f.store.nameEvidence(meetingID: f.meeting).isEmpty)
     }
 
+    /// A cut reply may add a name, but a name the conversation already gave to one speaker is reserved in that run
+    /// too (review m3): the same name never ends up applied at two speakers. The same two entries in a complete
+    /// answer are the conflict state instead, a suggestion at each. Every name is fictional.
+    @Test func aCutReplyCannotGiveTheNameTheConversationAlreadyGaveToAnotherSpeaker() async throws {
+        let f = try fixture(texts: [
+            "Zaczynamy spotkanie.", "Dziękuję wszystkim.", "Dzień dobry, nazywam się Marek.",
+            "Zaczynamy od budżetu.", "Hej, tu Marek, ruszamy.", "Omawiamy harmonogram projektu.",
+        ])
+        defer { withExtendedLifetime(f.directory) {} }
+        try f.store.applySpeakerPlan(plan(f), meetingID: f.meeting, diarizationModelID: nil)
+        let first = """
+            [{"speaker": "Mówca 1", "name": "Marek", "kind": "introduction", \
+            "quote": "nazywam się Marek", "confidence": "high"}]
+            """
+        #expect(try await refresh(f, generator: .answering(first)).written)
+        #expect(try state(f, segment: 2).label == "Marek")
+
+        // The model loops on the same name and is cut after one complete entry for the other speaker.
+        let cut = ScriptedGenerator { _, _ in
+            GenerationResult(
+                text: """
+                    [{"speaker": "Mówca 2", "name": "Marek", "kind": "introduction", \
+                    "quote": "tu Marek", "confidence": "high"}]
+                    """, stoppedByTokenLimit: true)
+        }
+        let truncated = try await refresh(f, generator: cut)
+        #expect(truncated.pass.truncated)
+        #expect(truncated.written)
+        // The name the conversation gave stays with its speaker, and only there: the cut reply cannot give it away.
+        let kept = try state(f, segment: 2)
+        #expect(kept.label == "Marek")
+        #expect(kept.source == .transcript && kept.status == .applied)
+        let other = try state(f, segment: 4)
+        #expect(other.label == "Mówca 2")
+        #expect(other.suggestedName == nil)
+        #expect(other.source == .default)
+
+        // The same two entries in a complete answer are the conflict state: a suggestion at each, applied at none.
+        let both = """
+            [{"speaker": "Mówca 1", "name": "Marek", "kind": "introduction", \
+            "quote": "nazywam się Marek", "confidence": "high"}, \
+            {"speaker": "Mówca 2", "name": "Marek", "kind": "introduction", \
+            "quote": "tu Marek", "confidence": "high"}]
+            """
+        #expect(try await refresh(f, generator: .answering(both)).written)
+        let one = try state(f, segment: 2)
+        let two = try state(f, segment: 4)
+        #expect(one.label == "Mówca 1" && one.suggestedName == "Marek" && one.status == .suggested)
+        #expect(two.label == "Mówca 2" && two.suggestedName == "Marek" && two.status == .suggested)
+    }
+
     /// The known name list reaches the resolver through `Resolution` (review n1): a sure announcement is applied
     /// only when the name stands on the list the platform or the calendar gave.
     @Test func theKnownNamesDecideASureAnnouncement() async throws {
