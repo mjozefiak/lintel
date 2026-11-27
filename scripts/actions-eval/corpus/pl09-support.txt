@@ -1,0 +1,17 @@
+# id: pl09-support
+# lang: pl
+# date: 2026-11-16
+# self: Monika
+# title: Eskalacja zgłoszenia klienta
+[00:02] Monika: Dzień dobry, panie Henryku, Monika z działu obsługi. Dzwonię w sprawie pana zgłoszenia.
+[00:09] Henryk: Dzień dobry. No wreszcie. Od trzech dni nie mogę się zalogować do panelu.
+[00:16] Monika: Bardzo przepraszam. Widzę, że reset hasła nie dochodzi na pana skrzynkę.
+[00:23] Henryk: Nic nie dochodzi. Sprawdzałem też spam.
+[00:28] Monika: Rozumiem. Prześlę panu instrukcję ręcznego resetu hasła jeszcze dziś, na adres z umowy.
+[00:37] Henryk: Dobrze. A przy okazji, zamówienie numer 88231 też wisi bez potwierdzenia.
+[00:45] Monika: Widzę je. To wygląda na błąd systemu. Zgłoszę to zespołowi technicznemu jako błąd, z numerem zamówienia 88231.
+[00:56] Henryk: Może mi pani od razu zwrócić pieniądze za to zamówienie?
+[01:02] Monika: Tego niestety nie mogę zrobić na tym etapie, najpierw musimy wyjaśnić błąd.
+[01:09] Henryk: Trudno. To zadzwońmy w czwartek o szesnastej i sprawdzimy, czy logowanie działa.
+[01:17] Monika: Dobrze, czwartek szesnasta, zadzwonię do pana.
+[01:22] Henryk: Dziękuję, do usłyszenia.

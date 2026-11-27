@@ -1,0 +1,17 @@
+# id: pl10-listener
+# lang: pl
+# date: 2026-11-26
+# self: Filip
+# title: Daily zespołu platformy
+[00:02] Sara: Hej, daily. Ja zacznę: wczoraj deploy na produkcję się wysypał, rollback poszedł.
+[00:09] Konrad: Wiem, logi wskazują na migrację bazy, która trwała ponad dziesięć minut.
+[00:16] Sara: Ja zrobię ticket na hotfix migracji i wezmę go na siebie.
+[00:22] Filip: Okej, ja dziś kończę review modułu powiadomień.
+[00:27] Konrad: Ja wyślę Idze link do dashboardu z metrykami, bo pytała.
+[00:33] Iga: Dzięki. A ja zaplanuję demo dla biznesu na przyszły tydzień, dam znać wszystkim.
+[00:40] Sara: Filip, zaproś proszę Kamila na środowe demo o piętnastej, on robił integrację z płatnościami.
+[00:48] Filip: Ok, wyślę mu zaproszenie.
+[00:52] Konrad: Może przenieśmy daily na dziewiątą trzydzieści?
+[00:56] Sara: Nie, zostańmy przy dziewiątej, część osób zaczyna wcześnie.
+[01:01] Iga: Zgoda. Coś jeszcze?
+[01:04] Sara: Nie, dzięki wszystkim.
