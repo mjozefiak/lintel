@@ -26,7 +26,7 @@ LINTEL_DICTATION_SCORER=<path>/tools/score_dictation.py \
 `--level` is the cleanup level of the app (`light`, `standard` or `full`). `light` runs `LightCleaner` alone: no
 model, no `--model`, app label `lintel-offline-light`, and the output adds `latency_us` (Light takes microseconds, so
 `latency_ms` is 0). `standard` (default) is the model path above; `full` is the same path with the Full prompt
-(`CleanupPrompt.fullSystem`) and the Full guard limits, app label `lintel-offline-full-v1`.
+(`CleanupPrompt.fullSystem`) and the Full guard limits, app label `lintel-offline-full-v<CleanupPrompt.fullVersion>` (v3 since phase 2b).
 
 Full also needs checks the scorer cannot make (no invented greeting or sign-off, no number or content word lost, a short
 item stays one line, a spoken greeting alone on its line, paragraphs in mails and long items, the guard's rejections and

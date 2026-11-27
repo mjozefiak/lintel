@@ -124,6 +124,16 @@ import os
         #expect(model(MemorySettingsStore(), offersFull: true).0.choices == [.off, .light, .standard, .full])
     }
 
+    /// The row's own default (a caller that passes no list, like a new settings pane) must not show Full while it is not
+    /// offered; the pane passes the model's list and the gallery lists every value on purpose.
+    @Test func theRowsDefaultListHasNoFullWhileFullIsNotOffered() {
+        let row = TidyUpRow(choice: .constant(.standard))
+        #expect(row.choices.contains(.full) == DictationSettings.fullIsOffered)
+        #expect(row.choices == FormattingSettingsModel.TidyChoice.listed(offeringFull: DictationSettings.fullIsOffered))
+        #expect(FormattingSettingsModel.TidyChoice.listed(offeringFull: false) == [.off, .light, .standard])
+        #expect(FormattingSettingsModel.TidyChoice.listed(offeringFull: true) == [.off, .light, .standard, .full])
+    }
+
     @Test func choosingFullWritesBothKeysAndNeedsAModel() async {
         let transport = ScriptedTransport(.failure(.cannotConnectToHost))
         let store = MemorySettingsStore()

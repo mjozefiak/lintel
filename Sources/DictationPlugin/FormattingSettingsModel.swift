@@ -27,6 +27,12 @@ final class FormattingSettingsModel {
             }
         }
 
+        /// The values a popup lists: all of them, Full only when it is offered. The one place that says so, so a view
+        /// built without a model (the row's own default) cannot show Full while it is not offered.
+        static func listed(offeringFull: Bool) -> [TidyChoice] {
+            allCases.filter { $0 != .full || offeringFull }
+        }
+
         /// The level a model runs at, `nil` for Off and Light, which run no model.
         var modelLevel: DictationSettings.CleanupLevel? {
             switch self {
@@ -38,9 +44,7 @@ final class FormattingSettingsModel {
     }
 
     /// The values the popup lists: Full only while it is offered.
-    var choices: [TidyChoice] {
-        TidyChoice.allCases.filter { $0 != .full || settings.offersFull }
-    }
+    var choices: [TidyChoice] { TidyChoice.listed(offeringFull: settings.offersFull) }
 
     /// The text "Try it" cleans up.
     static let sample = "yyy no więc jutro mamy spotkanie o dziesiątej nie to znaczy o jedenastej w biurze"
