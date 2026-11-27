@@ -465,6 +465,411 @@
       "sha256" : "ad9cfb99473f7c198c9a9087dff6eda0ef9370dd3d9c9e158fbd0affed13e634",
       "width" : 1360
     },
+    "ui.pill\/increased-contrast-message@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "9e8fcda0b94eb720cde163e7d26cb287d52ec2ecf2fa63c0cfccdf2c08fc55c6",
+      "width" : 556
+    },
+    "ui.pill\/increased-contrast-message@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "b6c4a2959fe7f27b8be2193a6947afe749077d39e3f0e3ae0f06ab611eb62e3c",
+      "width" : 556
+    },
+    "ui.pill\/increased-contrast-message@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "665abacc34f233cb268d4e8fd2c8583be3af06ee44b7b5227e7742b22daf04b7",
+      "width" : 732
+    },
+    "ui.pill\/increased-contrast@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "64594081da02665178c645e77dc54dd16dc15c8f1ef5a66ca7dca15930e06d4d",
+      "width" : 228
+    },
+    "ui.pill\/increased-contrast@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "4d15a0c389ab5580996ce6c7feeb4cccada2d492442e6d58f9172968744cff60",
+      "width" : 228
+    },
+    "ui.pill\/increased-contrast@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "eab6e6e5c37b68dfc702d96ad6ff3a7af2ce19a214b83c92d19ec9c3ce2f96b8",
+      "width" : 254
+    },
+    "ui.pill\/live-clock-amber-dot-hover@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "b9c4283fea8bd22fffc6e0aeb7d1e87132f0cab24620340b9a6380aa8bdfba31",
+      "width" : 882
+    },
+    "ui.pill\/live-clock-amber-dot-hover@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "3c25fdc9f67079f1ba5b9e549598fc19bc75ed4a27c9c57f3b8488b59d61c900",
+      "width" : 882
+    },
+    "ui.pill\/live-clock-amber-dot-hover@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "d01e3698dd5acf7ec81a1dacb68ea96137e4e1f09279c8d24f2a572ab412c052",
+      "width" : 1134
+    },
+    "ui.pill\/live-clock-amber-dot@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "9d2fdf402ad6b2efeb70269ee29ef67af7a1ef9d8c4acbefdac298c53c70ab9e",
+      "width" : 228
+    },
+    "ui.pill\/live-clock-amber-dot@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "23b36d621a7dd99003f069a212dfe077631f47e15814f5ac28137b79b6a7795d",
+      "width" : 228
+    },
+    "ui.pill\/live-clock-amber-dot@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "772fa2b1c3b6ced1f880bfa10f70e9e8ccfd9a0e3d7dc7d452cfb318acfda6a3",
+      "width" : 254
+    },
+    "ui.pill\/live-clock-countdown@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "aa56dbca93024dc833c943bc08cc7ccc4abce43071d82b4a284afdcb0b6adcdd",
+      "width" : 308
+    },
+    "ui.pill\/live-clock-countdown@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "df6a7901f139900c9a65b76d9d351e6fa432c45026c2b2295e4ee998a588fcee",
+      "width" : 308
+    },
+    "ui.pill\/live-clock-countdown@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "f8d5ae10670ef3a91e1ce2d8c461dfde8c07b9ac3ccde44aa95ce7ea2f7e133e",
+      "width" : 378
+    },
+    "ui.pill\/live-clock-hover@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "219d348e1c5948c11b3c046e44a7b6cfdab220dfd96e927e8189f000350b93e4",
+      "width" : 602
+    },
+    "ui.pill\/live-clock-hover@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "8ca394fef5b4b6ca37c0210d236fc0665eacfadd11e2c4ab2f25d801cdbc9ed9",
+      "width" : 602
+    },
+    "ui.pill\/live-clock-hover@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "d17734cb3ba923434bec4f43ae9b8f595707ab892c06a61c2d6ac58442646163",
+      "width" : 778
+    },
+    "ui.pill\/live-clock-problem@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "079b5928cf53bf2d848b9c8a98d4beeb6bcb7d9f8808448178dcaa8448be25df",
+      "width" : 556
+    },
+    "ui.pill\/live-clock-problem@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "6bc0f596520295f1ee1d597ec41add205f78426b444904bebfb8cc2207383d99",
+      "width" : 556
+    },
+    "ui.pill\/live-clock-problem@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "8fb7210323aef6d0e486cb6e7aabe8ad4fd8ae0566c86bdb6b54cb4ff92028de",
+      "width" : 732
+    },
+    "ui.pill\/live-clock-retrying@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "9de95b57ffd16938479a7f6e65c1f051d77cf31ce347621064c072d80d8c8ac1",
+      "width" : 492
+    },
+    "ui.pill\/live-clock-retrying@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "f23ff8fd84be8c6b856430e2afb32c4cc61ece110620679634273b500586873c",
+      "width" : 492
+    },
+    "ui.pill\/live-clock-retrying@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "1ddf1cdba83ce29e6864716bd31e0a8aaf603bf5fc59c6ca846d556bae97d69c",
+      "width" : 572
+    },
+    "ui.pill\/live-clock-widest@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "da4ceaeed00d5c6c7c53c8a405f3c2114ad69add8e909f7c1b70415461f0743d",
+      "width" : 666
+    },
+    "ui.pill\/live-clock-widest@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "3ec7452ee4263b079338895d673cd8bc2b387915bd61ab6ed08278467e18c8ed",
+      "width" : 666
+    },
+    "ui.pill\/live-clock-widest@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "6b4f28af70bc6274576978093ead52a6e6a82ed1621369182062f92d032e7c4a",
+      "width" : 840
+    },
+    "ui.pill\/live-clock@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "f8037fc3524ba631acf26e540a646cd52d639c93af517e8ad57f2169e74b9e4e",
+      "width" : 228
+    },
+    "ui.pill\/live-clock@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "6d48fcfedcb876b0f45481afe184b267a89b032b9f7b197ed06f2998f04ac5ab",
+      "width" : 228
+    },
+    "ui.pill\/live-clock@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "64e0d508289df6edc8d63f05c9cf303cdcdf68ed48ecbd3626f59f149c1f30f3",
+      "width" : 254
+    },
+    "ui.pill\/live-wave-amber-dot@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "db3c21cbb8b6bf5263ed507be465f938746e9922286d7ba026f8229f69e0e254",
+      "width" : 176
+    },
+    "ui.pill\/live-wave-amber-dot@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "09246fd2d7c8c87b117e8bcc419e0593aa9062a7f6e3bfd9cdb5af78285b6972",
+      "width" : 176
+    },
+    "ui.pill\/live-wave-amber-dot@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "234722396ac8807b0cea9948334e24bdb36081b459bee5d88211e261e598070b",
+      "width" : 198
+    },
+    "ui.pill\/live-wave-countdown@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "ba51f0571d383cc23460bc32d3ba25f0c512022393f4470ea61550239aed2c98",
+      "width" : 210
+    },
+    "ui.pill\/live-wave-countdown@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "7cc62400c6d47cd18fece3f7088846441917ea6afffe550736de25b7d443455e",
+      "width" : 210
+    },
+    "ui.pill\/live-wave-countdown@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "aec4d6be88bfae60d9a9ccaee8091fa73ae3711245667d4ae45706bdaa4a866a",
+      "width" : 234
+    },
+    "ui.pill\/live-wave-esc-unclaimed@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "11ddcef8b896d323659ec92aa526f4521f7cb587e6e89a08b8ba0ae72e48b7ed",
+      "width" : 240
+    },
+    "ui.pill\/live-wave-esc-unclaimed@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "e760094fe06b5855c681cd3ada3179a1f9a5af1506cc3071fc7e1e3e7f624e2e",
+      "width" : 240
+    },
+    "ui.pill\/live-wave-esc-unclaimed@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "22f5fab4937e3d18a37383dda9987298d72b1c6602f7162c349e89860ca7df9c",
+      "width" : 270
+    },
+    "ui.pill\/live-wave-fallback-line@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "870d4db1066d3d65046256aa2449964dde19218d876c65ef4b095304cbcc72fe",
+      "width" : 750
+    },
+    "ui.pill\/live-wave-fallback-line@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "dfda4e8fec0051595ad35712f46a9692e9265fc4fff56676f6d68c934dc6b008",
+      "width" : 750
+    },
+    "ui.pill\/live-wave-fallback-line@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "52b6c6e3b95dc0656749a6875cca22ccb3531e7b1be3e11dd6f43e23535203e1",
+      "width" : 894
+    },
+    "ui.pill\/live-wave-hover@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "0da8dab079bd7790c076e3e3974ab1cab325fc9059b1bf632b1fac5ba8138de3",
+      "width" : 314
+    },
+    "ui.pill\/live-wave-hover@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "a0f4361897505fcbb5f5f72da5121fe769e75e8c28bede6252f3b16f0faa7825",
+      "width" : 314
+    },
+    "ui.pill\/live-wave-hover@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "55c0119f55f8e6438b6abd5814f59125da3cc0d7ae7ed487deb521047db16f0d",
+      "width" : 352
+    },
+    "ui.pill\/live-wave@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "83f6d99a173f9364fc5018970c2898e64e876834454d867f2ed68b658178d02c",
+      "width" : 176
+    },
+    "ui.pill\/live-wave@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "a019f1f5073742dccde2f7f54b47bdb934824f975d44351297b68cb69fc1fd37",
+      "width" : 176
+    },
+    "ui.pill\/live-wave@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "1a4cec8ea5ae0d1f4ae9f770c4e0e8c58a8621d3a30147ad2776c38bd6f287fd",
+      "width" : 198
+    },
+    "ui.pill\/message-done@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "fe6de03a2f867f0bcd5741d9fa68eb1b61d05f6d3395ac95d383452e26c29ca7",
+      "width" : 292
+    },
+    "ui.pill\/message-done@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "abbbcfde5d088e012ff535fa594c659f209caa966770ebfe31740994bb929898",
+      "width" : 292
+    },
+    "ui.pill\/message-done@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "b3355d0e3067ea4e1018b4b67e1dcca29845613208d6e12951a0cc4739459fa4",
+      "width" : 394
+    },
+    "ui.pill\/message-error@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "e953444e77d1d5c82003c7642f0359b043a71cdc9f024881918a307407555d91",
+      "width" : 488
+    },
+    "ui.pill\/message-error@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "47684f55363ec457c4e9201705f6d6ad7ec74c622243b06fafd1860115319d53",
+      "width" : 488
+    },
+    "ui.pill\/message-error@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "aa4bb8af1fc52127ac72c130eed7e861068283ac41c257cff403a3770ea50201",
+      "width" : 538
+    },
+    "ui.pill\/message-undo@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "9233a51a807e80891ca773647b50c3165bc6699919e8412223f00fbd7f671efe",
+      "width" : 754
+    },
+    "ui.pill\/message-undo@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "1dc0a44c839aa9fd608c6d8e8cb5bba1eaa64fdae7cac3e4eb571955efa60150",
+      "width" : 754
+    },
+    "ui.pill\/message-undo@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "4d3ed3ea6078919f7216a3ec72fc996a968dfd3eb1c9eff2933efcc3feef78a3",
+      "width" : 892
+    },
+    "ui.pill\/message-widest@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "bab100c56787d6cdee97a9894f0090c5b189004138a0c2c53594fe4ca4c0be19",
+      "width" : 510
+    },
+    "ui.pill\/message-widest@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "033feb12e9db30ac4a144ed81df6a720384731b063e43451498f2d43be490e9e",
+      "width" : 510
+    },
+    "ui.pill\/message-widest@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "9c4e96d87ee6928e6da37453b2487b721935e1eb36222397239051ae3466911a",
+      "width" : 734
+    },
+    "ui.pill\/prompt-hover@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "4dd63cf6b0f1b962ff61c39376707eac7dd44316fea53f9664ac4bda64ffafa8",
+      "width" : 840
+    },
+    "ui.pill\/prompt-hover@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "9f05614bb137f7a1f4a14221c031a2be02873834e2bd94ef3288cf51bc5f110a",
+      "width" : 840
+    },
+    "ui.pill\/prompt-hover@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "0efe8897dac6ada48dd99a83455fb7b62f37510e3e3dbe327f533b6a3ea222fd",
+      "width" : 962
+    },
+    "ui.pill\/prompt-long-name@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "2c480b68ef7686906a06a13531c3464120bbfbc252f40f9661ab1669f1ed6da6",
+      "width" : 746
+    },
+    "ui.pill\/prompt-long-name@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "544af0025b1de121b436d65de1dede1583d58282e2948c5b6fdad0f68c648015",
+      "width" : 746
+    },
+    "ui.pill\/prompt-long-name@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "2b42bc1cef8c9bf03ac61c2659feed2d4638eb080127acae2d426bd95f447140",
+      "width" : 892
+    },
+    "ui.pill\/prompt@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "4db2f4c1615a9ffc40ab843823685cb2b136d4b02778b5c67c5ee2fc23fc1d4b",
+      "width" : 632
+    },
+    "ui.pill\/prompt@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "ad4197e2b6c472aa6dd5fb8116c81963c9014fdc06d1e0abf9c9b07e5dec7e6f",
+      "width" : 632
+    },
+    "ui.pill\/prompt@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "95352fc281ddd6792975fd2263252ad0ed756164e5de004fe3aeea586dd7c67f",
+      "width" : 726
+    },
+    "ui.pill\/reduced-motion-live@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "b0dc93c592cffe8e31c7f1011b43bc753497c6b7bf1f12d66b590cf7e991a163",
+      "width" : 176
+    },
+    "ui.pill\/reduced-motion-live@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "d4bb5883223ba431161d1919948055536d22e716c51ca2559a327ea2c7329e4c",
+      "width" : 176
+    },
+    "ui.pill\/reduced-motion-live@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "78ebae338dc6f476ba6180b90c986b8d04f8478780a9a9e2137d0b502c7f6b75",
+      "width" : 198
+    },
+    "ui.pill\/reduced-motion-working@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "b3aa402542088940e744b664725f2b96490d9e99f70d352b5e1393d1599a9828",
+      "width" : 64
+    },
+    "ui.pill\/reduced-motion-working@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "662447505156439fc8ccb624db86674669bcf62f10e0421168c6672c1934cb30",
+      "width" : 64
+    },
+    "ui.pill\/reduced-motion-working@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "9954faa1ab4a1ab60f4609e353108535787e67de98bc7b1fe69293073304d5c4",
+      "width" : 76
+    },
+    "ui.pill\/working-hover@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "a954bcc47fe4e58c99fe9428e578f535e2cb1c2452e04bb9c4e06dd229bfce80",
+      "width" : 328
+    },
+    "ui.pill\/working-hover@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "4ebb6348bcc6fd250ac65b06d846cd982f15632645e016ed5336ae2f504a8ce1",
+      "width" : 328
+    },
+    "ui.pill\/working-hover@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "9d843117272dc26dec7b9d86415e0d9f18f5d788cca94bc8b62af402faead393",
+      "width" : 428
+    },
+    "ui.pill\/working@dark-m-en.png" : {
+      "height" : 64,
+      "sha256" : "5f298bbb9b44255646b5b93a3ac0328baeeb666cb414b2de757e5636a2b0bf77",
+      "width" : 64
+    },
+    "ui.pill\/working@light-m-en.png" : {
+      "height" : 64,
+      "sha256" : "da56b8970f07b23211e59293d8f5662c54ba7354ac708e6d7df1ca3868ae6803",
+      "width" : 64
+    },
+    "ui.pill\/working@light-xl-pl.png" : {
+      "height" : 76,
+      "sha256" : "19b9ff1375daf06c4476fac8a336b3e0f075818b5319b75b3411efca4bf10ba1",
+      "width" : 76
+    },
     "ui.ring\/error@dark-m-en.png" : {
       "height" : 372,
       "sha256" : "0091777e3541f4c9d2bbc18f4531d68f25ec62f08351765650a001ae615632f0",
@@ -592,7 +997,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45855037849",
+  "recordRun" : "45965295955",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
