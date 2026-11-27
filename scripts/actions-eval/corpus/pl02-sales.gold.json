@@ -1,0 +1,15 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["email"], "evidence": [6, 7],
+     "fields": {"title": ["ofert"], "to": {"required": [["Anna", "Anna z Lumen", "Lumen"]], "optional": []},
+                "due": ["2026-11-20"], "condition": false, "must_mention": ["12"]}},
+    {"id": "a2", "type": ["calendar", "email"], "evidence": [8, 9],
+     "fields": {"title": ["demo"], "date": null, "time": null,
+                "participants": {"required": [["Anna"]], "optional": [["Kuba"], ["zespół", "zespol", "Lumen"]]},
+                "condition": true}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "other_speaker", "evidence": [10]},
+    {"id": "t2", "kind": "condition_failed", "evidence": [13, 14]}
+  ]
+}

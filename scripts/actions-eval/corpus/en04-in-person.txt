@@ -1,0 +1,15 @@
+# id: en04-in-person
+# lang: en
+# date: 2026-11-25
+# self: Me
+# title: Office meeting (one microphone)
+[00:02] Me: Alright, we're all here, let's go.
+[00:05] Speaker 2: First thing, the design review keeps slipping.
+[00:09] Me: I'll put the design review on the calendar for Monday at two, with Nora and Tim.
+[00:16] Speaker 3: Monday at two works for Tim, I checked.
+[00:20] Speaker 2: Also, can you send the budget sheet to finance? They're waiting for it.
+[00:25] Me: Yeah, I'll send it to Omar tomorrow.
+[00:29] Speaker 3: I'll email the venue about the January event.
+[00:34] Speaker 2: Should we move the review to Tuesday instead?
+[00:37] Me: No, Monday is better, Nora is away on Tuesday.
+[00:41] Speaker 3: Okay, that's all from me.

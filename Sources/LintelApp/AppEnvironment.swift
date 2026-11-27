@@ -95,6 +95,7 @@ struct AppEnvironment {
     ///   - openNote: asks the main window's sections to show a note.
     ///   - keptNoteCopies, deleteKeptNoteCopies: what Notes keeps of a plugin's recordings and its removal
     ///     (`NoteSourcesRelay`, answered by the plugin that implements `keptNoteCopyCount`).
+    ///   - liveRecorder: the first active plugin's live recording (`NoteSourcesRelay`).
     func makeContext(
         for manifest: PluginManifest,
         resultsChanged: @escaping @Sendable () -> Void = {},
@@ -111,7 +112,8 @@ struct AppEnvironment {
         noteSourcesChanged: @escaping @Sendable () -> AsyncStream<Void> = { AsyncStream { $0.finish() } },
         openNote: @escaping @MainActor @Sendable (NoteKey) -> Bool = { _ in false },
         keptNoteCopies: @escaping @MainActor @Sendable (PluginID) async -> Int = { _ in 0 },
-        deleteKeptNoteCopies: @escaping @MainActor @Sendable (PluginID, Bool) async -> Bool = { _, _ in true }
+        deleteKeptNoteCopies: @escaping @MainActor @Sendable (PluginID, Bool) async -> Bool = { _, _ in true },
+        liveRecorder: @escaping @MainActor @Sendable () -> (any LiveRecorder)? = { nil }
     ) -> PluginContext {
         PluginContext(
             storageDirectory: storageDirectory(for: manifest.id),
@@ -141,7 +143,8 @@ struct AppEnvironment {
             noteSourcesChanged: noteSourcesChanged,
             openNote: openNote,
             keptNoteCopies: keptNoteCopies,
-            deleteKeptNoteCopies: deleteKeptNoteCopies
+            deleteKeptNoteCopies: deleteKeptNoteCopies,
+            liveRecorder: liveRecorder
         )
     }
 

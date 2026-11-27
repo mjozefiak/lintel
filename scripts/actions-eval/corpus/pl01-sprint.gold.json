@@ -1,0 +1,13 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["jira"], "evidence": [4, 5],
+     "fields": {"title": ["csv"], "assignee": ["Ola"], "due": ["2026-11-20"], "condition": false}},
+    {"id": "a2", "type": ["calendar"], "evidence": [13],
+     "fields": {"title": ["retro"], "date": ["2026-11-24"], "time": "14:00",
+                "participants": {"required": [["Tomek"], ["Ola"]], "optional": []}, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "rejected", "evidence": [7, 8]},
+    {"id": "t2", "kind": "other_speaker", "evidence": [10]}
+  ]
+}

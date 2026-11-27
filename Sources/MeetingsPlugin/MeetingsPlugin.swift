@@ -41,6 +41,9 @@ public final class MeetingsPlugin: LintelPlugin {
     let notes: NotesService
     /// The recorded meetings as a Notes source (`noteSources`); its change streams end on `deactivate()`.
     let noteSource: MeetingNoteSource
+    /// The Notes window's live recording (`LintelPlugin.liveRecorder`, notes explorer step 2.3): an adapter over
+    /// the controller that follows it between `activate()` and `deactivate()`.
+    let liveRecorderAdapter: MeetingsLiveRecorder
     private let noteChanges = NoteChangeHub()
     /// `resultsChanged` plus a signal for the Notes source's change streams.
     private let changed: @Sendable () -> Void
@@ -115,7 +118,32 @@ public final class MeetingsPlugin: LintelPlugin {
                 providerRunner: providerRunner,
                 openModels: context.openModels, changed: changed, logger: context.logger))
         self.notes = notes
-        library.onMeetingReady = { [weak notes] id in notes?.meetingBecameReady(id) }
+        // The live recorder reads the meeting's Notes key and asks the notes pipeline; `weak` so the library
+        // and the service keep none of it.
+        let liveRecorder = MeetingsLiveRecorder(
+            dependencies: MeetingsLiveRecorder.Dependencies(
+                noteKey: { [weak library] id in
+                    guard let store = library?.store, let uuid = try? store.meetingUUID(id: id) else { return nil }
+                    return NoteKey(pluginID: MeetingLibraryPresentation.pluginID, id: uuid)
+                },
+                meetingID: { [weak library] key in
+                    guard key.pluginID == MeetingLibraryPresentation.pluginID, let store = library?.store
+                    else { return nil }
+                    return try? store.meetingID(uuid: key.id)
+                },
+                regenerateNotes: { [weak notes] id in notes?.regenerate(id) },
+                hasNotesJob: { [weak notes] id in notes?.board.phase(of: id) != nil },
+                notesBusy: { [weak notes] in notes?.isBusy ?? false },
+                notesStatus: { [weak library] id in
+                    guard let store = library?.store else { return nil }
+                    return try? store.notesStatus(of: id)
+                }))
+        liveRecorderAdapter = liveRecorder
+        library.onMeetingReady = { [weak notes, liveRecorder] id in
+            // "Stop Recording" (the window's stop without notes) keeps the notes off for that meeting.
+            guard !liveRecorder.suppressesNotes(id) else { return }
+            notes?.meetingBecameReady(id)
+        }
         library.onWillClose = { [weak notes] in notes?.cancelJobs() }
         libraryActions = MeetingsLibraryActions(
             library: library, pasteboard: context.pasteboard, regenerate: { notes.regenerate($0) },
@@ -178,9 +206,19 @@ public final class MeetingsPlugin: LintelPlugin {
         dependencies.recordingObserver = detector
         dependencies.pasteboard = context.pasteboard
         adjustControllerDependencies?(&dependencies)
+        // The hooks carry this attachment's token: a controller left over from an earlier activation (a shutdown
+        // past its timeout) never changes the status of the attachment that replaced it.
+        let attachment = UUID()
+        dependencies.hudObserver = { [weak liveRecorder = liveRecorderAdapter] state in
+            liveRecorder?.hudChanged(state, from: attachment)
+        }
+        dependencies.meetingRegistered = { [weak liveRecorder = liveRecorderAdapter] id in
+            liveRecorder?.meetingRegistered(id, from: attachment)
+        }
         let controller = MeetingController(dependencies)
         self.controller = controller
         relay.controller = controller
+        liveRecorderAdapter.attach(controller, token: attachment)
         startDetector(detector)
         // The banner's state is known before the shell first reads it; coming back from System Settings or from
         // a download in the Models pane reads it again.
@@ -200,6 +238,10 @@ public final class MeetingsPlugin: LintelPlugin {
         // The streams end when this method returns (the `defer` runs last), after the library is closed or
         // handed to a lingering session; a read that starts before that may still answer, a later one throws.
         defer { noteChanges.finishAll() }
+        // The window's recording ends with the plugin: `.idle` and finished streams, and a `start()` still
+        // waiting for the HUD is answered. The `defer` runs last, so `shutDown()` below (which hides the HUD and
+        // so answers a `start()` of an attempt that never registered) always comes first.
+        defer { liveRecorderAdapter.detach() }
         activationObserver?.stop()
         activationObserver = nil
         stopDetector()
@@ -254,6 +296,10 @@ public final class MeetingsPlugin: LintelPlugin {
     }
 
     public var noteSources: [any NoteSource] { [noteSource] }
+
+    /// The Notes window's Record button drives the same recording as the shortcut. Only while the plugin is
+    /// active: asking the getter does no work.
+    public var liveRecorder: (any LiveRecorder)? { controller == nil ? nil : liveRecorderAdapter }
 
     public var requiredPermissions: Set<Permission> { [.microphone, .systemAudioRecording] }
 }

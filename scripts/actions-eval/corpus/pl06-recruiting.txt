@@ -1,0 +1,18 @@
+# id: pl06-recruiting
+# lang: pl
+# date: 2026-11-17
+# self: Joanna
+# title: Rekrutacja na stanowisko analityka
+[00:03] Joanna: Piotrze, mamy kandydata na analityka, pana Adama Kowala. CV wygląda bardzo dobrze.
+[00:11] Piotr: Tak, rozmawiałem z nim krótko przez telefon. Jest dostępny w tym tygodniu.
+[00:18] Joanna: To umówię rozmowę z panem Kowalem na piątek o jedenastej. Ty też będziesz, prawda?
+[00:26] Piotr: Tak, wpisz mnie. Jego mail to adam.kowal@przyklad.pl, jakbyś potrzebowała.
+[00:34] Joanna: Dzięki. Napiszę też do pana Kowala z potwierdzeniem terminu i krótkim opisem procesu.
+[00:42] Piotr: Dobrze. Czy robimy zadanie domowe przed rozmową?
+[00:47] Joanna: Nie, tym razem bez zadania domowego, ocenimy go na rozmowie.
+[00:53] Piotr: Okej.
+[00:56] Joanna: Jeśli pierwszy etap pójdzie dobrze, umówię drugi etap z Leną, naszą CTO.
+[01:04] Piotr: Lena ma w grudniu sporo wyjazdów, trzeba będzie się dopasować.
+[01:10] Joanna: Wiem, ustalimy to po piątku.
+[01:14] Piotr: Ja w międzyczasie wyślę mu umowę NDA do podpisu.
+[01:19] Joanna: Dobrze, dzięki. To wszystko.

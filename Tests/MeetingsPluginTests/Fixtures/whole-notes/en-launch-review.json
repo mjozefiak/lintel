@@ -4,9 +4,10 @@
  "durationSec": 420,
  "fake": {
   "number": "7400",
+  "numberSpelled": "seven thousand four hundred",
   "weekday": "Tuesday",
-  "name": "Kwantoris",
-  "person": "Zenon",
+  "name": "Veltrix",
+  "person": "Dorian",
   "generic": "Speaker 1",
   "due": "Tuesday"
  },
