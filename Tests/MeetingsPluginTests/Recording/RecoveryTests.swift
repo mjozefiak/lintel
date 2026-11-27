@@ -135,6 +135,48 @@ private let texts: [Int: String] = [11: "Pierwsza wypowiedź", 12: "Druga wypowi
         #expect(try store.segmentCount(meetingID: meeting.id) == 1)
     }
 
+    // MARK: The stored model (#314)
+
+    /// A meeting is transcribed with the model it was recorded with: the resumer asks for the stored id, for
+    /// the detector and the engine alike, and never for the model chosen in Settings at resume time.
+    @Test func aResumedMeetingAsksForTheModelStoredWithIt() async throws {
+        let rig = try RecoveryRig(texts: texts)
+        let mic = micScript()
+        let stored = ModelCatalog.whisperLargeV3Turbo.id
+        let meeting = try await rig.seed(
+            .processing, mic: mic, stored: [(.mic, 16_000..<64_000, texts[11]!)], modelID: stored)
+        let asks = ModelAsks()
+        let engine = rig.engine
+        let folder = rig.harness.directory.url.appending(path: "model")
+        let spans = mic.spans
+        let lease = rig.lease
+        let library = rig.library(resumer: { store, keys, spool in
+            MeetingResumer(
+                store: store, keys: keys, spool: spool,
+                makeVAD: { id in
+                    asks.recordDetector(id)
+                    return ScriptedVAD(spans)
+                },
+                speech: { id in
+                    asks.recordSpeech(id)
+                    return ResumeSpeech(engine: engine, modelID: id, folder: folder)
+                },
+                lease: lease, finalize: { _, _ in }, now: { RecoveryRig.now },
+                // The fake engine names an utterance by the level of its first sample: no padding in front.
+                preRoll: .zero, postRoll: .zero)
+        })
+        library.open()
+        let store = try #require(library.store)
+
+        #expect(await pollUntil { (try? store.audioState(of: meeting.id)) == .deleted })
+        #expect(try store.status(of: meeting.id) == .ready)
+        #expect(asks.detector == [stored])
+        #expect(asks.speech == [stored])
+        // The meeting still finished: only the model it asked for changed.
+        #expect(try rig.rows(library, meeting.id).map(\.text) == [texts[11]!, texts[12]!])
+        library.close()
+    }
+
     // MARK: Padding
 
     @Test func resumedRangesGetThePreRollAreCutWithItAndNeverOverlapOrExceedTheWindow() async throws {
@@ -409,4 +451,15 @@ private let texts: [Int: String] = [11: "Pierwsza wypowiedź", 12: "Druga wypowi
 
 extension RecoveryRig {
     var seedStoreForTests: MeetingsStore? { seedStoreAccess }
+}
+
+/// The model ids a resumer asked for, once for the detector and once for the engine.
+final class ModelAsks: Sendable {
+    private let state = Mutex<(detector: [String], speech: [String])>(([], []))
+
+    func recordDetector(_ id: String) { state.withLock { $0.detector.append(id) } }
+    func recordSpeech(_ id: String) { state.withLock { $0.speech.append(id) } }
+
+    var detector: [String] { state.withLock { $0.detector } }
+    var speech: [String] { state.withLock { $0.speech } }
 }

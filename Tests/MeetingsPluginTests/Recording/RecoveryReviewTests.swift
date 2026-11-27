@@ -159,8 +159,8 @@ private func finished(_ handle: MeetingFinishHandle) async -> ResumeOutcome {
         let lease = rig.lease
         let library = rig.library(resumer: { store, keys, spool in
             MeetingResumer(
-                store: store, keys: keys, spool: spool, makeVAD: { ThrowingVAD() },
-                speech: { ResumeSpeech(engine: engine, modelID: "test-model", folder: folder) }, lease: lease,
+                store: store, keys: keys, spool: spool, makeVAD: { _ in ThrowingVAD() },
+                speech: { _ in ResumeSpeech(engine: engine, modelID: "test-model", folder: folder) }, lease: lease,
                 finalize: { _, _ in }, now: { RecoveryRig.now })
         })
         library.open()
