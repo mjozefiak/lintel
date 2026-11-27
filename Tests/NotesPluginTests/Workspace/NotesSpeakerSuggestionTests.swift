@@ -343,3 +343,49 @@ struct NotesQASpeakerNamesTests {
     }
 }
 #endif
+
+/// Return on the focused suggestion line says Yes, in a real (off-screen) window.
+@MainActor
+@Suite(.serialized) struct NotesSpeakerSuggestionKeyTests {
+    @Test func returnOnTheFocusedLineConfirms() async throws {
+        let document = NoteDocumentModel(id: .live(SpeakerRig.key))
+        document.apply(
+            SpeakerRig.content(
+                speakers: SpeakerRig.suggesting,
+                summary: Fixtures.summary("meetings", "orchard", secondsAgo: 60)))
+        document.selectLayer("transcript")
+        var answers: [(String, String, Bool)] = []
+        document.answerSpeakerSuggestion = { answers.append(($0, $1, $2)) }
+        document.canEditSpeakers = true
+        let suggestion = try #require(document.speakerSuggestion(at: document.blocks[1]))
+        let window = NSWindow(
+            contentRect: NSRect(x: -10_000, y: -10_000, width: 460, height: 120), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(
+            rootView: SpeakerSuggestionLine(document: document, suggestion: suggestion).padding(16))
+        window.orderFrontRegardless()
+        window.makeKey()
+        defer { window.close() }
+        func key(_ code: UInt16, _ characters: String) {
+            for type in [NSEvent.EventType.keyDown, .keyUp] {
+                if let event = NSEvent.keyEvent(
+                    with: type, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                    context: nil, characters: characters, charactersIgnoringModifiers: characters, isARepeat: false,
+                    keyCode: code)
+                {
+                    window.sendEvent(event)
+                }
+            }
+        }
+        let focused = await pollUntil("the line to take the focus", guard: .seconds(10)) {
+            if window.firstResponder === window { key(48, "\t") }
+            return window.firstResponder !== window
+        }
+        #expect(focused)
+        key(36, "\r")
+        let answered = await pollUntil("Return to answer", guard: .seconds(10)) { !answers.isEmpty }
+        #expect(answered)
+        #expect(answers.map { "\($0.0)|\($0.1)|\($0.2)" } == ["2|Marek|true"])
+    }
+}
