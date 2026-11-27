@@ -111,6 +111,9 @@ final class NoteDocumentModel {
     func startEditing(_ session: NoteEditingSession) {
         self.session = session
         wantsEditing = false
+        // The editor starts from the writer's text, which can differ from the layer as it was read: the comment
+        // highlights are found in the text the editor shows.
+        if let start = session.startText, start != selectedLayer?.markdown { setEditorText(start) }
     }
 
     /// Leaves the editor. The session is handed to `onEditingEnded`, which writes what is typed and reloads.

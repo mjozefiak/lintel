@@ -232,6 +232,27 @@ import Testing
         #expect(session.startText == "restored")
     }
 
+    @Test func theEditorViewStartsFromTheSessionsTextNotFromTheNoteAsRead() async throws {
+        let r = try ReconRig()
+        let doc = try r.rig.seededDocument(r.rig.layer("agent", version: "n1"))
+        let id = NoteDocumentID.live(r.key, layer: "notes")
+        let writer = r.registry.writer(for: id, item: .live(r.key)) { r.rig.writer(.existing(docID: doc.id)) }
+        try r.rig.failNextInsert(body: "typed")
+        writer.submit("typed")
+        await r.registry.release(item: .live(r.key))
+        // The pen on the note read again with the old head: the view's buffer and the document's editor text.
+        let content = r.rig.content(layers: [r.rig.layer("agent", version: "n1")])
+        let document = NoteDocumentModel(id: .live(r.key))
+        document.apply(content)
+        let session = try #require(
+            NoteEditingSession.make(
+                content: content, layerID: "notes", store: r.store, registry: r.registry, model: document,
+                readOnly: false))
+        document.startEditing(session)
+        #expect(NoteEditingDocument.initialBuffer(document: document, session: session) == "typed")
+        #expect(document.editorText == "typed")
+    }
+
     @Test func aLayerNeverWrittenStartsFromTheNoteAsRead() throws {
         let r = try ReconRig()
         let session = try editorAgain(r, readWith: "source text")
