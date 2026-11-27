@@ -104,7 +104,7 @@ struct NoteRowView: View {
                 Button {
                     Task { await model.makeNote(from: row.id) }
                 } label: {
-                    Text("Make note", comment: "Path bar and explorer: copies a dictation into a new note")
+                    Text("Make note", comment: "Full window and explorer: copies a dictation into a new note")
                 }
                 .disabled(!model.canMakeNote(row.id))
             }

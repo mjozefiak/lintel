@@ -91,8 +91,8 @@ struct NoteFullWindowBar: View {
                 iconButton(
                     "pencil",
                     label: document.isEditing
-                        ? Text("Done editing", comment: "Path bar: leaves the editor")
-                        : Text("Edit", comment: "Path bar: opens the note in the editor"),
+                        ? Text("Done editing", comment: "Full window: leaves the editor")
+                        : Text("Edit", comment: "Full window: opens the note in the editor"),
                     tint: document.isEditing ? LintelBrand.accentText : LintelBrand.secondaryText
                 ) {
                     model.toggleEditing()
@@ -107,26 +107,27 @@ struct NoteFullWindowBar: View {
             if let document = model.currentDocument, NoteCollection.isDictation(document.id) {
                 iconButton(
                     "note.text.badge.plus",
-                    label: Text("Make note", comment: "Path bar and explorer: copies a dictation into a new note")
+                    label: Text("Make note", comment: "Full window and explorer: copies a dictation into a new note")
                 ) {
                     Task { await model.makeNote(from: document.id) }
                 }
                 .disabled(!model.canMakeNote(document.id) || document.phase != .loaded)
             }
-            iconButton("doc.on.doc", label: Text("Copy Markdown", comment: "Path bar: copies the note as Markdown")) {
+            iconButton("doc.on.doc", label: Text("Copy Markdown", comment: "Full window: copies the note as Markdown"))
+            {
                 model.copyMarkdown()
             }
             .keyboardShortcut("c", modifiers: [.command, .shift])
             if !model.inspectorVisible {
                 iconButton(
-                    "sidebar.right", label: Text("Show the inspector", comment: "Path bar: shows the inspector")
+                    "sidebar.right", label: Text("Show the inspector", comment: "Full window: shows the inspector")
                 ) {
                     model.setInspectorVisible(true)
                 }
             }
             iconButton(
                 "square.and.arrow.down",
-                label: Text("Save .md…", comment: "Path bar: saves the note as a Markdown file")
+                label: Text("Save .md…", comment: "Full window: saves the note as a Markdown file")
             ) {
                 Task { await model.saveMarkdown() }
             }
@@ -150,8 +151,8 @@ struct NoteFullWindowBar: View {
 
     static func text(_ feedback: NotesWorkspaceModel.Feedback) -> String {
         switch feedback {
-        case .copied: String(localized: "Copied", comment: "Path bar: the Markdown was copied")
-        case .saved: String(localized: "Saved", comment: "Path bar: the Markdown file was saved")
+        case .copied: String(localized: "Copied", comment: "Full window: the Markdown was copied")
+        case .saved: String(localized: "Saved", comment: "Full window: the Markdown file was saved")
         case .saveFailed:
             String(
                 localized: "The .md file couldn’t be saved. Check that the folder is writable.",
@@ -159,7 +160,7 @@ struct NoteFullWindowBar: View {
         case .createFailed:
             String(localized: "The note couldn’t be created.", comment: "Notes: a new note could not be written")
         case .noteMade:
-            String(localized: "Note created", comment: "Path bar: a dictation was copied into a new note")
+            String(localized: "Note created", comment: "Full window: a dictation was copied into a new note")
         case .makeNoteFailed:
             String(
                 localized: "The note couldn’t be created. The dictation is unchanged.",
@@ -167,7 +168,7 @@ struct NoteFullWindowBar: View {
         case .titleFailed:
             String(localized: "The title couldn’t be saved.", comment: "Notes: a note's title could not be written")
         case .deleted:
-            String(localized: "note.deleted", defaultValue: "Deleted", comment: "Path bar: the note was deleted")
+            String(localized: "note.deleted", defaultValue: "Deleted", comment: "Full window: the note was deleted")
         case .deleteFailed:
             String(
                 localized: "The note couldn’t be deleted. Nothing was changed.",
@@ -177,7 +178,7 @@ struct NoteFullWindowBar: View {
                 localized: "The note was deleted, but the copy in Notes couldn’t be removed yet.",
                 comment: "Notes: the owner deleted the note but its edited copy stayed")
         case .restored:
-            String(localized: "Version restored", comment: "Path bar: an earlier version became the current text")
+            String(localized: "Version restored", comment: "Full window: an earlier version became the current text")
         case .restoreChanged:
             String(
                 localized: "The note changed in the meantime. Open the history again and restore from there.",
@@ -191,9 +192,9 @@ struct NoteFullWindowBar: View {
                 localized: "That is not an earlier saved version of this note. Nothing was changed.",
                 comment: "Notes: a restore target was not an earlier applied version")
         case .proposalApplied:
-            String(localized: "Proposal applied", comment: "Path bar: a proposed version became the current text")
+            String(localized: "Proposal applied", comment: "Full window: a proposed version became the current text")
         case .proposalDiscarded:
-            String(localized: "Proposal discarded", comment: "Path bar: a proposed version was set aside")
+            String(localized: "Proposal discarded", comment: "Full window: a proposed version was set aside")
         case .proposalChanged:
             String(
                 localized: "The note changed in the meantime. Compare again before applying.",

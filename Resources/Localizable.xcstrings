@@ -4807,24 +4807,6 @@
         }
       }
     },
-    "Choose a note in the list." : {
-      "comment" : "Notes: hint under the title when no tab is open",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose a note in the list."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wybierz notatkę z listy."
-          }
-        }
-      }
-    },
     "Choose another model. Nothing was written for the last meeting." : {
       "comment" : "Settings → Meetings banner detail: the plan does not include the model",
       "extractionState" : "manual",
@@ -7166,7 +7148,7 @@
       }
     },
     "Done editing" : {
-      "comment" : "Path bar: leaves the editor",
+      "comment" : "Full window: leaves the editor",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -12134,7 +12116,7 @@
       }
     },
     "Make note" : {
-      "comment" : "Path bar and explorer: copies a dictation into a new note",
+      "comment" : "Full window and explorer: copies a dictation into a new note",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -13753,24 +13735,6 @@
         }
       }
     },
-    "No note open" : {
-      "comment" : "Notes: centre column when no tab is open",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No note open"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Brak otwartej notatki"
-          }
-        }
-      }
-    },
     "No notes match “%@”." : {
       "comment" : "Explorer: a search found nothing; the query",
       "extractionState" : "manual",
@@ -14438,7 +14402,7 @@
       }
     },
     "Note created" : {
-      "comment" : "Path bar: a dictation was copied into a new note",
+      "comment" : "Full window: a dictation was copied into a new note",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -16508,7 +16472,7 @@
       }
     },
     "Proposal applied" : {
-      "comment" : "Path bar: a proposed version became the current text",
+      "comment" : "Full window: a proposed version became the current text",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -16526,7 +16490,7 @@
       }
     },
     "Proposal discarded" : {
-      "comment" : "Path bar: a proposed version was set aside",
+      "comment" : "Full window: a proposed version was set aside",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -18722,7 +18686,7 @@
       }
     },
     "Saved" : {
-      "comment" : "Path bar: the Markdown file was saved",
+      "comment" : "Full window: the Markdown file was saved",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -19442,7 +19406,7 @@
       }
     },
     "Show the inspector" : {
-      "comment" : "Path bar: shows the inspector",
+      "comment" : "Full window: shows the inspector",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -25274,7 +25238,7 @@
       }
     },
     "Version restored" : {
-      "comment" : "Path bar: an earlier version became the current text",
+      "comment" : "Full window: an earlier version became the current text",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
@@ -27290,7 +27254,7 @@
       }
     },
     "note.deleted" : {
-      "comment" : "Path bar: the note was deleted",
+      "comment" : "Full window: the note was deleted",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

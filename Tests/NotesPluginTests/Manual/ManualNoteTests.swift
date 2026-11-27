@@ -54,6 +54,7 @@ import Testing
         let model = model(r)
         await model.refresh()
         await model.newNote()
+        let first = try #require(model.currentID)
         await model.newNote()
         let keys = model.rows.map(\.id.key)
         #expect(keys.count == 2 && Set(keys).count == 2)
@@ -62,7 +63,9 @@ import Testing
             let id = String(key.rawValue.dropFirst("notes:".count))
             #expect(UUID(uuidString: id) != nil && id == id.lowercased())
         }
-        #expect(model.currentID == .live(keys[0]) || model.currentID == .live(keys[1]))
+        // The full window shows the note created last.
+        let last = try #require(keys.first { $0 != first.key })
+        #expect(model.currentID == .live(last))
     }
 
     @Test func anExplorerSearchIsClearedSoTheNewRowShows() async throws {
@@ -144,6 +147,8 @@ import Testing
         #expect(model.title(of: try #require(model.row(for: id))) == "Untitled note")
         await model.setTitle(id, to: "  Plan\u{202E}\nfor\tFriday \u{200B}")
         #expect(model.title(of: try #require(model.row(for: id))) == "Plan for Friday")
+        // The full window's header shows it too.
+        #expect(model.currentDocument?.summary.map { model.presentation.title($0) } == "Plan for Friday")
         // The index follows the title through the trigger.
         let hits = try r.store.search("friday")
         #expect(hits.map(\.key) == [id.key] && hits.first?.titleMatched == true)

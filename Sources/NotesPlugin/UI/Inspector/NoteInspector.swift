@@ -159,7 +159,8 @@ struct NoteDetailsPane: View {
             if NoteCollection.isDictation(document.id) {
                 actionRow(
                     "note.text.badge.plus",
-                    Text("Make note", comment: "Path bar and explorer: copies a dictation into a new note"), keys: nil,
+                    Text("Make note", comment: "Full window and explorer: copies a dictation into a new note"),
+                    keys: nil,
                     tint: LintelBrand.accentText
                 ) { Task { await model.makeNote(from: document.id) } }
                 .disabled(!model.canMakeNote(document.id) || document.phase != .loaded)
@@ -172,11 +173,11 @@ struct NoteDetailsPane: View {
                 .disabled(document.phase != .loaded)
             }
             actionRow(
-                "doc.on.doc", Text("Copy Markdown", comment: "Path bar: copies the note as Markdown"), keys: "⌘⇧C",
+                "doc.on.doc", Text("Copy Markdown", comment: "Full window: copies the note as Markdown"), keys: "⌘⇧C",
                 tint: LintelBrand.ink
             ) { model.copyMarkdown() }
             actionRow(
-                "square.and.arrow.down", Text("Save .md…", comment: "Path bar: saves the note as a Markdown file"),
+                "square.and.arrow.down", Text("Save .md…", comment: "Full window: saves the note as a Markdown file"),
                 keys: nil, tint: LintelBrand.ink
             ) { Task { await model.saveMarkdown() } }
             if model.canDelete(document.id) {
