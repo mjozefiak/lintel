@@ -79,9 +79,10 @@ python3 -I scripts/dictation-eval/check_full.py --raw <raw>.jsonl --out <full re
   number. The speech engine's time for the last segment is not: it is the same for every source.
 - **Provider failures apart.** `provider_failures` holds closed codes (`failed.rateLimited`, `timedOut`, ...) and the
   chunk stays raw; `rejections` are the guard's, as for the local source. One request may take 60 s in the eval: the
-  tail is measured, not cut. `provider_summary.py` applies the release limits of the spec (Standard 4 s since the Phase 4 measurement, A10; Full 6 s)
-  afterwards and prints p50, p90 (nearest rank), the dictations over the limit and the latency gate (p90 at or under the
-  limit). A level is offered for the provider only when the gate passes **and** the level's quality targets hold.
+  tail is measured, not cut. `provider_summary.py` applies the release limits of the spec (Standard and Full 6 s; owner
+  decision 2026-11-27, A10, A11) afterwards and prints p50, p90 (nearest rank), the dictations over the limit and the
+  latency gate (p90 at or under the limit). A level is offered for the provider only when the gate passes **and** the
+  level's quality targets hold.
 - After 5 dictations in a row whose every chunk failed at the provider the run stops (no login, a limit).
 - Output adds `release_ms`, `audio_ms`, `audio_estimated`, `chunk_ms` (each request from its hand-over, queue
   included), `provider_failures`, `source`, `level`, `prompt_version`, `provider_model` and `exact_model`. The app label

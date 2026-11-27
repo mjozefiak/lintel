@@ -245,9 +245,9 @@ Reading:
 - **Standard on the provider meets D2's quality targets** (FLEURS WER ≤ raw + 0.3 pt; self-corrections 85.7 % ≥ 60 %;
   forbidden words left 4.2 % ≤ 15 %) and is better than the built-in model on self-corrections, forbidden words, terms and
   lost content words. It **fails the spec's 2 s limit** (132 of 160 dictations over it; a CLI request costs about 2 s
-  before the model writes anything, so no prompt change brings it under 2 s on this path). With the owner's proposed
-  provider limit of **4 s** it passes on every set: p90 3.25, 3.23 and 3.85 s, 3.30 s over all 160; 4 of the 40 corpus
-  dictations (none of FLEURS) would have been pasted raw at 4 s.
+  before the model writes anything, so no prompt change brings it under 2 s on this path). With the owner's provider
+  limit of **6 s** it passes on every set: p90 3.25, 3.23 and 3.85 s, 3.30 s over all 160, max 5.76 s, so no dictation
+  would have been pasted raw at 6 s (4 of the 160 were over 4 s, all on the corpus).
 - **Full on the provider passes its 6 s latency gate** (p90 3.27 s over all 160, corpus 4.27 s; one two-chunk corpus
   dictation took 6.29 s, because its last chunk is sent at the release) and fixes the built-in Full's main miss:
   self-corrections 85.7 % (built-in Full 57.1 %), with fewer lost content words than any other source. Against its
@@ -255,10 +255,10 @@ Reading:
   73.2 % (≥ Standard), `chat` WER +1.5 pt and `code` WER +30.7 pt (≤ Standard + 1 pt; `code` is two items, and Full
   equals raw and the built-in models there, while the provider's Standard wrote them better), and one short item with a
   line break (`pl-mail-01`, the same item as the built-in Full). The other Full targets hold.
-- **Owner decision (2026-11-26, Phase 4): the provider serves both levels, `ProviderLevels.offered = [.standard, .full]`,
-  with a provider latency limit of 4 s at Standard (instead of 2 s, A10) and 6 s at Full (A11).** It is confirmed on the
-  Phase 4 PR; Phase 5 writes the constant. Full's three misses above are recorded for that confirmation; the Full prompt
-  is v1 (if a later round changes it, Full is measured again).
+- **Owner decision (2026-11-27, confirming the Phase 4 proposal): the provider serves both levels,
+  `ProviderLevels.offered = [.standard, .full]`, with a provider latency limit of 6 s at Standard (instead of the spec's
+  2 s, A10; the proposal was 4 s) and 6 s at Full (A11).** Phase 5 writes the constant. Full's three misses above are
+  recorded for that confirmation; the Full prompt is v1 (if a later round changes it, Full is measured again).
 - Limits: one run, one model (sonnet), one network, the account's load at the time unknown; two multi-chunk dictations
   only, so the queue in the gate behind an earlier chunk is mostly covered by the offline tests; `code` and `chat` are
   two and four items.
