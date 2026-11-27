@@ -615,6 +615,16 @@
       "sha256" : "386ea794e648d74a1842b5aa7c974e10521f73cba76b777fe975fbb159cfabc3",
       "width" : 640
     },
+    "notes.explorer\/narrow-stacked@light-m-en.png" : {
+      "height" : 1040,
+      "sha256" : "8e6c0f8336744536aa3e378a2ef12a1e98f626ca2a27ee7dd8eeb24195680174",
+      "width" : 508
+    },
+    "notes.explorer\/narrow-stacked@light-xl-pl.png" : {
+      "height" : 1040,
+      "sha256" : "15cfcb2e8ba20069ac515aef856e5f05bc28f9b6f47248b15f4fb6d19aa1e0fc",
+      "width" : 508
+    },
     "notes.explorer\/search-no-results-meetings@dark-m-en.png" : {
       "height" : 1240,
       "sha256" : "c46f1f664c45c59aeea9a55b733ec08d0d12de5f9fc66a7e701881fcb77744a5",
@@ -660,21 +670,6 @@
       "sha256" : "3143aca006ec3a74352eabdd48edbdeb70585ea2a54457cf7144de4f686abaa2",
       "width" : 1120
     },
-    "notes.preview\/failed-no-retry@dark-m-en.png" : {
-      "height" : 1000,
-      "sha256" : "99fe16099cff78999c1cc4014e09cdba68ec679da39353b44624d2e9d3c48fb6",
-      "width" : 1120
-    },
-    "notes.preview\/failed-no-retry@light-m-en.png" : {
-      "height" : 1000,
-      "sha256" : "4fd492d4f5288923d72396b0cb292a393d240c02216072a3e2e2c4124e2a6d96",
-      "width" : 1120
-    },
-    "notes.preview\/failed-no-retry@light-xl-pl.png" : {
-      "height" : 1000,
-      "sha256" : "7798db0d64a0f5f2e77183cfaf77539afec99c91bcc1e1bf28aeac6538a67e89",
-      "width" : 1120
-    },
     "notes.preview\/failed-with-retry@dark-m-en.png" : {
       "height" : 1000,
       "sha256" : "11484cd68cf5efbdf05322fbec65c400932517b0dfe123452b317d71f47af804",
@@ -707,17 +702,17 @@
     },
     "notes.preview\/meeting-notes@dark-m-en.png" : {
       "height" : 1000,
-      "sha256" : "1b7a3a2dd6b08d436782c446959e05f8d11856b9af22894a44f6563e6904b7bc",
+      "sha256" : "a8c790db69a22cbe0e4b431e78d05c4262fcd71e66799d2158a5979d5a3fe623",
       "width" : 1120
     },
     "notes.preview\/meeting-notes@light-m-en.png" : {
       "height" : 1000,
-      "sha256" : "801c253ddb6502434d7d7d4bc8ee03d0e8b97413e0aaddefa12a8f5ba9dc5c88",
+      "sha256" : "ff6571f3293e7a570d151f0eaa9aba13cd2d188d364c00f60110f98c53bced7b",
       "width" : 1120
     },
     "notes.preview\/meeting-notes@light-xl-pl.png" : {
       "height" : 1000,
-      "sha256" : "bd45f9b15b6982aad058d2c4ba273422dc4e407b046560d9ae7bd455cf7c69cf",
+      "sha256" : "70a954974ad22a10e5f2aa69f87228dc29f02c24324285ca1ef702b233f44900",
       "width" : 1120
     },
     "notes.preview\/meeting-transcript@dark-m-en.png" : {
@@ -749,6 +744,16 @@
       "height" : 1000,
       "sha256" : "d1376a69e638003ea4d43d89b9d161a2490c40bec51dfdca7ae71d29c5f18aef",
       "width" : 1120
+    },
+    "notes.preview\/narrow-failed@light-m-en.png" : {
+      "height" : 1040,
+      "sha256" : "91496f21797aa5f821eb39fe6d4b8affd6dbdca86d5b8048eb054efdc2b7cf4b",
+      "width" : 508
+    },
+    "notes.preview\/narrow-failed@light-xl-pl.png" : {
+      "height" : 1040,
+      "sha256" : "c916927ce4a6fa76a24e1364d69be7ec329d6c1277c1d31c7adb8d6ea3363849",
+      "width" : 508
     },
     "notes.preview\/needs-model@dark-m-en.png" : {
       "height" : 1000,
@@ -997,7 +1002,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45917262448",
+  "recordRun" : "45974338096",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001
