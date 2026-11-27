@@ -3,10 +3,11 @@
  "language": "pl",
  "durationSec": 300,
  "fake": {
-  "number": "7400",
+  "number": "1200",
+  "numberSpelled": "tysiąc dwieście",
   "weekday": "środę",
-  "name": "Kwantoris",
-  "person": "Zenon",
+  "name": "Miksor",
+  "person": "Baltazar",
   "generic": "Mówca 1",
   "due": "wtorek"
  },

@@ -1,0 +1,35 @@
+# id: pl12-long-agency
+# lang: pl
+# date: 2026-11-24
+# self: Ja
+# title: Spotkanie agencji (jeden mikrofon, tekst z rozpoznawania mowy)
+[00:02] Ja: okej nagrywam to lecimy bo o pierwszej mam kolejne
+[00:06] Mówca 2: dobra to ja zacznę od klienta Lavendo oni czekają na prezentację
+[00:12] Ja: no to umówię nas na prezentację dla Lavendo w czwartek o wpół do trzeciej
+[00:18] Mówca 2: a kto jedzie
+[00:20] Ja: ja ty i Weronika jak da radę
+[00:23] Mówca 4: Weronika da radę pytałem ją rano
+[00:27] Mówca 3: druga sprawa wycena dla Oskara z firmy Tarta
+[00:31] Mówca 3: wyszło czterdzieści dwa tysiące netto za całą kampanię wyślesz mu ją
+[00:36] Ja: tak wyślę Oskarowi wycenę jutro do południa
+[00:40] Mówca 3: tylko dopisz że druk jest osobno
+[00:43] Ja: jasne
+[00:45] Mówca 2: a może zrobisz ticket na nowe logo dla Lavendo bo stare jest takie yyy przestarzałe
+[00:51] Ja: nie logo zostaje oni są do niego przywiązani nie ruszamy
+[00:56] Mówca 2: no dobra
+[00:58] Mówca 4: ja wpiszę spotkanie z drukarnią na przyszły tydzień
+[01:03] Ja: super
+[01:05] Mówca 3: co z wersją angielską strony
+[01:08] Ja: jakby klient chciał wersję angielską to bym założył ticket na tłumaczenie
+[01:13] Mówca 4: nie chce pytałem wczoraj mówią że na razie tylko polski rynek
+[01:18] Ja: aha to nie ma tematu
+[01:20] Mówca 2: testy nowej strony są w piątek
+[01:23] Ja: jeśli testy w piątek nie przejdą to założę ticket na poprawki dla Weroniki
+[01:29] Mówca 4: oby przeszły
+[01:31] Mówca 3: i jeszcze budżet musimy przejrzeć bo kończy się kwartał
+[01:35] Ja: dobra wpiszę nam przegląd budżetu za dwa tygodnie w poniedziałek o dziesiątej dla całej czwórki
+[01:42] Mówca 2: za dwa tygodnie pasuje
+[01:45] Mówca 3: a ja bym jeszcze chciał żebyśmy kiedyś zrobili jakieś szkolenie z AI
+[01:50] Ja: kiedyś pewnie tak
+[01:52] Mówca 2: to tyle
+[01:54] Ja: dzięki lecę

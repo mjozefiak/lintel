@@ -1,0 +1,21 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["calendar"], "evidence": [3, 5, 6],
+     "fields": {"title": ["lavendo"], "date": ["2026-11-26"], "time": "14:30",
+                "participants": {"required": [["Weronika"]], "optional": [["Mówca 2"], ["Lavendo"]]}, "condition": false}},
+    {"id": "a2", "type": ["email"], "evidence": [8, 9],
+     "fields": {"title": ["wycen"], "to": {"required": [["Oskar", "Oskarowi"]], "optional": []},
+                "due": ["2026-11-25"], "condition": false, "must_mention": ["42000"]}},
+    {"id": "a3", "type": ["jira"], "evidence": [22],
+     "fields": {"title": ["popraw"], "assignee": ["Weronika", "Weroniki"], "due": null, "condition": true}},
+    {"id": "a4", "type": ["calendar"], "evidence": [25],
+     "fields": {"title": ["budżet"], "date": ["2026-12-07"], "time": "10:00",
+                "participants": {"required": [], "optional": [["Mówca 2"], ["Mówca 3"], ["Mówca 4"], ["Weronika"]]}, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "rejected", "evidence": [12, 13]},
+    {"id": "t2", "kind": "other_speaker", "evidence": [15]},
+    {"id": "t3", "kind": "condition_failed", "evidence": [18, 19, 20]},
+    {"id": "t4", "kind": "vague", "evidence": [27, 28]}
+  ]
+}

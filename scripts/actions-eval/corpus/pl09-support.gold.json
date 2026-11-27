@@ -1,0 +1,15 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["email"], "evidence": [5],
+     "fields": {"title": ["hasł"], "to": {"required": [["Henryk", "Henryka", "Henrykiem"]], "optional": []},
+                "due": ["2026-11-16"], "condition": false}},
+    {"id": "a2", "type": ["jira"], "evidence": [6, 7],
+     "fields": {"title": ["zamówien"], "assignee": null, "due": null, "condition": false, "must_mention": ["88231"]}},
+    {"id": "a3", "type": ["calendar"], "evidence": [10, 11],
+     "fields": {"title": [], "date": ["2026-11-19"], "time": "16:00",
+                "participants": {"required": [["Henryk", "Henryka", "Henrykiem"]], "optional": []}, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "rejected", "evidence": [8, 9]}
+  ]
+}

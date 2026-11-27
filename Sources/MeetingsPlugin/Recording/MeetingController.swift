@@ -88,6 +88,12 @@ final class MeetingController {
         /// Told about every change of the phase and every ignored late `start()` (tests wait on it instead of
         /// polling).
         var stateChanged: @MainActor () -> Void = {}
+        /// Told every state the HUD shows, and `nil` when it is hidden (the plugin's live recorder maps it to
+        /// the Notes window's `LiveRecordingStatus`; it changes nothing here).
+        var hudObserver: @MainActor (MeetingHUDState?) -> Void = { _ in }
+        /// Told the meeting's row id once the recording really started (the session is up and the row is
+        /// registered): the HUD shows `recording` before that, and a session whose start fails never gets here.
+        var meetingRegistered: @MainActor (Int64) -> Void = { _ in }
         /// The meeting detector (Phase 3), told when a recording runs, how loud it is and when it ends.
         var recordingObserver: (any MeetingRecordingObserver)?
     }
@@ -121,7 +127,9 @@ final class MeetingController {
     /// How many watcher timers ran out (tests wait on it instead of sleeping).
     private(set) var watcherFirings = 0
     private var session: (any RecordingSession)?
-    private var meetingID: Int64?
+    /// The row id of the running recording's meeting; `nil` until the session has one (the live recorder reads
+    /// it for the meeting's Notes key).
+    private(set) var meetingID: Int64?
     /// "Copy message" was pressed before the meeting had an id.
     private var pendingConsentCopy: Date?
     /// The app of the suggestion the user accepted for the attempt that is running; set by `begin` once its
@@ -143,6 +151,18 @@ final class MeetingController {
 
     init(_ dependencies: Dependencies) {
         deps = dependencies
+    }
+
+    /// Shows a HUD state and tells the observer (the live recorder) about it, in that order.
+    private func showHUD(_ state: MeetingHUDState) {
+        deps.hud.show(state)
+        deps.hudObserver(state)
+    }
+
+    /// Hides the HUD and tells the observer.
+    private func hideHUD() {
+        deps.hud.hide()
+        deps.hudObserver(nil)
     }
 
     var isBusy: Bool { phase != .idle }
@@ -200,7 +220,7 @@ final class MeetingController {
         guard let session else { return }
         phase = .finishing
         cancelWatchers()
-        deps.hud.show(.finishing)
+        showHUD(.finishing)
         requestFinish(session, token: runToken)
     }
 
@@ -211,7 +231,7 @@ final class MeetingController {
         releaseActivity()
         sourceBundleID = nil
         phase = .idle
-        deps.hud.hide()
+        hideHUD()
     }
 
     /// Asks the session to finish, once. When the session returns without having sent `.finished` (it never
@@ -292,7 +312,7 @@ final class MeetingController {
             guard phase == .awaitingMicrophoneDecision else { return }
             sourceBundleID = nil
             phase = .idle
-            deps.hud.hide()
+            hideHUD()
         }
     }
 
@@ -357,7 +377,7 @@ final class MeetingController {
             case .denied: return microphoneDenied(offersSystemOnly: recordsSystem)
             case .notDetermined:
                 // The shortcut is the user's action: the prompt is allowed now.
-                deps.hud.show(.allowMicrophone)
+                showHUD(.allowMicrophone)
                 let granted = await deps.authorizer.requestAccess()
                 guard isPreparing(token) else { return }
                 if !granted { return microphoneDenied(offersSystemOnly: recordsSystem) }
@@ -378,7 +398,7 @@ final class MeetingController {
         sawMicrophoneLevel = false
         sawMicrophoneSignal = false
         lastShownLevels = (0, 0)
-        deps.hud.show(.recording(recording))
+        showHUD(.recording(recording))
         let consumer = Task { [weak self] in
             for await event in session.events {
                 guard let self else { return }
@@ -400,6 +420,7 @@ final class MeetingController {
         guard holdsSession(token) else { return ignoredStaleStart() }
         meetingID = id
         library.registerLive(meetingID: id)
+        deps.meetingRegistered(id)
         if let copiedAt = pendingConsentCopy { storeConsentCopy(at: copiedAt, meetingID: id) }
         if phase == .preparing {
             phase = .recording
@@ -423,7 +444,7 @@ final class MeetingController {
             // Waiting for the user's decision holds nothing; `begin` takes the activity again.
             releaseActivity()
             phase = .awaitingMicrophoneDecision
-            deps.hud.show(.problem(.microphoneDenied(offersSystemOnly: true)))
+            showHUD(.problem(.microphoneDenied(offersSystemOnly: true)))
         } else {
             fail(.microphoneDenied(offersSystemOnly: false))
         }
@@ -440,14 +461,14 @@ final class MeetingController {
         default: problem = .couldNotStart
         }
         endSession()
-        deps.hud.show(.problem(problem))
+        showHUD(.problem(problem))
     }
 
     private func fail(_ problem: MeetingHUDState.Problem) {
         releaseActivity()
         sourceBundleID = nil
         phase = .idle
-        deps.hud.show(.problem(problem))
+        showHUD(.problem(problem))
     }
 
     // MARK: Events
@@ -457,10 +478,10 @@ final class MeetingController {
         switch event {
         case .stateChanged(.finishing):
             enterFinishing()
-            deps.hud.show(.finishing)
+            showHUD(.finishing)
         case .stateChanged(.processing):
             enterFinishing()
-            deps.hud.show(.processing(deps.settings.diarization ? .recognisingSpeakers : .closing))
+            showHUD(.processing(deps.settings.diarization ? .recognisingSpeakers : .closing))
         case .stateChanged:
             break
         case .level(let channel, let level):
@@ -505,7 +526,7 @@ final class MeetingController {
             refresh()
         case .replaying(let remaining):
             enterFinishing()
-            deps.hud.show(.processing(.transcribing(remaining: remaining)))
+            showHUD(.processing(.transcribing(remaining: remaining)))
         case .trackResumed(let channel):
             // A track that was unavailable at the start or lost is recording again.
             recording.unavailable.remove(channel)
@@ -569,7 +590,7 @@ final class MeetingController {
     /// The recording pill shows the latest numbers, while the recording runs (or still starts).
     private func refresh() {
         guard session != nil, phase == .recording || phase == .preparing else { return }
-        deps.hud.show(.recording(recording))
+        showHUD(.recording(recording))
     }
 
     // MARK: Watchers
@@ -651,12 +672,12 @@ final class MeetingController {
         deps.logger.info("Meeting recording ended")
         switch outcome.result {
         case .ready:
-            deps.hud.show(.saved)
+            showHUD(.saved)
             if let id = outcome.meetingID { deps.library.meetingReady(id) }
-        case .incomplete: deps.hud.show(.savedIncomplete)
-        case .failed: deps.hud.show(.problem(.failed))
-        case .discarded: deps.hud.show(.problem(.nothingHeard))
-        case .notStarted: deps.hud.hide()
+        case .incomplete: showHUD(.savedIncomplete)
+        case .failed: showHUD(.problem(.failed))
+        case .discarded: showHUD(.problem(.nothingHeard))
+        case .notStarted: hideHUD()
         }
     }
 
@@ -696,7 +717,7 @@ final class MeetingController {
             deps.recordingObserver?.recordingEnded()
             if phase != .idle {
                 phase = .idle
-                deps.hud.hide()
+                hideHUD()
             }
             return true
         }
@@ -711,7 +732,7 @@ final class MeetingController {
             return false
         }
         runTask = nil
-        deps.hud.hide()
+        hideHUD()
         return true
     }
 
