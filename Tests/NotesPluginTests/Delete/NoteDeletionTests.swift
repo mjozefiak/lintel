@@ -78,7 +78,7 @@ import Testing
 
     // MARK: Through the model: the sheet, the tab, the strip
 
-    @Test func confirmingTheSheetDeletesTheNoteClosesItsTabAndSaysSo() async throws {
+    @Test func confirmingTheSheetDeletesTheNoteGoesBackToTheListAndSaysSo() async throws {
         let r = try ReconRig()
         let doc = try await editedNote(r)
         let model = model(r)
@@ -92,7 +92,7 @@ import Testing
         #expect(r.source.deleteCalls == 0, "asking deletes nothing")
         await model.confirmDelete(request)
         #expect(r.source.deleteCalls == 1)
-        #expect(model.pendingDelete == nil && model.documents[item] == nil && !model.tabs.contains(item))
+        #expect(model.pendingDelete == nil && model.documents[item] == nil && !model.isFullWindow)
         #expect(try r.store.document(id: doc.id) == nil)
         #expect(model.feedback == .deleted)
     }
@@ -108,7 +108,7 @@ import Testing
         #expect(try r.store.document(id: doc.id) != nil)
     }
 
-    @Test func aSourceFailureSaysSoAndKeepsTheTabAndTheCopy() async throws {
+    @Test func aSourceFailureSaysSoAndKeepsTheNoteOpenAndTheCopy() async throws {
         let r = try ReconRig()
         let doc = try await editedNote(r)
         let model = model(r)
@@ -120,7 +120,7 @@ import Testing
         await model.confirmDelete(try #require(model.pendingDelete))
         #expect(model.feedback == .deleteFailed)
         #expect(model.strips.contains { $0.id == "feedback" })
-        #expect(model.tabs.contains(item))
+        #expect(model.currentID == item)
         #expect(try r.store.document(id: doc.id) != nil)
     }
 
@@ -275,6 +275,6 @@ extension NoteDeletionTests {
         try r.store.close()
         await model.confirmDelete(request)
         #expect(model.feedback == .deleteFailed)
-        #expect(model.tabs.contains(.live(manual)))
+        #expect(model.currentID == .live(manual))
     }
 }

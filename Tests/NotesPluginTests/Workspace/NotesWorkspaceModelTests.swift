@@ -71,7 +71,7 @@ private struct Rig {
 }
 
 @MainActor
-@Suite("Notes workspace: listing, tabs and routes")
+@Suite("Notes workspace: listing, the full window and routes")
 struct NotesWorkspaceModelTests {
     @Test("the first read lists the notes newest first, grouped by time; dictations are their own list")
     func listing() async {
@@ -97,41 +97,52 @@ struct NotesWorkspaceModelTests {
         #expect(rig.model.groups.map { rig.model.title(of: $0) } == ["Dictation"])
     }
 
-    @Test("a route selects the key and opens one tab for the note")
-    func routeOpensOneTab() async {
+    @Test("a route selects the note and opens it in the full window; one note at a time")
+    func routeOpensTheFullWindow() async {
         let rig = Rig()
         await rig.model.refresh()
         let route = NoteRoute.route(for: Rig.meetingKey)
         #expect(rig.model.handle(route))
         #expect(rig.model.currentID == .live(Rig.meetingKey))
-        #expect(rig.model.tabs.tabs.count == 1)
-        #expect(rig.model.tabs.tabs[0].title == "Orchard weekly sync")
-        // The same route, and the explorer's click, are the same tab.
+        #expect(rig.model.explorer.selection == .live(Rig.meetingKey))
+        #expect(rig.model.isFullWindow)
+        // The same route, and Open in the explorer, show the same note.
         #expect(rig.model.handle(route))
         rig.model.open(.live(Rig.meetingKey))
-        #expect(rig.model.tabs.tabs.count == 1)
-        // Another note is another tab and the route selects it.
+        #expect(rig.model.currentID == .live(Rig.meetingKey))
+        // Another note replaces it: the first one's document goes, the new one is selected.
         #expect(rig.model.handle(NoteRoute.route(for: Rig.dictationKey)))
-        #expect(rig.model.tabs.tabs.count == 2)
         #expect(rig.model.currentID == .live(Rig.dictationKey))
+        #expect(rig.model.explorer.selection == .live(Rig.dictationKey))
+        #expect(rig.model.documents[.live(Rig.meetingKey)] == nil)
     }
 
-    @Test("a route to a meeting whose tab shows the transcript reuses that tab and its layer")
-    func routeReusesTheTranscriptTab() async throws {
+    @Test("Open shows the layer of the preview's tab, and going back shows the tab of the layer on screen")
+    func openKeepsThePreviewTab() async throws {
         let rig = Rig()
         await rig.model.refresh()
         let id = NoteItemID.live(Rig.meetingKey)
+        rig.model.select(row: id)
+        await rig.model.loadPreview(id)
+        rig.model.selectPreviewTab(.transcript)
+        let document = try #require(rig.model.previewDocument)
         rig.model.open(id)
-        await rig.model.loadContent(id)
-        let document = try #require(rig.model.currentDocument)
-        document.selectLayer("transcript")
-        rig.model.open(.live(Rig.dictationKey))
-        #expect(rig.model.currentID != id)
-        #expect(rig.model.handle(NoteRoute.route(for: Rig.meetingKey)))
-        #expect(rig.model.tabs.tabs.count == 2)
-        #expect(rig.model.currentID == id)
         #expect(rig.model.currentDocument === document)
         #expect(document.layerID == "transcript")
+        // In the full window the layer is the user's: a reload does not switch it back.
+        document.selectLayer("notes")
+        await rig.model.loadContent(id)
+        #expect(document.layerID == "notes")
+        rig.model.closeFullWindow()
+        #expect(rig.model.previewTab == .notes)
+        #expect(rig.model.explorer.selection == id)
+        #expect(rig.model.previewDocument === document)
+        // My notes in the preview is My notes in the full window, and back.
+        rig.model.selectPreviewTab(.mine)
+        rig.model.open(id)
+        #expect(document.showsMine)
+        rig.model.closeFullWindow()
+        #expect(rig.model.previewTab == .mine)
     }
 
     @Test("a route of another kind, or without a note key, is not handled")
@@ -143,7 +154,7 @@ struct NotesWorkspaceModelTests {
         #expect(!rig.model.handle(WorkspaceRoute(kind: "openNote", id: ":orchard")))
         #expect(!rig.model.handle(WorkspaceRoute(kind: "openNote", id: "meetings:")))
         #expect(!rig.model.handle(WorkspaceRoute(kind: "openNote", id: "")))
-        #expect(rig.model.tabs.tabs.isEmpty)
+        #expect(!rig.model.isFullWindow)
         #expect(rig.model.currentID == nil)
     }
 
@@ -154,24 +165,25 @@ struct NotesWorkspaceModelTests {
         #expect(NoteRoute.route(for: key).kind == "openNote")
     }
 
-    @Test("closing the current tab shows its right neighbour, and the last tab goes with the window")
+    @Test("⌘W and ‹ All notes leave the full window; in the list ⌘W leaves the window to close")
     func closing() async {
         let rig = Rig()
         await rig.model.refresh()
-        let first = NoteItemID.live(Rig.meetingKey)
-        let second = NoteItemID.live(Rig.dictationKey)
-        let third = NoteItemID.live(Rig.otherKey)
-        for id in [first, second, third] { rig.model.open(id) }
-        rig.model.select(second)
-        #expect(rig.model.closeCurrentTab())
-        #expect(rig.model.currentID == third)
-        #expect(rig.model.documents[second] == nil)
-        #expect(rig.model.closeCurrentTab())
-        #expect(rig.model.currentID == first)
-        // One tab left: ⌘W closes it and reports that the window should close too.
-        #expect(!rig.model.closeCurrentTab())
+        let id = NoteItemID.live(Rig.meetingKey)
+        #expect(!rig.model.handleClose())
+        rig.model.open(id)
+        let requests = rig.model.listFocusRequests
+        #expect(rig.model.handleClose())
+        #expect(!rig.model.isFullWindow)
+        #expect(rig.model.explorer.selection == id)
+        // The list takes the keyboard back, so ↑ / ↓ and Return work at once.
+        #expect(rig.model.listFocusRequests == requests + 1)
+        // The preview keeps the same document (nothing is read again).
+        #expect(rig.model.documents[id] != nil)
+        #expect(!rig.model.handleClose())
+        rig.model.open(id)
+        rig.model.closeFullWindow()
         #expect(rig.model.currentID == nil)
-        #expect(!rig.model.closeCurrentTab())
     }
 
     @Test("content: an answer is shown, no such note is gone, a failure or a missing source is only unavailable")
@@ -202,13 +214,10 @@ struct NotesWorkspaceModelTests {
         #expect(rig.model.documents[orphan]?.phase == .unavailable)
     }
 
-    @Test("a refresh renames the tab and shows the busy mark while a note is being written")
-    func refreshUpdatesTabs() async {
+    @Test("the status bar counts the notes being written")
+    func writingCount() async {
         let rig = Rig(writing: true)
         await rig.model.refresh()
-        let id = NoteItemID.live(Rig.otherKey)
-        rig.model.open(id)
-        #expect(rig.model.tabs.tabs[0].isBusy)
         #expect(rig.model.writingCount == 1)
         #expect(rig.model.statusSummary.hasSuffix("1 writing"))
         rig.meetings.items = [
@@ -217,33 +226,7 @@ struct NotesWorkspaceModelTests {
                 startedAt: Fixtures.epoch.addingTimeInterval(-90_000))
         ]
         await rig.model.refresh()
-        #expect(rig.model.tabs.tabs[0].title == "Renamed call")
-        #expect(!rig.model.tabs.tabs[0].isBusy)
         #expect(rig.model.writingCount == 0)
-    }
-
-    @Test("the path bar names the group, the note and a layer past the first")
-    func path() async throws {
-        let rig = Rig()
-        await rig.model.refresh()
-        #expect(rig.model.pathComponents == nil)
-        let id = NoteItemID.live(Rig.meetingKey)
-        rig.model.open(id)
-        await rig.model.loadContent(id)
-        #expect(rig.model.pathComponents == ["Today", "Orchard weekly sync"])
-        try #require(rig.model.currentDocument).selectLayer("transcript")
-        #expect(rig.model.pathComponents == ["Today", "Orchard weekly sync", "Transcript"])
-    }
-
-    @Test("a dictation's path ends in its kind and time, not its text")
-    func dictationPath() async {
-        let rig = Rig()
-        await rig.model.setCollection(.dictations)
-        rig.model.open(.live(Rig.dictationKey))
-        let path = rig.model.pathComponents
-        #expect(path?.first == "Today")
-        #expect(path?.last?.hasPrefix("Dictation") == true)
-        #expect(path?.contains("Hi Kasia") == false)
     }
 
     @Test("a change signalled by the set of sources reads the list again")
@@ -290,7 +273,7 @@ struct NotesWorkspaceModelTests {
         #expect(rig.model.feedback == nil)
         #expect(rig.model.feedbackSerial == serial + 1)
         // Nothing is open: nothing is copied.
-        rig.model.close(.live(Rig.meetingKey))
+        rig.model.closeFullWindow()
         rig.model.copyMarkdown()
         #expect(rig.pasteboard.writes.count == 1)
     }

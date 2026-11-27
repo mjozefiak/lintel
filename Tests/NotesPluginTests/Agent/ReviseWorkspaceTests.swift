@@ -6,7 +6,7 @@ import Testing
 @testable import NotesPlugin
 
 /// Spec step 6.2: the workspace around the revise run: the lock strip, "Ask agent", the report strips, the editor
-/// lock and the tab that closes under a run. The service is the real one over a scripted lease; no window.
+/// lock and the full window that is left while a run goes on (phase 3b: the run is never cancelled by it). The service is the real one over a scripted lease; no window.
 @MainActor
 @Suite(.finishesRigs, .timeLimit(.minutes(2))) struct ReviseWorkspaceTests {
     private let notes = ReviseFixtures.note
@@ -164,15 +164,48 @@ import Testing
         await task.value
     }
 
-    @Test func closingTheTabCancelsItsRun() async throws {
-        let handle = ScriptedReviseHandle([.hang])
+    @Test func goingBackToTheListLetsTheRunFinishAndApply() async throws {
+        let gate = ReviseGate()
+        let handle = ScriptedReviseHandle([.after(gate, answer)])
+        let s = try await setup(steps: [.handle(handle)])
+        await comment(s, "next sprint")
+        let document = try #require(s.model.documents[s.item])
+        let task = Task { await s.model.revise() }
+        await handle.generating.wait()
+        // "‹ All notes" while the agent writes: the run is NOT cancelled and the note keeps its document.
+        s.model.closeFullWindow()
+        #expect(!s.model.isFullWindow)
+        #expect(s.service.isRunActive)
+        #expect(handle.releases == 0)
+        #expect(s.model.documents[s.item] === document)
+        // Opening it again shows the lock strip of the same run.
+        s.model.open(s.item)
+        #expect(s.model.strips.contains { $0.id == "revise.writing" })
+        s.model.closeFullWindow()
+        gate.open()
+        await task.value
+        #expect(!s.service.isRunActive)
+        let head = try #require(try s.r.store.liveDocument(key: s.r.key, layer: "notes"))
+        let body = try #require(try s.r.store.headRevision(of: head.id)).body
+        #expect(body.contains("(owner: Marek)."))
+    }
+
+    @Test func choosingAnotherNoteWhileTheAgentWritesKeepsTheRunAndDropsTheDocumentAfterwards() async throws {
+        let gate = ReviseGate()
+        let handle = ScriptedReviseHandle([.after(gate, answer)])
         let s = try await setup(steps: [.handle(handle)])
         await comment(s, "next sprint")
         let task = Task { await s.model.revise() }
         await handle.generating.wait()
-        s.model.close(s.item)
+        s.model.closeFullWindow()
+        let other = NoteItemID.live(NoteKey(pluginID: "meetings", id: "other"))
+        s.model.select(row: other)
+        // The note whose run goes on keeps its document (dropping it would hide the run's end).
+        #expect(s.model.documents[s.item] != nil)
+        #expect(s.service.isRunActive)
+        gate.open()
         await task.value
-        #expect(!s.service.isRunActive)
+        #expect(s.model.documents[s.item] == nil)
         #expect(handle.releases == 1)
     }
 

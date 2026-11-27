@@ -75,9 +75,9 @@ struct NotesMakeNoteTests {
         #expect(rig.model.collection == .all)
         #expect(rig.model.currentID == .live(Fixtures.key("notes", "made-1")))
         #expect(rig.model.documents[rig.model.currentID ?? id]?.wantsEditing == true)
-        #expect(rig.model.tabs.tabs.count == 1)
+        #expect(rig.model.isFullWindow)
         #expect(rig.model.feedback == .noteMade)
-        // The dictation itself got no tab and no write: only its content was read.
+        // The dictation itself got no write: only its content was read.
         #expect(rig.dictation.deleteCalls == 0)
     }
 
@@ -98,7 +98,8 @@ struct NotesMakeNoteTests {
         await rig.model.loadContent(id)
         await rig.model.makeNote(from: id)
         #expect(rig.created.all == ["Buy milk."])
-        #expect(rig.model.tabs.tabs.count == 2)
+        // The new note replaces the dictation in the full window.
+        #expect(rig.model.currentID == .live(Fixtures.key("notes", "made-1")))
     }
 
     @Test("a second tap after the first finished makes a second, independent note")
@@ -110,7 +111,7 @@ struct NotesMakeNoteTests {
         await rig.model.setCollection(.dictations)
         await rig.model.makeNote(from: id)
         #expect(rig.created.all == ["Buy milk.", "Buy milk."])
-        #expect(rig.model.tabs.tabs.count == 2)
+        #expect(rig.model.currentID == .live(Fixtures.key("notes", "made-2")))
     }
 
     @Test("while one is being made the action is off, so one tap makes one note")
@@ -139,7 +140,7 @@ struct NotesMakeNoteTests {
         #expect(!off.model.canMakeNote(id))
         await off.model.makeNote(from: id)
         #expect(off.created.all.isEmpty)
-        #expect(off.model.tabs.tabs.isEmpty)
+        #expect(!off.model.isFullWindow)
 
         let on = MakeRig()
         #expect(!on.model.canMakeNote(.live(Fixtures.key("meetings", "a"))))
@@ -156,7 +157,7 @@ struct NotesMakeNoteTests {
         #expect(Feedback.isStrip(.makeNoteFailed))
         #expect(rig.model.strips.contains { $0.id == "feedback" && $0.isDismissible })
         #expect(rig.model.collection == .dictations)
-        #expect(rig.model.tabs.tabs.isEmpty)
+        #expect(!rig.model.isFullWindow)
         #expect(!rig.model.isMakingNote)
         // The user can try again: the dictation still holds the text.
         #expect(rig.model.canMakeNote(.live(MakeRig.withCleaned)))

@@ -58,13 +58,16 @@ extension NotesWorkspaceModel {
         if outcome == .queued { return }
         document.lock.reset()
         guard documents[id] === document else { return }
+        // The user went back to the list and chose another note while the agent wrote: the run was not cancelled
+        // (phase 3b) and its result is in the store; the document nobody looks at goes now.
+        defer { if id != openedID, id != explorer.selection { dropPreview(id) } }
         if outcome != .cancelled { document.setReviseReport(outcome) }
         if case .applied = outcome {
             // The editor is built again on the new text: its undo stack is cleared (spec "Edit lock and revise run").
             document.leaveEditing(notifying: false)
             await loadContent(id)
             await loadHistory(for: id)
-            if wasEditing { beginEditing(id) }
+            if wasEditing, id == openedID { beginEditing(id) }
         } else {
             await refreshComments(id)
         }

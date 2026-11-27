@@ -89,8 +89,9 @@ public final class NotesPlugin: LintelPlugin {
         [notesSection]
     }
 
-    /// The Notes section of the main window: explorer, tabs, path bar, document and status bar (spec step 3.2).
-    /// `handleRoute` takes an `openNote` route, `handleClose` closes a tab before the window.
+    /// The Notes section of the main window: the explorer (list and preview) or one note in the full window, and the
+    /// status bar. `handleRoute` takes an `openNote` route; `handleClose` (⌘W) leaves the full window before the
+    /// window closes.
     var notesSection: WorkspaceSection {
         WorkspaceSection(
             id: NotesWorkspaceModel.sectionID,
@@ -103,7 +104,7 @@ public final class NotesPlugin: LintelPlugin {
             makeView: { [self] in AnyView(NotesSectionView(model: workspace)) },
             handleRoute: { [self] route in workspace.handle(route) },
             willHide: { [self] in await documents.flushAll() },
-            handleClose: { [self] in workspace.closeCurrentTab() },
+            handleClose: { [self] in workspace.handleClose() },
             menuItems: [
                 // New Note (⌘N) is a menu item of the Notes section, window-only (spec "NotesPlugin").
                 CommandInfo(
@@ -128,7 +129,16 @@ public final class NotesPlugin: LintelPlugin {
                         "Hide content", comment: "Command palette and menu: blurs the notes for screen sharing"),
                     shortcut: NotesWorkspaceModel.hideContentShortcut,
                     run: { [self] in workspace.toggleHideContent() }),
-            ]
+                // "‹ All notes" (⌘[) of the full window; Esc does the same in the window (phase 3b).
+                CommandInfo(
+                    title: LocalizedStringResource(
+                        "Back to All Notes", comment: "Notes menu: leaves the full window and shows the list"),
+                    shortcut: NoteFullWindowBar.backShortcut,
+                    isEnabled: { [self] in workspace.isFullWindow },
+                    run: { [self] in workspace.closeFullWindow() }),
+            ],
+            // A note open in the full window fills the whole window: the shell leaves its sidebar out.
+            hidesSidebar: { [self] in workspace.isFullWindow }
         )
     }
 

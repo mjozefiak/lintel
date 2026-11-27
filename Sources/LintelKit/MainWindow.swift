@@ -112,6 +112,11 @@ public struct WorkspaceSection: Identifiable, Sendable {
     /// The section's own block of the main window's sidebar; `nil` draws one row with `title` and `symbolName`.
     /// Added with the notes explorer; defaults to `nil`.
     public let sidebar: WorkspaceSidebar?
+    /// `true` while the section fills the whole window (a note open in the full window): the shell leaves its
+    /// sidebar out until it is `false` again. The shell asks it while it draws the window, so a closure that reads
+    /// an `@Observable` value redraws the window when that value changes. Added with the notes explorer's phase
+    /// 3b; defaults to `{ false }` (the sidebar is always shown).
+    public let hidesSidebar: @MainActor @Sendable () -> Bool
 
     public init(
         id: String,
@@ -123,7 +128,8 @@ public struct WorkspaceSection: Identifiable, Sendable {
         handleRoute: @escaping @MainActor @Sendable (WorkspaceRoute) -> Bool = { _ in false },
         willHide: @escaping @MainActor @Sendable () async -> Void = {},
         handleClose: @escaping @MainActor @Sendable () -> Bool = { false },
-        menuItems: [CommandInfo] = []
+        menuItems: [CommandInfo] = [],
+        hidesSidebar: @escaping @MainActor @Sendable () -> Bool = { false }
     ) {
         self.id = id
         self.title = title
@@ -135,6 +141,7 @@ public struct WorkspaceSection: Identifiable, Sendable {
         self.willHide = willHide
         self.handleClose = handleClose
         self.menuItems = menuItems
+        self.hidesSidebar = hidesSidebar
     }
 }
 

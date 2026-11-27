@@ -150,7 +150,6 @@ struct NotesPaletteTests {
         rig.model.toggleHideContent()
         #expect(rig.model.hidesContent)
         #expect(rig.model.shown("Orchard weekly sync") == "••••••")
-        #expect(rig.model.shownPath(["Today", "Orchard weekly sync"]) == ["Today", "••••••"])
         #expect(rig.model.strips.first?.id == "hidden")
         #expect(rig.model.strips.first?.actions.first?.id == "hidden.show")
         rig.model.showPalette()

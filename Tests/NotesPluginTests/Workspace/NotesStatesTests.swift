@@ -142,7 +142,7 @@ struct NotesScreenTests {
         #expect(rig.model.strips.map(\.id).starts(with: ["hidden", "locked"]))
     }
 
-    @Test("a tab's own strip does not follow the last tab into the explorer; the explorer's own failure does")
+    @Test("the full window's own strip does not follow it into the explorer; the explorer's own failure does")
     func explorerStripsOnlyTheirOwn() async {
         let rig = StatesRig()
         await rig.model.refresh()
@@ -150,10 +150,10 @@ struct NotesScreenTests {
         rig.model.show(.saveFailed)
         #expect(rig.model.strips.map(\.id) == ["save"])
         #expect(rig.model.explorerStrips.isEmpty)
-        // Its Try again and "Choose another place…" act on the open note: with the last tab closed they could do
-        // nothing, so the explorer does not show them.
-        rig.model.close(.live(StatesRig.key))
-        #expect(rig.model.tabs.tabs.isEmpty)
+        // Its Try again and "Choose another place…" act on the open note: back in the list they could do nothing,
+        // so the explorer does not show them.
+        rig.model.closeFullWindow()
+        #expect(!rig.model.isFullWindow)
         #expect(rig.model.explorerStrips.isEmpty)
         rig.model.show(.restoreFailed)
         #expect(rig.model.explorerStrips.isEmpty)

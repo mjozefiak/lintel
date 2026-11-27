@@ -88,6 +88,9 @@ final class NoteDocumentModel {
     private(set) var session: NoteEditingSession?
     /// A new note opens straight in the editor: set before its content is read, taken once it is loaded.
     var wantsEditing = false
+    /// The full window shows My notes (the `mine` layer of a meeting) instead of a layer of the source. My notes is
+    /// not one of `layers`: no source offers it and nothing but the user writes it (phase 3b).
+    var showsMine = false
     /// Editing ended (the pen, another layer): the session still has text to write. Set by the workspace model.
     var onEditingEnded: ((NoteEditingSession) -> Void)?
 

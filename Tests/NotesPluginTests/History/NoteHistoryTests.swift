@@ -193,7 +193,6 @@ import Testing
         let compare = try #require(model.documents[item]?.compare)
         #expect(compare.baseAuthor == .agent && compare.author == .human)
         #expect(compare.result.lines.map(\.kind) == [.context, .removed, .added])
-        #expect(model.pathComponents?.last == "Compare")
         model.closeCompare()
         #expect(model.documents[item]?.compare == nil)
     }

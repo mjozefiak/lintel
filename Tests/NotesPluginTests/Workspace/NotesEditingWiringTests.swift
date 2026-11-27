@@ -18,9 +18,9 @@ import Testing
         return model
     }
 
-    // MARK: Tabs
+    // MARK: The full window
 
-    @Test func aDetachReKeysTheOpenTabAndARouteToTheNewRowOpensASecondTab() async throws {
+    @Test func aDetachReKeysTheOpenNoteAndARouteToTheNewRowOpensIt() async throws {
         let r = try ReconRig()
         let layers = [
             r.rig.layer("agent notes", id: "notes", version: "n1"),
@@ -37,22 +37,21 @@ import Testing
         #expect(model.documents[.live(r.key)]?.layers.first { $0.id == "notes" }?.markdown == "my notes")
         r.source.existing = []
         await r.reconciler.sweep()
-        #expect(model.tabs.contains(detached))
-        #expect(!model.tabs.contains(.live(r.key)))
         #expect(model.currentID == detached)
-        // The recreated note's row 1 has the same key: another identity, another tab.
-        model.open(.live(r.key))
-        #expect(model.tabs.tabs.count == 2)
-        #expect(model.currentID == .live(r.key))
-        // The detached tab shows only its overlaid layers, never the source's text for a layer without one.
+        #expect(model.explorer.selection == detached)
+        #expect(model.documents[.live(r.key)] == nil)
+        // The detached copy shows only its overlaid layers, never the source's text for a layer without one.
         await waitUntil { model.documents[detached]?.phase == .loaded }
         let shown = try #require(model.documents[detached])
         #expect(shown.layers.map(\.id) == ["notes"])
         #expect(shown.layers.first?.markdown == "my notes")
+        // The recreated note's row 1 has the same key: another identity, opened in its place.
+        model.open(.live(r.key))
+        #expect(model.currentID == .live(r.key))
         _ = doc
     }
 
-    @Test func aDetachedTabNeverReadsTheSource() async throws {
+    @Test func aDetachedCopyNeverReadsTheSource() async throws {
         let r = try ReconRig()
         let doc = try await r.editedOverlay(r.rig.layer("old", version: "n1"), text: "kept")
         try r.store.detachReportingRows(r.key)
@@ -64,20 +63,6 @@ import Testing
         #expect(r.source.contentCalls == 0)
         #expect(model.documents[item]?.layers.first?.markdown == "kept")
         _ = doc
-    }
-
-    @Test func theTabSetReKeysInPlaceAndRefusesADuplicate() {
-        var tabs = NoteTabSet()
-        let key = NoteKey(pluginID: "meetings", id: "m1")
-        tabs.open(NoteTab(id: .live(key), kind: .meeting, title: "One"))
-        tabs.open(NoteTab(id: .live(NoteKey(pluginID: "meetings", id: "m2")), kind: .meeting, title: "Two"))
-        tabs.select(.live(key))
-        let moved = tabs.rekey(from: .live(key), to: .detached(key, startedAtMs: 5))
-        #expect(moved)
-        #expect(tabs.tabs.map(\.title) == ["One", "Two"])
-        #expect(tabs.current == .detached(key, startedAtMs: 5))
-        let again = tabs.rekey(from: .live(key), to: .detached(key, startedAtMs: 5))
-        #expect(!again)
     }
 
     // MARK: Registry and closing

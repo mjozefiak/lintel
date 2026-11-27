@@ -136,11 +136,11 @@ extension NotesWorkspaceModel {
         var isDismissible = false
     }
 
-    /// The strips under the path bar, most important first.
+    /// The strips under the full window's bar, most important first.
     var strips: [Strip] {
         var result: [Strip] = []
         if hidesContent {
-            // Prototype `lib-hidden`: the accent strip under the path bar.
+            // Prototype `lib-hidden`: the accent strip under the bar.
             result.append(
                 Strip(
                     id: "hidden", tone: .accent,
@@ -167,7 +167,7 @@ extension NotesWorkspaceModel {
         if feedback == .saveFailed {
             result.append(
                 Strip(
-                    id: "save", tone: .error, text: NotePathBar.text(.saveFailed),
+                    id: "save", tone: .error, text: NoteFullWindowBar.text(.saveFailed),
                     actions: [
                         Strip.Action(id: "save.retry", title: Self.tryAgain),
                         Strip.Action(
@@ -186,7 +186,7 @@ extension NotesWorkspaceModel {
             result.append(
                 Strip(
                     id: "feedback", tone: failed == .copyNotRemoved ? .attention : .error,
-                    text: NotePathBar.text(failed), isDismissible: true))
+                    text: NoteFullWindowBar.text(failed), isDismissible: true))
         }
         if let document = currentDocument, document.phase == .loaded {
             if document.session?.keptAsProposal == true {
@@ -219,14 +219,13 @@ extension NotesWorkspaceModel {
         return result
     }
 
-    /// The strips the explorer shows across the list and the preview while no tab is open (QA of #348, minors 4
-    /// and 6): Hide content with the way back, notes that can't be opened with Try again, and what an action of the
-    /// explorer itself reports (a failed delete or "Make note", a copy that stayed). A tab's own strips (a failed
-    /// save, restore, proposal or comment) stay with the path bar: their buttons act on the open note, so they would
-    /// do nothing here once the last tab closed. With a tab open the path bar shows every strip, so the explorer
-    /// shows none and nothing is twice.
+    /// The strips the explorer shows across the list and the preview (QA of #348, minors 4 and 6): Hide content
+    /// with the way back, notes that can't be opened with Try again, and what an action of the explorer itself
+    /// reports (a failed delete or "Make note", a copy that stayed). The full window's own strips (a failed save,
+    /// restore, proposal or comment) stay with its bar: their buttons act on the open note, so they would do nothing
+    /// here once it was left. In the full window its bar shows every strip, so the explorer shows none.
     var explorerStrips: [Strip] {
-        guard tabs.tabs.isEmpty else { return [] }
+        guard !isFullWindow else { return [] }
         let fromExplorer: [Feedback] = [.deleteFailed, .makeNoteFailed, .copyNotRemoved]
         return strips.filter { strip in
             switch strip.id {
