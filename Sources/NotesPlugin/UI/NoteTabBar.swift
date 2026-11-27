@@ -361,7 +361,10 @@ struct NotesStatusBar: View {
             .font(textSize.font(.footnote))
             .foregroundStyle(LintelBrand.secondaryText)
             .padding(.horizontal, 12 * textSize.scale)
-            .frame(height: 26 * textSize.scale)
+            // At least the bar's height, more when the words wrap in a narrow window: nothing is cut off.
+            .padding(.vertical, 3 * textSize.scale)
+            .frame(minHeight: 26 * textSize.scale)
+            .fixedSize(horizontal: false, vertical: true)
             .background(LintelBrand.sidebarBackground)
         }
         .accessibilityElement(children: .combine)

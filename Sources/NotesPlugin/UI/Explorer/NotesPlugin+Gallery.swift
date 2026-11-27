@@ -209,8 +209,8 @@ private struct NotesSidebarGalleryHost: View {
 @MainActor enum NotesExplorerGallery {
     private static let listWindow = GalleryPresentation.window(width: 320, height: 620)
     private static let previewWindow = GalleryPresentation.window(width: 560, height: 500)
-    /// What a window tiled to about 310 pt leaves the section after the slim sidebar (132 pt).
-    private static let narrowWindow = GalleryPresentation.window(width: 178, height: 520)
+    /// What a window tiled to about 310 pt leaves the section after the sidebar rail (56 pt).
+    private static let narrowWindow = GalleryPresentation.window(width: 254, height: 520)
     /// Only the worst cases: Medium light English and Extra Large Polish (the wrapping that matters).
     private static let narrowVariants = [
         GalleryVariant(appearance: .light, textSize: .medium, language: "en"),

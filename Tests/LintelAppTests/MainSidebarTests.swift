@@ -32,9 +32,9 @@ struct MainSidebarTests {
         #expect(MainSidebar.width(windowWidth: 0) == 220)
         #expect(MainSidebar.width(windowWidth: 1180) == 220)
         #expect(MainSidebar.width(windowWidth: 640) == 220)
-        #expect(MainSidebar.width(windowWidth: 639) == 132)
+        #expect(MainSidebar.width(windowWidth: 639) == 56)
         // About 310 pt (AeroSpace): the slim sidebar leaves the section more than half the window.
-        #expect(MainSidebar.width(windowWidth: 310) == 132)
+        #expect(MainSidebar.width(windowWidth: 310) == 56)
         #expect(310 - MainSidebar.width(windowWidth: 310) > 310 / 2)
     }
 
