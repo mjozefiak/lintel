@@ -67,6 +67,9 @@ enum NotesSettingsKey {
     static let qaView = "qaView"
     /// DEBUG only: text typed into the explorer's search field once the first list is in.
     static let qaSearch = "qaSearch"
+    /// DEBUG only, with `--qa-notes`: `on` gives the fixture meetings a speaker with a name suggestion ("Marek?") and
+    /// a long applied name, and lets Yes and No answer it in memory (speaker names, step 1.6b). Not a contract.
+    static let qaSpeakerSuggestion = "qaSpeakerSuggestion"
     #endif
 }
 

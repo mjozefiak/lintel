@@ -288,6 +288,13 @@ public final class NotesPlugin: LintelPlugin {
                 return false
             }
         }
+        // Yes and No on a speaker name suggestion are answered by the owner too; any error reaches the strip.
+        environment.confirmSpeakerName = { key, speakerID, name in
+            try await library.answerSpeakerName(key, speakerID: speakerID, name: name, confirm: true)
+        }
+        environment.rejectSpeakerName = { key, speakerID, name in
+            try await library.answerSpeakerName(key, speakerID: speakerID, name: name, confirm: false)
+        }
         if usesStore && !NotesSettings(context.settings).readOnly {
             environment.installWriting(
                 store: storeProvider, registry: registry, settings: context.settings, clock: context.clock,
@@ -417,7 +424,10 @@ public final class NotesPlugin: LintelPlugin {
             case "off", "locked":
                 return { [] }
             default:
-                let fixtures = NotesQAFixtureSource.all(empty: qaState == "empty")
+                var fixtures = NotesQAFixtureSource.all(empty: qaState == "empty")
+                if context.settings.string(NotesSettingsKey.qaSpeakerSuggestion) == "on" {
+                    fixtures = NotesQASpeakerNames.editable(fixtures)
+                }
                 return { fixtures + real() }
             }
         }
