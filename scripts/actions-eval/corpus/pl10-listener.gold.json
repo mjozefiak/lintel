@@ -1,0 +1,13 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["calendar", "email"], "evidence": [7, 8],
+     "fields": {"title": ["demo"], "date": ["2026-12-02"], "time": "15:00",
+                "participants": {"required": [["Kamil", "Kamila"]], "optional": []}, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "other_speaker", "evidence": [3]},
+    {"id": "t2", "kind": "other_speaker", "evidence": [5]},
+    {"id": "t3", "kind": "other_speaker", "evidence": [6]},
+    {"id": "t4", "kind": "rejected", "evidence": [9, 10]}
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["calendar"], "evidence": [3, 4, 6],
+     "fields": {"title": ["dostawc"], "date": ["2026-11-25"], "time": "10:30",
+                "participants": {"required": [["Robert"]], "optional": [["dostawca", "dostawcą", "dostawcy"]]}, "condition": false}},
+    {"id": "a2", "type": ["email"], "evidence": [8, 9],
+     "fields": {"title": ["faktur"], "to": {"required": [["Halina", "Haliny", "Halinie"]], "optional": []},
+                "due": ["2026-11-27", "2026-11-29"], "condition": false}},
+    {"id": "a3", "type": ["calendar"], "evidence": [11],
+     "fields": {"title": ["przegląd"], "date": ["2026-12-03"], "time": "09:00",
+                "participants": {"required": [["Robert"], ["Zosia"]], "optional": []}, "condition": false}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "rejected", "evidence": [5, 7]}
+  ]
+}

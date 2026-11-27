@@ -1,0 +1,18 @@
+# id: pl05-triage
+# lang: pl
+# date: 2026-11-19
+# self: Bartek
+# title: Triage błędów mobilnych
+[00:02] Bartek: Dobra, triage. Zaczynamy od najgorszego.
+[00:06] Igor: Najgorszy jest crash na iOS w wersji 17.4. Dotyka około trzech procent użytkowników, wszystko przy otwieraniu koszyka.
+[00:18] Bartek: To jest priorytet wysoki. Zakładam ticket na crash koszyka na iOS 17.4 i daję go Igorowi. Igor, do wtorku?
+[00:29] Igor: Do wtorku zdążę.
+[00:33] Natalia: Drugi temat: timeout API płatności po trzydziestu sekundach. Zdarza się w godzinach szczytu.
+[00:42] Bartek: To też ticket, przypiszę Natalii. Bez sztywnego terminu, ale w tym sprincie.
+[00:50] Natalia: Okej. I ja przy okazji założę ticket na uzupełnienie dokumentacji tego endpointu.
+[00:58] Bartek: Dobra, dzięki.
+[01:02] Igor: A może założymy ticket na wymianę biblioteki do wykresów? Ta obecna jest ciężka.
+[01:09] Bartek: Odpuśćmy, to nie jest teraz problem. Nikt się nie skarży.
+[01:15] Igor: Zgoda.
+[01:18] Natalia: Statystyki: w zeszłym tygodniu mieliśmy sto dwadzieścia zgłoszeń, w tym tygodniu osiemdziesiąt.
+[01:27] Bartek: Czyli idzie w dobrą stronę. Dobra, kończymy.

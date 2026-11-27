@@ -1,0 +1,17 @@
+{
+  "actions": [
+    {"id": "a1", "type": ["calendar"], "evidence": [3, 4],
+     "fields": {"title": ["rozmow"], "date": ["2026-11-20"], "time": "11:00",
+                "participants": {"required": [["Adam Kowal", "Kowal", "Adam"], ["Piotr"]], "optional": []}, "condition": false}},
+    {"id": "a2", "type": ["email"], "evidence": [5],
+     "fields": {"title": ["potwierdz"], "to": {"required": [["Adam Kowal", "Kowal", "Adam"]], "optional": []},
+                "to_emails": ["adam.kowal@przyklad.pl"], "due": null, "condition": false}},
+    {"id": "a3", "type": ["calendar"], "evidence": [9],
+     "fields": {"title": ["etap"], "date": null, "time": null,
+                "participants": {"required": [["Lena"]], "optional": [["Adam Kowal", "Kowal", "Adam"], ["Piotr"]]}, "condition": true}}
+  ],
+  "traps": [
+    {"id": "t1", "kind": "rejected", "evidence": [6, 7]},
+    {"id": "t2", "kind": "other_speaker", "evidence": [12]}
+  ]
+}

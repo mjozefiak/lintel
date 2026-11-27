@@ -2,9 +2,9 @@ import Foundation
 import LintelKit
 import Synchronization
 
-/// What `PluginContext.noteSources`, `noteSourcesChanged` and `openNote` reach before the coordinator exists
-/// (plugin contexts are built while the host is). The coordinator sets the two handlers once the host is built
-/// and calls `signalChanged()` whenever a plugin is switched on or off.
+/// What `PluginContext.noteSources`, `noteSourcesChanged`, `openNote` and `liveRecorder` reach before the
+/// coordinator exists (plugin contexts are built while the host is). The coordinator sets the handlers once the
+/// host is built and calls `signalChanged()` whenever a plugin is switched on or off.
 ///
 /// `sources` hands out only the active plugins' sources and drops (and logs once) a source whose `pluginID`
 /// differs from its plugin's id, and any later source of the same id (`NoteSourceSet` in `NotesPlugin` also
@@ -20,6 +20,8 @@ final class NoteSourcesRelay: Sendable {
     @MainActor var commands: () -> [CommandInfo] = { [] }
     /// What Notes keeps of a plugin's recordings (edited or commented copies) and its removal. Set by the coordinator.
     @MainActor var keptCopies: (PluginID) async -> Int = { _ in 0 }
+    /// The first active plugin's live recorder (the Notes section's Record button). Set by the coordinator.
+    @MainActor var liveRecorder: () -> (any LiveRecorder)? = { nil }
     @MainActor var deleteKeptCopies: (PluginID, Bool) async -> Bool = { _, _ in true }
 
     /// One stream per call, finished when its consumer stops.

@@ -465,6 +465,126 @@
       "sha256" : "ad9cfb99473f7c198c9a9087dff6eda0ef9370dd3d9c9e158fbd0affed13e634",
       "width" : 1360
     },
+    "meetings.speaker-names\/notes-off@dark-m-en.png" : {
+      "height" : 342,
+      "sha256" : "6f04a3dbaa46ec133032fd923835d2369140efcac172db11d69e4c55c07b5431",
+      "width" : 1360
+    },
+    "meetings.speaker-names\/notes-off@light-m-en.png" : {
+      "height" : 342,
+      "sha256" : "88f90b5a270d6896fff6bcdb6279161042d6f05afcb1dfa1b05fdedf51c55fd7",
+      "width" : 1360
+    },
+    "meetings.speaker-names\/notes-off@light-xl-pl.png" : {
+      "height" : 382,
+      "sha256" : "e74a9180beaae8363e3b7cd6e8757c54da320db800c405b9807f44a1685a4ae7",
+      "width" : 1360
+    },
+    "meetings.speaker-names\/notes-on@dark-m-en.png" : {
+      "height" : 342,
+      "sha256" : "59eccd40bb6936d49092e37186f9b8b7768433c3709996ad60d13fcca6b8b04c",
+      "width" : 1360
+    },
+    "meetings.speaker-names\/notes-on@light-m-en.png" : {
+      "height" : 342,
+      "sha256" : "8082e2f7d5bef9c5d732c28f03917958bd0acc1210d58d987a7c2f67cd76be9d",
+      "width" : 1360
+    },
+    "meetings.speaker-names\/notes-on@light-xl-pl.png" : {
+      "height" : 382,
+      "sha256" : "5118adc8e3c7f3dca6cef3b05e61e9ce9bda79e91ed65ef25369225792d3ddae",
+      "width" : 1360
+    },
+    "meetings.speakers\/all-named@dark-m-en.png" : {
+      "height" : 406,
+      "sha256" : "3ec259e9f1f80dfd6c0cdfe0fdf9d9efcf37da9062610093c7734c005dbf06ba",
+      "width" : 840
+    },
+    "meetings.speakers\/all-named@light-m-en.png" : {
+      "height" : 406,
+      "sha256" : "70a39a1053763be5e41e4bc3b1e02a004dc73801297156838b8f367d9a0b80eb",
+      "width" : 840
+    },
+    "meetings.speakers\/all-named@light-xl-pl.png" : {
+      "height" : 468,
+      "sha256" : "ffb06b9d619d958bf55fdaea54872255323be2cfa7312d397469efb29ee44efc",
+      "width" : 840
+    },
+    "meetings.speakers\/conflict@dark-m-en.png" : {
+      "height" : 444,
+      "sha256" : "16e96ead7ebebb919914b62c1ee2196d892f4f47f2a8941e1d190c6811921a70",
+      "width" : 840
+    },
+    "meetings.speakers\/conflict@light-m-en.png" : {
+      "height" : 444,
+      "sha256" : "e8ab4bb30cf735e3a63f529313b94719a314928d90a42e10b89930fd552f7a85",
+      "width" : 840
+    },
+    "meetings.speakers\/conflict@light-xl-pl.png" : {
+      "height" : 508,
+      "sha256" : "eb86666b43aefaec14d5bd951d4f1c1a3b0a80f8d1cb61b2c5e93774a219f8b7",
+      "width" : 840
+    },
+    "meetings.speakers\/editing@dark-m-en.png" : {
+      "height" : 466,
+      "sha256" : "f12b106fa36159cadd3e85436fefb4e499622a2587a5cd914f19e44078433b48",
+      "width" : 840
+    },
+    "meetings.speakers\/editing@light-m-en.png" : {
+      "height" : 466,
+      "sha256" : "b65579383474ce583619d86944320f4a16b8f7ead1d74fbd3194ecdd15e3e9ff",
+      "width" : 840
+    },
+    "meetings.speakers\/editing@light-xl-pl.png" : {
+      "height" : 532,
+      "sha256" : "08aad184a520b19effb833721c4091000ba6962bcb5d48b5c38214f58b82b43a",
+      "width" : 840
+    },
+    "meetings.speakers\/merge-offer@dark-m-en.png" : {
+      "height" : 504,
+      "sha256" : "753b898a620bbcce133c598c08ad166b8f2b92f677d825092d69e97fd2f85f94",
+      "width" : 840
+    },
+    "meetings.speakers\/merge-offer@light-m-en.png" : {
+      "height" : 504,
+      "sha256" : "875552b98bcb908ea8ccddbf0c3b03ef067ad3d7ea1aeeb81c191306ea80cd78",
+      "width" : 840
+    },
+    "meetings.speakers\/merge-offer@light-xl-pl.png" : {
+      "height" : 620,
+      "sha256" : "1ec74101a91a65a314d52cf42a4bccc74790332e80337b0a2f7a2f06b3a00f9c",
+      "width" : 840
+    },
+    "meetings.speakers\/mixed-suggestion@dark-m-en.png" : {
+      "height" : 462,
+      "sha256" : "b739bd24165c06fa7a70384f17e1841297097c8593541e40ab7ca22f2d366790",
+      "width" : 840
+    },
+    "meetings.speakers\/mixed-suggestion@light-m-en.png" : {
+      "height" : 462,
+      "sha256" : "a5755dd18e9a7038232fa4a3beb85cf9d9ceadce151b74fa1af0a5504125a847",
+      "width" : 840
+    },
+    "meetings.speakers\/mixed-suggestion@light-xl-pl.png" : {
+      "height" : 532,
+      "sha256" : "f4f334e4774562e79f0e3beada864287bb3fa0ba5bb4874042f81ce31451c0b0",
+      "width" : 840
+    },
+    "meetings.speakers\/no-names@dark-m-en.png" : {
+      "height" : 406,
+      "sha256" : "1df73d9e66bd41d43b20cc7f30f5e6f245330668b0a9bdb14f63928b96ff6f8a",
+      "width" : 840
+    },
+    "meetings.speakers\/no-names@light-m-en.png" : {
+      "height" : 406,
+      "sha256" : "57a5b0935f1a6465dc9c0d6b425dd9e374d8b30e6e3d9e91921ca29cca45503f",
+      "width" : 840
+    },
+    "meetings.speakers\/no-names@light-xl-pl.png" : {
+      "height" : 468,
+      "sha256" : "d6a59479c7a06f0cade011fd705baf5dde2f35cee04a8c03e92b2883815a907a",
+      "width" : 840
+    },
     "ui.ring\/error@dark-m-en.png" : {
       "height" : 372,
       "sha256" : "0091777e3541f4c9d2bbc18f4531d68f25ec62f08351765650a001ae615632f0",
@@ -592,7 +712,7 @@
     "scale" : 2,
     "xcode" : "Xcode 27.2 Build version 27B52 "
   },
-  "recordRun" : "45855037849",
+  "recordRun" : "45933816974",
   "threshold" : {
     "channel" : 3,
     "share" : 0.001

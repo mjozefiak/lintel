@@ -3,10 +3,11 @@
  "language": "pl",
  "durationSec": 120,
  "fake": {
-  "number": "7400",
+  "number": "950",
+  "numberSpelled": "dziewięćset pięćdziesiąt",
   "weekday": "środę",
-  "name": "Kwantoris",
-  "person": "Zenon",
+  "name": "Kwadryga",
+  "person": "Ignacy",
   "generic": "Mówca 1",
   "due": "wtorek"
  },

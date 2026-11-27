@@ -1,0 +1,22 @@
+# id: pl04-dates
+# lang: pl
+# date: 2026-11-23
+# self: Kasia
+# title: Logistyka i dostawcy
+[00:03] Kasia: Dzień dobry wszystkim. Mamy dziś kilka spraw z logistyki, postaram się szybko.
+[00:10] Robert: Dostawca opakowań prosił o spotkanie, chcą omówić nowe ceny.
+[00:17] Kasia: Dobrze. Umówię nas z dostawcą na pojutrze, na dziesiątą trzydzieści. Robert, będziesz?
+[00:26] Robert: Będę.
+[00:29] Zosia: A może przesuniemy to spotkanie na piątek? W środę mam dużo na głowie.
+[00:36] Kasia: Nie, zostajemy przy środzie, dostawca w piątek nie może. Ty nie musisz być, Zosiu.
+[00:44] Zosia: Okej, to mnie nie wpisuj.
+[00:48] Robert: Kasia, jeszcze jedno: wyślij proszę Halinie z księgowości zestawienie faktur za październik do końca tygodnia, bo zamykają miesiąc.
+[00:59] Kasia: Dobra, wyślę Halinie do końca tygodnia.
+[01:04] Zosia: A przegląd kwartalny? Kiedy go robimy?
+[01:09] Kasia: Wpiszę przegląd kwartalny na trzeciego grudnia o dziewiątej, dla całej naszej trójki.
+[01:18] Robert: Trzeci grudnia to czwartek, pasuje.
+[01:22] Zosia: Mi też pasuje.
+[01:25] Robert: Dostawca wspominał też o rabacie przy zamówieniu powyżej dwóch tysięcy sztuk.
+[01:33] Kasia: To omówimy w środę, nie ma co teraz zgadywać.
+[01:38] Zosia: Dobra, to wszystko?
+[01:41] Kasia: Tak, dzięki.

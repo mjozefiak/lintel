@@ -61,7 +61,9 @@ struct WholeNotesPipeline: Sendable {
         let lengthMs = durationMs ?? ((utterances.map(\.startMs).max() ?? 0) + 60_000)
         let maxTopics = NotesLayout.maxTopics(durationMs: lengthMs)
         let budget = generator.profile.inputBudgetTokens
-        let parts = Self.parts(of: utterances, budget: budget, partTokens: configuration.partTokens)
+        let parts = Self.parts(
+            of: utterances, budget: budget,
+            partTokens: Self.partTokens(configured: configuration.partTokens, budget: budget))
         if parts.count > configuration.maxParts { throw NotesFailure.transcriptTooLong }
 
         try Task.checkCancellation()
@@ -147,6 +149,12 @@ struct WholeNotesPipeline: Sendable {
     }
 
     // MARK: Parts
+
+    /// The size of one part: the configured one, never above the generator's input budget (a model with a 24k
+    /// budget cannot take a 40k part, and the parts decide whether the meeting is too long at all).
+    static func partTokens(configured: Int, budget: Int) -> Int {
+        max(1, min(configured, budget))
+    }
 
     /// The transcript in one part when it fits `budget`; else parts of at most `partTokens`, cut between utterances
     /// at the longest pause near the limit, without overlap.

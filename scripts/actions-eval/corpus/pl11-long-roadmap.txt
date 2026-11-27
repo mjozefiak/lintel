@@ -1,0 +1,48 @@
+# id: pl11-long-roadmap
+# lang: pl
+# date: 2026-11-20
+# self: Marek
+# title: Przegląd roadmapy Q1 (długie)
+[00:03] Marek: dobra to chyba wszyscy są zaczynamy od roadmapy na pierwszy kwartał
+[00:09] Ania: tak ja mam slajdy zaraz udostępnię
+[00:14] Kuba: widać już
+[00:17] Ania: no to pierwsza rzecz to eksport raportów klienci chcą większe pliki
+[00:24] Marek: ile teraz mamy limitu
+[00:27] Ania: pięć tysięcy wierszy a prośby są o dziesięć tysięcy
+[00:33] Kuba: technicznie to nie jest duży problem trzeba tylko zmienić stronicowanie
+[00:39] Marek: okej to zakładam ticket na podniesienie limitu eksportu do dziesięciu tysięcy wierszy i daję go Kubie
+[00:47] Kuba: yyy dobra zobaczymy
+[00:50] Ania: druga rzecz to roadmapa dla marketingu pani Beata pytała kiedy dostanie wersję do kampanii
+[00:58] Ania: Marek wyślesz jej tę roadmapę bo ja w poniedziałek mam cały dzień warsztaty
+[01:04] Marek: dobra wyślę Beacie roadmapę w poniedziałek
+[01:08] Ula: a ja mam pytanie o ankietę satysfakcji kiedy ona idzie
+[01:13] Marek: ankietę wyślę do wszystkich klientów w przyszłym tygodniu
+[01:18] Ula: super bo ostatnia była pół roku temu
+[01:23] Ania: trzecia rzecz integracja z Vortexem
+[01:27] Ania: oni chcą spotkania żeby omówić zakres
+[01:31] Marek: umówię nas z Vortexem na środę dwudziestego piątego o jedenastej Ania ty będziesz potrzebna
+[01:39] Ania: pasuje mi
+[01:42] Kuba: ja w międzyczasie napiszę do Vortexa z pytaniem o format danych
+[01:47] Marek: dzięki
+[01:50] Ula: Marek a umówisz nas z prawnikiem w sprawie nowego regulaminu
+[01:55] Marek: zobaczę nie obiecuję raczej nie w tym miesiącu bo prawnik jest zawalony
+[02:01] Ula: no dobra
+[02:04] Ania: czwarta rzecz to aplikacja mobilna ale to raczej drugi kwartał
+[02:09] Marek: tak mobilną przesuwamy na drugi kwartał nie ma co teraz o tym gadać
+[02:14] Kuba: zgoda
+[02:17] Ania: piąta to wydajność dashboardu ładuje się czasem kilkanaście sekund
+[02:23] Kuba: to jest głównie zapytanie o statystyki miesięczne
+[02:27] Marek: a widziałem jeszcze błąd w raportach tygodniowych sumy się nie zgadzają zgłoszę to jako błąd
+[02:34] Ula: tak klienci też to zgłaszali
+[02:37] Kuba: wracając do eksportu ja niestety nie mogę go wziąć od grudnia jestem w projekcie dla banku
+[02:43] Marek: aha no to w takim razie ticket na eksport dam Uli
+[02:47] Ula: okej wezmę
+[02:50] Ania: a co z budżetem na konferencję
+[02:54] Marek: budżet jest ten sam co w zeszłym roku czterdzieści tysięcy
+[02:59] Ula: wracając jeszcze do ankiety to dział obsługi ma ją w swoim planie
+[03:04] Marek: a no tak to ankietę jednak wyśle dział obsługi nie ja skreślam to u siebie
+[03:09] Kuba: i jeszcze o Beacie słyszałem że ona w poniedziałek jest na urlopie
+[03:14] Marek: aha to wyślę jej roadmapę we wtorek jak wróci
+[03:18] Ania: dobrze to by było na tyle
+[03:21] Ula: dzięki
+[03:23] Marek: dzięki wszystkim miłego weekendu

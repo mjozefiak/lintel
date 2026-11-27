@@ -955,6 +955,17 @@ enum Temporal {
         groups[word] != nil
     }
 
+    /// The month groups of January to December, in the order a numeric date writes them (`15.03` is March).
+    private static let monthGroups = [
+        "styczen", "luty", "marzec", "kwiecien", "maj", "czerwiec",
+        "lipiec", "sierpien", "wrzesien", "pazdziernik", "listopad", "grudzien",
+    ]
+
+    /// The group a month number names (`3` → `marzec`), `nil` outside 1 to 12.
+    static func monthGroup(_ number: Int) -> String? {
+        (1...12).contains(number) ? monthGroups[number - 1] : nil
+    }
+
     /// Anything a due date is made of: a number, a weekday, a month, a relative day or period.
     static func isDateWord(_ word: String) -> Bool {
         word.contains(where: \.isNumber) || isCalendarWord(word)
