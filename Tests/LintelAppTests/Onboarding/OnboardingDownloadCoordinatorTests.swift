@@ -2,6 +2,7 @@ import Foundation
 import LintelKit
 import LintelSpeech
 import LintelTestSupport
+import Synchronization
 import Testing
 
 @testable import LintelApp
@@ -135,6 +136,86 @@ import Testing
         #expect(await fake.installs == ["parakeet-ultra"])
     }
 
+    @Test func anInstalledPackageIsSkippedAndTheFreeSpaceComesFromThePendingOne() async {
+        // "Show welcome again" never repeats a finished download: the installed speech model needs nothing, and
+        // its (here tiny) free-space figure is not the one the pending speaker model is compared with.
+        let fake = FakeInstaller(outcome: .succeed)
+        await fake.setSpace(ModelSpaceCheck(needed: 0, available: 5), for: "parakeet-ultra")
+        await fake.setSpace(ModelSpaceCheck(needed: 1_000, available: 1_000_000), for: "diarization-community-1")
+        let script = Script()
+        script.usages = [
+            "meetings": [
+                usage("parakeet-ultra"),
+                usage("diarization-community-1", kind: .diarization, required: false, selected: true),
+            ]
+        ]
+        let coordinator = make(script: script, fake: fake)
+
+        coordinator.start(for: .meetings)
+
+        let reached = await waitForObserved("the download to finish") { coordinator.state == .done }
+        #expect(reached)
+        #expect(await fake.spaceChecks == ["parakeet-ultra", "diarization-community-1"])
+        #expect(await fake.installs == ["diarization-community-1"])
+    }
+
+    @Test func aDiskThatFillsUpDuringTheDownloadShowsTheSizes() async {
+        // The space check passed, then the volume filled up before `install` checked again.
+        let fake = FakeInstaller(outcome: .fail(ModelError.insufficientSpace(needed: 700, available: 300)))
+        let script = Script()
+        script.usages = ["dictation": [usage("parakeet-ultra")]]
+        let coordinator = make(script: script, fake: fake)
+
+        coordinator.start(for: .dictation)
+
+        let refused = await waitForObserved("the space state") {
+            coordinator.state == .needsSpace(needed: 700, available: 300)
+        }
+        #expect(refused)
+    }
+
+    @Test func theLiveCoordinatorUsesTheSharedSpeechAndSpeakerFolders() async throws {
+        // A registry whose managers download nothing and see a full disk, so the run stops at the space check
+        // without touching the network; the folders it asked for are the ones Settings → Models uses.
+        let root = FileManager.default.temporaryDirectory.appending(
+            path: "onboarding-download-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appending(path: "Models", directoryHint: .isDirectory)
+        let folders = FolderLog()
+        let registry = ModelManagers(factory: { directory, logger in
+            folders.record(directory)
+            return ModelManager(
+                directory: directory, downloader: RefusingDownloader(), availableSpace: { _ in 0 }, logger: logger)
+        })
+        let script = Script()
+        script.usages = [
+            "dictation": [usage("parakeet-ultra")],
+            "meetings": [
+                usage("parakeet-ultra"),
+                usage("diarization-community-1", kind: .diarization, required: false, selected: true),
+                usage("llm-qwen3-4b-instruct-2507-q4km", kind: .llm, required: false, selected: true),
+            ],
+        ]
+        let coordinator = OnboardingDownloadCoordinator.live(
+            modelsDirectory: models, usages: { script.answer($0) }, registry: registry)
+
+        coordinator.start(for: .both)
+
+        let refused = await waitForObserved("the space state") {
+            if case .needsSpace(needed: _, available: 0) = coordinator.state { return true }
+            return false
+        }
+        #expect(refused)
+        #expect(
+            folders.paths
+                == [
+                    models.appending(path: "speech", directoryHint: .isDirectory).standardizedFileURL.path,
+                    models.appending(path: "diarization", directoryHint: .isDirectory).standardizedFileURL.path,
+                ])
+        // The space check only reads: nothing was written under the models folder.
+        #expect(!FileManager.default.fileExists(atPath: root.path))
+    }
+
     @Test func neverDownloadsTheNotesModel() async {
         let fake = FakeInstaller(outcome: .succeed)
         let script = Script()
@@ -212,8 +293,12 @@ import Testing
         #expect(reached)
         #expect(await fake.installs == ["parakeet-ultra"])
 
-        // Finished is finished: another call starts nothing.
+        // Finished is finished: another call starts nothing (a run would check the space again first).
         coordinator.start(for: .dictation)
+        coordinator.retry()
+        for _ in 0..<20 { await Task.yield() }
+        #expect(coordinator.state == .done)
+        #expect(await fake.spaceChecks == ["parakeet-ultra"])
         #expect(await fake.installs == ["parakeet-ultra"])
     }
 
@@ -268,6 +353,24 @@ import Testing
             packageID: packageID, kind: kind,
             role: LocalizedStringResource("Test model", comment: "Test: a model usage's role"),
             isRequired: required, isSelected: selected, customFolder: customFolder)
+    }
+}
+
+/// The folders a `ModelManagers` registry built a manager for, in order.
+nonisolated final class FolderLog: Sendable {
+    private let log = Mutex<[String]>([])
+
+    var paths: [String] { log.withLock { $0 } }
+
+    func record(_ directory: URL) {
+        log.withLock { $0.append(directory.standardizedFileURL.path) }
+    }
+}
+
+/// A downloader that never reaches the network; the live-coordinator test stops before any download.
+nonisolated struct RefusingDownloader: FileDownloading {
+    func download(_ url: URL, to file: URL, progress: @escaping @Sendable (Int) -> Void) async throws {
+        throw ModelError.httpStatus(599)
     }
 }
 
