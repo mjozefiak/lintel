@@ -208,7 +208,7 @@ struct GoldenBudgetTests {
         #expect(try Self.byteCount(ofGoldenAt: brokenURL) == broken.count)
     }
 
-    @Test("every golden picture is a Git LFS object")
+    @Test("every golden picture is stored as a Git LFS pointer, and .gitattributes covers it")
     func everyGoldenIsAnLFSObject() throws {
         let root = TestPaths.repoRoot.standardizedFileURL.path + "/"
         let paths = try files().map { url -> String in
@@ -217,38 +217,101 @@ struct GoldenBudgetTests {
             return String(path.dropFirst(root.count))
         }
         #expect(!paths.isEmpty)
-        let output = try Self.git(["check-attr", "filter", "diff", "merge", "--"] + paths, in: TestPaths.repoRoot)
-        var problems: [String] = []
-        var seen = Set<String>()
-        for line in output.split(separator: "\n") {
+
+        // 1. The attribute: without a matching `.gitattributes` line a new picture is stored as a plain blob.
+        let attributes = try Self.git(["check-attr", "filter", "diff", "merge", "--"] + paths, in: TestPaths.repoRoot)
+        var attributeProblems: [String] = []
+        var attributeSeen = Set<String>()
+        for line in attributes.split(separator: "\n") {
             guard let match = line.firstMatch(of: /^(.+): (filter|diff|merge): (.*)$/) else {
-                problems.append(String(line))
+                attributeProblems.append(String(line))
                 continue
             }
-            seen.insert(String(match.1))
-            if match.3 != "lfs" { problems.append(String(line)) }
+            attributeSeen.insert(String(match.1))
+            if match.3 != "lfs" { attributeProblems.append(String(line)) }
         }
         #expect(
-            problems.isEmpty,
-            "a golden PNG is not a Git LFS object; .gitattributes has to cover it: \(problems.sorted().prefix(5))")
-        #expect(seen == Set(paths), "git check-attr did not answer for every golden")
+            attributeProblems.isEmpty,
+            "a golden PNG is not covered by the Git LFS attributes: \(attributeProblems.sorted().prefix(5))")
+        #expect(attributeSeen == Set(paths), "git check-attr did not answer for every golden")
+
+        // 2. The stored blob: `git check-attr` reads `.gitattributes` only, so it answers `lfs` for a picture that was
+        //    committed as a plain blob too. Read what the index holds and require a pointer — the check that the
+        //    attribute one cannot make. Works without git-lfs and with the filters installed.
+        let blobs = try Self.indexedBlobs(for: paths)
+        let missing = Set(paths).subtracting(blobs.keys)
+        #expect(
+            missing.isEmpty,
+            "a golden PNG is not staged in the Git index (git add): \(missing.sorted().prefix(5))")
+        var pointerProblems: [String] = []
+        for (path, data) in blobs where LFSPointer(data: data) == nil {
+            pointerProblems.append("\(path) (\(data.count) bytes)")
+        }
+        #expect(
+            pointerProblems.isEmpty,
+            "a golden PNG is stored as a plain blob, not a Git LFS pointer: \(pointerProblems.sorted().prefix(5))")
     }
 
-    /// `git` in the repository, for the one check that reads its attributes.
+    /// The bytes of the blobs the index holds for `paths`, keyed by repo-relative path. Reads the index
+    /// (`git ls-files -s`) and the stored objects (`git cat-file --batch`), never the working tree: with the LFS
+    /// filters installed the working tree holds the pictures even when a plain blob was committed, so only the stored
+    /// object tells the truth. Needs neither git-lfs nor the filters.
+    private static func indexedBlobs(for paths: [String]) throws -> [String: Data] {
+        let listing = try git(["ls-files", "-s", "--"] + paths, in: TestPaths.repoRoot)
+        var entries: [(path: String, oid: String)] = []
+        for line in listing.split(separator: "\n") {
+            // "<mode> <oid> <stage>\t<path>"
+            guard let tab = line.firstIndex(of: "\t") else { continue }
+            let fields = line[..<tab].split(separator: " ")
+            guard fields.count >= 2 else { continue }
+            entries.append((String(line[line.index(after: tab)...]), String(fields[1])))
+        }
+        guard !entries.isEmpty else { return [:] }
+        let input = Data(entries.map { $0.oid + "\n" }.joined().utf8)
+        let batch = try gitData(["cat-file", "--batch"], stdin: input, in: TestPaths.repoRoot)
+        var blobs: [String: Data] = [:]
+        var cursor = batch.startIndex
+        for entry in entries {
+            guard let newline = batch[cursor...].firstIndex(of: 0x0A) else { break }
+            let header = batch[cursor..<newline]
+            let fields = String(decoding: header, as: UTF8.self).split(separator: " ")
+            let contentStart = batch.index(after: newline)
+            guard fields.count == 3, let size = Int(fields[2]) else {
+                // "<oid> missing": the object is not in the repository, so the path counts as missing.
+                cursor = contentStart
+                continue
+            }
+            let available = batch.distance(from: contentStart, to: batch.endIndex)
+            let contentEnd = batch.index(contentStart, offsetBy: min(size, available))
+            blobs[entry.path] = Data(batch[contentStart..<contentEnd])
+            cursor = contentEnd < batch.endIndex ? batch.index(after: contentEnd) : batch.endIndex
+        }
+        return blobs
+    }
+
+    /// `git` in the repository, for the checks that read its attributes and its stored objects.
     private static func git(_ arguments: [String], in directory: URL) throws -> String {
+        String(decoding: try gitData(arguments, stdin: Data(), in: directory), as: UTF8.self)
+    }
+
+    private static func gitData(_ arguments: [String], stdin: Data, in directory: URL) throws -> Data {
         let process = Process()
         process.executableURL = URL(filePath: "/usr/bin/env")
         process.arguments = ["git", "-C", directory.path] + arguments
         process.standardError = FileHandle.nullDevice
-        let pipe = Pipe()
-        process.standardOutput = pipe
+        let input = Pipe()
+        let output = Pipe()
+        process.standardInput = input
+        process.standardOutput = output
         try process.run()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        input.fileHandleForWriting.write(stdin)
+        try input.fileHandleForWriting.close()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             throw GitFailure(status: process.terminationStatus, command: arguments.first ?? "")
         }
-        return String(decoding: data, as: UTF8.self)
+        return data
     }
 
     struct GitFailure: Error, CustomStringConvertible {
