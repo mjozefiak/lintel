@@ -283,8 +283,10 @@ import Testing
         #expect(
             await SpeakerNamePass(generator: failing).run(segments: Self.lines, conditions: .init()).status == .failed)
 
+        // A cut answer is an answer (its complete entries count; here there are none).
         let cut = ScriptedGenerator { _, _ in GenerationResult(text: "[", stoppedByTokenLimit: true) }
-        #expect(await SpeakerNamePass(generator: cut).run(segments: Self.lines, conditions: .init()).status == .failed)
+        #expect(
+            await SpeakerNamePass(generator: cut).run(segments: Self.lines, conditions: .init()).status == .answered)
 
         let off = await SpeakerNamePass(generator: ScriptedGenerator.answering("[]"))
             .run(segments: Self.lines, conditions: .init(namesFromConversation: false))

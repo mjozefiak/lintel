@@ -85,7 +85,8 @@ struct SpeakerNameResolution: Equatable, Sendable {
 ///   priority: `platform` > `transcript` > `calendar` (orchestrator decision 2026-11-26).
 /// - A name the user rejected for a cluster never comes back for that cluster, from any source, neither as a name
 ///   nor as a suggestion.
-/// - Transcript: a self-introduction the model is sure of (`introduction`, `high`) is `applied`; an announcement
+/// - Transcript: a self-introduction the model is sure of (`introduction`, `high`) is `applied`, unless the same
+///   cluster introduces itself with another name too (then each is only `suggested`); an announcement
 ///   (`announced`, `high`) is `applied` only when the name stands on the known name list, else `suggested`;
 ///   everything else (`addressed`, `low`, a name outside a non-empty list) is `suggested`. A name outside a
 ///   non-empty list carries a smaller strength.
@@ -154,6 +155,18 @@ enum SpeakerNameResolver {
 
         var candidates: [Int: [Candidate]] = [:]
 
+        // A cluster that introduces itself with two different names contradicts itself (step 1.5: a greeting of
+        // several guests read as introductions): none of those introductions is sure enough to apply.
+        var introduced: [Int: [String]] = [:]
+        for evidence in request.evidence where evidence.source == .transcript && evidence.kind == .introduction {
+            guard let cluster = cluster(for: evidence, in: request, indexes: indexes),
+                let name = cleanedName(evidence.name)
+            else { continue }
+            var names = introduced[cluster.id, default: []]
+            if !names.contains(where: { samePerson($0, name) }) { names.append(name) }
+            introduced[cluster.id] = names
+        }
+
         // Transcript: names said in the conversation.
         for evidence in request.evidence where evidence.source == .transcript {
             guard let cluster = cluster(for: evidence, in: request, indexes: indexes),
@@ -163,13 +176,15 @@ enum SpeakerNameResolver {
                 !isRejected(name, by: cluster), !isReserved(name, in: reserved)
             else { continue }
             let onList = matchesKnown(name, request.knownNames)
+            let offList = !request.knownNames.isEmpty && !onList
             let applied: Bool
             switch (kind, evidence.confidence) {
-            case (.introduction, .high): applied = true
+            // Outside a list it is only a suggestion (step 1.5: an introduction with a misheard surname, the
+            // right person under a name the list does not hold, was the one applied false name of the test set).
+            case (.introduction, .high): applied = (introduced[cluster.id]?.count ?? 0) <= 1 && !offList
             case (.announced, .high): applied = onList
             default: applied = false
             }
-            let offList = !request.knownNames.isEmpty && !onList
             add(
                 Candidate(
                     cluster: cluster.id, name: name, source: .transcript,
@@ -385,6 +400,15 @@ enum SpeakerNameResolver {
     /// `Marek` / `Marku`, `Anna` / `Anno`), case and diacritics folded first.
     private static func sameName(_ first: String, _ second: String) -> Bool {
         NotesText.namesMatch(TextNormalizer.normalize(first), TextNormalizer.normalize(second))
+    }
+
+    /// Two introductions name one person when their first names match ("Marek Nowak" and "Marek"), the
+    /// contradiction rule only.
+    private static func samePerson(_ first: String, _ second: String) -> Bool {
+        let firstWords = TextNormalizer.normalize(first).split(separator: " ")
+        let secondWords = TextNormalizer.normalize(second).split(separator: " ")
+        guard let one = firstWords.first, let other = secondWords.first else { return false }
+        return NotesText.namesMatch(String(one), String(other))
     }
 
     private static func matchesKnown(_ name: String, _ knownNames: [String]) -> Bool {

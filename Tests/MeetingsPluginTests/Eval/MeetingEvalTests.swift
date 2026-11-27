@@ -23,6 +23,15 @@ import Testing
 /// under `capture` in the result), `_DIARIZATION_FOLDER`, `_SPEAKER_NAMES` (a JSON of oracle names that replace "Mówca N" after diarization), `_ALLOW_DEBUG`. The WAV must be
 /// 16 kHz mono. The transcript goes only into the JSON; the test prints numbers, never text.
 ///
+/// **Speaker names (spec `2026-11-25-meeting-speaker-names`, step 1.5).** `_NAMES=1` (quote track, needs
+/// `_NOTES_MODEL`) runs the names step of the notes job before the notes: the diarized transcript goes into a
+/// temporary encrypted store and `MeetingSpeakerNames.refresh` names it with `SpeakerNamePass` on the notes model
+/// (`SpeakerNamesEval`). The result gets `speakerNames` (keyed by the run's "Mówca N" labels, for `score.py`) and
+/// `speakerNamesPass` (counts and the pass time); the notes read the `applied` names as labels, as in the app.
+/// `_KNOWN_NAMES=<entry.json | JSON list>` gives the extractor and the resolver a participant list (a simulated
+/// calendar; never sent to the model). `_SKIP_NOTES=1` stops after the names. With `_DUMP_REJECTIONS=1` the
+/// names, the accepted evidence and the model's answers go to `<name>.names.json` (out folder only).
+///
 /// **Replay.** `LINTEL_MEETING_EVAL_TRANSCRIPT=<result.json>` (an `EvalResult` an earlier run wrote) replaces
 /// `_AUDIO`: no recognition and no diarization, the saved `asr.segments` (with speakers) go straight into the
 /// notes, so variants differ only in the notes code. `_CODE_VERSION` is the code of THIS run; the result's
@@ -75,6 +84,8 @@ struct MeetingEvalTests {
             result = saved
             result.recording = name
             result.notes = nil
+            result.speakerNames = nil
+            result.speakerNamesPass = nil
             result.config.codeVersion = codeVersion
             result.config.transcriptSource = transcriptURL.lastPathComponent
             rows = saved.asr.segments
@@ -240,9 +251,55 @@ struct MeetingEvalTests {
             configuration.reduceInputTokens = MeetingsSettings.defaultNotesReduceInputTokens
             let runtime = LlamaRuntime(contextLength: NotesModel.contextLength)
             let recorder = RecordingRuntime(runtime)
+            // One lease for the names and the notes, as in the app: the notes find the model the names loaded warm.
+            let lease = LLMLease()
             let notesModel = NotesModel(
-                lease: LLMLease(), runtime: recorder, modelURL: modelURL, keepWarm: { .seconds(1) })
+                lease: lease, runtime: recorder, modelURL: modelURL, keepWarm: { .seconds(1) })
             let traceEvents = Mutex<[NotesTraceEvent]>([])
+            let jobStarted = clock.now
+            var notesRows = rows
+            // `_NAMES=1`: the speaker names step of the notes job (step 1.5) before the notes, on the same model.
+            if Self.value("NAMES") == "1" {
+                let known = try Self.value("KNOWN_NAMES").map { try SpeakerNamesEval.knownNames(at: URL(filePath: $0)) }
+                let namesLease = NotesLease(
+                    model: notesModel, configuration: configuration, sleep: { try await Task.sleep(for: $0) },
+                    onEvent: { _ in })
+                let named: SpeakerNamesEval.Outcome
+                do {
+                    named = try await SpeakerNamesEval.run(
+                        rows: rows, knownNames: known ?? [], selfName: "", generator: namesLease)
+                } catch {
+                    await Self.unloadAndWait(runtime)
+                    throw error
+                }
+                result.speakerNames = named.names
+                result.speakerNamesPass = named.trace
+                notesRows = named.notesRows
+                if let trace = named.trace { traceEvents.withLock { $0.append(.speakerNames(trace)) } }
+                let applied = named.names.filter { $0.status == "applied" }.count
+                let suggested = named.names.filter { $0.status == "suggested" }.count
+                print(
+                    "MEETING-EVAL names list=\(known?.count ?? 0) status=\(named.trace?.passStatus.rawValue ?? "none")"
+                        + " ms=\(named.trace?.elapsedMs ?? 0) excerpts=\(named.trace?.excerpts ?? 0)"
+                        + " dropped=\(named.trace?.droppedExcerpts ?? 0) answers=\(named.trace?.answers ?? 0)"
+                        + " accepted=\(named.trace?.acceptedEvidence ?? 0) applied=\(applied) suggested=\(suggested)")
+                for failure in recorder.namesFailures { print("MEETING-EVAL names-failure \(failure)") }
+                if Self.value("DUMP_REJECTIONS") == "1" {
+                    let url = try EvalResultWriter.write(
+                        SpeakerNamesEval.Dump(
+                            recording: name, knownNames: known?.count ?? 0, speakers: named.speakers,
+                            accepted: named.accepted, answers: recorder.namesAnswers, excerpts: named.excerptsBlock),
+                        to: outDirectory)
+                    print("MEETING-EVAL wrote \(url.path)")
+                }
+            }
+            // `_SKIP_NOTES=1`: names only (tuning runs); the result keeps no notes.
+            if Self.value("SKIP_NOTES") == "1" {
+                await Self.unloadAndWait(runtime)
+                let written = try EvalResultWriter.write(result, to: outDirectory)
+                print("MEETING-EVAL wrote \(written.path)")
+                return
+            }
             // `LINTEL_MEETING_EVAL_NO_VERIFIER=1`: a control run without the semantic verifier on the same build.
             let noVerifier = Self.value("NO_VERIFIER") == "1"
             print("MEETING-EVAL notes verifier=\(noVerifier ? "off" : "on")")
@@ -250,7 +307,9 @@ struct MeetingEvalTests {
                 model: notesModel, configuration: configuration,
                 trace: { event in traceEvents.withLock { $0.append(event) } },
                 verifier: noVerifier ? nil : { @Sendable runtime in LLMNotesVerifier(runtime: runtime) })
-            let utterances = rows.map { NotesUtterance(startMs: $0.startMs, speaker: $0.speaker ?? "?", text: $0.text) }
+            let utterances = notesRows.map {
+                NotesUtterance(startMs: $0.startMs, speaker: $0.speaker ?? "?", text: $0.text)
+            }
             let footprint = FootprintSampler()
             footprint.start()
             let started = clock.now
@@ -293,6 +352,9 @@ struct MeetingEvalTests {
                         + " points=\(dump.report.pointCount) rejected=\(dump.report.rejectedCount)")
                 print("MEETING-EVAL wrote \(dump.url.path)")
             }
+            let job = clock.now - jobStarted
+            let jobSeconds = Double(job.components.seconds) + Double(job.components.attoseconds) / 1e18
+            print("MEETING-EVAL job seconds=\(Self.ms(jobSeconds)) names=\(Self.value("NAMES") == "1" ? "on" : "off")")
             print(
                 "MEETING-EVAL notes seconds=\(Self.ms(seconds)) peakMB=\(Self.ms(peak)) status=\(notes.status.rawValue)"
                     + " chunks=\(notes.chunkCount) points=\(notes.verifiedPointCount) dropped=\(notes.droppedCount)")

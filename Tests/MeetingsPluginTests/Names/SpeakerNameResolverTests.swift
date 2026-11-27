@@ -289,6 +289,28 @@ import Testing
         #expect(result(1, results)?.status == .suggested)
     }
 
+    @Test func aClusterThatIntroducesItselfWithTwoNamesGetsNoAppliedName() {
+        // Step 1.5: a chair greeting several guests was read as introductions of the chair.
+        let results = resolve([cluster(1)], evidence: [evidence("Marek"), evidence("Ewa"), evidence("Marek")])
+        #expect(result(1, results)?.name == nil)
+        #expect(result(1, results)?.status == .suggested)
+        #expect(["Marek", "Ewa"].contains(result(1, results)?.suggestedName ?? ""))
+    }
+
+    @Test func twoFormsOfOneNameAreOneIntroduction() {
+        let results = resolve([cluster(1)], evidence: [evidence("Marek Nowak"), evidence("Marek")])
+        #expect(result(1, results)?.status == .applied)
+    }
+
+    @Test func anotherClustersIntroductionDoesNotContradict() {
+        let results = resolve(
+            [cluster(1), cluster(2, label: "Mówca 2")],
+            evidence: [evidence("Marek", segment: 0), evidence("Ewa", speaker: "Mówca 2", segment: 1)],
+            segments: [0: 1, 1: 2])
+        #expect(result(1, results)?.name == "Marek")
+        #expect(result(2, results)?.name == "Ewa")
+    }
+
     @Test func anAnnouncementOnTheKnownListIsApplied() {
         let results = resolve([cluster(1)], evidence: [evidence("Marek", kind: .announced)], known: ["Marek"])
         #expect(result(1, results)?.name == "Marek")
@@ -313,10 +335,14 @@ import Testing
         #expect(result(1, results)?.suggestedName == "Marek")
     }
 
-    @Test func aSelfIntroductionOutsideTheListIsStillApplied() {
-        let results = resolve([cluster(1)], evidence: [evidence("Marek")], known: ["Anna"])
-        #expect(result(1, results)?.name == "Marek")
-        #expect(result(1, results)?.status == .applied)
+    @Test func aSelfIntroductionOutsideAListIsSuggested() {
+        // Step 1.5: the list's spelling is the trusted one; a misheard surname must not be applied.
+        let results = resolve([cluster(1)], evidence: [evidence("Marek Nowakk")], known: ["Marek Nowak", "Anna"])
+        #expect(result(1, results)?.name == nil)
+        #expect(result(1, results)?.suggestedName == "Marek Nowakk")
+        #expect(result(1, results)?.status == .suggested)
+        let onList = resolve([cluster(1)], evidence: [evidence("Marek")], known: ["Marek", "Anna"])
+        #expect(result(1, onList)?.status == .applied)
     }
 
     @Test func aNameOutsideTheListHasLessStrength() {

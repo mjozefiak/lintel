@@ -104,11 +104,14 @@ enum MeetingSpeakerNames {
     }
 
     /// Resolves and writes the names of `document`'s meeting. `pass` is the conversation source; `nil` runs only the
-    /// sources without a model. Returns `nil` when the meeting is not diarized (nothing is read or written then).
+    /// sources without a model. `knownNames` is the participant list of the platform or the calendar for the
+    /// resolver (empty in F1: no such source runs yet; the evaluation passes a simulated calendar, step 1.5); the
+    /// pass carries its own copy for the extractor. Neither list ever goes to the model. Returns `nil` when the
+    /// meeting is not diarized (nothing is read or written then).
     @concurrent
     static func refresh(
         store: any SpeakerNameStore, document: MeetingDocument, selfName: String, pass: SpeakerNamePass?,
-        conditions: SpeakerNamePass.Conditions
+        conditions: SpeakerNamePass.Conditions, knownNames: [String] = []
     ) async -> Report? {
         guard document.speakerMode == .diarized, !document.speakers.isEmpty else { return nil }
         var report = Report(speakers: document.speakers.count)
@@ -131,7 +134,8 @@ enum MeetingSpeakerNames {
         // model was reading. The store reads the document, the speakers and their evidence and writes the
         // resolution in one transaction, so a user write is either seen by the plan or lands after it.
         let resolution = Resolution(
-            before: before, evidence: answered, selfName: selfName, conversationAnswered: conversationAnswered)
+            before: before, evidence: answered, selfName: selfName, conversationAnswered: conversationAnswered,
+            knownNames: knownNames)
         do {
             guard
                 let result = try store.resolveSpeakerNames(
@@ -267,6 +271,8 @@ extension MeetingSpeakerNames {
         let evidence: [NameEvidence]
         let selfName: String
         let conversationAnswered: Bool
+        /// The participant list of the platform or the calendar (step 1.5); empty in F1.
+        let knownNames: [String]
 
         /// The names to write for the meeting the transaction read. The evidence of the speakers this run does not
         /// write (a name the user confirmed keeps where it came from) stays, pointed again at its speaker by its
@@ -288,7 +294,7 @@ extension MeetingSpeakerNames {
             let resolutions = SpeakerNameResolver.resolve(
                 SpeakerNameRequest(
                     mode: .diarized, clusters: clusters, selfName: selfName, evidence: evidence,
-                    segmentClusters: snapshot.segmentClusters))
+                    knownNames: knownNames, segmentClusters: snapshot.segmentClusters))
 
             // The labels of the speakers left without a name, in the order `SpeakerAssigner` numbers them.
             let defaults = MeetingSpeakerNames.defaultLabels(

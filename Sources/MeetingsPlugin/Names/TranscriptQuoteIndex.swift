@@ -245,6 +245,11 @@ struct TranscriptQuoteIndex: Sendable {
     /// The speaker's label (consecutive segments of one speaker are one speaker).
     func speaker(of word: Int) -> String { segments[wordSegment[word]].speaker }
 
+    /// The speakers whose words hold `quote` (by `find`), in label order.
+    func speakers(holding quote: [String]) -> [String] {
+        speakerNames.filter { find(quote, near: 0, speaker: $0) != nil }
+    }
+
     /// Whether the transcript word at `index` may be left out of a quote.
     private func canSkip(_ index: Int, quote: [String]) -> Bool {
         let word = words[index]

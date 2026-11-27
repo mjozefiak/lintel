@@ -10,7 +10,7 @@ import LintelSpeech
 /// and nothing else — no participant list, no `selfName`, no title of the meeting (spec: Risks → privacy). It works
 /// for Polish and English transcripts; the answer is the same JSON in either language.
 enum SpeakerNamePrompt {
-    static let version = "names1"
+    static let version = "names2"
 
     static let system = """
         You find the names of the people who speak in a meeting, from excerpts of its transcript. The excerpts are \
@@ -20,26 +20,28 @@ enum SpeakerNamePrompt {
         The meeting may be in Polish, English or both.
 
         A name is evidence of one of these kinds:
-        - introduction: the speaker introduces themselves ("tu Marek", "nazywam się Marek", "jestem Anna", \
-        "I'm Anna", "my name is Anna"). speaker is the label of the line with the quote.
-        - announced: somebody gives the floor to a person who speaks in the line right after the quote ("głos ma \
-        pan poseł Kowalski", "oddaję głos Annie", "please welcome Anna"). speaker is the label of the line right \
-        after the quote: the person given the floor.
-        - addressed: somebody calls a person by name and that person answers in the line right after the quote \
-        ("Marku, zrobisz to?"). speaker is the label of the line right after the quote: the person who answers.
-        - referred: a name of somebody who is not speaking ("Marek mówił, że…"). It names nobody who is speaking.
+        - introduction: the speaker says their own name ("tu Marek", "nazywam się Marek", "jestem Anna", \
+        "I'm Anna", "my name is Anna"), also when they open with their name and their role ("Dzień dobry, Jan \
+        Nowak, departament finansów").
+        - announced: the speaker gives the floor to a person, who speaks next ("głos ma pan poseł Kowalski", \
+        "oddaję głos Annie", "poproszę pana dyrektora Nowaka", "zapraszam panią Annę", "please welcome Anna").
+        - addressed: the speaker calls a person by name, who answers next ("Marku, zrobisz to?").
+        - referred: a name of somebody who is not speaking ("Marek mówił, że…", greeting a guest, naming an \
+        author). It names nobody who is speaking.
 
         Answer only with a JSON array and nothing else, one object per name:
         [{"speaker": "Mówca 1", "name": "Marek", "kind": "introduction", "quote": "nazywam się Marek", \
         "confidence": "high"}]
 
         Rules:
+        - speaker is the label of the line the quote is copied from, for every kind.
         - name is the name of a person in the nominative: "Marek", not "Marku"; "Anna", not "Anno". Only the name, \
         without a title or a function, at most 3 words.
-        - quote is copied word for word from one line of the excerpts, without the time and the speaker, at most \
-        15 words.
+        - quote is copied word for word from one sentence of one line of the excerpts, without the time and the \
+        speaker, at most 15 words, and it holds the name.
         - kind is introduction, announced, addressed or referred; confidence is "high" when the excerpt says it \
         clearly, "low" otherwise.
+        - Each name at most once per kind. Never use a name of the example below: it is not part of the meeting.
         - Do not add a name that nobody says and do not guess a name from a label. When no name is said, answer [].
         """
 
@@ -64,9 +66,9 @@ enum SpeakerNamePrompt {
         "confidence": "high"},
           {"speaker": "Mówca 2", "name": "Anna", "kind": "introduction", "quote": "ja jestem Anna", \
         "confidence": "high"},
-          {"speaker": "Mówca 2", "name": "Anna", "kind": "addressed", "quote": "Anna, czy testy już przeszły", \
+          {"speaker": "Mówca 1", "name": "Anna", "kind": "addressed", "quote": "Anna, czy testy już przeszły", \
         "confidence": "high"},
-          {"speaker": "Mówca 3", "name": "Ewa", "kind": "announced", "quote": "Głos ma pani prezes, czyli Ewa", \
+          {"speaker": "Mówca 1", "name": "Ewa", "kind": "announced", "quote": "Głos ma pani prezes, czyli Ewa", \
         "confidence": "high"}
         ]
         """

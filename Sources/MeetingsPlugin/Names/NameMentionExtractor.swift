@@ -54,6 +54,9 @@ struct NameMentionExtractor: Sendable {
         var segments: [NameSegment]
         /// The candidates that stand in `segments`.
         var candidates: [Candidate]
+        /// The excerpt was made around a phrase, a vocative or a known name (the first tier), not only around
+        /// bare capitalised words.
+        var isPrimary = false
     }
 
     struct Outcome: Equatable, Sendable {
@@ -73,39 +76,148 @@ struct NameMentionExtractor: Sendable {
     /// budget goes to the names a phrase points at. The kept excerpts keep their transcript order.
     func excerpts(from segments: [NameSegment]) -> Outcome {
         var perSegment: [Int: [Candidate]] = [:]
+        var positions: [Int: [Int]] = [:]
+        var primaryHits: Set<Int> = []
         for (index, segment) in segments.enumerated() {
-            let found = candidates(in: segment, at: index)
-            if !found.isEmpty { perSegment[index] = found }
+            let found = scan(segment, at: index)
+            if !found.isEmpty {
+                perSegment[index] = found.map(\.candidate)
+                positions[index] = found.map(\.position)
+                if found.contains(where: { $0.candidate.kind != nil || $0.known }) { primaryHits.insert(index) }
+            }
         }
         guard !perSegment.isEmpty else { return Outcome(excerpts: [], droppedExcerpts: 0) }
 
-        var ranges: [ClosedRange<Int>] = []
-        for hit in perSegment.keys.sorted() {
-            let range = max(0, hit - 1)...min(segments.count - 1, hit + 1)
-            if let last = ranges.last, range.lowerBound <= last.upperBound {
-                ranges[ranges.count - 1] = last.lowerBound...max(last.upperBound, range.upperBound)
-            } else {
-                ranges.append(range)
-            }
-        }
-        var excerpts = ranges.map { range in
-            Excerpt(range: range, segments: Array(segments[range]), candidates: range.flatMap { perSegment[$0] ?? [] })
+        // Two tiers (step 1.5): the segments with a phrase, a vocative or a known name make their excerpts first;
+        // the bare capitalised words make theirs only from the segments those excerpts leave. Merged into one
+        // tier, the bare words of a long meeting (institutions, places) chained the phrase excerpts into runs of
+        // dozens of segments, and the budget held a third of them.
+        let primaryRanges = Self.ranges(around: primaryHits.sorted(), count: segments.count, avoiding: [])
+        let covered = Set(primaryRanges.flatMap { Array($0) })
+        let secondaryHits = perSegment.keys.filter { !covered.contains($0) }.sorted()
+        let secondaryRanges = Self.ranges(around: secondaryHits, count: segments.count, avoiding: covered)
+        let tiered =
+            primaryRanges.map { ($0, true) } + secondaryRanges.map { ($0, false) }
+        var excerpts = tiered.sorted { $0.0.lowerBound < $1.0.lowerBound }.map { range, primary in
+            Excerpt(
+                range: range,
+                segments: range.map { index in
+                    if let at = positions[index] { return Self.windowed(segments[index], around: at) }
+                    // A neighbour without a candidate is context: who answers and how the line starts, or how the
+                    // line before the name ends. The guard checks quotes against the whole transcript.
+                    return Self.trimmed(segments[index], keepingStart: perSegment[index - 1] != nil)
+                },
+                candidates: range.flatMap { perSegment[$0] ?? [] }, isPrimary: primary)
         }
         guard excerpts.count > Self.maximumExcerpts else {
             return Outcome(excerpts: excerpts, droppedExcerpts: 0)
         }
-        // Phrases first, then the bare words; the index breaks the tie, so each group stays in transcript order.
-        let ranked = excerpts.indices.sorted { lhs, rhs in
-            (hasPhrase(excerpts[lhs]), lhs) < (hasPhrase(excerpts[rhs]), rhs)
-        }
-        let kept = Set(ranked.prefix(Self.maximumExcerpts))
+        let kept = Set(Self.ranked(excerpts).prefix(Self.maximumExcerpts))
         let dropped = excerpts.count - kept.count
         excerpts = excerpts.indices.filter { kept.contains($0) }.map { excerpts[$0] }
         return Outcome(excerpts: excerpts, droppedExcerpts: dropped)
     }
 
-    private func hasPhrase(_ excerpt: Excerpt) -> Int {
-        excerpt.candidates.contains { $0.kind != nil } ? 0 : 1
+    /// The most words a neighbour without a candidate keeps in an excerpt (step 1.5: a long meeting's segments run
+    /// up to the 15 s window, and whole neighbours filled the built-in model's context with three excerpts in four).
+    static let neighbourWords = 12
+
+    /// `segment` with at most `neighbourWords` words: its first ones when it follows a candidate's segment (the
+    /// answer to a vocative or an announcement), else its last ones (the lead-up to the name).
+    static func trimmed(_ segment: NameSegment, keepingStart: Bool) -> NameSegment {
+        let words = segment.text.split(whereSeparator: \.isWhitespace)
+        guard words.count > neighbourWords else { return segment }
+        var trimmed = segment
+        let kept = keepingStart ? words.prefix(neighbourWords) : words.suffix(neighbourWords)
+        trimmed.text = kept.joined(separator: " ")
+        return trimmed
+    }
+
+    /// `segment` cut to the words within `neighbourWords` of a candidate token (`positions` index
+    /// `NotesText.tokens(segment.text)`), the original spelling kept. Windows that do not touch are joined with
+    /// " … ". A segment that is short enough comes back whole.
+    static func windowed(_ segment: NameSegment, around positions: [Int]) -> NameSegment {
+        let tokens = NotesText.tokens(segment.text)
+        guard tokens.count > 2 * neighbourWords + 1, !positions.isEmpty else { return segment }
+        var windows: [ClosedRange<Int>] = []
+        for position in positions.sorted() {
+            let window = max(0, position - neighbourWords)...min(tokens.count - 1, position + neighbourWords)
+            if let last = windows.last, window.lowerBound <= last.upperBound + 1 {
+                windows[windows.count - 1] = last.lowerBound...max(last.upperBound, window.upperBound)
+            } else {
+                windows.append(window)
+            }
+        }
+        let characters = Array(segment.text)
+        let parts = windows.map { window -> String in
+            // The window runs to the start of the next token, so the punctuation after its last word stays.
+            let end = window.upperBound + 1 < tokens.count ? tokens[window.upperBound + 1].start : characters.count
+            let start = min(tokens[window.lowerBound].start, characters.count)
+            return String(characters[start..<max(start, min(end, characters.count))])
+                .trimmingCharacters(in: .whitespaces)
+        }
+        var result = segment
+        result.text =
+            (windows.first?.lowerBound ?? 0 > 0 ? "… " : "") + parts.joined(separator: " … ")
+            + ((windows.last?.upperBound ?? 0) < tokens.count - 1 ? " …" : "")
+        return result
+    }
+
+    /// The excerpts of `outcome` that fit `budget` estimated tokens (`NotesText.estimateTokens` of their lines),
+    /// taken in the same order of preference as the excerpt limit: an excerpt with a phrase first, then the bare
+    /// words, each group in transcript order. An excerpt that does not fit is skipped and a later, shorter one may
+    /// still be taken. The kept excerpts keep their transcript order; the skipped ones are added to
+    /// `droppedExcerpts`. The built-in model's context (8192 tokens) holds far fewer than 40 excerpts of a long
+    /// meeting, whose segments run up to the 15 s window (step 1.5: 28 excerpts of a 43-minute meeting were
+    /// about 11 700 tokens).
+    static func fitting(_ outcome: Outcome, budget: Int) -> Outcome {
+        let excerpts = outcome.excerpts
+        var left = budget
+        var kept: Set<Int> = []
+        for index in ranked(excerpts) {
+            let cost = estimatedTokens(of: excerpts[index])
+            guard cost <= left else { continue }
+            left -= cost
+            kept.insert(index)
+        }
+        return Outcome(
+            excerpts: excerpts.indices.filter { kept.contains($0) }.map { excerpts[$0] },
+            droppedExcerpts: outcome.droppedExcerpts + excerpts.count - kept.count)
+    }
+
+    /// The estimated tokens of one excerpt as the prompt writes it (its lines plus the block tags).
+    static func estimatedTokens(of excerpt: Excerpt) -> Int {
+        excerpt.segments.reduce(4) { total, segment in total + NotesText.estimateTokens(segment.line) + 2 }
+    }
+
+    /// The indexes of `excerpts` by preference: phrases first, then the bare words; the index breaks the tie, so
+    /// each group stays in transcript order.
+    private static func ranked(_ excerpts: [Excerpt]) -> [Int] {
+        excerpts.indices.sorted { lhs, rhs in
+            (hasPhrase(excerpts[lhs]), lhs) < (hasPhrase(excerpts[rhs]), rhs)
+        }
+    }
+
+    private static func hasPhrase(_ excerpt: Excerpt) -> Int {
+        excerpt.isPrimary || excerpt.candidates.contains { $0.kind != nil } ? 0 : 1
+    }
+
+    /// The windows of one segment before and one after each hit, merged where they touch, never reaching into
+    /// `avoiding` (the indexes another tier's excerpts already hold).
+    private static func ranges(around hits: [Int], count: Int, avoiding: Set<Int>) -> [ClosedRange<Int>] {
+        var ranges: [ClosedRange<Int>] = []
+        for hit in hits {
+            var lower = max(0, hit - 1)
+            var upper = min(count - 1, hit + 1)
+            if avoiding.contains(lower) { lower = hit }
+            if avoiding.contains(upper) { upper = hit }
+            if let last = ranges.last, lower <= last.upperBound {
+                ranges[ranges.count - 1] = last.lowerBound...max(last.upperBound, upper)
+            } else {
+                ranges.append(lower...upper)
+            }
+        }
+        return ranges
     }
 
     // MARK: One segment
@@ -113,11 +225,16 @@ struct NameMentionExtractor: Sendable {
     /// The candidates of one segment: its known names and its capitalised words, with the kind a phrase gives
     /// them (a phrase beats a comma, a comma beats a bare capital).
     func candidates(in segment: NameSegment, at index: Int) -> [Candidate] {
+        scan(segment, at: index).map(\.candidate)
+    }
+
+    /// `candidates(in:at:)` with the position of each candidate's token in `NotesText.tokens(segment.text)`.
+    private func scan(_ segment: NameSegment, at index: Int) -> [(candidate: Candidate, position: Int, known: Bool)] {
         let tokens = NotesText.tokens(segment.text)
         guard !tokens.isEmpty else { return [] }
         let characters = Array(segment.text)
         let phrases = Self.phraseKinds(in: tokens)
-        var found: [Candidate] = []
+        var found: [(candidate: Candidate, position: Int, known: Bool)] = []
         var seen = Set<String>()
         for (position, token) in tokens.enumerated() {
             let word = token.word
@@ -139,7 +256,7 @@ struct NameMentionExtractor: Sendable {
             }
             let name = known ?? String(characters[token.start..<min(token.end, characters.count)])
             guard seen.insert(name.lowercased()).inserted else { continue }
-            found.append(Candidate(name: name, segment: index, kind: kind))
+            found.append((Candidate(name: name, segment: index, kind: kind), position, known != nil))
         }
         return found
     }
