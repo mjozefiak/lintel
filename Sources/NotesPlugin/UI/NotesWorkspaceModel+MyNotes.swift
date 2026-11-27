@@ -19,10 +19,10 @@ extension NotesWorkspaceModel {
             let session = environment.makeMineSession(content)
             let reason: MyNotesPad.ReadOnlyReason? =
                 session == nil ? (environment.notesReadOnly ? .readOnly : .unavailable) : nil
-            // Only the user writes `mine`, and only through the registry's one writer, so a writer that outlived
-            // the last pad (its write failed and lingers, or a retry landed after the heads were read) knows the
-            // newest text; the stored head can be older, and the next keystroke would replace the unsaved text.
-            let text = session?.writer.latestText ?? stored
+            // The note's heads can be older than the text typed last (a write that failed and lingers, a retry or
+            // a flush that landed after they were read): the session's text is the newest (`makeMine`), and the
+            // next keystroke would otherwise replace what was typed.
+            let text = session?.startText ?? stored
             document.myNotes = MyNotesPad(text: text, session: session, readOnlyReason: reason)
         }
     }
@@ -39,30 +39,34 @@ extension NotesWorkspaceModel {
         Task { await pad.flush() }
     }
 
-    /// The note left the screen: what is typed is written and the writer is let go.
-    /// The release is remembered until it ends, so a read of the same note waits for it (`awaitMyNotesRelease`):
-    /// heads read while its write still runs would be older than what was typed.
-    func closeMyNotes(_ document: NoteDocumentModel) {
-        guard let pad = document.myNotes, case .live(let key) = document.id else { return }
+    /// The note left the screen (`dropPreview`): My notes are written, then every writer of the note (My notes and
+    /// the layers that were edited, restored, commented on or revised) is written and let go
+    /// (`NoteDocumentRegistry.release(item:)`), so the reconciler and the deferred delete of detached rows no longer
+    /// count the note as open. A writer whose write fails stays in the registry with its text.
+    /// Leaves of one note run one after the other; `awaitRelease` waits for them. A read does not need to: My notes
+    /// start from the writer's text or a head read in the same turn as the writer (`makeMine`).
+    func releaseDocuments(_ document: NoteDocumentModel) {
+        let id = document.id
+        let pad = document.myNotes
         document.myNotes = nil
-        let release = environment.releaseWriter
-        let previous = myNotesReleases[key]
+        let registry = environment.registry
+        let previous = documentReleases[id]
         let token = UUID()
         let task = Task {
             await previous?.task.value
-            await pad.flush(closingSession: true)
-            await release(.live(key, layer: NotesStore.mineLayer))
+            await pad?.flush(closingSession: true)
+            await registry?.release(item: id)
         }
-        myNotesReleases[key] = (token, task)
+        documentReleases[id] = (token, task)
         Task {
             await task.value
-            if myNotesReleases[key]?.token == token { myNotesReleases[key] = nil }
+            if documentReleases[id]?.token == token { documentReleases[id] = nil }
         }
     }
 
-    /// Waits until a note's My notes, closed when it left the screen, is written and its writer let go.
-    func awaitMyNotesRelease(_ key: NoteKey) async {
-        await myNotesReleases[key]?.task.value
+    /// Waits until the writers of a note that left the screen are written and let go (`releaseDocuments`).
+    func awaitRelease(_ id: NoteItemID) async {
+        await documentReleases[id]?.task.value
     }
 
     /// The full window's "My notes" segment. The editor of a layer ends first (it writes what is typed).

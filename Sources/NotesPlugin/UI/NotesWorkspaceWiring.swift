@@ -89,7 +89,6 @@ extension NotesWorkspaceModel.Environment {
         }
         let library = self.library
         let budget = contentBudget
-        releaseWriter = { id in await registry.release(id) }
         makeMineSession = { content in
             // Like the editor: nothing is opened for a profile without a library; the writer opens (and creates)
             // it at the first typed character.

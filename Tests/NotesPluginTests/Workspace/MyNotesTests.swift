@@ -214,7 +214,7 @@ import Testing
         #expect(pad.saveFailed)
         // Another note: the close's flush fails again and the writer lingers with the text.
         model.select(row: elsewhere)
-        await model.awaitMyNotesRelease(r.key)
+        await model.awaitRelease(.live(r.key))
         let again = try await comeBack(r, model)
         #expect(again !== pad)
         let writer = try #require(again.session?.writer)
@@ -240,7 +240,7 @@ import Testing
         await pad.flush()
         #expect(pad.saveFailed)
         model.select(row: elsewhere)
-        await model.awaitMyNotesRelease(r.key)
+        await model.awaitRelease(.live(r.key))
         setReadOnly(r, false)
         // The heads are read before the retry: the store still says "first".
         let again = try await comeBack(r, model)
@@ -261,7 +261,7 @@ import Testing
         setReadOnly(r, true)
         await pad.flush()
         model.select(row: elsewhere)
-        await model.awaitMyNotesRelease(r.key)
+        await model.awaitRelease(.live(r.key))
         setReadOnly(r, false)
         await fireRetry(r)
         await waitUntil { !pad.saveFailed }
@@ -274,12 +274,77 @@ import Testing
         #expect(try mine(r)?.body == "written while away!")
     }
 
+    // MARK: A flush that forgets the writer between the read and My notes (re-review M1b)
+
+    /// Types "first" (written), then "first, then unsaved" while Notes is read-only (the write fails), leaves for
+    /// another note and comes back on the Notes tab: the heads read now still say "first".
+    @discardableResult
+    private func failThenComeBackOnNotes(_ r: ReconRig, _ model: NotesWorkspaceModel) async throws -> MyNotesPad {
+        let pad = try await showMine(r, model)
+        // The flush point below forgets this writer: the rig stops its timers at the end.
+        r.rig.adopt(try #require(pad.session?.writer))
+        type(pad, "first")
+        await pad.flush()
+        #expect(try mine(r)?.body == "first")
+        type(pad, "first, then unsaved")
+        setReadOnly(r, true)
+        await pad.flush()
+        #expect(pad.saveFailed)
+        model.select(row: elsewhere)
+        await model.awaitRelease(.live(r.key))
+        let id = NoteItemID.live(r.key)
+        model.select(row: id)
+        await model.loadPreview(id)
+        #expect(model.previewTab == .notes)
+        #expect(model.previewDocument?.mineMarkdown == "first")
+        return pad
+    }
+
+    @Test func aFlushAllWhileAwayFromMyNotesThenMyNotesShowsTheTextItWrote() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        try await failThenComeBackOnNotes(r, model)
+        // Hiding the window (or Settings, or `deactivate()`) writes the lingering text and forgets the writer.
+        setReadOnly(r, false)
+        await r.registry.flushAll()
+        #expect(try mine(r)?.body == "first, then unsaved")
+        #expect(r.registry.writer(for: .live(r.key, layer: NotesStore.mineLayer)) == nil)
+        model.selectPreviewTab(.mine)
+        let again = try #require(model.previewDocument?.myNotes)
+        #expect(again.text == "first, then unsaved")
+        #expect(!again.saveFailed && !again.isSaving)
+        // The first keystroke extends the text instead of replacing it.
+        type(again, again.text + "!")
+        await again.flush()
+        #expect(try mine(r)?.body == "first, then unsaved!")
+    }
+
+    @Test func theWritersOwnRetryThenAFlushAllWhileAwayThenMyNotesShowsTheTextItWrote() async throws {
+        let r = try ReconRig()
+        let model = model(r)
+        let pad = try await failThenComeBackOnNotes(r, model)
+        setReadOnly(r, false)
+        // The writer's retry lands while Notes is shown; the next flush point forgets the lingering writer.
+        await fireRetry(r)
+        await waitUntil { !pad.saveFailed }
+        #expect(try mine(r)?.body == "first, then unsaved")
+        await r.registry.flushAll()
+        #expect(r.registry.writer(for: .live(r.key, layer: NotesStore.mineLayer)) == nil)
+        model.selectPreviewTab(.mine)
+        let again = try #require(model.previewDocument?.myNotes)
+        #expect(again.text == "first, then unsaved")
+        type(again, again.text + ", then typed")
+        await again.flush()
+        #expect(try mine(r)?.body == "first, then unsaved, then typed")
+    }
+
     @Test func comingBackWhileTheCloseStillWritesShowsTheTypedText() async throws {
         let r = try ReconRig()
         let model = model(r)
         let pad = try await showMine(r, model)
         type(pad, "quick")
-        // Back at once, while the close's write may still run: the read waits for it, and the pad shows the text.
+        // Back at once, while the close's write may still run: the pad starts from the writer's text, or from the
+        // head read in the same turn once the writer was let go.
         model.select(row: elsewhere)
         let again = try await comeBack(r, model)
         #expect(again.text == "quick")

@@ -229,6 +229,114 @@ import Testing
         #expect(try rig.store.liveDocument(key: rig.meeting, layer: "notes") == nil)
     }
 
+    // MARK: A flush waits for the write that runs (review M1b of #360)
+
+    /// A writer whose first write stops in the seed's start-time check until `gate` opens.
+    private func gatedWriter(
+        _ rig: DocRig, entered: CountLatch, gate: CountLatch, onWait: @escaping @Sendable () -> Void = {}
+    ) throws -> RevisionWriter {
+        let started = NoteTime.milliseconds(rig.started)
+        return rig.adopt(
+            RevisionWriter(
+                store: rig.store, target: .seed(try rig.plan(rig.layer("seed"))), clock: rig.clock,
+                observer: RevisionWriter.Observer(waitsForWrite: onWait),
+                sourceStartedAtMs: {
+                    entered.increment()
+                    await gate.wait()
+                    return started
+                }, log: rig.log))
+    }
+
+    /// The registry's flush (a release, `flushAll`) while a timer's write runs: returns once that flush either waits
+    /// for the running write or came back without it, and says whether it waited.
+    private func flushWhileAWriteRuns(
+        _ writer: RevisionWriter, waited: CountLatch, progress: CountLatch
+    ) async -> (task: Task<RevisionWriter.Outcome, any Error>, waited: Bool) {
+        let task = Task {
+            defer { progress.increment() }
+            return try await writer.flush(closingSession: true)
+        }
+        await progress.wait()
+        return (task, waited.count > 0)
+    }
+
+    @Test func aFlushWithNothingBufferedReturnsOnlyOnceTheRunningWriteIsInTheStore() async throws {
+        let rig = try DocRig()
+        let entered = CountLatch()
+        let gate = CountLatch()
+        let waited = CountLatch()
+        let progress = CountLatch()
+        let writer = try gatedWriter(rig, entered: entered, gate: gate) {
+            waited.increment()
+            progress.increment()
+        }
+        writer.submit("typed")
+        // A timer's flush took the text; its write runs.
+        let running = Task { try await writer.flush() }
+        await entered.wait()
+        // The registry's flush finds nothing buffered: it waits instead of returning.
+        let release = await flushWhileAWriteRuns(writer, waited: waited, progress: progress)
+        #expect(release.waited)
+        #expect(try rig.store.liveDocument(key: rig.meeting, layer: "notes") == nil)
+        gate.increment()
+        #expect(try await release.task.value == .nothing)
+        let document = try #require(try rig.store.liveDocument(key: rig.meeting, layer: "notes"))
+        #expect(try rig.head(document.id).body == "typed")
+        _ = try await running.value
+    }
+
+    @Test func aFlushThatWaitedForAFailedWriteWritesItsTextItselfOrThrows() async throws {
+        let rig = try DocRig()
+        let entered = CountLatch()
+        let gate = CountLatch()
+        let waited = CountLatch()
+        let progress = CountLatch()
+        let writer = try gatedWriter(rig, entered: entered, gate: gate) {
+            waited.increment()
+            progress.increment()
+        }
+        try rig.failNextInsert(body: "typed")
+        writer.submit("typed")
+        let running = Task { try await writer.flush() }
+        await entered.wait()
+        let release = await flushWhileAWriteRuns(writer, waited: waited, progress: progress)
+        #expect(release.waited)
+        gate.increment()
+        await #expect(throws: (any Error).self) { try await running.value }
+        // The failed write put its text back; the waiting flush wrote it again, failed the same way and says so,
+        // so a release keeps the writer and its text instead of forgetting them.
+        await #expect(throws: (any Error).self) { try await release.task.value }
+        #expect(writer.hasPendingText)
+        try rig.clearFault()
+        try await writer.flush(closingSession: true)
+        let document = try #require(try rig.store.liveDocument(key: rig.meeting, layer: "notes"))
+        #expect(try rig.head(document.id).body == "typed")
+    }
+
+    @Test func aFailedWriteNeverPutsItsTextBackOverNewerTyping() async throws {
+        let rig = try DocRig()
+        let entered = CountLatch()
+        let gate = CountLatch()
+        let queued = CountLatch()
+        let writer = try gatedWriter(rig, entered: entered, gate: gate) { queued.increment() }
+        try rig.failNextInsert(body: "older")
+        writer.submit("older")
+        let running = Task { try await writer.flush() }
+        await entered.wait()
+        writer.submit("newer")
+        // The newer text is taken by the next write, which queues behind the one that fails.
+        let next = Task { try await writer.flush() }
+        await queued.wait()
+        gate.increment()
+        await #expect(throws: (any Error).self) { try await running.value }
+        _ = try await next.value
+        let document = try #require(try rig.store.liveDocument(key: rig.meeting, layer: "notes"))
+        #expect(try rig.head(document.id).body == "newer")
+        #expect(!writer.hasPendingText)
+        try await writer.flush(closingSession: true)
+        #expect(try rig.head(document.id).body == "newer")
+    }
+
     // MARK: One writer, compare-and-set
 
     @Test func aLostCompareAndSetKeepsTheTextAsAProposal() async throws {

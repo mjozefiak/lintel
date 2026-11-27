@@ -102,13 +102,9 @@ final class NoteDocumentRegistry {
         entries[id] = nil
     }
 
-    /// Writes and forgets one layer document's writer (My notes when its note leaves the screen); see
-    /// `release(ids:)` for a flush that fails or a re-acquisition in between.
-    func release(_ id: NoteDocumentID) async {
-        await release(ids: [id])
-    }
-
-    /// A note left the screen (or the full window closed it): writes and forgets every document of `item`.
+    /// A note left the screen (`NotesWorkspaceModel.dropPreview`, also when the full window gave it up or an agent
+    /// run on a note nobody looks at ended): writes and forgets every document of `item`; see `release(ids:)` for a
+    /// flush that fails or a re-acquisition in between.
     func release(item: NoteItemID) async {
         await release(ids: entries.filter { $0.value.item == item }.map(\.key))
     }

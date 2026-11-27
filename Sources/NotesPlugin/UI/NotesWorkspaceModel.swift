@@ -64,8 +64,6 @@ final class NotesWorkspaceModel {
         /// My notes' session for a loaded recorded note (the `mine` layer, written only by `human`); `nil` when
         /// nothing can write here (no store wired, or Notes is read-only).
         var makeMineSession: @MainActor (NoteContent) -> NoteEditingSession? = { _ in nil }
-        /// Writes and forgets one layer document's writer (My notes of a note that left the screen).
-        var releaseWriter: @MainActor (NoteDocumentID) async -> Void = { _ in }
         /// `plugins.notes.readOnly` was on when the section was built: My notes says so instead of "unavailable".
         var notesReadOnly = false
         /// The history of a layer (its revisions) from `notes.sqlite`; `.none` when the layer has no overlay.
@@ -419,8 +417,8 @@ final class NotesWorkspaceModel {
     }
 
     @ObservationIgnored private var previewReads: [NoteItemID: Task<Void, Never>] = [:]
-    /// My notes that left the screen and are still being written (`closeMyNotes`).
-    @ObservationIgnored var myNotesReleases: [NoteKey: (token: UUID, task: Task<Void, Never>)] = [:]
+    /// Notes that left the screen whose writers are still being written and let go (`releaseDocuments`).
+    @ObservationIgnored var documentReleases: [NoteItemID: (token: UUID, task: Task<Void, Never>)] = [:]
 
     /// Forgets a preview nobody sees. The note open in the full window keeps its document, and so does a note whose
     /// agent run is going on: the run is never cancelled by a click elsewhere, and its document is dropped once the
@@ -429,7 +427,7 @@ final class NotesWorkspaceModel {
         guard id != openedID, id != explorer.selection, let document = documents[id] else { return }
         guard !document.lock.isActive else { return }
         if document.isEditing { document.leaveEditing() }
-        closeMyNotes(document)
+        releaseDocuments(document)
         documents[id] = nil
         contentEpochs[id] = nil
     }
@@ -694,8 +692,6 @@ final class NotesWorkspaceModel {
             return
         }
         let key = id.key
-        // My notes closed when the note left the screen may still be writing: its heads come after that write.
-        await awaitMyNotesRelease(key)
         await environment.reconcile(key)
         guard isCurrent(epoch, id, document) else { return }
         let outcome = await SourceFanOut.call(budget: environment.contentBudget, clock: environment.clock) {

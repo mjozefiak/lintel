@@ -79,6 +79,71 @@ import Testing
         #expect(r.registry.documentIDs.isEmpty)
     }
 
+    // MARK: Leaving a note releases its writers (re-review m4)
+
+    /// The meeting selected and read, with a writer on its Notes layer (an edit, Restore, a comment or a revision).
+    private func selectedWithLayerWriter(
+        _ r: ReconRig, _ model: NotesWorkspaceModel, item: NoteItemID? = nil, docID: Int64
+    ) async -> RevisionWriter {
+        let id = item ?? .live(r.key)
+        await model.refresh()
+        model.select(row: id)
+        await model.loadPreview(id)
+        let documentID: NoteDocumentID =
+            if case .detached = id { .detached(docID: docID) } else { .live(r.key, layer: "notes") }
+        return r.registry.writer(for: documentID, item: id) { r.rig.writer(.existing(docID: docID)) }
+    }
+
+    private var elsewhere: NoteItemID { .live(NoteKey(pluginID: "meetings", id: "elsewhere")) }
+
+    @Test func choosingAnotherNoteWritesTheLayerWritersAndForgetsThem() async throws {
+        let r = try ReconRig()
+        let doc = try r.rig.seededDocument(r.rig.layer("agent", version: "n1"))
+        r.publish([r.rig.layer("agent", id: "notes", version: "n1")])
+        let model = model(r)
+        let writer = await selectedWithLayerWriter(r, model, docID: doc.id)
+        writer.submit("typed, not written yet")
+        #expect(r.registry.openLiveKeys == [r.key])
+        model.select(row: elsewhere)
+        await model.awaitRelease(.live(r.key))
+        // Written first, then forgotten: the reconciler and the detached-row cleanup no longer count it as open.
+        #expect(try r.rig.head(doc.id).body == "typed, not written yet")
+        #expect(r.registry.writer(for: .live(r.key, layer: "notes")) == nil)
+        #expect(r.registry.openLiveKeys.isEmpty)
+    }
+
+    @Test func aLayerWriterWhoseWriteFailsStaysWithItsText() async throws {
+        let r = try ReconRig()
+        let doc = try r.rig.seededDocument(r.rig.layer("agent", version: "n1"))
+        r.publish([r.rig.layer("agent", id: "notes", version: "n1")])
+        let model = model(r)
+        let writer = await selectedWithLayerWriter(r, model, docID: doc.id)
+        try r.rig.failNextInsert(body: "kept")
+        writer.submit("kept")
+        model.select(row: elsewhere)
+        await model.awaitRelease(.live(r.key))
+        #expect(r.registry.writer(for: .live(r.key, layer: "notes")) === writer)
+        #expect(writer.hasPendingText)
+        try r.rig.clearFault()
+        await r.registry.flushAll()
+        #expect(try r.rig.head(doc.id).body == "kept")
+        #expect(r.registry.writer(for: .live(r.key, layer: "notes")) == nil)
+    }
+
+    @Test func leavingADetachedCopyReleasesItsWriterToo() async throws {
+        let r = try ReconRig()
+        let doc = try await r.editedOverlay(r.rig.layer("old", version: "n1"), text: "kept")
+        try r.store.detachReportingRows(r.key)
+        let model = model(r)
+        let item = NoteItemID.detached(r.key, startedAtMs: NoteTime.milliseconds(r.rig.started))
+        let writer = await selectedWithLayerWriter(r, model, item: item, docID: doc.id)
+        writer.submit("kept, and more")
+        model.select(row: elsewhere)
+        await model.awaitRelease(item)
+        #expect(try r.rig.head(doc.id).body == "kept, and more")
+        #expect(r.registry.documentIDs.isEmpty)
+    }
+
     // MARK: The editing session
 
     @Test func theSessionRefusesToSeedWhileTheSourceIsStillWorking() throws {

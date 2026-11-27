@@ -207,10 +207,14 @@ import Testing
         // The note whose run goes on keeps its document (dropping it would hide the run's end).
         #expect(s.model.documents[s.item] != nil)
         #expect(s.service.isRunActive)
+        #expect(s.r.registry.openLiveKeys == [s.r.key])
         gate.open()
         await task.value
         #expect(s.model.documents[s.item] == nil)
         #expect(handle.releases == 1)
+        // The run's end dropped the document and let its writers go (re-review m4).
+        await s.model.awaitRelease(s.item)
+        #expect(s.r.registry.openLiveKeys.isEmpty)
     }
 
     // MARK: Ask agent
