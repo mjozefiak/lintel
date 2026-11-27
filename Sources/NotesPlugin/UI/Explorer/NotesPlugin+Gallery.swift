@@ -307,13 +307,18 @@ private struct NotesSidebarGalleryHost: View {
                     "my-notes",
                     "The My notes tab, empty: “Only you write here…” above the pad and what the pad is for.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .mine, myNotes: .empty),
-                    part: .preview),
-                // One golden each (the 25 MiB budget); the contact sheet shows every variant.
+                    part: .preview,
+                    variants: [
+                        GalleryVariant(appearance: .light, textSize: .medium, language: "en"),
+                        GalleryVariant(appearance: .light, textSize: .extraLarge, language: "pl"),
+                    ]),
+                // The 25 MiB budget: the three My notes states share the CI subset (dark is the saving pad's, pl + XL
+                // the failed one's) instead of three goldens each; the contact sheet shows every variant.
                 state(
                     "my-notes-saving",
                     "My notes while what was typed is being written: “Saving…” on the right of the line.",
                     NotesExplorerGalleryCase(selected: NotesQAFixtures.meetingID, tab: .mine, myNotes: .saving),
-                    part: .preview, variants: [GalleryVariant(appearance: .light, textSize: .medium, language: "en")]),
+                    part: .preview, variants: [GalleryVariant(appearance: .dark, textSize: .medium, language: "en")]),
                 state(
                     "my-notes-failed",
                     "My notes could not be written: the strip “Your notes weren’t saved. Lintel keeps trying.” with Try Now; the text stays.",
