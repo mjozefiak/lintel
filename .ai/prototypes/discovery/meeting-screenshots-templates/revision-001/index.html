@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lintel: zrzuty ekranu i szablony notatek (szkic)</title>
+<style>
+  :root {
+    --page: #F8F6F2; --surface: #ffffff; --ink: #1d1b18; --muted: #6b665e; --line: #e2ddd4; --soft: #f1ede6;
+    --accent: #267C6C; --accent-ink: #036152; --amber: #B25E00; --red: #C42B1C; --on-accent: #fff;
+    --shadow: 0 6px 22px rgba(0,0,0,.14), 0 0 0 .5px rgba(0,0,0,.12);
+  }
+  body.dark {
+    --page: #1c1a18; --surface: #262421; --ink: #f3f0ea; --muted: #b0aa9f; --line: #3a3733; --soft: #302d29;
+    --accent: #6BBDAB; --accent-ink: #8fd3c3; --amber: #FFB454; --red: #FFA8A0; --on-accent: #0f2a25;
+    --shadow: 0 6px 22px rgba(0,0,0,.5), 0 0 0 .5px rgba(255,255,255,.14);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; background: var(--page); color: var(--ink); }
+  header.top { position: sticky; top: 0; z-index: 20; background: var(--page); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  header.top h1 { font-size: 15px; margin: 0 10px 0 0; }
+  fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  legend { float: left; margin-right: 6px; color: var(--muted); font-size: 12px; }
+  .seg button { font: inherit; font-size: 12px; padding: 2px 9px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 6px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--page); border-color: var(--ink); }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  nav.screens { display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--page); }
+  nav.screens a { color: var(--ink); text-decoration: none; font-size: 13px; padding: 3px 9px; border-radius: 6px; }
+  nav.screens a[aria-current="page"] { background: var(--soft); font-weight: 600; }
+  main { max-width: 1180px; margin: 0 auto; padding: 16px; }
+  .banner { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+  section.screen { display: none; }
+  section.screen.active { display: block; }
+  section.screen > h2 { font-size: 18px; margin: 4px 0 4px; }
+  .lead { color: var(--muted); max-width: 820px; margin: 0 0 14px; }
+  .q { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 4px; background: #fde9cc; color: #5a3a00; margin-left: 4px; vertical-align: 1px; }
+  .testbar { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; margin: 0 0 14px; }
+  .testbar b { color: var(--ink); font-weight: 600; }
+  .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 5px 12px; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .btn.danger { color: var(--red); }
+  .btn.small { font-size: 12px; padding: 3px 9px; }
+  .btn.link { border: 0; background: none; color: var(--accent-ink); text-decoration: underline; padding: 2px 4px; }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+  [hidden] { display: none !important; }
+  .status { min-height: 1.4em; font-size: 13px; color: var(--accent-ink); margin: 6px 0; }
+  .err { color: var(--red); font-size: 12px; margin: 3px 0 0; }
+
+  /* desktop stage + meeting window */
+  .stage { position: relative; border-radius: 12px; overflow: hidden; min-height: 330px; background: linear-gradient(135deg, #dfe7ee, #f1ece3 60%, #e6ebe3); padding: 52px 24px 24px; }
+  body.dark .stage { background: linear-gradient(135deg, #1f2730, #2a2520 60%, #1d2622); }
+  .meetwin { max-width: 560px; margin: 0 auto; background: #202124; border-radius: 10px; color: #e8eaed; box-shadow: var(--shadow); overflow: hidden; }
+  .meetwin .bar { font-size: 11px; padding: 6px 10px; background: #2d2e31; color: #bdc1c6; }
+  .meetwin .slide { margin: 12px; height: 150px; border-radius: 6px; background: #f4f1ea; color: #333; padding: 14px; font-size: 13px; }
+  .meetwin .slide b { display: block; font-size: 16px; margin-bottom: 6px; }
+  .meetwin .tiles { display: flex; gap: 8px; padding: 0 12px 12px; }
+  .meetwin .tiles span { flex: 1; height: 34px; border-radius: 6px; background: #3c4043; font-size: 11px; display: grid; place-items: center; }
+  .pillwrap { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); }
+  .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .25s; }
+  .flash.on { opacity: .55; transition: none; }
+  body.reduce .flash { display: none; }
+
+  /* the pill (follows #273) */
+  .pill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px 0 10px; border-radius: 999px; font-size: 13px; font-weight: 500; white-space: nowrap;
+    background: rgba(255,255,255,.78); color: #1d1b18; box-shadow: var(--shadow); backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6); }
+  body.dark .pill { background: rgba(40,38,35,.72); color: #f3f0ea; }
+  .pill .clock { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .pill .sec { color: var(--muted); }
+  .pill .ib { border: 0; width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center; cursor: pointer; padding: 0; background: rgba(127,127,127,.16); color: inherit; }
+  .pill .ib svg { width: 14px; height: 14px; }
+  .pill .act { border: 0; border-radius: 999px; padding: 0 10px; height: 24px; background: rgba(127,127,127,.16); cursor: pointer; font-weight: 600; font-size: 12px; }
+  .pill .more { display: inline-flex; align-items: center; gap: 6px; max-width: 0; opacity: 0; overflow: hidden; margin-left: -8px; transition: max-width .15s, opacity .15s, margin .15s; }
+  .pill:hover .more, .pill:focus-within .more, .pill.hovered .more { max-width: 40px; opacity: 1; margin-left: 0; overflow: visible; }
+  body.reduce .pill .more { transition: none; }
+  .ring { width: 16px; height: 16px; color: var(--accent); flex: none; }
+  .warn { color: var(--amber); }
+  .thumbmini { width: 26px; height: 18px; border-radius: 3px; background: #f4f1ea; border: 1px solid rgba(0,0,0,.2); flex: none; }
+
+  /* sheet + system dialog */
+  .sheet { max-width: 460px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .sheet h3 { margin: 0 0 6px; font-size: 16px; }
+  .sheet ul { margin: 8px 0 12px; padding-left: 18px; }
+  .sysdlg { max-width: 320px; margin: 16px auto 0; background: #ececec; color: #111; border-radius: 12px; padding: 16px; text-align: center; box-shadow: var(--shadow); font-size: 13px; }
+  .sysdlg .btns { display: grid; gap: 6px; margin-top: 12px; }
+  .sysdlg button { border: 0; border-radius: 6px; padding: 5px; background: #fff; cursor: pointer; }
+  .sysdlg button.def { background: #0a64d8; color: #fff; }
+
+  /* main window */
+  .win { display: grid; grid-template-columns: 190px 260px minmax(0, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); min-height: 520px; }
+  @media (max-width: 960px) { .win { grid-template-columns: minmax(0, 1fr); } .win .side, .win .list { display: none; } }
+  .win .side { background: var(--soft); padding: 12px 8px; font-size: 13px; border-right: 1px solid var(--line); }
+  .win .side div { padding: 4px 8px; border-radius: 6px; }
+  .win .side .on { background: var(--surface); font-weight: 600; }
+  .win .side .h { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-top: 10px; }
+  .win .list { border-right: 1px solid var(--line); padding: 10px; font-size: 13px; }
+  .win .list .day { font-size: 11px; color: var(--muted); text-transform: uppercase; margin: 8px 0 4px; }
+  .win .list .it { padding: 6px 8px; border-radius: 6px; }
+  .win .list .it.on { background: var(--soft); }
+  .win .list .it small { display: block; color: var(--muted); }
+  .win .pane { padding: 16px 20px; min-width: 0; }
+  .pane h3 { margin: 0; font-size: 18px; }
+  .meta { color: var(--muted); font-size: 12px; margin: 2px 0 10px; }
+  .chip { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 10px 0 12px; }
+  .tabs button { border: 0; background: none; padding: 6px 12px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  .notes h4 { font-size: 14px; margin: 14px 0 4px; }
+  .notes ul { margin: 0; padding-left: 18px; }
+  .notes p { margin: 0 0 8px; }
+  .tplbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; padding: 6px 10px; background: var(--soft); border-radius: 8px; }
+  .menu { position: absolute; z-index: 10; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); padding: 4px; min-width: 240px; }
+  .menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+  .menu button:hover, .menu button:focus-visible { background: var(--soft); }
+  .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+  .shot { display: inline-flex; flex-direction: column; gap: 3px; margin: 6px 8px 6px 0; border: 0; background: none; padding: 0; cursor: pointer; text-align: left; }
+  .shot .img { width: 168px; height: 96px; border-radius: 6px; border: 1px solid var(--line); background: #f4f1ea; color: #333; padding: 8px; font-size: 10px; overflow: hidden; }
+  .shot .img b { display: block; font-size: 12px; }
+  .shot small { color: var(--muted); font-size: 11px; }
+  .pad { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-height: 150px; }
+  .pad p { margin: 0 0 6px; }
+  .working { display: flex; gap: 8px; align-items: center; color: var(--muted); padding: 18px 0; }
+  .tr p { margin: 0 0 6px; }
+  .tr .t { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; font-size: 12px; }
+  .tr .shotline { font-size: 12px; color: var(--accent-ink); }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); padding: 18px 20px; max-width: 560px; width: calc(100% - 32px); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  .bigimg { height: 260px; border-radius: 8px; background: #f4f1ea; color: #333; padding: 18px; border: 1px solid var(--line); }
+  .bigimg b { font-size: 18px; display: block; margin-bottom: 8px; }
+
+  /* templates */
+  .tpls { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+  .tpl h3 { font-size: 14px; margin: 0 0 2px; }
+  .tpl ol { margin: 6px 0 10px; padding-left: 18px; font-size: 12px; color: var(--muted); }
+  .badge { font-size: 11px; padding: 0 6px; border-radius: 4px; background: var(--soft); color: var(--muted); margin-left: 4px; }
+  .badge.def { background: var(--accent); color: var(--on-accent); }
+  label.f { display: block; font-weight: 600; font-size: 13px; margin: 10px 0 3px; }
+  input[type=text], textarea, select { width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; background: var(--surface); }
+  textarea { resize: vertical; min-height: 54px; }
+  .secrow { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: var(--page); }
+  .secrow .row { justify-content: space-between; }
+  .help { font-size: 12px; color: var(--muted); margin: 3px 0 0; }
+  .preview h4 { margin: 12px 0 2px; font-size: 13px; }
+  .preview p { margin: 0; font-size: 12px; color: var(--muted); }
+  .setrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .setrow:last-child { border-bottom: 0; }
+  .setrow .help { margin: 0; }
+  .flow { font-size: 12px; border-collapse: collapse; width: 100%; margin-top: 8px; }
+  .flow th, .flow td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1 data-t="docTitle">Zrzuty ekranu i szablony notatek</h1>
+  <fieldset class="seg" id="langSeg"><legend data-t="lang">Język</legend><button type="button" data-v="pl" aria-pressed="true">PL</button><button type="button" data-v="en" aria-pressed="false">EN</button></fieldset>
+  <fieldset class="seg" id="themeSeg"><legend data-t="theme">Motyw</legend><button type="button" data-v="light" aria-pressed="true" data-t="light">Jasny</button><button type="button" data-v="dark" aria-pressed="false" data-t="dark">Ciemny</button></fieldset>
+  <fieldset class="seg" id="motionSeg"><legend data-t="reduceMotion">Ogranicz ruch</legend><button type="button" data-v="off" aria-pressed="true" data-t="off">Wył.</button><button type="button" data-v="on" aria-pressed="false" data-t="on">Wł.</button></fieldset>
+  <button type="button" class="btn small" id="reset" data-t="reset">Zacznij od nowa</button>
+</header>
+<nav class="screens" aria-label="Ekrany" id="nav">
+  <a href="#pill" data-t="navPill">1. Pastylka spotkania</a>
+  <a href="#permission" data-t="navPerm">2. Zgoda na zrzuty</a>
+  <a href="#recording" data-t="navRec">3. Panel nagrywania</a>
+  <a href="#note" data-t="navNote">4. Notatka</a>
+  <a href="#templates" data-t="navTpl">5. Szablony</a>
+  <a href="#editor" data-t="navEd">6. Edytor szablonu</a>
+  <a href="#settings" data-t="navSet">7. Ustawienia i dane</a>
+</nav>
+<main>
+  <p class="banner" data-t="banner">Szkic do decyzji właściciela, nie źródło prawdy (wygląd ustala galeria SwiftUI, #248). Dane wymyślone. Żółte etykiety Q-n to pytania do właściciela; przełączniki „Wariant” pokazują możliwe odpowiedzi.</p>
+  <div id="live" class="sr" aria-live="polite"></div>
+
+  <!-- 1 -->
+  <section class="screen" id="pill" aria-labelledby="h-pill">
+    <h2 id="h-pill" tabindex="-1" data-t="pillH">1. Pastylka spotkania z przyciskiem zrzutu</h2>
+    <p class="lead" data-t="pillLead">W zwykłym stanie pastylka się nie zmienia (pierścień, czas, stop). Przycisk aparatu pojawia się dopiero po najechaniu, obok stopu, i działa też skrótem. Po zrzucie przez 4 s widać jedną linię z „Cofnij”.</p>
+    <div class="testbar" role="group" aria-label="Test state">
+      <b data-t="testState">Stan testowy:</b>
+      <span data-t="permState">Zgoda na nagrywanie ekranu:</span>
+      <span class="seg" id="permSeg"><button type="button" data-v="unknown" aria-pressed="true" data-t="permUnknown">nie pytano</button><button type="button" data-v="granted" aria-pressed="false" data-t="permGranted">jest</button><button type="button" data-v="denied" aria-pressed="false" data-t="permDenied">odmowa</button></span>
+      <button type="button" class="btn small" id="tNoWin" data-t="tNoWin">Okno spotkania niewidoczne</button>
+      <button type="button" class="btn small" id="tFail" data-t="tFail">Zrzut nie udał się</button>
+      <button type="button" class="btn small" id="tHover" aria-pressed="false" data-t="tHover">Pokaż jak po najechaniu</button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="pillwrap" id="pillwrap"></div>
+      <div class="meetwin" aria-label="Fictional meeting window">
+        <div class="bar">Google Chrome · meet · Piekarnia Lipowa / Lintel</div>
+        <div class="slide"><b data-t="slideT">Plan wdrożenia, IV kwartał</b><span data-t="slideB">1. Pilotaż w 2 sklepach · 2. Szkolenie kasjerów · 3. Raport po 30 dniach</span></div>
+        <div class="tiles"><span>Hanna</span><span>Bartek</span><span data-t="you">Ty</span></div>
+      </div>
+      <div class="flash" id="flash"></div>
+    </div>
+    <p class="small muted" data-t="pillShortcut">Skrót (propozycja): ⌃⌥S. Działa tylko w trakcie nagrywania. Zrzut nie obejmuje okien Lintela.</p>
+    <p class="small"><span class="q">Q-1</span> <span data-t="q1">Co obejmuje zrzut: okno aplikacji spotkania (propozycja), cały ekran z oknem spotkania, czy zaznaczony obszar?</span> <span class="q">Q-2</span> <span data-t="q2">Przycisk tylko po najechaniu (propozycja) czy zawsze widoczny?</span></p>
+    <p class="status" id="pillStatus" role="status"></p>
+  </section>
+
+  <!-- 2 -->
+  <section class="screen" id="permission" aria-labelledby="h-perm">
+    <h2 id="h-perm" tabindex="-1" data-t="permH">2. Zgoda na zrzuty (tylko przy pierwszym zrzucie)</h2>
+    <p class="lead" data-t="permLead">Lintel nie pyta o nagrywanie ekranu przy instalacji ani przy włączaniu spotkań. Pyta dopiero, gdy ktoś pierwszy raz kliknie aparat. Najpierw własne wyjaśnienie, potem okno systemu.</p>
+    <div class="sheet" id="permSheet">
+      <h3 data-t="sheetH">Zrzuty ekranu w trakcie spotkania</h3>
+      <p data-t="sheetP">Żeby zapisać to, co widać w oknie spotkania, macOS musi pozwolić Lintelowi nagrywać ekran.</p>
+      <ul>
+        <li data-t="sheetL1">Lintel robi zrzut tylko wtedy, gdy klikniesz aparat albo użyjesz skrótu.</li>
+        <li data-t="sheetL2">Zrzuty zostają na tym Macu, zaszyfrowane razem z notatką.</li>
+        <li id="sheetProvider"></li>
+      </ul>
+      <div class="row"><button type="button" class="btn primary" id="permContinue" data-t="permContinue">Dalej</button><button type="button" class="btn" id="permNotNow" data-t="notNow">Nie teraz</button></div>
+    </div>
+    <div class="sysdlg" id="sysdlg" hidden role="group" aria-labelledby="sysT">
+      <strong id="sysT" data-t="sysT">„Lintel” chce nagrywać ten komputer</strong>
+      <p data-t="sysP">Zezwól w Ustawieniach systemowych → Prywatność i ochrona → Nagrywanie ekranu i dźwięku systemowego.</p>
+      <div class="btns"><button type="button" class="def" id="sysAllow" data-t="sysAllow">Otwórz Ustawienia systemowe (symulacja: zezwól)</button><button type="button" id="sysDeny" data-t="sysDeny">Odmów</button></div>
+    </div>
+    <p class="small muted" data-t="permNote">[ZAŁOŻENIE A-3] Na macOS 26 po nadaniu zgody aplikacja może wymagać ponownego uruchomienia, a system co jakiś czas przypomina o nagrywaniu ekranu. Do sprawdzenia w spike'u (faza 0 speca).</p>
+    <p class="status" id="permStatus" role="status"></p>
+  </section>
+
+  <!-- 3 -->
+  <section class="screen" id="recording" aria-labelledby="h-rec">
+    <h2 id="h-rec" tabindex="-1" data-t="recH">3. Panel nagrywania w oknie notatek (#255)</h2>
+    <p class="lead" data-t="recLead">W trakcie spotkania okno notatek pokazuje wiersz „Teraz”. Tu można wybrać szablon i dopisywać własne notatki; zrzut trafia do „Moich notatek” w miejscu kursora.</p>
+    <div class="win">
+      <div class="side"><div class="on" data-t="sAll">Wszystkie notatki</div><div data-t="sMeet">Spotkania</div><div data-t="sDict">Dyktowania</div><div class="h" data-t="sFolders">Foldery</div><div data-t="sClients">Klienci</div><div class="h">&nbsp;</div><div data-t="sTpl">Szablony</div><div data-t="sDictionary">Słownik</div></div>
+      <div class="list"><div class="day" data-t="today">Dziś</div><div class="it on"><span data-t="now">Teraz</span> · <span data-t="mTitle">Rozmowa z klientem: Piekarnia Lipowa</span><small data-t="recNow">Nagrywanie · 12:04</small></div><div class="it"><span data-t="m2">Cotygodniowy standup</span><small>09:30 · 18 min</small></div></div>
+      <div class="pane">
+        <h3 data-t="mTitle">Rozmowa z klientem: Piekarnia Lipowa</h3>
+        <p class="meta"><span data-t="recNow">Nagrywanie · 12:04</span> · <span data-t="hears">Lintel słyszy Ciebie i rozmówców.</span></p>
+        <div class="tplbar"><label for="recTpl" data-t="tplLabel">Szablon notatek</label><select id="recTpl" style="width:auto"></select><span class="small muted" data-t="tplRecHelp">Możesz go zmienić także po spotkaniu.</span></div>
+        <div class="row" style="margin:12px 0 6px; justify-content: space-between;"><strong data-t="myNotes">Moje notatki</strong><button type="button" class="btn small" id="recShot" data-t="recShot">Zrzut okna spotkania</button></div>
+        <p class="small muted" data-t="myNotesHelp">Tu piszesz tylko Ty. Lintel nigdy nie zmienia tych notatek.</p>
+        <div class="pad" id="pad" aria-label="My notes"></div>
+        <form id="padForm" class="row" style="margin-top:6px"><label for="padInput" class="sr" data-t="padAdd">Dopisz notatkę</label><input type="text" id="padInput" style="flex:1" placeholder=""><button class="btn small" type="submit" data-t="add">Dodaj</button></form>
+        <div class="row" style="margin-top:14px"><button type="button" class="btn primary" id="stopWrite" data-t="stopWrite">Zatrzymaj i napisz notatki</button></div>
+        <p class="status" id="recStatus" role="status"></p>
+      </div>
+    </div>
+    <p class="small" style="margin-top:8px"><span class="q">Q-3</span> <span data-t="q3">Gdzie żyją zrzuty: w „Moich notatkach” w miejscu kursora (propozycja), w osobnym pasku „Zrzuty” pod notatką, czy w notatce Lintela przy temacie, którego dotyczą?</span></p>
+  </section>
+
+  <!-- 4 -->
+  <section class="screen" id="note" aria-labelledby="h-note">
+    <h2 id="h-note" tabindex="-1" data-t="noteH">4. Gotowa notatka: szablon i zrzuty</h2>
+    <p class="lead" data-t="noteLead">Pod tytułem widać, według jakiego szablonu powstała notatka. „Zmień” pisze ją od nowa według innego szablonu; poprzednia wersja zostaje w historii.</p>
+    <div class="testbar" role="group" aria-label="Variants">
+      <b data-t="variant">Wariant:</b> <span class="q">Q-3</span> <span data-t="vPlace">zrzuty w</span>
+      <span class="seg" id="placeSeg"><button type="button" data-v="mine" aria-pressed="true" data-t="vMine">Moich notatkach</button><button type="button" data-v="strip" aria-pressed="false" data-t="vStrip">pasku pod notatką</button><button type="button" data-v="inline" aria-pressed="false" data-t="vInline">notatce przy temacie</button></span>
+      <span class="q">Q-5</span> <span data-t="vEmpty">pusta sekcja</span>
+      <span class="seg" id="emptySeg"><button type="button" data-v="hide" aria-pressed="true" data-t="vHide">ukryta</button><button type="button" data-v="show" aria-pressed="false" data-t="vShow">„Nie padło”</button></span>
+    </div>
+    <div class="win">
+      <div class="side"><div data-t="sAll">Wszystkie notatki</div><div class="on" data-t="sMeet">Spotkania</div><div data-t="sDict">Dyktowania</div><div class="h">&nbsp;</div><div data-t="sTpl">Szablony</div></div>
+      <div class="list"><div class="day" data-t="today">Dziś</div><div class="it on"><span data-t="mTitle">Rozmowa z klientem: Piekarnia Lipowa</span><small>12:00 · 42 min</small></div></div>
+      <div class="pane" style="position:relative">
+        <h3 data-t="mTitle">Rozmowa z klientem: Piekarnia Lipowa</h3>
+        <p class="meta"><span data-t="noteMeta">wt 25 lis · 42 min · 3 osoby</span> · <span class="chip" id="writerChip"></span></p>
+        <div class="tplbar"><span data-t="writtenWith">Szablon:</span> <strong id="noteTplName"></strong><button type="button" class="btn small" id="tplChange" aria-haspopup="menu" aria-expanded="false" data-t="change">Zmień</button></div>
+        <div class="menu" id="tplMenu" role="menu" hidden></div>
+        <div class="tabs" role="tablist"><button type="button" role="tab" id="tabNotes" aria-selected="true" data-t="tNotes">Notatki</button><button type="button" role="tab" id="tabMine" aria-selected="false" data-t="myNotes">Moje notatki</button><button type="button" role="tab" id="tabTr" aria-selected="false" data-t="tTr">Transkrypcja</button></div>
+        <div id="noteBody" role="tabpanel"></div>
+        <p class="status" id="noteStatus" role="status"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="screen" id="templates" aria-labelledby="h-tpl">
+    <h2 id="h-tpl" tabindex="-1" data-t="tplH">5. Szablony</h2>
+    <p class="lead" data-t="tplLead">Szablon mówi, jakie sekcje ma mieć notatka i co w nich zapisać. Nie zmienia zasady: w notatce jest tylko to, co padło na spotkaniu.</p>
+    <p class="small"><span class="q">Q-6</span> <span data-t="q6">Gdzie mieszkają szablony: w głównym oknie obok Słownika (propozycja, personalizacja w oknie, nie w Ustawieniach) czy w Ustawieniach → Spotkania?</span> <span class="q">Q-7</span> <span data-t="q7">Lista wbudowanych na start.</span></p>
+    <div class="row" style="justify-content: space-between; margin: 6px 0 10px"><span class="muted small" id="tplCount"></span><button type="button" class="btn primary" id="newTpl" data-t="newTpl">Nowy szablon</button></div>
+    <p class="status" id="tplStatus" role="status"></p>
+    <div class="tpls" id="tplList"></div>
+  </section>
+
+  <!-- 6 -->
+  <section class="screen" id="editor" aria-labelledby="h-ed">
+    <h2 id="h-ed" tabindex="-1" data-t="edH">6. Edytor szablonu</h2>
+    <p class="lead" data-t="edLead">Nazwa, opcjonalny opis spotkań i do 8 sekcji: nagłówek oraz krótka wskazówka, co tam zapisać. Po prawej kształt notatki.</p>
+    <div class="grid2">
+      <form class="card" id="edForm" novalidate>
+        <label class="f" for="edName" data-t="edName">Nazwa</label>
+        <input type="text" id="edName" maxlength="40" aria-describedby="edNameErr">
+        <p class="err" id="edNameErr" hidden></p>
+        <label class="f" for="edAbout" data-t="edAbout">O tych spotkaniach (opcjonalnie)</label>
+        <textarea id="edAbout" maxlength="300" aria-describedby="edAboutHelp"></textarea>
+        <p class="help" id="edAboutHelp" data-t="edAboutHelp">Np. „Rozmowy z klientami sklepu o wdrożeniu kas”. Pomaga dobrać słowa, nie dodaje faktów.</p>
+        <div class="row" style="justify-content: space-between; margin-top:12px"><strong data-t="edSections">Sekcje</strong><span class="small muted" id="secCount"></span></div>
+        <div id="secList"></div>
+        <p class="err" id="secErr" hidden></p>
+        <button type="button" class="btn small" id="addSec" data-t="addSec">Dodaj sekcję</button>
+        <fieldset style="display:block; margin-top:12px">
+          <legend class="f" style="float:none; color:var(--ink); font-size:13px; font-weight:600; margin:0 0 4px" data-t="edAlways">Zawsze na końcu <span class="q">Q-8</span></legend>
+          <label class="row small"><input type="checkbox" id="edDec" checked> <span data-t="secDecisions">Podjęte decyzje</span></label>
+          <label class="row small"><input type="checkbox" id="edNext" checked> <span data-t="secNext">Następne kroki</span></label>
+        </fieldset>
+        <p class="help" data-t="edGuard">Lintel zapisze w sekcjach tylko to, co padło na spotkaniu. Prośby o oceny, nastroje czy domysły zostaną pominięte.</p>
+        <div class="row" style="margin-top:14px"><button type="submit" class="btn primary" data-t="save">Zapisz szablon</button><button type="button" class="btn" id="edCancel" data-t="cancel">Anuluj</button></div>
+      </form>
+      <div class="card preview" aria-labelledby="pvH"><strong id="pvH" data-t="pvH">Tak będzie wyglądać notatka</strong><div id="pv"></div></div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="screen" id="settings" aria-labelledby="h-set">
+    <h2 id="h-set" tabindex="-1" data-t="setH">7. Ustawienia → Spotkania i Prywatność</h2>
+    <p class="lead" data-t="setLead">Dwa nowe wiersze w Spotkaniach i jeden w Prywatności i danych. Najważniejsze pytanie: co ze zrzutów trafia do tego, kto pisze notatki.</p>
+    <div class="testbar" role="group" aria-label="Variants"><b data-t="variant">Wariant:</b> <span class="q">Q-4</span> <span data-t="vProv">do piszącego notatki trafia</span>
+      <span class="seg" id="provSeg"><button type="button" data-v="none" aria-pressed="true" data-t="pNone">nic ze zrzutów</button><button type="button" data-v="ocr" aria-pressed="false" data-t="pOcr">tekst ze zrzutów (OCR na Macu)</button><button type="button" data-v="image" aria-pressed="false" data-t="pImg">obrazy (tylko Claude)</button></span></div>
+    <div class="grid2">
+      <div class="card">
+        <strong data-t="setMeet">Spotkania</strong>
+        <div class="setrow"><div><label for="setTpl" data-t="setTpl">Szablon notatek</label><p class="help" data-t="setTplHelp">Używany, gdy nie wybierzesz innego w trakcie spotkania.</p></div><select id="setTpl" style="width:auto"></select></div>
+        <div class="setrow"><div><span id="setShotL" data-t="setShot">Zrzuty ekranu w trakcie spotkania</span><p class="help" data-t="setShotHelp">Aparat w pastylce i skrót ⌃⌥S. Lintel robi zrzut tylko na Twoje polecenie.</p></div><input type="checkbox" id="setShot" aria-labelledby="setShotL" checked></div>
+        <div class="setrow"><div><label for="setScope" data-t="setScope">Zrzut obejmuje</label> <span class="q">Q-1</span></div><select id="setScope" style="width:auto"><option data-t="scopeWin">Okno spotkania</option><option data-t="scopeScreen">Cały ekran</option></select></div>
+      </div>
+      <div class="card">
+        <strong data-t="setPriv">Prywatność i dane</strong>
+        <div class="setrow"><div><span data-t="setShotsData">Zrzuty ze spotkań</span><p class="help" id="provHelp"></p></div><span class="chip" id="provChip"></span></div>
+        <table class="flow" aria-label="Data flow">
+          <thead><tr><th data-t="fWhat">Co</th><th data-t="fWhere">Gdzie</th><th data-t="fWho">Kto widzi</th></tr></thead>
+          <tbody id="flowBody"></tbody>
+        </table>
+        <p class="small muted" data-t="guardNote">Strażnik faktów: wariant „tekst ze zrzutów” wymaga decyzji, czy liczby i nazwy widoczne tylko na ekranie mogą trafić do notatki (Q-9).</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="notfound" aria-labelledby="h-nf"><h2 id="h-nf" tabindex="-1" data-t="nfH">Nie ma takiego ekranu</h2><p><a href="#pill" data-t="nfBack">Wróć do pastylki spotkania</a></p></section>
+</main>
+
+<dialog id="viewer" aria-labelledby="viewerT">
+  <h3 id="viewerT" style="margin:0 0 8px; font-size:15px"></h3>
+  <div class="bigimg"><b data-t="slideT">Plan wdrożenia, IV kwartał</b><span data-t="slideB">1. Pilotaż w 2 sklepach · 2. Szkolenie kasjerów · 3. Raport po 30 dniach</span></div>
+  <div class="row" style="margin-top:12px; justify-content: space-between"><div class="row"><button type="button" class="btn small" id="vCopy" data-t="vCopy">Kopiuj</button><button type="button" class="btn small" id="vTr" data-t="vTr">Pokaż w transkrypcji</button><button type="button" class="btn small danger" id="vDel" data-t="vDel">Usuń zrzut</button></div><button type="button" class="btn" id="vClose" data-t="close">Zamknij</button></div>
+</dialog>
+<dialog id="regen" aria-labelledby="regenT">
+  <h3 id="regenT" style="margin:0 0 8px; font-size:15px"></h3>
+  <p id="regenP"></p>
+  <div class="row"><button type="button" class="btn primary" id="regenGo" data-t="regenGo">Napisz od nowa</button><button type="button" class="btn" id="regenCancel" data-t="cancel">Anuluj</button></div>
+</dialog>
+
+<script>
+"use strict";
+const S = {
+  pl: {
+    docTitle: "Zrzuty ekranu i szablony notatek", lang: "Język", theme: "Motyw", light: "Jasny", dark: "Ciemny", reduceMotion: "Ogranicz ruch", off: "Wył.", on: "Wł.", reset: "Zacznij od nowa",
+    navPill: "1. Pastylka spotkania", navPerm: "2. Zgoda na zrzuty", navRec: "3. Panel nagrywania", navNote: "4. Notatka", navTpl: "5. Szablony", navEd: "6. Edytor szablonu", navSet: "7. Ustawienia i dane",
+    banner: "Szkic do decyzji właściciela, nie źródło prawdy (wygląd ustala galeria SwiftUI, #248). Dane wymyślone. Żółte etykiety Q-n to pytania do właściciela; przełączniki „Wariant” pokazują możliwe odpowiedzi.",
+    pillH: "1. Pastylka spotkania z przyciskiem zrzutu", pillLead: "W zwykłym stanie pastylka się nie zmienia (pierścień, czas, stop). Przycisk aparatu pojawia się dopiero po najechaniu, obok stopu, i działa też skrótem. Po zrzucie przez 4 s widać jedną linię z „Cofnij”.",
+    testState: "Stan testowy:", permState: "Zgoda na nagrywanie ekranu:", permUnknown: "nie pytano", permGranted: "jest", permDenied: "odmowa", tNoWin: "Okno spotkania niewidoczne", tFail: "Zrzut nie udał się", tHover: "Pokaż jak po najechaniu",
+    slideT: "Plan wdrożenia, IV kwartał", slideB: "1. Pilotaż w 2 sklepach · 2. Szkolenie kasjerów · 3. Raport po 30 dniach", you: "Ty",
+    pillShortcut: "Skrót (propozycja): ⌃⌥S. Działa tylko w trakcie nagrywania. Zrzut nie obejmuje okien Lintela.",
+    q1: "Co obejmuje zrzut: okno aplikacji spotkania (propozycja), cały ekran z oknem spotkania, czy zaznaczony obszar?", q2: "Przycisk tylko po najechaniu (propozycja) czy zawsze widoczny?",
+    shotBtn: "Zrób zrzut okna spotkania", stopBtn: "Zakończ nagrywanie", added: "Zrzut dodany", undo: "Cofnij", undone: "Zrzut usunięty.",
+    needPerm: "Zrzuty wymagają zgody na nagrywanie ekranu", allow: "Pozwól", deniedLine: "Brak zgody na nagrywanie ekranu", openSettings: "Ustawienia",
+    noWin: "Nie widzę okna spotkania", wholeScreen: "Zrzut ekranu", failLine: "Nie udało się zrobić zrzutu", tryAgain: "Spróbuj ponownie",
+    permH: "2. Zgoda na zrzuty (tylko przy pierwszym zrzucie)", permLead: "Lintel nie pyta o nagrywanie ekranu przy instalacji ani przy włączaniu spotkań. Pyta dopiero, gdy ktoś pierwszy raz kliknie aparat. Najpierw własne wyjaśnienie, potem okno systemu.",
+    sheetH: "Zrzuty ekranu w trakcie spotkania", sheetP: "Żeby zapisać to, co widać w oknie spotkania, macOS musi pozwolić Lintelowi nagrywać ekran.",
+    sheetL1: "Lintel robi zrzut tylko wtedy, gdy klikniesz aparat albo użyjesz skrótu.", sheetL2: "Zrzuty zostają na tym Macu, zaszyfrowane razem z notatką.",
+    sheetNone: "Zrzuty nie są wysyłane nikomu, także temu, kto pisze notatki.", sheetOcr: "Lintel odczytuje tekst ze zrzutu na tym Macu i dołącza go do notatek; obraz zostaje tutaj.", sheetImg: "Gdy notatki pisze Claude, obrazy zrzutów idą do Claude razem z transkrypcją.",
+    permContinue: "Dalej", notNow: "Nie teraz", sysT: "„Lintel” chce nagrywać ten komputer", sysP: "Zezwól w Ustawieniach systemowych → Prywatność i ochrona → Nagrywanie ekranu i dźwięku systemowego.",
+    sysAllow: "Otwórz Ustawienia systemowe (symulacja: zezwól)", sysDeny: "Odmów", permNote: "[ZAŁOŻENIE A-3] Na macOS 26 po nadaniu zgody aplikacja może wymagać ponownego uruchomienia, a system co jakiś czas przypomina o nagrywaniu ekranu. Do sprawdzenia w spike'u (faza 0 speca).",
+    permOk: "Zgoda nadana. Zrzut dodany do spotkania.", permNo: "Bez zgody zrzuty nie działają. Możesz wkleić własny zrzut do Moich notatek (⌘V).", permLater: "Nic się nie zmieniło. Lintel zapyta przy następnym kliknięciu aparatu.",
+    recH: "3. Panel nagrywania w oknie notatek (#255)", recLead: "W trakcie spotkania okno notatek pokazuje wiersz „Teraz”. Tu można wybrać szablon i dopisywać własne notatki; zrzut trafia do „Moich notatek” w miejscu kursora.",
+    sAll: "Wszystkie notatki", sMeet: "Spotkania", sDict: "Dyktowania", sFolders: "Foldery", sClients: "Klienci", sTpl: "Szablony", sDictionary: "Słownik", today: "Dziś", now: "Teraz",
+    mTitle: "Rozmowa z klientem: Piekarnia Lipowa", recNow: "Nagrywanie · 12:04", m2: "Cotygodniowy standup", hears: "Lintel słyszy Ciebie i rozmówców.",
+    tplLabel: "Szablon notatek", tplRecHelp: "Możesz go zmienić także po spotkaniu.", myNotes: "Moje notatki", recShot: "Zrzut okna spotkania", myNotesHelp: "Tu piszesz tylko Ty. Lintel nigdy nie zmienia tych notatek.",
+    padAdd: "Dopisz notatkę", padPh: "Dopisz notatkę i naciśnij Return", add: "Dodaj", stopWrite: "Zatrzymaj i napisz notatki", padEmpty: "Wpisz własne notatki albo wklej obraz (⌘V). Lintel zachowa je dokładnie tak, jak je zapiszesz.",
+    recShotNeedsPerm: "Najpierw zgoda na nagrywanie ekranu (ekran 2).", written: "Notatki napisane. Otwieram notatkę.",
+    q3: "Gdzie żyją zrzuty: w „Moich notatkach” w miejscu kursora (propozycja), w osobnym pasku „Zrzuty” pod notatką, czy w notatce Lintela przy temacie, którego dotyczą?",
+    noteH: "4. Gotowa notatka: szablon i zrzuty", noteLead: "Pod tytułem widać, według jakiego szablonu powstała notatka. „Zmień” pisze ją od nowa według innego szablonu; poprzednia wersja zostaje w historii.",
+    variant: "Wariant:", vPlace: "zrzuty w", vMine: "Moich notatkach", vStrip: "pasku pod notatką", vInline: "notatce przy temacie", vEmpty: "pusta sekcja", vHide: "ukryta", vShow: "„Nie padło”",
+    noteMeta: "wt 25 lis · 42 min · 3 osoby", writtenWith: "Szablon:", change: "Zmień", tNotes: "Notatki", tTr: "Transkrypcja",
+    chipMac: "◔ Napisane na tym Macu", chipClaude: "Napisane przez Claude",
+    shotsH: "Zrzuty ekranu", shotAt: "Zrzut z %s", noShots: "W tym spotkaniu nie było zrzutów.", nothingSaid: "Nie padło na spotkaniu.",
+    regenT: "Napisać notatki od nowa według szablonu „%s”?", regenP: "Obecna wersja zostanie w historii notatki. Twoje poprawki w notatce Lintela wrócą jako propozycja do przejrzenia. Moje notatki i zrzuty się nie zmienią.",
+    regenGo: "Napisz od nowa", cancel: "Anuluj", working: "Piszę notatki od nowa…", regenDone: "Notatki napisane według szablonu „%s”.", manageTpl: "Zarządzaj szablonami…",
+    vCopy: "Kopiuj", vTr: "Pokaż w transkrypcji", vDel: "Usuń zrzut", close: "Zamknij", copied: "Skopiowano obraz.", deleted: "Zrzut przeniesiony do Ostatnio usuniętych.",
+    trShot: "Zrzut ekranu", trLines: [["11:58","Hanna","Dzień dobry, mamy dziś pół godziny."],["12:03","Bartek","Pokażę plan na czwarty kwartał."],["12:06","Hanna","Pilotaż w dwóch sklepach nam pasuje."],["12:21","Bartek","Szkolenie kasjerów zrobimy w piątek."],["12:38","Ty","Wyślę ofertę do czwartku."]],
+    tplH: "5. Szablony", tplLead: "Szablon mówi, jakie sekcje ma mieć notatka i co w nich zapisać. Nie zmienia zasady: w notatce jest tylko to, co padło na spotkaniu.",
+    q6: "Gdzie mieszkają szablony: w głównym oknie obok Słownika (propozycja, personalizacja w oknie, nie w Ustawieniach) czy w Ustawieniach → Spotkania?", q7: "Lista wbudowanych na start.",
+    newTpl: "Nowy szablon", builtIn: "Wbudowany", isDefault: "Domyślny", setDefault: "Ustaw jako domyślny", duplicate: "Duplikuj", edit: "Edytuj", del: "Usuń", tplCount: "%d szablonów", copyOf: "%s (kopia)",
+    tplSaved: "Zapisano szablon „%s”.", tplDeleted: "Usunięto szablon „%s”. Notatki, które według niego powstały, się nie zmieniają.", defSet: "„%s” jest teraz domyślny.",
+    edH: "6. Edytor szablonu", edLead: "Nazwa, opcjonalny opis spotkań i do 8 sekcji: nagłówek oraz krótka wskazówka, co tam zapisać. Po prawej kształt notatki.",
+    edName: "Nazwa", edAbout: "O tych spotkaniach (opcjonalnie)", edAboutHelp: "Np. „Rozmowy z klientami sklepu o wdrożeniu kas”. Pomaga dobrać słowa, nie dodaje faktów.",
+    edSections: "Sekcje", addSec: "Dodaj sekcję", edAlways: "Zawsze na końcu", secDecisions: "Podjęte decyzje", secNext: "Następne kroki",
+    edGuard: "Lintel zapisze w sekcjach tylko to, co padło na spotkaniu. Prośby o oceny, nastroje czy domysły zostaną pominięte.", save: "Zapisz szablon",
+    pvH: "Tak będzie wyglądać notatka", pvIntro: "Krótki wstęp: o czym było spotkanie.", secHead: "Nagłówek sekcji", secHint: "Co tu zapisać", up: "W górę", down: "W dół", remove: "Usuń sekcję",
+    secCount: "%d z 8", errName: "Nadaj szablonowi nazwę.", errNameDup: "Szablon o tej nazwie już jest.", errNoSec: "Dodaj co najmniej jedną sekcję.", errHead: "Każda sekcja potrzebuje nagłówka.", maxSec: "To już 8 sekcji. Więcej rozmywa notatkę.",
+    newName: "", topicsAuto: "Tematy (Lintel nazwie je sam)", hintPh: "Np. „Czego klient potrzebuje i dlaczego”",
+    setH: "7. Ustawienia → Spotkania i Prywatność", setLead: "Dwa nowe wiersze w Spotkaniach i jeden w Prywatności i danych. Najważniejsze pytanie: co ze zrzutów trafia do tego, kto pisze notatki.",
+    vProv: "do piszącego notatki trafia", pNone: "nic ze zrzutów", pOcr: "tekst ze zrzutów (OCR na Macu)", pImg: "obrazy (tylko Claude)",
+    setMeet: "Spotkania", setTpl: "Szablon notatek", setTplHelp: "Używany, gdy nie wybierzesz innego w trakcie spotkania.", setShot: "Zrzuty ekranu w trakcie spotkania", setShotHelp: "Aparat w pastylce i skrót ⌃⌥S. Lintel robi zrzut tylko na Twoje polecenie.",
+    setScope: "Zrzut obejmuje", scopeWin: "Okno spotkania", scopeScreen: "Cały ekran", setPriv: "Prywatność i dane", setShotsData: "Zrzuty ze spotkań",
+    provNone: "Zostają na tym Macu. Do notatek trafia tylko transkrypcja.", provOcr: "Tekst ze zrzutów jest odczytywany na tym Macu i dołączany do notatek, także gdy pisze je Claude. Obrazy zostają tutaj.", provImg: "Gdy notatki pisze Claude, obrazy idą do Claude razem z transkrypcją. Model na tym Macu ich nie widzi.",
+    chipLocal: "Na tym Macu", chipOcr: "Tekst do notatek", chipImg: "Obrazy do Claude",
+    fWhat: "Co", fWhere: "Gdzie", fWho: "Kto widzi", fImg: "Obraz zrzutu", fText: "Tekst ze zrzutu", fMac: "ten Mac, zaszyfrowane", fNone: "—", fYou: "Ty", fYouWriter: "Ty i piszący notatki", fYouClaude: "Ty i Claude (gdy pisze notatki)", fNotMade: "nie powstaje",
+    guardNote: "Strażnik faktów: wariant „tekst ze zrzutów” wymaga decyzji, czy liczby i nazwy widoczne tylko na ekranie mogą trafić do notatki (Q-9).",
+    nfH: "Nie ma takiego ekranu", nfBack: "Wróć do pastylki spotkania", resetDone: "Szkic wrócił do stanu początkowego."
+  },
+  en: {
+    docTitle: "Screenshots and note templates", lang: "Language", theme: "Theme", light: "Light", dark: "Dark", reduceMotion: "Reduce Motion", off: "Off", on: "On", reset: "Start over",
+    navPill: "1. Meeting pill", navPerm: "2. Screenshot permission", navRec: "3. Recording panel", navNote: "4. Note", navTpl: "5. Templates", navEd: "6. Template editor", navSet: "7. Settings and data",
+    banner: "Sketch for the owner's decision, not the source of truth (the look is set in the SwiftUI gallery, #248). Fictional data. Yellow Q-n tags are owner questions; the “Variant” switches show possible answers.",
+    pillH: "1. Meeting pill with a screenshot button", pillLead: "At rest the pill does not change (ring, time, stop). The camera button appears only on hover, next to stop, and also works from a shortcut. After a capture, one line with “Undo” shows for 4 s.",
+    testState: "Test state:", permState: "Screen Recording permission:", permUnknown: "not asked", permGranted: "granted", permDenied: "denied", tNoWin: "Meeting window not visible", tFail: "Capture failed", tHover: "Show as on hover",
+    slideT: "Rollout plan, Q4", slideB: "1. Pilot in 2 shops · 2. Cashier training · 3. Report after 30 days", you: "You",
+    pillShortcut: "Shortcut (proposal): ⌃⌥S. Works only while recording. Lintel's own windows are never in the screenshot.",
+    q1: "What a screenshot covers: the meeting app's window (proposal), the whole screen with the meeting window, or a selected area?", q2: "Button on hover only (proposal) or always visible?",
+    shotBtn: "Take a screenshot of the meeting window", stopBtn: "End recording", added: "Screenshot added", undo: "Undo", undone: "Screenshot removed.",
+    needPerm: "Screenshots need Screen Recording", allow: "Allow", deniedLine: "No Screen Recording permission", openSettings: "Settings",
+    noWin: "Can't see the meeting window", wholeScreen: "Capture screen", failLine: "Couldn't take the screenshot", tryAgain: "Try Again",
+    permH: "2. Screenshot permission (first screenshot only)", permLead: "Lintel does not ask for Screen Recording at install or when meetings are turned on. It asks only the first time someone clicks the camera. Its own explanation first, then the system prompt.",
+    sheetH: "Screenshots during meetings", sheetP: "To save what the meeting window shows, macOS has to let Lintel record the screen.",
+    sheetL1: "Lintel takes a screenshot only when you click the camera or use the shortcut.", sheetL2: "Screenshots stay on this Mac, encrypted with the note.",
+    sheetNone: "Screenshots are not sent to anyone, including whoever writes the notes.", sheetOcr: "Lintel reads the text in a screenshot on this Mac and adds it to the notes; the image stays here.", sheetImg: "When Claude writes the notes, the screenshots go to Claude with the transcript.",
+    permContinue: "Continue", notNow: "Not Now", sysT: "“Lintel” would like to record this computer", sysP: "Allow it in System Settings → Privacy & Security → Screen & System Audio Recording.",
+    sysAllow: "Open System Settings (simulated: allow)", sysDeny: "Deny", permNote: "[ASSUMPTION A-3] On macOS 26 the app may need a relaunch after the permission is granted, and the system reminds about screen recording from time to time. To check in the spike (spec phase 0).",
+    permOk: "Permission granted. Screenshot added to the meeting.", permNo: "Without the permission screenshots don't work. You can paste your own screenshot into My notes (⌘V).", permLater: "Nothing changed. Lintel asks again the next time you click the camera.",
+    recH: "3. Recording panel in the notes window (#255)", recLead: "During a meeting the notes window shows a “Now” row. Here you can choose the template and add your own notes; a screenshot lands in “My notes” at the cursor.",
+    sAll: "All notes", sMeet: "Meetings", sDict: "Dictations", sFolders: "Folders", sClients: "Clients", sTpl: "Templates", sDictionary: "Dictionary", today: "Today", now: "Now",
+    mTitle: "Client call: Lipowa Bakery", recNow: "Recording · 12:04", m2: "Weekly standup", hears: "Lintel hears you and the other people in the call.",
+    tplLabel: "Note template", tplRecHelp: "You can also change it after the meeting.", myNotes: "My notes", recShot: "Screenshot meeting window", myNotesHelp: "Only you write here. Lintel never changes these notes.",
+    padAdd: "Add a note", padPh: "Type a note and press Return", add: "Add", stopWrite: "Stop and Write Notes", padEmpty: "Type your own notes or paste an image (⌘V). Lintel keeps them exactly as you write them.",
+    recShotNeedsPerm: "Screen Recording permission first (screen 2).", written: "Notes written. Opening the note.",
+    q3: "Where screenshots live: in “My notes” at the cursor (proposal), in a separate “Screenshots” strip under the note, or in Lintel's notes next to the topic they belong to?",
+    noteH: "4. Finished note: template and screenshots", noteLead: "Under the title you see which template wrote the note. “Change” writes it again with another template; the previous version stays in the history.",
+    variant: "Variant:", vPlace: "screenshots in", vMine: "My notes", vStrip: "a strip under the note", vInline: "the note, by topic", vEmpty: "empty section", vHide: "hidden", vShow: "“Not discussed”",
+    noteMeta: "Tue 25 Nov · 42 min · 3 people", writtenWith: "Template:", change: "Change", tNotes: "Notes", tTr: "Transcript",
+    chipMac: "◔ Written on this Mac", chipClaude: "Written by Claude",
+    shotsH: "Screenshots", shotAt: "Screenshot at %s", noShots: "No screenshots in this meeting.", nothingSaid: "Not discussed in the meeting.",
+    regenT: "Write the notes again with the “%s” template?", regenP: "The current version stays in the note's history. Your edits to Lintel's notes come back as a proposal to review. My notes and screenshots don't change.",
+    regenGo: "Write Again", cancel: "Cancel", working: "Writing the notes again…", regenDone: "Notes written with the “%s” template.", manageTpl: "Manage Templates…",
+    vCopy: "Copy", vTr: "Show in Transcript", vDel: "Delete Screenshot", close: "Close", copied: "Image copied.", deleted: "Screenshot moved to Recently Deleted.",
+    trShot: "Screenshot", trLines: [["11:58","Hanna","Good morning, we have half an hour today."],["12:03","Bartek","I'll show the plan for the fourth quarter."],["12:06","Hanna","A pilot in two shops works for us."],["12:21","Bartek","We'll do the cashier training on Friday."],["12:38","You","I'll send the offer by Thursday."]],
+    tplH: "5. Templates", tplLead: "A template says which sections the note has and what goes in them. It does not change the rule: the note holds only what was said in the meeting.",
+    q6: "Where templates live: in the main window next to the Dictionary (proposal: personalisation lives in the window, not in Settings) or in Settings → Meetings?", q7: "The built-in list at launch.",
+    newTpl: "New Template", builtIn: "Built-in", isDefault: "Default", setDefault: "Make Default", duplicate: "Duplicate", edit: "Edit", del: "Delete", tplCount: "%d templates", copyOf: "%s (copy)",
+    tplSaved: "Template “%s” saved.", tplDeleted: "Template “%s” deleted. Notes already written with it don't change.", defSet: "“%s” is now the default.",
+    edH: "6. Template editor", edLead: "A name, an optional description of the meetings and up to 8 sections: a heading and a short hint of what goes there. The note's shape on the right.",
+    edName: "Name", edAbout: "About these meetings (optional)", edAboutHelp: "For example “Calls with shop clients about the till rollout”. It helps with wording; it adds no facts.",
+    edSections: "Sections", addSec: "Add Section", edAlways: "Always at the end", secDecisions: "Decisions made", secNext: "Next steps",
+    edGuard: "Lintel writes only what was said in the meeting into the sections. Requests for ratings, moods or guesses are left out.", save: "Save Template",
+    pvH: "This is how the note will look", pvIntro: "A short intro: what the meeting was about.", secHead: "Section heading", secHint: "What goes here", up: "Move Up", down: "Move Down", remove: "Remove Section",
+    secCount: "%d of 8", errName: "Give the template a name.", errNameDup: "A template with this name already exists.", errNoSec: "Add at least one section.", errHead: "Every section needs a heading.", maxSec: "That's 8 sections. More would blur the note.",
+    newName: "", topicsAuto: "Topics (Lintel names them)", hintPh: "For example “What the client needs and why”",
+    setH: "7. Settings → Meetings and Privacy", setLead: "Two new rows in Meetings and one in Privacy & data. The key question: what from the screenshots reaches whoever writes the notes.",
+    vProv: "the notes writer gets", pNone: "nothing from screenshots", pOcr: "text from screenshots (OCR on the Mac)", pImg: "images (Claude only)",
+    setMeet: "Meetings", setTpl: "Note template", setTplHelp: "Used when you don't pick another one during the meeting.", setShot: "Screenshots during meetings", setShotHelp: "The camera in the pill and the ⌃⌥S shortcut. Lintel captures only when you ask.",
+    setScope: "A screenshot covers", scopeWin: "Meeting window", scopeScreen: "Whole screen", setPriv: "Privacy & data", setShotsData: "Meeting screenshots",
+    provNone: "They stay on this Mac. Only the transcript goes into the notes.", provOcr: "Text in screenshots is read on this Mac and added to the notes, also when Claude writes them. The images stay here.", provImg: "When Claude writes the notes, the images go to Claude with the transcript. The model on this Mac does not see them.",
+    chipLocal: "On this Mac", chipOcr: "Text to notes", chipImg: "Images to Claude",
+    fWhat: "What", fWhere: "Where", fWho: "Who sees it", fImg: "Screenshot image", fText: "Text from a screenshot", fMac: "this Mac, encrypted", fNone: "—", fYou: "You", fYouWriter: "You and the notes writer", fYouClaude: "You and Claude (when it writes the notes)", fNotMade: "not created",
+    guardNote: "Fact guard: the “text from screenshots” variant needs a decision on whether numbers and names seen only on screen may reach the note (Q-9).",
+    nfH: "No such screen", nfBack: "Back to the meeting pill", resetDone: "The sketch is back at its start."
+  }
+};
+
+const BUILTIN = [
+  { id: "general", builtin: true, name: { pl: "Ogólne", en: "General" }, sections: [{ auto: true }], dec: true, next: true },
+  { id: "oneonone", builtin: true, name: { pl: "1:1", en: "1:1" }, sections: [
+    { h: { pl: "Jak idzie praca", en: "How work is going" }, hint: { pl: "Co osoba mówi o swojej pracy i obciążeniu", en: "What the person says about their work and load" } },
+    { h: { pl: "Informacja zwrotna", en: "Feedback" }, hint: { pl: "Uwagi wypowiedziane w obie strony", en: "Feedback said in either direction" } },
+    { h: { pl: "Potrzebne wsparcie", en: "Support needed" }, hint: { pl: "Przeszkody i prośby o pomoc", en: "Blockers and requests for help" } }], dec: false, next: true },
+  { id: "standup", builtin: true, name: { pl: "Standup", en: "Standup" }, sections: [
+    { h: { pl: "Zrobione", en: "Done" }, hint: { pl: "Co kto skończył, z imieniem", en: "What each person finished, with their name" } },
+    { h: { pl: "W planie", en: "Planned" }, hint: { pl: "Co kto robi dalej", en: "What each person does next" } },
+    { h: { pl: "Blokery", en: "Blockers" }, hint: { pl: "Co kogo blokuje", en: "What blocks whom" } }], dec: false, next: true },
+  { id: "client", builtin: true, name: { pl: "Rozmowa z klientem", en: "Client call" }, sections: [
+    { h: { pl: "Potrzeby klienta", en: "Client needs" }, hint: { pl: "Czego klient potrzebuje i dlaczego", en: "What the client needs and why" } },
+    { h: { pl: "Obawy i zastrzeżenia", en: "Concerns" }, hint: { pl: "Zastrzeżenia wypowiedziane przez klienta", en: "Concerns the client voiced" } },
+    { h: { pl: "Ceny i terminy", en: "Prices and dates" }, hint: { pl: "Kwoty i daty, które padły", en: "Amounts and dates that were said" } }], dec: true, next: true },
+  { id: "interview", builtin: true, name: { pl: "Rekrutacja", en: "Interview" }, sections: [
+    { h: { pl: "Doświadczenie kandydata", en: "Candidate's experience" }, hint: { pl: "Co kandydat powiedział o swojej pracy, bez ocen", en: "What the candidate said about their work, no ratings" } },
+    { h: { pl: "Pytania kandydata", en: "Candidate's questions" }, hint: { pl: "O co pytał kandydat i co odpowiedziano", en: "What the candidate asked and the answers" } },
+    { h: { pl: "Ustalenia o procesie", en: "Process" }, hint: { pl: "Kolejne etapy, terminy, warunki, które padły", en: "Next stages, dates and terms that were said" } }], dec: false, next: true }
+];
+
+// Fictional note content per template, keyed by section index; inline screenshot goes with the "rollout" topic.
+const CONTENT = {
+  general: { pl: { intro: "Klient zgodził się na pilotaż w dwóch sklepach; zespół omówił plan wdrożenia i szkolenie.", secs: [["Plan wdrożenia", ["Pilotaż ruszy w dwóch sklepach przy ul. Lipowej i Polnej.", "Raport z pilotażu powstanie po 30 dniach."], true], ["Szkolenie kasjerów", ["Szkolenie odbędzie się w piątek w sklepie przy Lipowej."]]], dec: ["Pilotaż w dwóch sklepach zamiast w pięciu."], next: ["Wysłać ofertę na pilotaż — osoba: Ty, termin: czwartek", "Przygotować materiały szkoleniowe — osoba: Bartek"] },
+             en: { intro: "The client agreed to a pilot in two shops; the team went through the rollout plan and training.", secs: [["Rollout plan", ["The pilot starts in two shops, on Lipowa and Polna streets.", "A pilot report follows after 30 days."], true], ["Cashier training", ["Training takes place on Friday in the Lipowa shop."]]], dec: ["A pilot in two shops instead of five."], next: ["Send the pilot offer — person: You, due: Thursday", "Prepare the training materials — person: Bartek"] } },
+  client: { pl: { intro: "Klient zgodził się na pilotaż w dwóch sklepach; zespół omówił plan wdrożenia i szkolenie.", secs: [["Potrzeby klienta", ["Klient chce sprawdzić kasy w dwóch sklepach przed decyzją o pozostałych.", "Kasjerzy potrzebują szkolenia przed startem."], true], ["Obawy i zastrzeżenia", ["Hanna obawia się kolejek w pierwszym tygodniu."]], ["Ceny i terminy", []]], dec: ["Pilotaż w dwóch sklepach zamiast w pięciu."], next: ["Wysłać ofertę na pilotaż — osoba: Ty, termin: czwartek", "Przygotować materiały szkoleniowe — osoba: Bartek"] },
+            en: { intro: "The client agreed to a pilot in two shops; the team went through the rollout plan and training.", secs: [["Client needs", ["The client wants to test the tills in two shops before deciding on the rest.", "Cashiers need training before the start."], true], ["Concerns", ["Hanna is worried about queues in the first week."]], ["Prices and dates", []]], dec: ["A pilot in two shops instead of five."], next: ["Send the pilot offer — person: You, due: Thursday", "Prepare the training materials — person: Bartek"] } }
+};
+
+const state = {};
+function resetState() {
+  Object.assign(state, { lang: state.lang || "pl", theme: state.theme || "light", reduce: state.reduce || false,
+    perm: "unknown", pill: "idle", hover: false, shots: [], undoTimer: null, pendingShot: false,
+    pad: [], noteTpl: "client", recTpl: "client", defTpl: "general", custom: [], place: "mine", empty: "hide", provider: "none",
+    tab: "notes", working: false, editing: null, draft: null, viewerShot: null, regenTo: null });
+}
+resetState();
+
+const $ = (id) => document.getElementById(id);
+const t = (k) => S[state.lang][k] ?? k;
+const fmt = (k, ...a) => { let s = t(k); a.forEach((v) => { s = s.replace(/%[sd]/, v); }); return s; };
+const L = (o) => (typeof o === "string" ? o : o[state.lang]);
+const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v); } kids.flat().forEach((c) => { if (c != null) e.append(c.nodeType ? c : document.createTextNode(String(c))); }); return e; };
+const announce = (msg) => { $("live").textContent = ""; setTimeout(() => { $("live").textContent = msg; }, 30); };
+const say = (id, msg) => { $(id).textContent = msg; announce(msg); };
+const allTemplates = () => BUILTIN.concat(state.custom);
+const tplById = (id) => allTemplates().find((x) => x.id === id) || BUILTIN[0];
+const svg = (inner, cls = "") => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 20 20"); s.setAttribute("aria-hidden", "true"); if (cls) s.setAttribute("class", cls); s.innerHTML = inner; return s; };
+const ringSvg = () => svg('<circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="36 44" transform="rotate(-60 10 10)"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/>', "ring");
+const camSvg = () => svg('<path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="11" r="2.8" fill="none" stroke="currentColor" stroke-width="1.6"/>');
+const stopSvg = () => svg('<rect x="6" y="6" width="8" height="8" rx="2" fill="currentColor"/>');
+const warnSvg = () => svg('<path d="M10 2.5 18.5 17h-17z" fill="currentColor"/><rect x="9.1" y="7.5" width="1.8" height="5" rx=".9" fill="#fff"/><circle cx="10" cy="14.6" r="1" fill="#fff"/>', "ring warn");
+const clockNow = () => { const n = 4 + state.shots.length * 3; return `12:${String(n).padStart(2, "0")}`; };
+
+/* ---------- pill ---------- */
+function renderPill() {
+  const w = $("pillwrap"); w.replaceChildren();
+  const p = el("div", { class: "pill" + (state.hover ? " hovered" : ""), role: "group", "aria-label": `Lintel · ${t("recNow")}` });
+  const stop = el("button", { class: "ib", type: "button", "aria-label": t("stopBtn"), title: t("stopBtn") }, stopSvg());
+  const cam = el("button", { class: "ib", type: "button", id: "camBtn", "aria-label": t("shotBtn") + " (⌃⌥S)", title: t("shotBtn") + " (⌃⌥S)", onclick: capture }, camSvg());
+  if (state.pill === "idle") {
+    p.append(ringSvg(), el("span", { class: "clock" }, "42:10"), ...(state.shotsOff ? [] : [el("span", { class: "more" }, cam)]), stop);
+  } else if (state.pill === "captured") {
+    p.append(el("span", { class: "thumbmini", "aria-hidden": "true" }), el("span", {}, t("added")), el("button", { class: "act", type: "button", onclick: undoShot }, t("undo")));
+  } else if (state.pill === "needPerm") {
+    p.append(warnSvg(), el("span", {}, t("needPerm")), el("button", { class: "act", type: "button", onclick: () => go("permission") }, t("allow")));
+  } else if (state.pill === "denied") {
+    p.append(warnSvg(), el("span", {}, t("deniedLine")), el("button", { class: "act", type: "button", onclick: () => go("settings") }, t("openSettings")), el("button", { class: "ib", type: "button", "aria-label": t("close"), onclick: () => { state.pill = "idle"; renderPill(); } }, "✕"));
+  } else if (state.pill === "noWin") {
+    p.append(warnSvg(), el("span", {}, t("noWin")), el("button", { class: "act", type: "button", onclick: () => { state.pill = "idle"; addShot(t("scopeScreen")); } }, t("wholeScreen")), el("button", { class: "ib", type: "button", "aria-label": t("close"), onclick: () => { state.pill = "idle"; renderPill(); } }, "✕"));
+  } else if (state.pill === "failed") {
+    p.append(warnSvg(), el("span", {}, t("failLine")), el("button", { class: "act", type: "button", onclick: () => { state.pill = "idle"; capture(); } }, t("tryAgain")), el("button", { class: "ib", type: "button", "aria-label": t("close"), onclick: () => { state.pill = "idle"; renderPill(); } }, "✕"));
+  }
+  w.append(p);
+}
+function capture() {
+  if (state.perm === "unknown") { state.pendingShot = true; state.pill = "needPerm"; renderPill(); say("pillStatus", t("needPerm")); return; }
+  if (state.perm === "denied") { state.pill = "denied"; renderPill(); say("pillStatus", t("deniedLine")); return; }
+  addShot(t("scopeWin"));
+}
+function addShot(scope) {
+  const shot = { id: "s" + Date.now() + Math.random().toString(16).slice(2, 6), time: clockNow(), scope };
+  state.shots.push(shot);
+  state.pad.push({ kind: "shot", id: shot.id });
+  const f = $("flash"); f.classList.add("on"); setTimeout(() => f.classList.remove("on"), 60);
+  state.pill = "captured"; renderPill(); say("pillStatus", t("added") + " · " + shot.time);
+  clearTimeout(state.undoTimer); state.undoTimer = setTimeout(() => { if (state.pill === "captured") { state.pill = "idle"; renderPill(); } }, 4000);
+  renderPad();
+}
+function undoShot() {
+  const last = state.shots.pop();
+  if (last) state.pad = state.pad.filter((b) => b.id !== last.id);
+  clearTimeout(state.undoTimer); state.pill = "idle"; renderPill(); renderPad(); say("pillStatus", t("undone"));
+  const cam = $("camBtn"); if (cam) cam.focus();
+}
+
+/* ---------- permission ---------- */
+function renderPermission() {
+  const k = { none: "sheetNone", ocr: "sheetOcr", image: "sheetImg" }[state.provider];
+  $("sheetProvider").textContent = t(k);
+}
+$("permContinue").addEventListener("click", () => { $("sysdlg").hidden = false; $("sysAllow").focus(); });
+$("permNotNow").addEventListener("click", () => { state.pendingShot = false; state.pill = "idle"; renderPill(); say("permStatus", t("permLater")); });
+$("sysAllow").addEventListener("click", () => { state.perm = "granted"; syncSeg("permSeg", "granted"); $("sysdlg").hidden = true; say("permStatus", t("permOk")); state.pill = "idle"; if (state.pendingShot) { state.pendingShot = false; go("pill"); addShot(t("scopeWin")); } });
+$("sysDeny").addEventListener("click", () => { state.perm = "denied"; syncSeg("permSeg", "denied"); $("sysdlg").hidden = true; state.pendingShot = false; state.pill = "idle"; renderPill(); say("permStatus", t("permNo")); });
+
+/* ---------- recording panel ---------- */
+function shotThumb(shot, onOpen) {
+  return el("button", { class: "shot", type: "button", onclick: () => onOpen(shot), "aria-label": fmt("shotAt", shot.time) },
+    el("span", { class: "img", "aria-hidden": "true" }, el("b", {}, t("slideT")), t("slideB")), el("small", {}, fmt("shotAt", shot.time)));
+}
+function renderPad() {
+  const pad = $("pad"); pad.replaceChildren();
+  if (!state.pad.length) { pad.append(el("p", { class: "muted small" }, t("padEmpty"))); return; }
+  state.pad.forEach((b) => {
+    if (b.kind === "text") pad.append(el("p", {}, b.text));
+    else { const s = state.shots.find((x) => x.id === b.id); if (s) pad.append(shotThumb(s, openViewer)); }
+  });
+}
+function fillTplSelect(sel, value) {
+  sel.replaceChildren(...allTemplates().map((x) => el("option", { value: x.id, selected: x.id === value }, L(x.name))));
+}
+$("padForm").addEventListener("submit", (e) => { e.preventDefault(); const v = $("padInput").value.trim(); if (!v) return; state.pad.push({ kind: "text", text: v }); $("padInput").value = ""; renderPad(); });
+$("recShot").addEventListener("click", () => { if (state.perm !== "granted") { say("recStatus", t("recShotNeedsPerm")); return; } addShot(t("scopeWin")); state.pill = "idle"; renderPill(); say("recStatus", t("added")); });
+$("recTpl").addEventListener("change", (e) => { state.recTpl = e.target.value; });
+$("stopWrite").addEventListener("click", () => { state.noteTpl = state.recTpl; state.tab = "notes"; say("recStatus", t("written")); setTimeout(() => go("note"), 400); });
+
+/* ---------- note ---------- */
+function contentFor(tpl) {
+  const c = CONTENT[tpl.id];
+  if (c) return c[state.lang];
+  const g = CONTENT.general[state.lang];
+  if (tpl.sections.some((s) => s.auto)) return g;
+  return { intro: g.intro, secs: tpl.sections.map((s, i) => [L(s.h), i === 0 ? g.secs[0][1] : i === 1 ? g.secs[1][1] : [], i === 0]), dec: g.dec, next: g.next };
+}
+function renderNote() {
+  const tpl = tplById(state.noteTpl);
+  $("noteTplName").textContent = L(tpl.name);
+  $("writerChip").textContent = t(state.provider === "image" ? "chipClaude" : "chipMac");
+  ["tabNotes", "tabMine", "tabTr"].forEach((id) => $(id).setAttribute("aria-selected", String(id === { notes: "tabNotes", mine: "tabMine", tr: "tabTr" }[state.tab])));
+  const body = $("noteBody"); body.replaceChildren();
+  if (state.working) { body.append(el("div", { class: "working", role: "status" }, ringSvg(), t("working"))); return; }
+  if (state.tab === "notes") {
+    const c = contentFor(tpl); const box = el("div", { class: "notes" });
+    box.append(el("p", {}, c.intro));
+    c.secs.forEach(([h, pts, hasShot]) => {
+      if (!pts.length && state.empty === "hide") return;
+      box.append(el("h4", {}, h));
+      if (!pts.length) box.append(el("p", { class: "muted small" }, t("nothingSaid")));
+      else box.append(el("ul", {}, pts.map((x) => el("li", {}, x))));
+      if (hasShot && state.place === "inline" && state.shots.length) box.append(el("div", {}, state.shots.map((s) => shotThumb(s, openViewer))));
+    });
+    if (tpl.dec !== false) { box.append(el("h4", {}, t("secDecisions")), el("ul", {}, c.dec.map((x) => el("li", {}, x)))); }
+    if (tpl.next !== false) { box.append(el("h4", {}, t("secNext")), el("ul", {}, c.next.map((x) => el("li", {}, "☐ " + x)))); }
+    if (state.place === "strip") { box.append(el("h4", {}, t("shotsH") + ` (${state.shots.length})`)); box.append(state.shots.length ? el("div", {}, state.shots.map((s) => shotThumb(s, openViewer))) : el("p", { class: "muted small" }, t("noShots"))); }
+    body.append(box);
+  } else if (state.tab === "mine") {
+    body.append(el("p", { class: "small muted" }, t("myNotesHelp")));
+    const pad = el("div", { class: "pad" });
+    if (!state.pad.length) pad.append(el("p", { class: "muted small" }, t("padEmpty")));
+    state.pad.forEach((b) => { if (b.kind === "text") pad.append(el("p", {}, b.text)); else if (state.place === "mine") { const s = state.shots.find((x) => x.id === b.id); if (s) pad.append(shotThumb(s, openViewer)); } });
+    body.append(pad);
+  } else {
+    const tr = el("div", { class: "tr", id: "trBox" });
+    const lines = t("trLines"); let si = 0;
+    lines.forEach(([time, who, text]) => {
+      while (si < state.shots.length && state.shots[si].time <= time) { const s = state.shots[si]; tr.append(el("p", { class: "shotline", id: "tr-" + s.id, tabindex: "-1" }, el("span", { class: "t" }, s.time), "▣ " + t("trShot"))); si++; }
+      tr.append(el("p", {}, el("span", { class: "t" }, time), el("strong", {}, who + ": "), text));
+    });
+    while (si < state.shots.length) { const s = state.shots[si++]; tr.append(el("p", { class: "shotline", id: "tr-" + s.id, tabindex: "-1" }, el("span", { class: "t" }, s.time), "▣ " + t("trShot"))); }
+    body.append(tr);
+  }
+}
+[["tabNotes", "notes"], ["tabMine", "mine"], ["tabTr", "tr"]].forEach(([id, v]) => $(id).addEventListener("click", () => { state.tab = v; renderNote(); }));
+function openTplMenu() {
+  const m = $("tplMenu"); m.replaceChildren();
+  allTemplates().forEach((x) => m.append(el("button", { type: "button", role: "menuitemradio", "aria-checked": String(x.id === state.noteTpl), onclick: () => askRegen(x.id) }, (x.id === state.noteTpl ? "✓ " : "   ") + L(x.name))));
+  m.append(el("hr"), el("button", { type: "button", role: "menuitem", onclick: () => { closeTplMenu(); go("templates"); } }, t("manageTpl")));
+  const b = $("tplChange"); m.style.top = (b.offsetTop + b.offsetHeight + 4) + "px"; m.style.left = b.offsetLeft + "px";
+  m.hidden = false; b.setAttribute("aria-expanded", "true"); m.querySelector("button").focus();
+}
+function closeTplMenu() { $("tplMenu").hidden = true; $("tplChange").setAttribute("aria-expanded", "false"); }
+$("tplChange").addEventListener("click", () => ($("tplMenu").hidden ? openTplMenu() : closeTplMenu()));
+$("tplMenu").addEventListener("keydown", (e) => { if (e.key === "Escape") { closeTplMenu(); $("tplChange").focus(); } });
+function askRegen(id) {
+  closeTplMenu(); if (id === state.noteTpl) return;
+  state.regenTo = id; $("regenT").textContent = fmt("regenT", L(tplById(id).name)); $("regenP").textContent = t("regenP"); $("regen").showModal();
+}
+$("regenCancel").addEventListener("click", () => { $("regen").close(); $("tplChange").focus(); });
+$("regenGo").addEventListener("click", () => {
+  $("regen").close(); state.working = true; state.tab = "notes"; renderNote(); announce(t("working"));
+  setTimeout(() => { state.working = false; state.noteTpl = state.regenTo; renderNote(); say("noteStatus", fmt("regenDone", L(tplById(state.noteTpl).name))); $("tplChange").focus(); }, state.reduce ? 300 : 1200);
+});
+function openViewer(shot) { state.viewerShot = shot; $("viewerT").textContent = fmt("shotAt", shot.time) + " · " + shot.scope; $("viewer").showModal(); }
+$("vClose").addEventListener("click", () => $("viewer").close());
+$("vCopy").addEventListener("click", () => { $("viewer").close(); announce(t("copied")); const st = currentScreen() === "note" ? "noteStatus" : "recStatus"; $(st).textContent = t("copied"); });
+$("vDel").addEventListener("click", () => { const s = state.viewerShot; state.shots = state.shots.filter((x) => x !== s); state.pad = state.pad.filter((b) => b.id !== s.id); $("viewer").close(); renderPad(); renderNote(); const st = currentScreen() === "note" ? "noteStatus" : "recStatus"; say(st, t("deleted")); });
+$("vTr").addEventListener("click", () => { const s = state.viewerShot; $("viewer").close(); if (currentScreen() !== "note") go("note"); state.tab = "tr"; renderNote(); const n = $("tr-" + s.id); if (n) n.focus(); });
+
+/* ---------- templates ---------- */
+function renderTemplates() {
+  const list = $("tplList"); list.replaceChildren();
+  $("tplCount").textContent = fmt("tplCount", allTemplates().length);
+  allTemplates().forEach((x) => {
+    const secs = x.sections.map((s) => (s.auto ? t("topicsAuto") : L(s.h)));
+    if (x.dec) secs.push(t("secDecisions")); if (x.next) secs.push(t("secNext"));
+    const card = el("article", { class: "card tpl", "aria-labelledby": "tn-" + x.id },
+      el("h3", { id: "tn-" + x.id }, L(x.name), x.builtin ? el("span", { class: "badge" }, t("builtIn")) : null, x.id === state.defTpl ? el("span", { class: "badge def" }, t("isDefault")) : null),
+      el("ol", {}, secs.map((s) => el("li", {}, s))),
+      el("div", { class: "row" },
+        x.id !== state.defTpl ? el("button", { class: "btn small", type: "button", onclick: () => { state.defTpl = x.id; renderTemplates(); renderSettings(); say("tplStatus", fmt("defSet", L(x.name))); } }, t("setDefault")) : null,
+        x.builtin ? el("button", { class: "btn small", type: "button", onclick: () => startEdit(x, true) }, t("duplicate")) : el("button", { class: "btn small", type: "button", onclick: () => startEdit(x, false) }, t("edit")),
+        x.builtin ? null : el("button", { class: "btn small danger", type: "button", onclick: () => deleteTpl(x) }, t("del"))));
+    list.append(card);
+  });
+}
+function deleteTpl(x) {
+  state.custom = state.custom.filter((c) => c !== x);
+  if (state.defTpl === x.id) state.defTpl = "general"; if (state.recTpl === x.id) state.recTpl = state.defTpl;
+  renderAll(); say("tplStatus", fmt("tplDeleted", L(x.name)));
+}
+function startEdit(x, asCopy) {
+  const src = x || { name: { pl: "", en: "" }, about: "", sections: [{ h: "", hint: "" }], dec: true, next: true };
+  state.editing = asCopy || !x ? null : x.id;
+  state.draft = { name: asCopy ? fmt("copyOf", L(src.name)) : (x ? L(src.name) : ""), about: src.about || "",
+    sections: src.sections.filter((s) => !s.auto).map((s) => ({ h: L(s.h || ""), hint: L(s.hint || "") })), dec: src.dec !== false, next: src.next !== false };
+  if (!state.draft.sections.length) state.draft.sections.push({ h: "", hint: "" });
+  go("editor");
+}
+$("newTpl").addEventListener("click", () => startEdit(null, false));
+
+/* ---------- editor ---------- */
+function renderEditor() {
+  if (!state.draft) state.draft = { name: "", about: "", sections: [{ h: "", hint: "" }], dec: true, next: true };
+  const d = state.draft;
+  $("edName").value = d.name; $("edAbout").value = d.about; $("edDec").checked = d.dec; $("edNext").checked = d.next;
+  const list = $("secList"); list.replaceChildren();
+  d.sections.forEach((s, i) => {
+    const hId = "sh" + i, nId = "sn" + i;
+    const head = el("input", { type: "text", id: hId, maxlength: "40", value: s.h, placeholder: t("secHead") }); head.addEventListener("input", (e) => { s.h = e.target.value; e.target.removeAttribute("aria-invalid"); if (d.sections.length < 8) $("secErr").hidden = true; renderPreview(); });
+    const hint = el("textarea", { id: nId, maxlength: "200", placeholder: t("hintPh") }); hint.value = s.hint; hint.addEventListener("input", (e) => { s.hint = e.target.value; renderPreview(); });
+    list.append(el("div", { class: "secrow" },
+      el("div", { class: "row" }, el("label", { for: hId, class: "small" }, `${i + 1}. ${t("secHead")}`),
+        el("span", { class: "row" },
+          el("button", { type: "button", class: "btn small", disabled: i === 0, "aria-label": `${t("up")} ${i + 1}`, onclick: () => { [d.sections[i - 1], d.sections[i]] = [d.sections[i], d.sections[i - 1]]; renderEditor(); $("sh" + (i - 1)).focus(); } }, "↑"),
+          el("button", { type: "button", class: "btn small", disabled: i === d.sections.length - 1, "aria-label": `${t("down")} ${i + 1}`, onclick: () => { [d.sections[i + 1], d.sections[i]] = [d.sections[i], d.sections[i + 1]]; renderEditor(); $("sh" + (i + 1)).focus(); } }, "↓"),
+          el("button", { type: "button", class: "btn small danger", "aria-label": `${t("remove")} ${i + 1}`, onclick: () => { d.sections.splice(i, 1); renderEditor(); $("addSec").focus(); } }, "✕"))),
+      head, el("label", { for: nId, class: "small", style: "display:block;margin-top:6px" }, t("secHint")), hint));
+  });
+  $("secCount").textContent = fmt("secCount", d.sections.length);
+  $("addSec").disabled = d.sections.length >= 8;
+  $("secErr").hidden = d.sections.length < 8 ? $("secErr").hidden : false;
+  if (d.sections.length >= 8) $("secErr").textContent = t("maxSec");
+  renderPreview();
+}
+function renderPreview() {
+  const d = state.draft; const pv = $("pv"); pv.replaceChildren(el("p", { style: "margin-top:10px" }, t("pvIntro")));
+  d.sections.forEach((s) => pv.append(el("h4", {}, s.h || "…"), el("p", {}, s.hint || "")));
+  if (d.dec) pv.append(el("h4", {}, t("secDecisions"))); if (d.next) pv.append(el("h4", {}, t("secNext")));
+}
+$("edName").addEventListener("input", (e) => { state.draft.name = e.target.value; $("edNameErr").hidden = true; $("edName").removeAttribute("aria-invalid"); });
+$("edAbout").addEventListener("input", (e) => { state.draft.about = e.target.value; });
+$("edDec").addEventListener("change", (e) => { state.draft.dec = e.target.checked; renderPreview(); });
+$("edNext").addEventListener("change", (e) => { state.draft.next = e.target.checked; renderPreview(); });
+$("addSec").addEventListener("click", () => { if (state.draft.sections.length >= 8) return; state.draft.sections.push({ h: "", hint: "" }); renderEditor(); $("sh" + (state.draft.sections.length - 1)).focus(); });
+$("edCancel").addEventListener("click", () => { state.draft = null; go("templates"); });
+$("edForm").addEventListener("submit", (e) => {
+  e.preventDefault(); const d = state.draft; const name = d.name.trim();
+  const nameErr = $("edNameErr"), secErr = $("secErr"); nameErr.hidden = true; secErr.hidden = true; $("edName").removeAttribute("aria-invalid");
+  const dup = allTemplates().some((x) => x.id !== state.editing && L(x.name).toLowerCase() === name.toLowerCase());
+  if (!name || dup) { nameErr.textContent = t(name ? "errNameDup" : "errName"); nameErr.hidden = false; $("edName").setAttribute("aria-invalid", "true"); $("edName").focus(); announce(nameErr.textContent); return; }
+  if (!d.sections.length) { secErr.textContent = t("errNoSec"); secErr.hidden = false; $("addSec").focus(); announce(secErr.textContent); return; }
+  const bad = d.sections.findIndex((s) => !s.h.trim());
+  if (bad >= 0) { secErr.textContent = t("errHead"); secErr.hidden = false; $("sh" + bad).setAttribute("aria-invalid", "true"); $("sh" + bad).focus(); announce(secErr.textContent); return; }
+  const rec = { id: state.editing || "c" + Date.now(), builtin: false, name, about: d.about.trim(), sections: d.sections.map((s) => ({ h: s.h.trim(), hint: s.hint.trim() })), dec: d.dec, next: d.next };
+  if (state.editing) state.custom = state.custom.map((x) => (x.id === state.editing ? rec : x)); else state.custom.push(rec);
+  state.draft = null; state.editing = null; renderAll(); go("templates"); say("tplStatus", fmt("tplSaved", name));
+});
+
+/* ---------- settings ---------- */
+function renderSettings() {
+  fillTplSelect($("setTpl"), state.defTpl);
+  $("provHelp").textContent = t({ none: "provNone", ocr: "provOcr", image: "provImg" }[state.provider]);
+  $("provChip").textContent = t({ none: "chipLocal", ocr: "chipOcr", image: "chipImg" }[state.provider]);
+  const rows = state.provider === "none" ? [["fImg", "fMac", "fYou"], ["fText", "fNone", "fNotMade"]]
+    : state.provider === "ocr" ? [["fImg", "fMac", "fYou"], ["fText", "fMac", "fYouWriter"]] : [["fImg", "fMac", "fYouClaude"], ["fText", "fNone", "fNotMade"]];
+  $("flowBody").replaceChildren(...rows.map((r) => el("tr", {}, r.map((k) => el("td", {}, t(k))))));
+}
+$("setTpl").addEventListener("change", (e) => { state.defTpl = e.target.value; renderTemplates(); });
+$("setShot").addEventListener("change", (e) => { state.shotsOff = !e.target.checked; renderPill(); });
+
+/* ---------- segments, i18n, router ---------- */
+function syncSeg(id, v) { document.querySelectorAll(`#${id} button`).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
+function seg(id, fn) { document.querySelectorAll(`#${id} button`).forEach((b) => b.addEventListener("click", () => { syncSeg(id, b.dataset.v); fn(b.dataset.v); })); }
+seg("langSeg", (v) => { state.lang = v; document.documentElement.lang = v; ["pillStatus", "permStatus", "recStatus", "noteStatus", "tplStatus"].forEach((id) => { $(id).textContent = ""; }); renderAll(); });
+seg("themeSeg", (v) => { state.theme = v; document.body.classList.toggle("dark", v === "dark"); });
+seg("motionSeg", (v) => { state.reduce = v === "on"; document.body.classList.toggle("reduce", state.reduce); });
+seg("permSeg", (v) => { state.perm = v; state.pill = "idle"; renderPill(); });
+seg("placeSeg", (v) => { state.place = v; renderNote(); });
+seg("emptySeg", (v) => { state.empty = v; renderNote(); });
+seg("provSeg", (v) => { state.provider = v; renderSettings(); renderPermission(); renderNote(); });
+$("tNoWin").addEventListener("click", () => { if (state.perm !== "granted") { state.perm = "granted"; syncSeg("permSeg", "granted"); } state.pill = "noWin"; renderPill(); say("pillStatus", t("noWin")); });
+$("tFail").addEventListener("click", () => { if (state.perm !== "granted") { state.perm = "granted"; syncSeg("permSeg", "granted"); } state.pill = "failed"; renderPill(); say("pillStatus", t("failLine")); });
+$("tHover").addEventListener("click", (e) => { state.hover = !state.hover; e.currentTarget.setAttribute("aria-pressed", String(state.hover)); renderPill(); });
+$("reset").addEventListener("click", () => {
+  clearTimeout(state.undoTimer); resetState();
+  ["permSeg:unknown", "placeSeg:mine", "emptySeg:hide", "provSeg:none"].forEach((x) => { const [a, b] = x.split(":"); syncSeg(a, b); });
+  $("tHover").setAttribute("aria-pressed", "false"); $("sysdlg").hidden = true; $("padInput").value = "";
+  ["pillStatus", "permStatus", "recStatus", "noteStatus", "tplStatus"].forEach((id) => { $(id).textContent = ""; });
+  renderAll(); if (location.hash !== "#pill") location.hash = "#pill"; else show("pill"); announce(t("resetDone"));
+});
+function applyStrings() {
+  document.querySelectorAll("[data-t]").forEach((n) => { const k = n.dataset.t; const v = S[state.lang][k]; if (typeof v !== "string") return; const q = n.querySelector(".q"); n.textContent = v; if (q) n.append(" ", q); });
+  $("padInput").placeholder = t("padPh"); document.title = "Lintel: " + t("docTitle");
+}
+function renderAll() { applyStrings(); renderPill(); renderPermission(); fillTplSelect($("recTpl"), state.recTpl); renderPad(); renderNote(); renderTemplates(); if (currentScreen() === "editor") renderEditor(); renderSettings(); }
+const SCREENS = ["pill", "permission", "recording", "note", "templates", "editor", "settings"];
+function currentScreen() { const h = location.hash.slice(1); return SCREENS.includes(h) ? h : (h ? "notfound" : "pill"); }
+function show(id) {
+  document.querySelectorAll("section.screen").forEach((s) => s.classList.toggle("active", s.id === id));
+  document.querySelectorAll("#nav a").forEach((a) => (a.getAttribute("href") === "#" + id ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
+  if (id === "editor") renderEditor();
+  if (id === "recording") fillTplSelect($("recTpl"), state.recTpl);
+  const h = document.querySelector(`#${id} h2`); if (h) h.focus();
+}
+function go(id) { if (location.hash === "#" + id) show(id); else location.hash = "#" + id; }
+window.addEventListener("hashchange", () => show(currentScreen()));
+renderAll(); show(currentScreen());
+</script>
+</body>
+</html>
