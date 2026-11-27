@@ -676,8 +676,9 @@ final class ControllerRelay {
 /// Whether the built-in formatting model is installed, as last read by the Settings model (the formatter is chosen
 /// synchronously when a dictation starts).
 final class BuiltInInstalledFlag: Sendable {
-    private let state = Mutex(true)
-    /// Starts as `true`: until the model's place is read, the built-in source behaves as before this flag existed.
+    private let state = Mutex(false)
+    /// Starts as `false`: until `activate()` reads the model's place, a provider source whose level the provider does
+    /// not serve falls back to the user's server (or raw), never to a built-in formatter that may have no model.
     var value: Bool { state.withLock { $0 } }
     func set(_ installed: Bool) { state.withLock { $0 = installed } }
 }
