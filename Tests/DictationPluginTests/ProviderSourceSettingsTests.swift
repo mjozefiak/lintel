@@ -155,8 +155,8 @@ import Testing
         #expect(!ProviderLevels.offered.contains(.light))
     }
 
-    @Test func theReleaseLimitsAreFourAndSixSecondsAndLocalSourcesHaveNone() {
-        #expect(ProviderLevels.releaseDeadline(for: .standard) == .seconds(4))
+    @Test func theReleaseLimitIsSixSecondsAtBothModelLevelsAndLocalSourcesHaveNone() {
+        #expect(ProviderLevels.releaseDeadline(for: .standard) == .seconds(6))
         #expect(ProviderLevels.releaseDeadline(for: .full) == .seconds(6))
         #expect(ProviderLevels.releaseDeadline(for: .light) == nil)
     }
@@ -176,7 +176,7 @@ import Testing
     }
 
     @Test func aReleaseDeadlineOnlyForTheProviderAtAnOfferedLevel() {
-        #expect(DictationPlugin.releaseDeadline(settings: chosen(), builtInInstalled: true) == .seconds(4))
+        #expect(DictationPlugin.releaseDeadline(settings: chosen(), builtInInstalled: true) == .seconds(6))
         #expect(
             DictationPlugin.releaseDeadline(
                 settings: settings([

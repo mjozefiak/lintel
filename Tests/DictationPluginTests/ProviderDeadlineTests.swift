@@ -1,4 +1,5 @@
 import Foundation
+import LintelKit
 import LintelSpeech
 import LintelTestSupport
 import Synchronization
@@ -109,6 +110,39 @@ import Testing
         #expect(output.text.hasPrefix(first.prefix(1).uppercased() + first.dropFirst() + "."))
         #expect(output.text.hasSuffix(second))
         // The late request's process was cancelled, not left running.
+        #expect(rig.process.cancelledRuns == 1)
+    }
+
+    /// Owner decision 2026-11-27: Standard on the provider waits 6 s from the key release (it was 4 s), so its measured
+    /// worst case (5.76 s) comes back tidied.
+    @Test func standardOnTheProviderWaitsSixSecondsFromTheKeyRelease() async throws {
+        let settings = DictationSettings(
+            PluginSettings(
+                pluginID: "dictation",
+                store: MemorySettingsStore([
+                    "plugins.dictation.mode": .string("cleanup"),
+                    "plugins.dictation.llmSource": .string("provider"),
+                    "plugins.dictation.provider": .string("claude-code"),
+                ])))
+        let deadline = try #require(DictationPlugin.releaseDeadline(settings: settings, builtInInstalled: true))
+        let rig = rig(deadline: deadline) { _, _ in
+            try await Task.sleep(for: .seconds(60))
+            return FakeProviderProcess.output(answer: "never")
+        }
+        try await rig.session.start()
+        try await waitUntilTheFirstChunkIsOut(rig.process)
+        let finishing = Task { try await rig.session.finish() }
+        try await waitUntilTheSecondChunkIsOut(rig)
+        // Five seconds after the key release the late chunk is still waited for ...
+        rig.clock.advance(by: .seconds(5))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(rig.process.cancelledRuns == 0)
+        // ... and at six it is pasted as spoken.
+        rig.clock.advance(by: .seconds(1))
+        let output = try await finishing.value
+        #expect(output.formatting.fellBack == 1)
+        #expect(output.formatting.isPartial)
+        #expect(output.formatting.notableReason == .tooSlow)
         #expect(rig.process.cancelledRuns == 1)
     }
 
