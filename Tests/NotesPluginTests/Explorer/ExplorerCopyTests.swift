@@ -21,6 +21,8 @@ struct ExplorerCopyTests {
         return url.appending(path: "Resources/Localizable.xcstrings")
     }()
 
+    private static let prefixes = ["Explorer", "Preview", "Sidebar and list", "My notes", "Full window"]
+
     private static func entries() throws -> [Entry] {
         let data = try Data(contentsOf: catalogURL)
         let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -28,9 +30,7 @@ struct ExplorerCopyTests {
         var result: [Entry] = []
         for (key, value) in strings {
             let comment = value["comment"] as? String ?? ""
-            guard
-                ["Explorer", "Preview", "Sidebar and list", "My notes", "Full window"].contains(where: comment.hasPrefix)
-            else { continue }
+            guard Self.prefixes.contains(where: comment.hasPrefix) else { continue }
             // The older state lines (`NoteRowPresentation.stateText`) are not new copy: the explorer's rows say their
             // own words (`ExplorerRowText.state`), which this test does cover.
             if comment.hasPrefix("Explorer: state line") { continue }
