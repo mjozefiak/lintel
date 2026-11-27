@@ -57,10 +57,11 @@ enum FormatterGuard {
     }
 
     /// - Parameters:
+    ///   - level: `.full` adds the invented greeting/sign-off check, the lost-number check and the wider plain length
+    ///     range; every other level is Standard's check unchanged. Light has no model and never calls this.
     ///   - vocabulary: the user's vocabulary terms and spoken variants; one the transcript holds must stay in the output.
-    ///   - checksTerms: Standard and Full only (Light never calls this); a chunk with a self-correction signal is exempt.
-    /// - Parameter level: `.full` adds the invented greeting/sign-off check, the lost-number check and the wider plain
-    ///   length range; every other level is Standard's check unchanged. Light has no model and never calls this.
+    ///   - checksTerms: whether the term check runs (`TermCheck`); its default is the shipped `checksTerms` switch, and
+    ///     Standard and Full only reach here. A chunk with a self-correction signal is exempt.
     static func check(
         input: String, output rawOutput: String, level: DictationSettings.CleanupLevel,
         vocabulary: [String] = [], checksTerms: Bool = FormatterGuard.checksTerms

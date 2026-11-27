@@ -9,8 +9,9 @@ import Testing
 /// `BuiltInFormatter` over a real GGUF → `CleanupPrompt` → `FormatterGuard`, chunks joined as
 /// `DictationSession.assembleChunks` does) and writes the same format back, so the benchmark scorer reads it
 /// like an app's result. `LINTEL_DICTATION_EVAL_LEVEL=light` runs `LightCleaner` alone (no model, so
-/// `LINTEL_DICTATION_EVAL_MODEL` is not needed; `LINTEL_DICTATION_EVAL_VOCAB` names a JSON array of vocabulary words for the term check); the default, `standard`, and `full` are the model path above, with
-/// the level's prompt and guard limits. Off by default;
+/// `LINTEL_DICTATION_EVAL_MODEL` is not needed); the default, `standard`, and `full` are the model path above, with
+/// the level's prompt and guard limits (`LINTEL_DICTATION_EVAL_VOCAB` names a JSON array of vocabulary words for the
+/// term check). Off by default;
 /// `LINTEL_DICTATION_EVAL_INPUT` turns it on. Never prints text.
 @Suite struct DictationEvalTests {
     struct Line: Codable {
